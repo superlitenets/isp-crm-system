@@ -77,6 +77,50 @@ if ($page === 'landing' || $isHomepage) {
     exit;
 }
 
+if ($page === 'mpesa_callback') {
+    header('Content-Type: application/json');
+    
+    $callbackType = $_GET['type'] ?? '';
+    $rawInput = file_get_contents('php://input');
+    $data = json_decode($rawInput, true);
+    
+    file_put_contents(__DIR__ . '/../logs/mpesa_' . date('Y-m-d') . '.log', 
+        date('Y-m-d H:i:s') . " [{$callbackType}]: " . $rawInput . "\n", 
+        FILE_APPEND);
+    
+    try {
+        $mpesa = new \App\Mpesa();
+        
+        switch ($callbackType) {
+            case 'stkpush':
+                if ($data) {
+                    $mpesa->handleStkCallback($data);
+                }
+                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+                break;
+                
+            case 'validation':
+                $response = $mpesa->handleC2BValidation($data ?? []);
+                echo json_encode($response);
+                break;
+                
+            case 'confirmation':
+                if ($data) {
+                    $mpesa->handleC2BConfirmation($data);
+                }
+                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);
+                break;
+                
+            default:
+                echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Unknown callback type']);
+        }
+    } catch (Exception $e) {
+        error_log("M-Pesa callback error: " . $e->getMessage());
+        echo json_encode(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback']);
+    }
+    exit;
+}
+
 if ($page === 'login') {
     $loginError = '';
     $csrfToken = \App\Auth::generateToken();
@@ -643,6 +687,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_mpesa_settings':
+                try {
+                    $mpesa = new \App\Mpesa();
+                    $mpesa->saveConfig('mpesa_environment', $_POST['mpesa_environment'] ?? 'sandbox');
+                    $mpesa->saveConfig('mpesa_shortcode', $_POST['mpesa_shortcode'] ?? '');
+                    $mpesa->saveConfig('mpesa_consumer_key', $_POST['mpesa_consumer_key'] ?? '');
+                    $mpesa->saveConfig('mpesa_consumer_secret', $_POST['mpesa_consumer_secret'] ?? '');
+                    $mpesa->saveConfig('mpesa_passkey', $_POST['mpesa_passkey'] ?? '');
+                    $mpesa->saveConfig('mpesa_callback_url', $_POST['mpesa_callback_url'] ?? '');
+                    $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '');
+                    $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '');
+                    $message = 'M-Pesa settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving M-Pesa settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_template':
                 $name = trim($_POST['name'] ?? '');
                 $content = trim($_POST['content'] ?? '');
@@ -1190,6 +1254,113 @@ if ($page === 'inventory' && isset($_GET['action'])) {
     }
 }
 
+// Handle M-Pesa payments
+if ($page === 'payments' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $mpesa = new \App\Mpesa();
+    $tab = $_GET['tab'] ?? 'stkpush';
+    $paymentAction = $_GET['action'] ?? '';
+    
+    $csrfValid = \App\Auth::validateToken($_POST['csrf_token'] ?? '');
+    if (!$csrfValid) {
+        $_SESSION['error_message'] = 'Invalid request. Please try again.';
+    } else {
+        try {
+            if ($tab === 'stkpush' && $paymentAction === 'send') {
+                $phone = $_POST['phone'] ?? '';
+                $amount = (float)($_POST['amount'] ?? 0);
+                $accountRef = $_POST['account_ref'] ?? '';
+                $description = $_POST['description'] ?? 'Payment';
+                $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                
+                if (empty($phone) || $amount <= 0 || empty($accountRef)) {
+                    $_SESSION['error_message'] = 'Phone number, amount, and account reference are required.';
+                } else {
+                    $result = $mpesa->stkPush($phone, $amount, $accountRef, $description, $customerId);
+                    if ($result['success']) {
+                        $_SESSION['success_message'] = $result['message'];
+                    } else {
+                        $_SESSION['error_message'] = $result['message'];
+                    }
+                }
+                \App\Auth::regenerateToken();
+            } elseif ($tab === 'c2b' && $paymentAction === 'register_urls') {
+                $result = $mpesa->registerC2BUrls();
+                if ($result['success']) {
+                    $_SESSION['success_message'] = 'C2B URLs registered successfully!';
+                } else {
+                    $_SESSION['error_message'] = 'Failed to register C2B URLs: ' . $result['message'];
+                }
+                \App\Auth::regenerateToken();
+            }
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
+    header('Location: ?page=payments&tab=' . $tab);
+    exit;
+}
+
+// Handle M-Pesa GET actions (query status)
+if ($page === 'payments' && isset($_GET['action'])) {
+    $mpesa = new \App\Mpesa();
+    $paymentAction = $_GET['action'];
+    $tab = $_GET['tab'] ?? 'stkpush';
+    
+    if ($paymentAction === 'query' && isset($_GET['id'])) {
+        $result = $mpesa->stkQuery($_GET['id']);
+        if (isset($result['ResultCode']) && $result['ResultCode'] === '0') {
+            $_SESSION['success_message'] = 'Transaction completed successfully!';
+        } elseif (isset($result['ResultCode'])) {
+            $_SESSION['error_message'] = 'Transaction status: ' . ($result['ResultDesc'] ?? 'Unknown');
+        } else {
+            $_SESSION['error_message'] = 'Could not query transaction status.';
+        }
+        header('Location: ?page=payments&tab=' . $tab);
+        exit;
+    } elseif ($paymentAction === 'export') {
+        $transactions = $mpesa->getTransactions([
+            'date_from' => $_GET['date_from'] ?? date('Y-m-01'),
+            'date_to' => $_GET['date_to'] ?? date('Y-m-d'),
+            'limit' => 10000
+        ]);
+        
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('M-Pesa Transactions');
+        
+        $headers = ['Date', 'Phone', 'Amount', 'Receipt', 'Account Ref', 'Customer', 'Status', 'Description'];
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue([$col + 1, 1], $header);
+        }
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        
+        $row = 2;
+        foreach ($transactions as $tx) {
+            $sheet->setCellValue([1, $row], $tx['created_at']);
+            $sheet->setCellValue([2, $row], $tx['phone_number'] ?? '');
+            $sheet->setCellValue([3, $row], $tx['amount'] ?? 0);
+            $sheet->setCellValue([4, $row], $tx['mpesa_receipt_number'] ?? '');
+            $sheet->setCellValue([5, $row], $tx['account_reference'] ?? '');
+            $sheet->setCellValue([6, $row], $tx['customer_name'] ?? '');
+            $sheet->setCellValue([7, $row], $tx['status'] ?? '');
+            $sheet->setCellValue([8, $row], $tx['result_desc'] ?? '');
+            $row++;
+        }
+        
+        foreach (range('A', 'H') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        
+        $filename = 'mpesa_transactions_' . date('Y-m-d_His') . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+}
+
 $search = $_GET['search'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
 $priorityFilter = $_GET['priority'] ?? '';
@@ -1342,6 +1513,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments">
+                    <i class="bi bi-phone"></i> M-Pesa
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -1386,6 +1562,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'inventory':
                 include __DIR__ . '/../templates/inventory.php';
+                break;
+            case 'payments':
+                include __DIR__ . '/../templates/payments.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();

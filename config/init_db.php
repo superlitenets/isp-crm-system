@@ -435,6 +435,57 @@ function runMigrations(PDO $db): void {
                 icon VARCHAR(50) DEFAULT 'wifi',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'mpesa_transactions' => "
+            CREATE TABLE IF NOT EXISTS mpesa_transactions (
+                id SERIAL PRIMARY KEY,
+                transaction_type VARCHAR(20) NOT NULL,
+                merchant_request_id VARCHAR(100),
+                checkout_request_id VARCHAR(100),
+                result_code INTEGER,
+                result_desc TEXT,
+                mpesa_receipt_number VARCHAR(50),
+                transaction_date TIMESTAMP,
+                phone_number VARCHAR(20),
+                amount DECIMAL(12, 2),
+                account_reference VARCHAR(100),
+                transaction_desc TEXT,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                invoice_id INTEGER,
+                status VARCHAR(20) DEFAULT 'pending',
+                raw_callback JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'mpesa_c2b_transactions' => "
+            CREATE TABLE IF NOT EXISTS mpesa_c2b_transactions (
+                id SERIAL PRIMARY KEY,
+                transaction_type VARCHAR(20),
+                trans_id VARCHAR(50) UNIQUE,
+                trans_time TIMESTAMP,
+                trans_amount DECIMAL(12, 2),
+                business_short_code VARCHAR(20),
+                bill_ref_number VARCHAR(100),
+                invoice_number VARCHAR(100),
+                org_account_balance DECIMAL(12, 2),
+                third_party_trans_id VARCHAR(100),
+                msisdn VARCHAR(20),
+                first_name VARCHAR(100),
+                middle_name VARCHAR(100),
+                last_name VARCHAR(100),
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'received',
+                raw_data JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'mpesa_config' => "
+            CREATE TABLE IF NOT EXISTS mpesa_config (
+                id SERIAL PRIMARY KEY,
+                config_key VARCHAR(50) UNIQUE NOT NULL,
+                config_value TEXT,
+                is_encrypted BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

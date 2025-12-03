@@ -89,6 +89,13 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Package cards with features, pricing, and badges
   - Contact section with company details
   - Accessible at `/` without login
+- **M-Pesa Integration**: Complete mobile money integration:
+  - **STK Push**: Send payment prompts directly to customer phones
+  - **C2B Payments**: Receive payments when customers pay to your Paybill
+  - **Payment Reports**: Track all transactions with filtering and export
+  - Real-time callback processing for payment status updates
+  - Auto-link payments to customers by phone or account number
+  - Sandbox mode for testing before going live
 
 ## Database Schema
 - **users**: Staff members (technicians, admins)
@@ -115,6 +122,9 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **equipment_assignments**: Equipment assigned to employees
 - **equipment_loans**: Equipment loaned to customers
 - **equipment_faults**: Fault reports and repair tracking
+- **mpesa_transactions**: STK Push payment transactions
+- **mpesa_c2b_transactions**: C2B payment transactions from customers
+- **mpesa_config**: M-Pesa API configuration settings
 
 ## Authentication
 The system includes built-in authentication:
@@ -219,6 +229,7 @@ Available placeholders for ticket templates:
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added M-Pesa integration (STK Push, C2B, payment reports)
 - December 2024: Added Inventory Management module for equipment tracking
 - December 2024: Equipment assignment to employees and loans to customers
 - December 2024: Fault reporting and repair tracking for equipment

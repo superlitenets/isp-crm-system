@@ -71,6 +71,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-globe"></i> Landing Page
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'mpesa' ? 'active' : '' ?>" href="?page=settings&subpage=mpesa">
+            <i class="bi bi-phone"></i> M-Pesa
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -1796,5 +1801,174 @@ function copyLandingUrl() {
     alert('URL copied to clipboard!');
 }
 </script>
+
+<?php elseif ($subpage === 'mpesa'): ?>
+<?php
+$mpesa = new \App\Mpesa();
+$mpesaConfig = $mpesa->getConfig();
+?>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_mpesa_settings">
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa Daraja API Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Get your credentials from 
+                        <a href="https://developer.safaricom.co.ke/" target="_blank">Safaricom Daraja Portal</a>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="bi bi-shield-lock"></i> <strong>Security Tip:</strong> 
+                        For production, use environment variables (MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_PASSKEY, MPESA_SHORTCODE) instead of storing credentials here.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Environment</label>
+                            <select class="form-select" name="mpesa_environment">
+                                <option value="sandbox" <?= ($mpesaConfig['mpesa_environment'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox (Testing)</option>
+                                <option value="production" <?= ($mpesaConfig['mpesa_environment'] ?? '') === 'production' ? 'selected' : '' ?>>Production (Live)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Business Shortcode (Paybill/Till)</label>
+                            <input type="text" class="form-control" name="mpesa_shortcode" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '174379') ?>"
+                                   placeholder="174379">
+                            <div class="form-text">Use 174379 for sandbox testing</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Consumer Key *</label>
+                            <input type="text" class="form-control" name="mpesa_consumer_key" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>"
+                                   placeholder="Your Consumer Key">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Consumer Secret *</label>
+                            <input type="password" class="form-control" name="mpesa_consumer_secret" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>"
+                                   placeholder="Your Consumer Secret">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Passkey</label>
+                        <input type="text" class="form-control" name="mpesa_passkey" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919') ?>"
+                               placeholder="Lipa na M-Pesa Passkey">
+                        <div class="form-text">Sandbox passkey is pre-filled. Get production passkey from Safaricom after going live.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Callback URLs</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">These URLs receive payment notifications from M-Pesa. They are auto-generated but can be customized.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">STK Push Callback URL</label>
+                        <input type="url" class="form-control" name="mpesa_callback_url" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">C2B Validation URL</label>
+                            <input type="url" class="form-control" name="mpesa_validation_url" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">C2B Confirmation URL</label>
+                            <input type="url" class="form-control" name="mpesa_confirmation_url" 
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save M-Pesa Settings
+                </button>
+                <a href="?page=payments" class="btn btn-outline-success">
+                    <i class="bi bi-arrow-right"></i> Go to Payments
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Connection Status</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($mpesa->isConfigured()): ?>
+                    <?php 
+                    $token = $mpesa->getAccessToken();
+                    if ($token): 
+                    ?>
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle"></i> <strong>Connected!</strong><br>
+                        <small>Successfully authenticated with M-Pesa API</small>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-x-circle"></i> <strong>Connection Failed</strong><br>
+                        <small>Check your Consumer Key and Secret</small>
+                    </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>Not Configured</strong><br>
+                    <small>Enter your API credentials to enable M-Pesa</small>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-book"></i> Quick Guide</h5>
+            </div>
+            <div class="card-body small">
+                <ol class="mb-0">
+                    <li class="mb-2">Register at <a href="https://developer.safaricom.co.ke/" target="_blank">Daraja Portal</a></li>
+                    <li class="mb-2">Create a new app and select "Lipa na M-Pesa Sandbox"</li>
+                    <li class="mb-2">Copy Consumer Key and Secret here</li>
+                    <li class="mb-2">Test with sandbox phone: <code>254708374149</code></li>
+                    <li class="mb-2">For production, apply for "Go Live" on Daraja</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-bug"></i> Test Credentials</h5>
+            </div>
+            <div class="card-body small">
+                <p class="text-muted mb-2">Sandbox test values:</p>
+                <ul class="mb-0">
+                    <li>Shortcode: <code>174379</code></li>
+                    <li>Phone: <code>254708374149</code></li>
+                    <li>Passkey: <code>bfb279...1ed2c919</code> (pre-filled)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php endif; ?>
