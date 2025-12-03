@@ -1628,6 +1628,8 @@ $defaultCommission = $salespersonModel->getDefaultCommission();
 
 <?php endif; ?>
 
+<?php endif; ?>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const userSelect = document.getElementById('userAccountSelect');
