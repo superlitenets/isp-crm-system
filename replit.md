@@ -14,6 +14,7 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── Customer.php      # Customer model and operations
 │   ├── Ticket.php        # Ticket model and operations
 │   ├── Employee.php      # HR/Employee management
+│   ├── Inventory.php     # Inventory/equipment management
 │   ├── SMS.php           # Twilio SMS integration
 │   ├── SMSGateway.php    # Custom SMS gateway integration
 │   ├── Settings.php      # Company settings and ticket templates
@@ -30,6 +31,7 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── customers.php     # Customer management views
 │   ├── tickets.php       # Ticket management views
 │   ├── hr.php            # Human Resources module
+│   ├── inventory.php     # Inventory management module
 │   └── settings.php      # Settings (company, SMS, templates)
 ├── public/
 │   └── index.php         # Main application entry point
@@ -58,6 +60,14 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Tiered deduction rules (e.g., 1-15 min = $5, 16-30 min = $10)
   - Department-specific or company-wide rules
   - Automatic payroll integration
+- **Inventory Management**: Complete equipment tracking system:
+  - Equipment categories (routers, modems, switches, cables, etc.)
+  - Track serial numbers, MAC addresses, purchase details
+  - Assign equipment to employees with full history
+  - Loan equipment to customers with deposit tracking
+  - Fault reporting and repair tracking
+  - Equipment condition and status monitoring
+  - Full equipment history and audit trail
 - **Settings Module**: Comprehensive configuration including:
   - Company settings (name, contact info, branding)
   - SMS gateway configuration (supports any POST/GET API)
@@ -95,6 +105,11 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **device_user_mapping**: Maps device user IDs to employees
 - **late_rules**: Late arrival deduction rules configuration
 - **service_packages**: ISP service plans displayed on landing page
+- **equipment_categories**: Equipment category definitions
+- **equipment**: Inventory items with serial numbers, MAC addresses
+- **equipment_assignments**: Equipment assigned to employees
+- **equipment_loans**: Equipment loaned to customers
+- **equipment_faults**: Fault reports and repair tracking
 
 ## Authentication
 The system includes built-in authentication:
@@ -199,6 +214,9 @@ Available placeholders for ticket templates:
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added Inventory Management module for equipment tracking
+- December 2024: Equipment assignment to employees and loans to customers
+- December 2024: Fault reporting and repair tracking for equipment
 - December 2024: Added public landing page with dynamic service packages
 - December 2024: Added package management in Settings (Service Packages tab)
 - December 2024: Added landing page customization in Settings (Landing Page tab)

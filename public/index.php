@@ -979,6 +979,16 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=equipment');
                         exit;
+                    } elseif ($inventoryAction === 'delete') {
+                        if (!\App\Auth::isAdmin()) {
+                            $_SESSION['error_message'] = 'Only administrators can delete equipment.';
+                        } else {
+                            $inventory->deleteEquipment((int)$_POST['id']);
+                            $_SESSION['success_message'] = 'Equipment deleted successfully!';
+                            \App\Auth::regenerateToken();
+                        }
+                        header('Location: ?page=inventory&tab=equipment');
+                        exit;
                     }
                     break;
                     
@@ -999,9 +1009,13 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         header('Location: ?page=inventory&tab=categories');
                         exit;
                     } elseif ($inventoryAction === 'delete') {
-                        $inventory->deleteCategory((int)$_POST['id']);
-                        $_SESSION['success_message'] = 'Category deleted successfully!';
-                        \App\Auth::regenerateToken();
+                        if (!\App\Auth::isAdmin()) {
+                            $_SESSION['error_message'] = 'Only administrators can delete categories.';
+                        } else {
+                            $inventory->deleteCategory((int)$_POST['id']);
+                            $_SESSION['success_message'] = 'Category deleted successfully!';
+                            \App\Auth::regenerateToken();
+                        }
                         header('Location: ?page=inventory&tab=categories');
                         exit;
                     }
