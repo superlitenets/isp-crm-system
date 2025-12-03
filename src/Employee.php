@@ -5,8 +5,25 @@ namespace App;
 class Employee {
     private \PDO $db;
 
-    public function __construct() {
-        $this->db = \Database::getConnection();
+    public function __construct(?\PDO $db = null) {
+        $this->db = $db ?? \Database::getConnection();
+    }
+    
+    public function getEmployees(): array {
+        $stmt = $this->db->query("
+            SELECT e.*, d.name as department_name,
+                   SPLIT_PART(e.name, ' ', 1) as first_name,
+                   CASE 
+                       WHEN POSITION(' ' IN e.name) > 0 
+                       THEN SUBSTRING(e.name FROM POSITION(' ' IN e.name) + 1)
+                       ELSE ''
+                   END as last_name
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            WHERE e.employment_status = 'active'
+            ORDER BY e.name ASC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     public function generateEmployeeId(): string {

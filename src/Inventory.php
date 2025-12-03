@@ -158,7 +158,14 @@ class Inventory {
     
     public function getAssignments(array $filters = []): array {
         $sql = "SELECT a.*, e.name as equipment_name, e.serial_number, e.brand, e.model,
-                       emp.first_name, emp.last_name, u.name as assigned_by_name
+                       SPLIT_PART(emp.name, ' ', 1) as first_name,
+                       CASE 
+                           WHEN POSITION(' ' IN emp.name) > 0 
+                           THEN SUBSTRING(emp.name FROM POSITION(' ' IN emp.name) + 1)
+                           ELSE ''
+                       END as last_name,
+                       emp.name as employee_name,
+                       u.name as assigned_by_name
                 FROM equipment_assignments a
                 JOIN equipment e ON a.equipment_id = e.id
                 JOIN employees emp ON a.employee_id = emp.id
@@ -188,7 +195,13 @@ class Inventory {
     public function getAssignment(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT a.*, e.name as equipment_name, e.serial_number,
-                   emp.first_name, emp.last_name
+                   SPLIT_PART(emp.name, ' ', 1) as first_name,
+                   CASE 
+                       WHEN POSITION(' ' IN emp.name) > 0 
+                       THEN SUBSTRING(emp.name FROM POSITION(' ' IN emp.name) + 1)
+                       ELSE ''
+                   END as last_name,
+                   emp.name as employee_name
             FROM equipment_assignments a
             JOIN equipment e ON a.equipment_id = e.id
             JOIN employees emp ON a.employee_id = emp.id
