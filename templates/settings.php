@@ -933,24 +933,22 @@ if ($action === 'sync_device' && $id) {
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="?page=settings&subpage=biometric&action=test_device&id=<?= $device['id'] ?>" 
-                                           class="btn btn-outline-info" title="Test Connection">
-                                            <i class="bi bi-plug"></i>
-                                        </a>
-                                        <a href="?page=settings&subpage=biometric&action=sync_device&id=<?= $device['id'] ?>" 
-                                           class="btn btn-outline-success" title="Sync Now">
-                                            <i class="bi bi-arrow-repeat"></i>
-                                        </a>
-                                        <a href="?page=settings&subpage=biometric&action=map_users&id=<?= $device['id'] ?>" 
-                                           class="btn btn-outline-primary" title="Map Users">
-                                            <i class="bi bi-people"></i>
-                                        </a>
                                         <button type="button" class="btn btn-outline-info test-connection-btn" 
                                                 data-device-id="<?= $device['id'] ?>" 
                                                 data-device-name="<?= htmlspecialchars($device['name']) ?>"
                                                 title="Test Connection">
                                             <i class="bi bi-plug"></i>
                                         </button>
+                                        <button type="button" class="btn btn-outline-success sync-device-btn" 
+                                                data-device-id="<?= $device['id'] ?>" 
+                                                data-device-name="<?= htmlspecialchars($device['name']) ?>"
+                                                title="Sync Now">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                        <a href="?page=settings&subpage=biometric&action=map_users&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-primary" title="Map Users">
+                                            <i class="bi bi-people"></i>
+                                        </a>
                                         <a href="?page=settings&subpage=biometric&action=edit_device&id=<?= $device['id'] ?>" 
                                            class="btn btn-outline-secondary" title="Edit">
                                             <i class="bi bi-pencil"></i>
@@ -1224,6 +1222,56 @@ if ($action === 'sync_device' && $id) {
     </div>
 </div>
 
+<div class="modal fade" id="syncDeviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-repeat"></i> Sync Biometric Device</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="syncLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Syncing...</span>
+                    </div>
+                    <p class="mt-2 mb-0">Syncing attendance from <strong id="syncDeviceName"></strong>...</p>
+                    <p class="small text-muted">This may take a few minutes...</p>
+                </div>
+                <div id="syncResult" class="d-none">
+                    <div id="syncSuccess" class="d-none">
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle-fill"></i> Sync Completed!
+                        </div>
+                        <table class="table table-sm mb-0">
+                            <tr>
+                                <th width="50%">Records Synced</th>
+                                <td id="resultRecordsSynced">0</td>
+                            </tr>
+                            <tr>
+                                <th>Records Processed</th>
+                                <td id="resultRecordsProcessed">0</td>
+                            </tr>
+                            <tr>
+                                <th>Message</th>
+                                <td id="resultSyncMessage">-</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div id="syncFailed" class="d-none">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle-fill"></i> Sync Failed
+                            <p class="mb-0 mt-2 small" id="syncErrorMessage"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.querySelectorAll('.test-connection-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
@@ -1260,6 +1308,45 @@ document.querySelectorAll('.test-connection-btn').forEach(btn => {
             document.getElementById('testConnectionResult').classList.remove('d-none');
             document.getElementById('testFailed').classList.remove('d-none');
             document.getElementById('testErrorMessage').textContent = 'Network error: ' + error.message;
+        }
+    });
+});
+
+document.querySelectorAll('.sync-device-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const deviceId = this.dataset.deviceId;
+        const deviceName = this.dataset.deviceName;
+        
+        document.getElementById('syncDeviceName').textContent = deviceName;
+        document.getElementById('syncLoading').classList.remove('d-none');
+        document.getElementById('syncResult').classList.add('d-none');
+        document.getElementById('syncSuccess').classList.add('d-none');
+        document.getElementById('syncFailed').classList.add('d-none');
+        
+        const modal = new bootstrap.Modal(document.getElementById('syncDeviceModal'));
+        modal.show();
+        
+        try {
+            const response = await fetch(`?page=api&action=sync_biometric_device&device_id=${deviceId}`);
+            const result = await response.json();
+            
+            document.getElementById('syncLoading').classList.add('d-none');
+            document.getElementById('syncResult').classList.remove('d-none');
+            
+            if (result.success) {
+                document.getElementById('syncSuccess').classList.remove('d-none');
+                document.getElementById('resultRecordsSynced').textContent = result.records_synced || 0;
+                document.getElementById('resultRecordsProcessed').textContent = result.records_processed || 0;
+                document.getElementById('resultSyncMessage').textContent = result.message || 'Sync completed';
+            } else {
+                document.getElementById('syncFailed').classList.remove('d-none');
+                document.getElementById('syncErrorMessage').textContent = result.message || 'Unknown error';
+            }
+        } catch (error) {
+            document.getElementById('syncLoading').classList.add('d-none');
+            document.getElementById('syncResult').classList.remove('d-none');
+            document.getElementById('syncFailed').classList.remove('d-none');
+            document.getElementById('syncErrorMessage').textContent = 'Network error: ' + error.message;
         }
     });
 });
