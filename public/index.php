@@ -466,6 +466,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_sms_settings':
+                try {
+                    $settings->saveSMSSettings($_POST);
+                    $smsGateway = new \App\SMSGateway();
+                    $message = 'SMS settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving SMS settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_template':
                 $name = trim($_POST['name'] ?? '');
                 $content = trim($_POST['content'] ?? '');

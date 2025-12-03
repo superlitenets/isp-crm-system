@@ -4,19 +4,57 @@ namespace App;
 
 class Settings {
     private \PDO $db;
+    private string $encryptionKey;
 
     public function __construct() {
         $this->db = \Database::getConnection();
+        $this->encryptionKey = $this->getEncryptionKey();
+    }
+
+    private function getEncryptionKey(): string {
+        $key = getenv('SESSION_SECRET') ?: getenv('ENCRYPTION_KEY');
+        if (!$key) {
+            $key = 'isp-crm-default-key-change-in-production';
+        }
+        return hash('sha256', $key, true);
+    }
+
+    private function encrypt(string $plaintext): string {
+        if (empty($plaintext)) return '';
+        $iv = openssl_random_pseudo_bytes(16);
+        $encrypted = openssl_encrypt($plaintext, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
+        return base64_encode($iv . '::' . $encrypted);
+    }
+
+    private function decrypt(string $ciphertext): string {
+        if (empty($ciphertext)) return '';
+        $decoded = base64_decode($ciphertext);
+        if ($decoded === false || strpos($decoded, '::') === false) {
+            return $ciphertext;
+        }
+        list($iv, $encrypted) = explode('::', $decoded, 2);
+        $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
+        return $decrypted !== false ? $decrypted : $ciphertext;
     }
 
     public function get(string $key, $default = null) {
-        $stmt = $this->db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = ?");
+        $stmt = $this->db->prepare("SELECT setting_value, setting_type FROM company_settings WHERE setting_key = ?");
         $stmt->execute([$key]);
-        $result = $stmt->fetchColumn();
-        return $result !== false ? $result : $default;
+        $result = $stmt->fetch();
+        if ($result === false) {
+            return $default;
+        }
+        if ($result['setting_type'] === 'secret') {
+            return $this->decrypt($result['setting_value']);
+        }
+        return $result['setting_value'];
     }
 
     public function set(string $key, $value, string $type = 'text'): bool {
+        $storedValue = $value;
+        if ($type === 'secret' && !empty($value)) {
+            $storedValue = $this->encrypt($value);
+        }
         $stmt = $this->db->prepare("
             INSERT INTO company_settings (setting_key, setting_value, setting_type)
             VALUES (?, ?, ?)
@@ -25,7 +63,7 @@ class Settings {
                 setting_type = EXCLUDED.setting_type,
                 updated_at = CURRENT_TIMESTAMP
         ");
-        return $stmt->execute([$key, $value, $type]);
+        return $stmt->execute([$key, $storedValue, $type]);
     }
 
     public function getAll(): array {
@@ -210,6 +248,52 @@ class Settings {
         return [
             'H:i' => date('H:i') . ' (24-hour)',
             'h:i A' => date('h:i A') . ' (12-hour)'
+        ];
+    }
+
+    public function getSMSSettings(): array {
+        return [
+            'sms_provider' => $this->get('sms_provider', 'advanta'),
+            'advanta_api_key' => $this->get('advanta_api_key', ''),
+            'advanta_partner_id' => $this->get('advanta_partner_id', ''),
+            'advanta_shortcode' => $this->get('advanta_shortcode', ''),
+            'advanta_url' => $this->get('advanta_url', 'https://quicksms.advantasms.com/api/services/sendsms/'),
+            'twilio_account_sid' => $this->get('twilio_account_sid', ''),
+            'twilio_auth_token' => $this->get('twilio_auth_token', ''),
+            'twilio_phone_number' => $this->get('twilio_phone_number', ''),
+            'custom_sms_url' => $this->get('custom_sms_url', ''),
+            'custom_sms_api_key' => $this->get('custom_sms_api_key', ''),
+            'custom_sms_sender_id' => $this->get('custom_sms_sender_id', ''),
+        ];
+    }
+
+    public function saveSMSSettings(array $data): bool {
+        $fields = [
+            'sms_provider', 'advanta_api_key', 'advanta_partner_id', 'advanta_shortcode', 'advanta_url',
+            'twilio_account_sid', 'twilio_auth_token', 'twilio_phone_number',
+            'custom_sms_url', 'custom_sms_api_key', 'custom_sms_sender_id'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $this->set($field, $data[$field], 'secret');
+            }
+        }
+        return true;
+    }
+
+    public function getAdvantaConfig(): array {
+        $apiKey = getenv('ADVANTA_API_KEY') ?: $this->get('advanta_api_key', '');
+        $partnerId = getenv('ADVANTA_PARTNER_ID') ?: $this->get('advanta_partner_id', '');
+        $shortcode = getenv('ADVANTA_SHORTCODE') ?: $this->get('advanta_shortcode', '');
+        $url = getenv('ADVANTA_URL') ?: $this->get('advanta_url', 'https://quicksms.advantasms.com/api/services/sendsms/');
+        
+        return [
+            'api_key' => $apiKey,
+            'partner_id' => $partnerId,
+            'shortcode' => $shortcode,
+            'url' => $url,
+            'configured' => !empty($apiKey) && !empty($partnerId) && !empty($shortcode)
         ];
     }
 }

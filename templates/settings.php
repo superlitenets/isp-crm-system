@@ -194,8 +194,14 @@ document.getElementById('currencySelect').addEventListener('change', function() 
 
 <?php
 $testResult = null;
+$sendTestResult = null;
+$smsSettings = $settings->getSMSSettings();
+
 if (($_GET['action'] ?? '') === 'test') {
     $testResult = $smsGateway->testConnection();
+}
+if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
+    $sendTestResult = $smsGateway->send($_GET['phone'], 'Test message from ISP CRM System. If you received this, your SMS gateway is working!');
 }
 ?>
 
@@ -217,18 +223,33 @@ if (($_GET['action'] ?? '') === 'test') {
                 </div>
                 
                 <?php if ($gatewayInfo['status'] === 'Enabled'): ?>
-                <a href="?page=settings&subpage=sms&action=test" class="btn btn-outline-primary">
-                    <i class="bi bi-lightning"></i> Test Connection
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="?page=settings&subpage=sms&action=test" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-lightning"></i> Test Connection
+                    </a>
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#sendTestModal">
+                        <i class="bi bi-send"></i> Send Test SMS
+                    </button>
+                </div>
                 <?php endif; ?>
                 
                 <?php if ($testResult): ?>
-                <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> mt-3">
+                <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> mt-3 mb-0">
                     <?php if ($testResult['success']): ?>
                     <strong>Connection Successful!</strong><br>
                     Provider: <?= $testResult['gateway']['type'] ?>
                     <?php else: ?>
                     <strong>Connection Failed:</strong> <?= htmlspecialchars($testResult['error']) ?>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($sendTestResult): ?>
+                <div class="alert alert-<?= $sendTestResult['success'] ? 'success' : 'danger' ?> mt-3 mb-0">
+                    <?php if ($sendTestResult['success']): ?>
+                    <strong>Test SMS Sent!</strong> Check your phone.
+                    <?php else: ?>
+                    <strong>Failed:</strong> <?= htmlspecialchars($sendTestResult['error'] ?? 'Unknown error') ?>
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
@@ -284,112 +305,85 @@ if (($_GET['action'] ?? '') === 'test') {
         <h5 class="mb-0"><i class="bi bi-send-fill"></i> Advanta SMS Configuration</h5>
     </div>
     <div class="card-body">
-        <div class="alert alert-info">
-            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> How to Configure Advanta SMS</h6>
-            <p>Go to the <strong>Secrets</strong> tab in Replit and add these 4 values from your Advanta account:</p>
-        </div>
-        
-        <table class="table table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 200px;">Secret Name</th>
-                    <th>Description</th>
-                    <th>Where to Find</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code class="bg-light p-1">ADVANTA_API_KEY</code></td>
-                    <td>Your Advanta API Key</td>
-                    <td>Advanta Dashboard > API Settings</td>
-                </tr>
-                <tr>
-                    <td><code class="bg-light p-1">ADVANTA_PARTNER_ID</code></td>
-                    <td>Your Partner ID (numeric)</td>
-                    <td>Advanta Dashboard > Account Info</td>
-                </tr>
-                <tr>
-                    <td><code class="bg-light p-1">ADVANTA_SHORTCODE</code></td>
-                    <td>Sender ID (appears as sender name)</td>
-                    <td>Your registered Sender ID, e.g., "MyISP"</td>
-                </tr>
-                <tr>
-                    <td><code class="bg-light p-1">ADVANTA_URL</code></td>
-                    <td>API Endpoint (optional)</td>
-                    <td>Default: <code>https://quicksms.advantasms.com/api/services/sendsms/</code></td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <h6><i class="bi bi-1-circle"></i> Step 1: Get Credentials</h6>
-                        <p class="mb-0 small">Log in to <a href="https://quicksms.advantasms.com" target="_blank">quicksms.advantasms.com</a> and get your API Key, Partner ID, and Shortcode.</p>
-                    </div>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_sms_settings">
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">API Key <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="advanta_api_key" 
+                           value="<?= htmlspecialchars($smsSettings['advanta_api_key']) ?>" 
+                           placeholder="Enter your Advanta API Key">
+                    <small class="text-muted">Found in Advanta Dashboard > API Settings</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Partner ID <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="advanta_partner_id" 
+                           value="<?= htmlspecialchars($smsSettings['advanta_partner_id']) ?>" 
+                           placeholder="e.g., 12345">
+                    <small class="text-muted">Your numeric Partner ID</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Shortcode / Sender ID <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="advanta_shortcode" 
+                           value="<?= htmlspecialchars($smsSettings['advanta_shortcode']) ?>" 
+                           placeholder="e.g., MyISP">
+                    <small class="text-muted">This appears as the sender name on customer phones</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">API URL</label>
+                    <input type="url" class="form-control" name="advanta_url" 
+                           value="<?= htmlspecialchars($smsSettings['advanta_url'] ?: 'https://quicksms.advantasms.com/api/services/sendsms/') ?>" 
+                           placeholder="https://quicksms.advantasms.com/api/services/sendsms/">
+                    <small class="text-muted">Leave default unless you have a custom endpoint</small>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <h6><i class="bi bi-2-circle"></i> Step 2: Add Secrets</h6>
-                        <p class="mb-0 small">In Replit, go to <strong>Tools > Secrets</strong> and add each value with the exact names shown above.</p>
-                    </div>
-                </div>
+            
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save SMS Settings
+                </button>
             </div>
-        </div>
+        </form>
         
-        <div class="alert alert-success mt-4 mb-0">
-            <strong><i class="bi bi-check-circle"></i> That's it!</strong> Once all secrets are added, the system will automatically use Advanta SMS for notifications.
+        <hr class="my-4">
+        
+        <div class="alert alert-light border mb-0">
+            <h6><i class="bi bi-info-circle"></i> Where to get these details:</h6>
+            <ol class="mb-0 small">
+                <li>Log in to <a href="https://quicksms.advantasms.com" target="_blank">quicksms.advantasms.com</a></li>
+                <li>Go to <strong>API Settings</strong> to find your API Key</li>
+                <li>Your <strong>Partner ID</strong> is shown in your account profile</li>
+                <li>Your <strong>Shortcode</strong> is your registered Sender ID (alphanumeric)</li>
+            </ol>
         </div>
     </div>
 </div>
 
-<div class="card mt-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="bi bi-question-circle"></i> Alternative Providers</h5>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">If you don't use Advanta SMS, you can configure other providers:</p>
-        
-        <div class="accordion" id="altProviders">
-            <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#twilioConfig">
-                        Twilio SMS
-                    </button>
-                </h2>
-                <div id="twilioConfig" class="accordion-collapse collapse" data-bs-parent="#altProviders">
-                    <div class="accordion-body">
-                        <ul class="mb-0">
-                            <li><code>TWILIO_ACCOUNT_SID</code> - Your Twilio Account SID</li>
-                            <li><code>TWILIO_AUTH_TOKEN</code> - Your Twilio Auth Token</li>
-                            <li><code>TWILIO_PHONE_NUMBER</code> - Your Twilio phone number</li>
-                        </ul>
+<div class="modal fade" id="sendTestModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-send"></i> Send Test SMS</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET">
+                <div class="modal-body">
+                    <input type="hidden" name="page" value="settings">
+                    <input type="hidden" name="subpage" value="sms">
+                    <input type="hidden" name="action" value="send_test">
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" name="phone" placeholder="e.g., 254712345678" required>
+                        <small class="text-muted">Enter phone number in international format (e.g., 254712345678 for Kenya)</small>
                     </div>
                 </div>
-            </div>
-            <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#customConfig">
-                        Custom SMS API
-                    </button>
-                </h2>
-                <div id="customConfig" class="accordion-collapse collapse" data-bs-parent="#altProviders">
-                    <div class="accordion-body">
-                        <ul class="mb-0">
-                            <li><code>SMS_API_URL</code> - Your SMS gateway API endpoint</li>
-                            <li><code>SMS_API_KEY</code> - API key or authentication token</li>
-                            <li><code>SMS_SENDER_ID</code> - Sender ID</li>
-                            <li><code>SMS_API_METHOD</code> - POST or GET</li>
-                            <li><code>SMS_CONTENT_TYPE</code> - json or form</li>
-                            <li><code>SMS_PHONE_PARAM</code> - Parameter name for phone</li>
-                            <li><code>SMS_MESSAGE_PARAM</code> - Parameter name for message</li>
-                        </ul>
-                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-send"></i> Send Test</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>

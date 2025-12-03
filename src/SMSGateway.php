@@ -16,13 +16,16 @@ class SMSGateway {
     private string $senderParam = 'sender';
 
     public function __construct() {
-        $advantaApiKey = getenv('ADVANTA_API_KEY');
-        $advantaPartnerId = getenv('ADVANTA_PARTNER_ID');
-        $advantaShortcode = getenv('ADVANTA_SHORTCODE');
-        $advantaUrl = getenv('ADVANTA_URL') ?: 'https://quicksms.advantasms.com/api/services/sendsms/';
-
-        if ($advantaApiKey && $advantaPartnerId && $advantaShortcode) {
-            $this->setupAdvanta($advantaUrl, $advantaApiKey, $advantaPartnerId, $advantaShortcode);
+        $settings = new Settings();
+        $advantaConfig = $settings->getAdvantaConfig();
+        
+        if ($advantaConfig['configured']) {
+            $this->setupAdvanta(
+                $advantaConfig['url'],
+                $advantaConfig['api_key'],
+                $advantaConfig['partner_id'],
+                $advantaConfig['shortcode']
+            );
         } else {
             $this->apiUrl = getenv('SMS_API_URL') ?: null;
             $this->apiKey = getenv('SMS_API_KEY') ?: null;
@@ -38,12 +41,15 @@ class SMSGateway {
             }
         }
 
-        $twilioSid = getenv('TWILIO_ACCOUNT_SID');
-        $twilioToken = getenv('TWILIO_AUTH_TOKEN');
-        $twilioPhone = getenv('TWILIO_PHONE_NUMBER');
-        
-        if ($twilioSid && $twilioToken && $twilioPhone && !$this->enabled) {
-            $this->setupTwilio($twilioSid, $twilioToken, $twilioPhone);
+        if (!$this->enabled) {
+            $smsSettings = $settings->getSMSSettings();
+            $twilioSid = getenv('TWILIO_ACCOUNT_SID') ?: $smsSettings['twilio_account_sid'];
+            $twilioToken = getenv('TWILIO_AUTH_TOKEN') ?: $smsSettings['twilio_auth_token'];
+            $twilioPhone = getenv('TWILIO_PHONE_NUMBER') ?: $smsSettings['twilio_phone_number'];
+            
+            if ($twilioSid && $twilioToken && $twilioPhone) {
+                $this->setupTwilio($twilioSid, $twilioToken, $twilioPhone);
+            }
         }
     }
 
