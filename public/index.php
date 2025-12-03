@@ -1014,62 +1014,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'save_salesperson':
-                $salesperson = new \App\Salesperson($db);
-                $name = trim($_POST['name'] ?? '');
-                $phone = trim($_POST['phone'] ?? '');
-                if (empty($name) || empty($phone)) {
-                    $message = 'Salesperson name and phone are required.';
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can add salespeople.';
                     $messageType = 'danger';
                 } else {
-                    try {
-                        $spData = [
-                            'name' => $name,
-                            'email' => $_POST['email'] ?? null,
-                            'phone' => $phone,
-                            'commission_type' => $_POST['commission_type'] ?? 'percentage',
-                            'commission_value' => floatval($_POST['commission_value'] ?? 10),
-                            'is_active' => isset($_POST['is_active']) ? 1 : 0
-                        ];
-                        $salesperson->create($spData);
-                        $message = 'Salesperson added successfully!';
-                        $messageType = 'success';
-                        \App\Auth::regenerateToken();
-                        header('Location: ?page=sales&tab=salespersons');
-                        exit;
-                    } catch (Exception $e) {
-                        $message = 'Error adding salesperson: ' . $e->getMessage();
+                    $salesperson = new \App\Salesperson($db);
+                    $name = trim($_POST['name'] ?? '');
+                    $phone = trim($_POST['phone'] ?? '');
+                    $employeeId = !empty($_POST['employee_id']) ? (int)$_POST['employee_id'] : null;
+                    
+                    if (empty($name) || empty($phone)) {
+                        $message = 'Salesperson name and phone are required.';
                         $messageType = 'danger';
+                    } elseif ($employeeId !== null) {
+                        $empCheck = $db->prepare("SELECT id FROM employees WHERE id = ?");
+                        $empCheck->execute([$employeeId]);
+                        if (!$empCheck->fetch()) {
+                            $message = 'Invalid employee selected.';
+                            $messageType = 'danger';
+                            break;
+                        }
+                    }
+                    
+                    if (empty($message)) {
+                        try {
+                            $spData = [
+                                'name' => $name,
+                                'email' => $_POST['email'] ?? null,
+                                'phone' => $phone,
+                                'employee_id' => $employeeId,
+                                'commission_type' => $_POST['commission_type'] ?? 'percentage',
+                                'commission_value' => floatval($_POST['commission_value'] ?? 10),
+                                'is_active' => isset($_POST['is_active']) ? 1 : 0,
+                                'notes' => $_POST['notes'] ?? null
+                            ];
+                            $salesperson->create($spData);
+                            $message = 'Salesperson added successfully!';
+                            $messageType = 'success';
+                            \App\Auth::regenerateToken();
+                            header('Location: ?page=hr&subpage=salespeople');
+                            exit;
+                        } catch (Exception $e) {
+                            $message = 'Error adding salesperson: ' . $e->getMessage();
+                            $messageType = 'danger';
+                        }
                     }
                 }
                 break;
 
             case 'update_salesperson':
-                $salesperson = new \App\Salesperson($db);
-                $spId = (int)($_POST['salesperson_id'] ?? 0);
-                $name = trim($_POST['name'] ?? '');
-                $phone = trim($_POST['phone'] ?? '');
-                if (!$spId || empty($name) || empty($phone)) {
-                    $message = 'Salesperson ID, name and phone are required.';
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update salespeople.';
                     $messageType = 'danger';
                 } else {
-                    try {
-                        $spData = [
-                            'name' => $name,
-                            'email' => $_POST['email'] ?? null,
-                            'phone' => $phone,
-                            'commission_type' => $_POST['commission_type'] ?? 'percentage',
-                            'commission_value' => floatval($_POST['commission_value'] ?? 10),
-                            'is_active' => isset($_POST['is_active']) ? 1 : 0
-                        ];
-                        $salesperson->update($spId, $spData);
-                        $message = 'Salesperson updated successfully!';
-                        $messageType = 'success';
-                        \App\Auth::regenerateToken();
-                        header('Location: ?page=sales&tab=salespersons');
-                        exit;
-                    } catch (Exception $e) {
-                        $message = 'Error updating salesperson: ' . $e->getMessage();
+                    $salesperson = new \App\Salesperson($db);
+                    $spId = (int)($_POST['salesperson_id'] ?? 0);
+                    $name = trim($_POST['name'] ?? '');
+                    $phone = trim($_POST['phone'] ?? '');
+                    $employeeId = !empty($_POST['employee_id']) ? (int)$_POST['employee_id'] : null;
+                    
+                    if (!$spId || empty($name) || empty($phone)) {
+                        $message = 'Salesperson ID, name and phone are required.';
                         $messageType = 'danger';
+                    } elseif ($employeeId !== null) {
+                        $empCheck = $db->prepare("SELECT id FROM employees WHERE id = ?");
+                        $empCheck->execute([$employeeId]);
+                        if (!$empCheck->fetch()) {
+                            $message = 'Invalid employee selected.';
+                            $messageType = 'danger';
+                            break;
+                        }
+                    }
+                    
+                    if (empty($message)) {
+                        try {
+                            $spData = [
+                                'name' => $name,
+                                'email' => $_POST['email'] ?? null,
+                                'phone' => $phone,
+                                'employee_id' => $employeeId,
+                                'commission_type' => $_POST['commission_type'] ?? 'percentage',
+                                'commission_value' => floatval($_POST['commission_value'] ?? 10),
+                                'is_active' => isset($_POST['is_active']) ? 1 : 0,
+                                'notes' => $_POST['notes'] ?? null
+                            ];
+                            $salesperson->update($spId, $spData);
+                            $message = 'Salesperson updated successfully!';
+                            $messageType = 'success';
+                            \App\Auth::regenerateToken();
+                            header('Location: ?page=hr&subpage=salespeople');
+                            exit;
+                        } catch (Exception $e) {
+                            $message = 'Error updating salesperson: ' . $e->getMessage();
+                            $messageType = 'danger';
+                        }
                     }
                 }
                 break;
@@ -1123,6 +1161,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } catch (Exception $e) {
                     $message = 'Error marking commissions as paid: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_commission_settings':
+                try {
+                    $settings->saveSetting('default_commission_type', $_POST['default_commission_type'] ?? 'percentage');
+                    $settings->saveSetting('default_commission_value', $_POST['default_commission_value'] ?? '10');
+                    $settings->saveSetting('min_commission_order_amount', $_POST['min_commission_order_amount'] ?? '0');
+                    $settings->saveSetting('auto_mark_commission_paid', isset($_POST['auto_mark_commission_paid']) ? '1' : '0');
+                    \App\Settings::clearCache();
+                    $message = 'Commission settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving commission settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

@@ -76,6 +76,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-phone"></i> M-Pesa
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'sales' ? 'active' : '' ?>" href="?page=settings&subpage=sales">
+            <i class="bi bi-graph-up-arrow"></i> Commissions
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -1982,5 +1987,143 @@ $mpesaConfig = $mpesa->getConfig();
         </div>
     </div>
 </div>
+
+<?php elseif ($subpage === 'sales'): ?>
+<?php
+$commissionSettings = [
+    'default_commission_type' => $settings->getSetting('default_commission_type') ?? 'percentage',
+    'default_commission_value' => $settings->getSetting('default_commission_value') ?? '10',
+    'min_order_amount' => $settings->getSetting('min_commission_order_amount') ?? '0',
+    'auto_mark_paid' => $settings->getSetting('auto_mark_commission_paid') ?? '0'
+];
+?>
+
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-percent"></i> Commission Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_commission_settings">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Default Commission Type</label>
+                            <select name="default_commission_type" class="form-select" id="commissionType">
+                                <option value="percentage" <?= $commissionSettings['default_commission_type'] === 'percentage' ? 'selected' : '' ?>>
+                                    Percentage (%)
+                                </option>
+                                <option value="fixed" <?= $commissionSettings['default_commission_type'] === 'fixed' ? 'selected' : '' ?>>
+                                    Fixed Amount (KES)
+                                </option>
+                            </select>
+                            <small class="text-muted">Applied to new salespersons by default</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Default Commission Value</label>
+                            <div class="input-group">
+                                <span class="input-group-text" id="commissionPrefix">
+                                    <?= $commissionSettings['default_commission_type'] === 'percentage' ? '%' : 'KES' ?>
+                                </span>
+                                <input type="number" step="0.01" name="default_commission_value" class="form-control" 
+                                       value="<?= htmlspecialchars($commissionSettings['default_commission_value']) ?>">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Minimum Order Amount for Commission</label>
+                            <div class="input-group">
+                                <span class="input-group-text">KES</span>
+                                <input type="number" step="0.01" name="min_commission_order_amount" class="form-control" 
+                                       value="<?= htmlspecialchars($commissionSettings['min_order_amount']) ?>">
+                            </div>
+                            <small class="text-muted">Orders below this amount won't earn commission (0 = no minimum)</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Auto-mark Commission as Paid</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="auto_mark_commission_paid" id="autoMarkPaid"
+                                       <?= $commissionSettings['auto_mark_paid'] ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="autoMarkPaid">
+                                    Automatically mark commission as paid when order is paid
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Commissions</h5>
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Commissions are calculated when orders are created with a salesperson assigned.</p>
+                <ul class="mb-0">
+                    <li><strong>Percentage:</strong> Commission = Order Amount x Rate%</li>
+                    <li><strong>Fixed:</strong> Flat amount per order</li>
+                </ul>
+                <hr>
+                <p class="mb-0 text-muted">
+                    <i class="bi bi-lightbulb"></i> Individual salesperson commission rates can be set in HR &gt; Salespeople tab.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <?php
+                $salespersonModel = new \App\Salesperson($dbConn);
+                $allSalespersons = $salespersonModel->getAll();
+                $activeSp = array_filter($allSalespersons, fn($s) => $s['is_active']);
+                $totalPendingComm = 0;
+                $totalPaidComm = 0;
+                foreach ($allSalespersons as $sp) {
+                    $stats = $salespersonModel->getSalesStats($sp['id']);
+                    $totalPendingComm += $stats['pending_commission'] ?? 0;
+                    $totalPaidComm += $stats['paid_commission'] ?? 0;
+                }
+                ?>
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <h4 class="mb-0 text-primary"><?= count($activeSp) ?></h4>
+                        <small class="text-muted">Active Salespeople</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h4 class="mb-0 text-warning">KES <?= number_format($totalPendingComm, 0) ?></h4>
+                        <small class="text-muted">Pending Commission</small>
+                    </div>
+                    <div class="col-12">
+                        <h4 class="mb-0 text-success">KES <?= number_format($totalPaidComm, 0) ?></h4>
+                        <small class="text-muted">Total Paid Commission</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('commissionType').addEventListener('change', function() {
+    document.getElementById('commissionPrefix').textContent = this.value === 'percentage' ? '%' : 'KES';
+});
+</script>
 
 <?php endif; ?>

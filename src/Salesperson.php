@@ -285,4 +285,90 @@ class Salesperson {
             'value' => (float) $value
         ];
     }
+
+    public function getByEmployeeId(int $employeeId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT s.*, 
+                   e.name as employee_name,
+                   u.name as user_name
+            FROM salespersons s
+            LEFT JOIN employees e ON s.employee_id = e.id
+            LEFT JOIN users u ON s.user_id = u.id
+            WHERE s.employee_id = ?
+        ");
+        $stmt->execute([$employeeId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    public function getEmployeeSalesMetrics(int $employeeId, ?string $periodStart = null, ?string $periodEnd = null): array {
+        $salesperson = $this->getByEmployeeId($employeeId);
+        
+        if (!$salesperson) {
+            return [
+                'is_salesperson' => false,
+                'total_orders' => 0,
+                'total_sales' => 0,
+                'total_commission' => 0,
+                'avg_order_value' => 0,
+                'rank' => null,
+                'period_orders' => 0,
+                'period_sales' => 0,
+                'period_commission' => 0
+            ];
+        }
+        
+        $allTimeStats = $this->getSalesStats($salesperson['id']);
+        
+        $periodSql = "
+            SELECT 
+                COUNT(*) as period_orders,
+                COALESCE(SUM(order_amount), 0) as period_sales,
+                COALESCE(SUM(commission_amount), 0) as period_commission
+            FROM sales_commissions
+            WHERE salesperson_id = ?
+        ";
+        $params = [$salesperson['id']];
+        
+        if ($periodStart) {
+            $periodSql .= " AND created_at >= ?";
+            $params[] = $periodStart;
+        }
+        if ($periodEnd) {
+            $periodSql .= " AND created_at <= ?";
+            $params[] = $periodEnd . ' 23:59:59';
+        }
+        
+        $stmt = $this->db->prepare($periodSql);
+        $stmt->execute($params);
+        $periodStats = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $rankStmt = $this->db->query("
+            SELECT id, RANK() OVER (ORDER BY total_sales DESC) as rank
+            FROM salespersons
+            WHERE is_active = TRUE
+        ");
+        $rankings = $rankStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $rank = $rankings[$salesperson['id']] ?? null;
+        
+        $avgOrderValue = $allTimeStats['total_orders'] > 0 
+            ? $allTimeStats['total_sales'] / $allTimeStats['total_orders'] 
+            : 0;
+        
+        return [
+            'is_salesperson' => true,
+            'salesperson_id' => $salesperson['id'],
+            'salesperson_name' => $salesperson['name'],
+            'total_orders' => (int) $allTimeStats['total_orders'],
+            'total_sales' => (float) $allTimeStats['total_sales'],
+            'total_commission' => (float) $allTimeStats['total_commission'],
+            'pending_commission' => (float) $allTimeStats['pending_commission'],
+            'paid_commission' => (float) $allTimeStats['paid_commission'],
+            'avg_order_value' => $avgOrderValue,
+            'rank' => $rank,
+            'period_orders' => (int) ($periodStats['period_orders'] ?? 0),
+            'period_sales' => (float) ($periodStats['period_sales'] ?? 0),
+            'period_commission' => (float) ($periodStats['period_commission'] ?? 0)
+        ];
+    }
 }

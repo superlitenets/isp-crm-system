@@ -74,6 +74,20 @@ class Settings {
         }
         return $default;
     }
+    
+    public function getSetting(string $key, $default = null) {
+        return $this->get($key, $default);
+    }
+    
+    public function saveSetting(string $key, string $value, string $type = 'text'): void {
+        $stmt = $this->db->prepare("
+            INSERT INTO company_settings (setting_key, setting_value, setting_type)
+            VALUES (?, ?, ?)
+            ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?, updated_at = CURRENT_TIMESTAMP
+        ");
+        $stmt->execute([$key, $value, $type, $value]);
+        self::$cache[$key] = ['value' => $value, 'type' => $type];
+    }
 
     public function set(string $key, $value, string $type = 'text'): bool {
         $storedValue = $value;

@@ -407,6 +407,11 @@ $performanceStatuses = $employee->getPerformanceStatuses();
             <i class="bi bi-alarm"></i> Late Arrivals
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'salespeople' ? 'active' : '' ?>" href="?page=hr&subpage=salespeople">
+            <i class="bi bi-person-badge"></i> Salespeople
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'departments'): ?>
@@ -817,11 +822,15 @@ $performanceStatuses = $employee->getPerformanceStatuses();
 
 <?php elseif ($subpage === 'performance'): ?>
 
-<?php $performanceReviews = $employee->getAllPerformanceReviews(); ?>
-<?php $performanceStats = $employee->getPerformanceStats(); ?>
+<?php 
+$performanceReviews = $employee->getAllPerformanceReviews(); 
+$performanceStats = $employee->getPerformanceStats();
+$salespersonModel = new \App\Salesperson($db);
+$salesLeaderboard = $salespersonModel->getLeaderboard('month');
+?>
 
 <div class="row g-4 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card bg-success text-white">
             <div class="card-body">
                 <h4><?= $performanceStats['completed'] ?? 0 ?></h4>
@@ -829,7 +838,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card bg-warning text-dark">
             <div class="card-body">
                 <h4><?= $performanceStats['pending'] ?? 0 ?></h4>
@@ -837,7 +846,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body">
                 <h4><?= number_format($performanceStats['avg_rating'] ?? 0, 1) ?>/5</h4>
@@ -845,7 +854,62 @@ $performanceStatuses = $employee->getPerformanceStatuses();
             </div>
         </div>
     </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h4><?= count($salesLeaderboard) ?></h4>
+                <small>Active Salespeople</small>
+            </div>
+        </div>
+    </div>
 </div>
+
+<?php if (!empty($salesLeaderboard)): ?>
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0"><i class="bi bi-trophy"></i> Sales Leaderboard (Last 30 Days)</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">Rank</th>
+                        <th>Salesperson</th>
+                        <th class="text-end">Orders</th>
+                        <th class="text-end">Total Sales</th>
+                        <th class="text-end">Commission Earned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($salesLeaderboard as $index => $seller): ?>
+                    <tr>
+                        <td>
+                            <?php if ($index === 0): ?>
+                            <span class="badge bg-warning text-dark"><i class="bi bi-trophy"></i> 1</span>
+                            <?php elseif ($index === 1): ?>
+                            <span class="badge bg-secondary">2</span>
+                            <?php elseif ($index === 2): ?>
+                            <span class="badge bg-dark">3</span>
+                            <?php else: ?>
+                            <span class="badge bg-light text-dark"><?= $index + 1 ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <strong><?= htmlspecialchars($seller['name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($seller['phone']) ?></small>
+                        </td>
+                        <td class="text-end"><?= $seller['order_count'] ?></td>
+                        <td class="text-end">KES <?= number_format($seller['total_sales'], 0) ?></td>
+                        <td class="text-end text-success">KES <?= number_format($seller['total_commission'], 0) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card mb-4">
     <div class="card-body d-flex justify-content-end">
@@ -863,6 +927,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                     <tr>
                         <th>Employee</th>
                         <th>Review Period</th>
+                        <th>Sales Metrics</th>
                         <th>Reviewer</th>
                         <th>Overall Rating</th>
                         <th>Status</th>
@@ -871,13 +936,36 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                 </thead>
                 <tbody>
                     <?php foreach ($performanceReviews as $review): ?>
+                    <?php 
+                    $empSalesMetrics = $salespersonModel->getEmployeeSalesMetrics(
+                        $review['employee_id'],
+                        $review['review_period_start'],
+                        $review['review_period_end']
+                    );
+                    ?>
                     <tr>
                         <td>
                             <strong><?= htmlspecialchars($review['employee_name']) ?></strong>
                             <br><small class="text-muted"><?= htmlspecialchars($review['department_name'] ?? 'No Department') ?></small>
+                            <?php if ($empSalesMetrics['is_salesperson']): ?>
+                            <br><span class="badge bg-info"><i class="bi bi-person-badge"></i> Sales Team</span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?= date('M j, Y', strtotime($review['review_period_start'])) ?> - <?= date('M j, Y', strtotime($review['review_period_end'])) ?>
+                        </td>
+                        <td>
+                            <?php if ($empSalesMetrics['is_salesperson']): ?>
+                            <div class="small">
+                                <strong><?= $empSalesMetrics['period_orders'] ?></strong> orders<br>
+                                <span class="text-success">KES <?= number_format($empSalesMetrics['period_sales'], 0) ?></span>
+                                <?php if ($empSalesMetrics['rank']): ?>
+                                <br><span class="badge bg-<?= $empSalesMetrics['rank'] <= 3 ? 'warning' : 'light text-dark' ?>">Rank #<?= $empSalesMetrics['rank'] ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
                         </td>
                         <td><?= htmlspecialchars($review['reviewer_name'] ?? 'Not assigned') ?></td>
                         <td>
@@ -913,7 +1001,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                     <?php endforeach; ?>
                     <?php if (empty($performanceReviews)): ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             No performance reviews found.
                         </td>
                     </tr>
@@ -1347,6 +1435,197 @@ $lastSync = $biometricService->getLastSyncTime();
     </div>
 </div>
 
+<?php endif; ?>
+
+<?php elseif ($subpage === 'salespeople'): ?>
+<?php
+$salespersonModel = new \App\Salesperson($db);
+$allSalespersons = $salespersonModel->getAll();
+$spAction = $_GET['sp_action'] ?? 'list';
+$spId = isset($_GET['sp_id']) ? (int)$_GET['sp_id'] : null;
+$editSalesperson = $spId ? $salespersonModel->getById($spId) : null;
+$defaultCommission = $salespersonModel->getDefaultCommission();
+?>
+
+<?php if ($spAction === 'add' || $spAction === 'edit'): ?>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-person-plus"></i> <?= $spAction === 'edit' ? 'Edit Salesperson' : 'Add Salesperson' ?></h4>
+    <a href="?page=hr&subpage=salespeople" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="<?= $spAction === 'edit' ? 'update_salesperson' : 'save_salesperson' ?>">
+            <?php if ($editSalesperson): ?>
+            <input type="hidden" name="salesperson_id" value="<?= $editSalesperson['id'] ?>">
+            <?php endif; ?>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-control" name="name" required 
+                           value="<?= htmlspecialchars($editSalesperson['name'] ?? '') ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Phone *</label>
+                    <input type="text" class="form-control" name="phone" required 
+                           value="<?= htmlspecialchars($editSalesperson['phone'] ?? '') ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" 
+                           value="<?= htmlspecialchars($editSalesperson['email'] ?? '') ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Link to Employee</label>
+                    <select name="employee_id" class="form-select">
+                        <option value="">-- None --</option>
+                        <?php foreach ($allEmployees as $emp): ?>
+                        <option value="<?= $emp['id'] ?>" <?= ($editSalesperson['employee_id'] ?? '') == $emp['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['employee_id']) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="text-muted">Link to employee record for performance tracking</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Commission Type</label>
+                    <select name="commission_type" class="form-select" id="spCommType">
+                        <option value="percentage" <?= (!$editSalesperson || $editSalesperson['commission_type'] === 'percentage') ? 'selected' : '' ?>>Percentage (%)</option>
+                        <option value="fixed" <?= ($editSalesperson && $editSalesperson['commission_type'] === 'fixed') ? 'selected' : '' ?>>Fixed (KES)</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Commission Value</label>
+                    <div class="input-group">
+                        <span class="input-group-text" id="spCommPrefix">%</span>
+                        <input type="number" step="0.01" name="commission_value" class="form-control" 
+                               value="<?= $editSalesperson ? $editSalesperson['commission_value'] : $defaultCommission['value'] ?>">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <select name="is_active" class="form-select">
+                        <option value="1" <?= (!$editSalesperson || $editSalesperson['is_active']) ? 'selected' : '' ?>>Active</option>
+                        <option value="0" <?= ($editSalesperson && !$editSalesperson['is_active']) ? 'selected' : '' ?>>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes" class="form-control" rows="2"><?= htmlspecialchars($editSalesperson['notes'] ?? '') ?></textarea>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Salesperson
+                </button>
+                <a href="?page=hr&subpage=salespeople" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<?php else: ?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-person-badge"></i> Sales Team</h4>
+    <?php if (\App\Auth::isAdmin()): ?>
+    <a href="?page=hr&subpage=salespeople&sp_action=add" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Add Salesperson
+    </a>
+    <?php endif; ?>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Employee</th>
+                        <th>Commission</th>
+                        <th>Total Sales</th>
+                        <th>Total Commission</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allSalespersons as $sp): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($sp['name']) ?></strong></td>
+                        <td>
+                            <?= htmlspecialchars($sp['phone']) ?>
+                            <?php if ($sp['email']): ?>
+                            <br><small class="text-muted"><?= htmlspecialchars($sp['email']) ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($sp['employee_name']): ?>
+                            <a href="?page=hr&action=view_employee&id=<?= $sp['employee_id'] ?>">
+                                <?= htmlspecialchars($sp['employee_name']) ?>
+                            </a>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($sp['commission_type'] === 'percentage'): ?>
+                            <span class="badge bg-info"><?= number_format($sp['commission_value'], 1) ?>%</span>
+                            <?php else: ?>
+                            <span class="badge bg-success">KES <?= number_format($sp['commission_value'], 2) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>KES <?= number_format($sp['total_sales'], 0) ?></td>
+                        <td>KES <?= number_format($sp['total_commission'], 0) ?></td>
+                        <td>
+                            <?php if ($sp['is_active']): ?>
+                            <span class="badge bg-success">Active</span>
+                            <?php else: ?>
+                            <span class="badge bg-secondary">Inactive</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (\App\Auth::isAdmin()): ?>
+                            <div class="btn-group btn-group-sm">
+                                <a href="?page=hr&subpage=salespeople&sp_action=edit&sp_id=<?= $sp['id'] ?>" class="btn btn-outline-primary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this salesperson?')">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="delete_salesperson">
+                                    <input type="hidden" name="salesperson_id" value="<?= $sp['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($allSalespersons)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-person-badge" style="font-size: 2rem;"></i>
+                            <p class="mt-2">No salespeople found. <a href="?page=hr&subpage=salespeople&sp_action=add">Add your first salesperson</a></p>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php endif; ?>

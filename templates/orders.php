@@ -1,5 +1,7 @@
 <?php
 $orderModel = new \App\Order();
+$salespersonModel = new \App\Salesperson($db);
+$activeSalespersons = $salespersonModel->getActive();
 $action = $_GET['action'] ?? 'list';
 $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $order = $orderId ? $orderModel->getById($orderId) : null;
@@ -13,10 +15,18 @@ $stats = $orderModel->getStats();
             <input type="hidden" name="page" value="orders">
             <select name="status" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
                 <option value="">All Status</option>
-                <option value="new" <?= ($_GET['status'] ?? '') === 'new' ? 'selected' : '' ?>>New</option>
+                <option value="new" <?= ($_GET['status'] ?? '') === 'new' ? 'selected' : '' ?>>New (Leads)</option>
                 <option value="confirmed" <?= ($_GET['status'] ?? '') === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
                 <option value="converted" <?= ($_GET['status'] ?? '') === 'converted' ? 'selected' : '' ?>>Converted</option>
                 <option value="cancelled" <?= ($_GET['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+            </select>
+            <select name="salesperson" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
+                <option value="">All Leads</option>
+                <?php foreach ($activeSalespersons as $sp): ?>
+                <option value="<?= $sp['id'] ?>" <?= ($_GET['salesperson'] ?? '') == $sp['id'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($sp['name']) ?>
+                </option>
+                <?php endforeach; ?>
             </select>
             <input type="text" class="form-control form-control-sm" name="search" 
                    placeholder="Search orders..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="width: 200px;">
@@ -202,6 +212,29 @@ $stats = $orderModel->getStats();
                         </td>
                     </tr>
                     <?php endif; ?>
+                    <?php if ($order['salesperson_id']): ?>
+                    <tr>
+                        <th>Lead By</th>
+                        <td>
+                            <i class="bi bi-person-badge text-primary"></i>
+                            <strong><?= htmlspecialchars($order['salesperson_name']) ?></strong>
+                            <?php if ($order['salesperson_phone']): ?>
+                            <small class="text-muted">(<?= htmlspecialchars($order['salesperson_phone']) ?>)</small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Commission</th>
+                        <td>
+                            <strong>KES <?= number_format($order['commission_amount'] ?? 0, 2) ?></strong>
+                            <?php 
+                            $commStatus = $order['commission_status'] ?? 'pending';
+                            $commColor = $commStatus === 'paid' ? 'success' : 'warning';
+                            ?>
+                            <span class="badge bg-<?= $commColor ?>"><?= ucfirst($commStatus) ?></span>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                 </table>
                 
                 <?php if ($order['notes']): ?>
@@ -221,7 +254,8 @@ $stats = $orderModel->getStats();
         <?php 
         $orders = $orderModel->getAll([
             'status' => $_GET['status'] ?? '',
-            'search' => $_GET['search'] ?? ''
+            'search' => $_GET['search'] ?? '',
+            'salesperson_id' => $_GET['salesperson'] ?? ''
         ]);
         ?>
         <?php if (empty($orders)): ?>
@@ -238,6 +272,7 @@ $stats = $orderModel->getStats();
                         <th>Order #</th>
                         <th>Customer</th>
                         <th>Package</th>
+                        <th>Lead By</th>
                         <th>Amount</th>
                         <th>Payment</th>
                         <th>Status</th>
@@ -252,12 +287,23 @@ $stats = $orderModel->getStats();
                             <a href="?page=orders&action=view&id=<?= $o['id'] ?>">
                                 <code><?= htmlspecialchars($o['order_number']) ?></code>
                             </a>
+                            <?php if ($o['order_status'] === 'new' && $o['salesperson_id']): ?>
+                            <br><span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Waiting Approval</span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <strong><?= htmlspecialchars($o['customer_name']) ?></strong>
                             <br><small class="text-muted"><?= htmlspecialchars($o['customer_phone']) ?></small>
                         </td>
                         <td><?= htmlspecialchars($o['package_name'] ?? '-') ?></td>
+                        <td>
+                            <?php if (!empty($o['salesperson_name'])): ?>
+                            <i class="bi bi-person-badge text-primary"></i>
+                            <?= htmlspecialchars($o['salesperson_name']) ?>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
                         <td>KES <?= number_format($o['amount'] ?? 0) ?></td>
                         <td>
                             <?php

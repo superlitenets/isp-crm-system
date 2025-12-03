@@ -136,6 +136,11 @@ class Order {
             $params = array_merge($params, [$search, $search, $search, $search]);
         }
         
+        if (!empty($filters['salesperson_id'])) {
+            $where[] = "o.salesperson_id = ?";
+            $params[] = (int)$filters['salesperson_id'];
+        }
+        
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
         $limit = isset($filters['limit']) ? (int)$filters['limit'] : 100;
         
