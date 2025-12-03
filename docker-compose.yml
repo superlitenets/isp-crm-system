@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: isp_crm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-isp_crm}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm_user} -d ${POSTGRES_DB:-isp_crm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  php:
+    build: .
+    container_name: isp_crm_php
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - PGHOST=db
+      - PGPORT=5432
+      - PGDATABASE=${POSTGRES_DB:-isp_crm}
+      - PGUSER=${POSTGRES_USER:-crm_user}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-isp_crm}
+      - SESSION_SECRET=${SESSION_SECRET:-change_this_to_random_string}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ADVANTA_API_KEY=${ADVANTA_API_KEY:-}
+      - ADVANTA_PARTNER_ID=${ADVANTA_PARTNER_ID:-}
+      - ADVANTA_SHORTCODE=${ADVANTA_SHORTCODE:-}
+      - ADVANTA_URL=${ADVANTA_URL:-}
+    volumes:
+      - ./:/var/www/html:cached
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: isp_crm_nginx
+    restart: unless-stopped
+    depends_on:
+      - php
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro
+    
+volumes:
+  db_data:
