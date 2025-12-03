@@ -28,6 +28,8 @@ require_once __DIR__ . '/../src/Salesperson.php';
 
 initializeDatabase();
 
+$db = Database::getConnection();
+
 \App\Auth::init();
 
 $page = $_GET['page'] ?? 'dashboard';
