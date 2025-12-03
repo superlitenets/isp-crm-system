@@ -22,8 +22,7 @@ services:
     container_name: isp_crm_php
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
       - PGHOST=db
       - PGPORT=5432
@@ -39,20 +38,13 @@ services:
       - ADVANTA_URL=${ADVANTA_URL:-}
     volumes:
       - ./:/var/www/html:cached
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep php-fpm || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   nginx:
     image: nginx:stable-alpine
     container_name: isp_crm_nginx
     restart: unless-stopped
     depends_on:
-      php:
-        condition: service_healthy
+      - php
     ports:
       - "80:80"
     volumes:
