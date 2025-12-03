@@ -941,6 +941,155 @@ if ($page === 'hr' && $action === 'sync_biometric') {
     }
 }
 
+if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $inventory = new \App\Inventory($db);
+    $tab = $_GET['tab'] ?? 'equipment';
+    $inventoryAction = $_GET['action'] ?? '';
+    
+    $csrfValid = \App\Auth::validateToken($_POST['csrf_token'] ?? '');
+    if (!$csrfValid) {
+        $_SESSION['error_message'] = 'Invalid request. Please try again.';
+    } else {
+        try {
+            switch ($tab) {
+                case 'equipment':
+                    if ($inventoryAction === 'save') {
+                        $data = [
+                            'category_id' => $_POST['category_id'] ?: null,
+                            'name' => $_POST['name'],
+                            'brand' => $_POST['brand'] ?? null,
+                            'model' => $_POST['model'] ?? null,
+                            'serial_number' => $_POST['serial_number'] ?? null,
+                            'mac_address' => $_POST['mac_address'] ?? null,
+                            'purchase_date' => $_POST['purchase_date'] ?: null,
+                            'purchase_price' => $_POST['purchase_price'] ?: null,
+                            'warranty_expiry' => $_POST['warranty_expiry'] ?: null,
+                            'condition' => $_POST['condition'] ?? 'new',
+                            'status' => $_POST['status'] ?? 'available',
+                            'location' => $_POST['location'] ?? null,
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        if (!empty($_POST['id'])) {
+                            $inventory->updateEquipment((int)$_POST['id'], $data);
+                            $_SESSION['success_message'] = 'Equipment updated successfully!';
+                        } else {
+                            $inventory->addEquipment($data);
+                            $_SESSION['success_message'] = 'Equipment added successfully!';
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=equipment');
+                        exit;
+                    }
+                    break;
+                    
+                case 'categories':
+                    if ($inventoryAction === 'save') {
+                        $data = [
+                            'name' => $_POST['name'],
+                            'description' => $_POST['description'] ?? null
+                        ];
+                        if (!empty($_POST['id'])) {
+                            $inventory->updateCategory((int)$_POST['id'], $data);
+                            $_SESSION['success_message'] = 'Category updated successfully!';
+                        } else {
+                            $inventory->addCategory($data);
+                            $_SESSION['success_message'] = 'Category added successfully!';
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=categories');
+                        exit;
+                    } elseif ($inventoryAction === 'delete') {
+                        $inventory->deleteCategory((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Category deleted successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=categories');
+                        exit;
+                    }
+                    break;
+                    
+                case 'assignments':
+                    if ($inventoryAction === 'assign') {
+                        $data = [
+                            'equipment_id' => (int)$_POST['equipment_id'],
+                            'employee_id' => (int)$_POST['employee_id'],
+                            'assigned_date' => $_POST['assigned_date'] ?? date('Y-m-d'),
+                            'assigned_by' => $currentUser['id'],
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        $inventory->assignToEmployee($data);
+                        $_SESSION['success_message'] = 'Equipment assigned successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=assignments');
+                        exit;
+                    } elseif ($inventoryAction === 'return') {
+                        $inventory->returnFromEmployee((int)$_POST['assignment_id']);
+                        $_SESSION['success_message'] = 'Equipment returned successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=assignments');
+                        exit;
+                    }
+                    break;
+                    
+                case 'loans':
+                    if ($inventoryAction === 'loan') {
+                        $data = [
+                            'equipment_id' => (int)$_POST['equipment_id'],
+                            'customer_id' => (int)$_POST['customer_id'],
+                            'loan_date' => $_POST['loan_date'] ?? date('Y-m-d'),
+                            'expected_return_date' => $_POST['expected_return_date'] ?: null,
+                            'loaned_by' => $currentUser['id'],
+                            'deposit_amount' => $_POST['deposit_amount'] ?? 0,
+                            'deposit_paid' => isset($_POST['deposit_paid']),
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        $inventory->loanToCustomer($data);
+                        $_SESSION['success_message'] = 'Equipment loaned successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=loans');
+                        exit;
+                    } elseif ($inventoryAction === 'return') {
+                        $inventory->returnFromCustomer((int)$_POST['loan_id']);
+                        $_SESSION['success_message'] = 'Equipment returned successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=loans');
+                        exit;
+                    }
+                    break;
+                    
+                case 'faults':
+                    if ($inventoryAction === 'report') {
+                        $data = [
+                            'equipment_id' => (int)$_POST['equipment_id'],
+                            'reported_date' => $_POST['reported_date'] ?? date('Y-m-d'),
+                            'reported_by' => $currentUser['id'],
+                            'fault_description' => $_POST['fault_description'],
+                            'severity' => $_POST['severity'] ?? 'minor'
+                        ];
+                        $inventory->reportFault($data);
+                        $_SESSION['success_message'] = 'Fault reported successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=faults');
+                        exit;
+                    } elseif ($inventoryAction === 'mark_repaired') {
+                        $data = [
+                            'repair_date' => $_POST['repair_date'] ?? date('Y-m-d'),
+                            'repair_cost' => $_POST['repair_cost'] ?: null,
+                            'repair_notes' => $_POST['repair_notes'] ?? null
+                        ];
+                        $inventory->markFaultRepaired((int)$_POST['fault_id'], $data);
+                        $_SESSION['success_message'] = 'Equipment marked as repaired!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=faults');
+                        exit;
+                    }
+                    break;
+            }
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
+}
+
 $search = $_GET['search'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
 $priorityFilter = $_GET['priority'] ?? '';
@@ -1088,6 +1237,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
+                    <i class="bi bi-box-seam"></i> Inventory
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -1129,6 +1283,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'hr':
                 include __DIR__ . '/../templates/hr.php';
+                break;
+            case 'inventory':
+                include __DIR__ . '/../templates/inventory.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();
