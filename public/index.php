@@ -1180,6 +1180,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+
+            case 'save_mobile_settings':
+                try {
+                    $mobileData = [
+                        'mobile_enabled' => isset($_POST['mobile_enabled']) ? '1' : '0',
+                        'mobile_salesperson_enabled' => isset($_POST['mobile_salesperson_enabled']) ? '1' : '0',
+                        'mobile_technician_enabled' => isset($_POST['mobile_technician_enabled']) ? '1' : '0',
+                        'mobile_token_expiry_days' => $_POST['mobile_token_expiry_days'] ?? '30',
+                        'mobile_app_name' => $_POST['mobile_app_name'] ?? 'ISP Mobile',
+                        'mobile_require_location' => isset($_POST['mobile_require_location']) ? '1' : '0',
+                        'mobile_allow_offline' => isset($_POST['mobile_allow_offline']) ? '1' : '0',
+                    ];
+                    $settings->saveMobileAppSettings($mobileData);
+                    \App\Settings::clearCache();
+                    $message = 'Mobile app settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving mobile settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
         }
     }
 }

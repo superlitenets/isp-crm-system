@@ -81,6 +81,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-graph-up-arrow"></i> Commissions
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'mobile' ? 'active' : '' ?>" href="?page=settings&subpage=mobile">
+            <i class="bi bi-phone"></i> Mobile App
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -2125,5 +2130,165 @@ document.getElementById('commissionType').addEventListener('change', function() 
     document.getElementById('commissionPrefix').textContent = this.value === 'percentage' ? '%' : 'KES';
 });
 </script>
+
+<?php elseif ($subpage === 'mobile'): ?>
+
+<?php $mobileSettings = $settings->getMobileAppSettings(); ?>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-phone"></i> Mobile App Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_mobile_settings">
+                    
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 
+                                Mobile app URL: <strong><?= htmlspecialchars((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'your-domain.com')) ?>/mobile/</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">App Name</label>
+                            <input type="text" name="mobile_app_name" class="form-control" 
+                                   value="<?= htmlspecialchars($mobileSettings['mobile_app_name']) ?>" 
+                                   placeholder="ISP Mobile">
+                            <small class="text-muted">Displayed on the mobile app and when installed on devices</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Token Expiry (Days)</label>
+                            <input type="number" name="mobile_token_expiry_days" class="form-control" 
+                                   value="<?= htmlspecialchars($mobileSettings['mobile_token_expiry_days']) ?>" 
+                                   min="1" max="365">
+                            <small class="text-muted">How long users stay logged in before needing to re-authenticate</small>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="mb-3"><i class="bi bi-toggles"></i> Feature Access</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_enabled" id="mobileEnabled" value="1"
+                                       <?= $mobileSettings['mobile_enabled'] === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="mobileEnabled">
+                                    <strong>Enable Mobile App</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Master switch to enable/disable mobile app access</small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_salesperson_enabled" id="salespersonEnabled" value="1"
+                                       <?= $mobileSettings['mobile_salesperson_enabled'] === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="salespersonEnabled">
+                                    <strong>Salesperson Access</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Allow salespersons to use the mobile app</small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_technician_enabled" id="technicianEnabled" value="1"
+                                       <?= $mobileSettings['mobile_technician_enabled'] === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="technicianEnabled">
+                                    <strong>Technician Access</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Allow technicians to use the mobile app</small>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="mb-3"><i class="bi bi-shield-check"></i> Security Options</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_require_location" id="requireLocation" value="1"
+                                       <?= $mobileSettings['mobile_require_location'] === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="requireLocation">
+                                    <strong>Require Location for Attendance</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Technicians must share location when clocking in/out</small>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_allow_offline" id="allowOffline" value="1"
+                                       <?= $mobileSettings['mobile_allow_offline'] === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="allowOffline">
+                                    <strong>Allow Offline Mode</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Allow basic viewing when internet is unavailable</small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Mobile App</h5>
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">The mobile app (PWA) provides field access for:</p>
+                <ul class="mb-3">
+                    <li><strong>Salespersons:</strong> Create orders, view commissions, manage leads</li>
+                    <li><strong>Technicians:</strong> View tickets, clock in/out, manage equipment</li>
+                </ul>
+                <hr>
+                <p class="mb-2"><strong>Installation:</strong></p>
+                <ol class="mb-0 ps-3">
+                    <li>Open <code>/mobile/</code> on a phone browser</li>
+                    <li>Tap "Add to Home Screen" or install prompt</li>
+                    <li>Login with employee email and password</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Active Sessions</h5>
+            </div>
+            <div class="card-body">
+                <?php
+                $tokenStmt = $dbConn->query("SELECT COUNT(*) as total, 
+                    SUM(CASE WHEN expires_at > NOW() THEN 1 ELSE 0 END) as active 
+                    FROM mobile_tokens");
+                $tokenStats = $tokenStmt->fetch(\PDO::FETCH_ASSOC);
+                ?>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="mb-0 text-primary"><?= $tokenStats['active'] ?? 0 ?></h4>
+                        <small class="text-muted">Active Sessions</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="mb-0 text-secondary"><?= $tokenStats['total'] ?? 0 ?></h4>
+                        <small class="text-muted">Total Logins</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php endif; ?>

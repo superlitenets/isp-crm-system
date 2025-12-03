@@ -534,4 +534,30 @@ class Settings {
             'star' => 'Star'
         ];
     }
+
+    public function getMobileAppSettings(): array {
+        return [
+            'mobile_enabled' => $this->get('mobile_enabled', '1'),
+            'mobile_salesperson_enabled' => $this->get('mobile_salesperson_enabled', '1'),
+            'mobile_technician_enabled' => $this->get('mobile_technician_enabled', '1'),
+            'mobile_token_expiry_days' => $this->get('mobile_token_expiry_days', '30'),
+            'mobile_app_name' => $this->get('mobile_app_name', 'ISP Mobile'),
+            'mobile_require_location' => $this->get('mobile_require_location', '0'),
+            'mobile_allow_offline' => $this->get('mobile_allow_offline', '1'),
+        ];
+    }
+
+    public function saveMobileAppSettings(array $data): bool {
+        $fields = [
+            'mobile_enabled', 'mobile_salesperson_enabled', 'mobile_technician_enabled',
+            'mobile_token_expiry_days', 'mobile_app_name', 'mobile_require_location', 'mobile_allow_offline'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $this->set($field, $data[$field]);
+            }
+        }
+        return true;
+    }
 }
