@@ -4,11 +4,11 @@ namespace App;
 
 class Ticket {
     private \PDO $db;
-    private SMS $sms;
+    private SMSGateway $sms;
 
     public function __construct() {
         $this->db = \Database::getConnection();
-        $this->sms = new SMS();
+        $this->sms = new SMSGateway();
     }
 
     public function generateTicketNumber(): string {

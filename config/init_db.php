@@ -65,10 +65,48 @@ function initializeDatabase(): void {
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS departments (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        manager_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS employees (
+        id SERIAL PRIMARY KEY,
+        employee_id VARCHAR(20) UNIQUE NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(100),
+        phone VARCHAR(20) NOT NULL,
+        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+        position VARCHAR(100) NOT NULL,
+        salary DECIMAL(12, 2),
+        hire_date DATE,
+        employment_status VARCHAR(20) DEFAULT 'active',
+        emergency_contact VARCHAR(100),
+        emergency_phone VARCHAR(20),
+        address TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE departments DROP CONSTRAINT IF EXISTS fk_manager;
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_manager') THEN
+            ALTER TABLE departments ADD CONSTRAINT fk_manager FOREIGN KEY (manager_id) REFERENCES employees(id) ON DELETE SET NULL;
+        END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
     CREATE INDEX IF NOT EXISTS idx_customers_account ON customers(account_number);
+    CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department_id);
+    CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status);
     ";
 
     try {

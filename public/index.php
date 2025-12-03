@@ -14,6 +14,8 @@ require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Customer.php';
 require_once __DIR__ . '/../src/Ticket.php';
 require_once __DIR__ . '/../src/SMS.php';
+require_once __DIR__ . '/../src/SMSGateway.php';
+require_once __DIR__ . '/../src/Employee.php';
 
 initializeDatabase();
 
@@ -60,6 +62,8 @@ if ($page === 'login') {
 $customer = new \App\Customer();
 $ticket = new \App\Ticket();
 $sms = new \App\SMS();
+$smsGateway = new \App\SMSGateway();
+$employee = new \App\Employee();
 $currentUser = \App\Auth::user();
 
 $message = '';
@@ -202,6 +206,125 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         \App\Auth::regenerateToken();
                     } catch (Exception $e) {
                         $message = 'Error adding comment: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'create_employee':
+                $name = trim($_POST['name'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                $position = trim($_POST['position'] ?? '');
+                
+                if (empty($name) || empty($phone) || empty($position)) {
+                    $message = 'Please fill in all required fields.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->create($_POST);
+                        if (!empty($_POST['user_id'])) {
+                            $empId = (int)Database::getConnection()->lastInsertId();
+                            $employee->linkToUser($empId, (int)$_POST['user_id']);
+                        }
+                        $message = 'Employee added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error adding employee: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'update_employee':
+                $name = trim($_POST['name'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                $position = trim($_POST['position'] ?? '');
+                
+                if (empty($name) || empty($phone) || empty($position)) {
+                    $message = 'Please fill in all required fields.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->update((int)$_POST['id'], $_POST);
+                        if (isset($_POST['user_id'])) {
+                            $employee->linkToUser((int)$_POST['id'], (int)$_POST['user_id'] ?: null);
+                        }
+                        $message = 'Employee updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating employee: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'delete_employee':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete employees.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->delete((int)$_POST['id']);
+                        $message = 'Employee deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting employee: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'create_department':
+                $name = trim($_POST['name'] ?? '');
+                if (empty($name)) {
+                    $message = 'Department name is required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->createDepartment($_POST);
+                        $message = 'Department created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating department: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'update_department':
+                $name = trim($_POST['name'] ?? '');
+                if (empty($name)) {
+                    $message = 'Department name is required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->updateDepartment((int)$_POST['id'], $_POST);
+                        $message = 'Department updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating department: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'delete_department':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete departments.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->deleteDepartment((int)$_POST['id']);
+                        $message = 'Department deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting department: ' . $e->getMessage();
                         $messageType = 'danger';
                     }
                 }
@@ -351,6 +474,16 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-ticket"></i> Tickets
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'hr' ? 'active' : '' ?>" href="?page=hr">
+                    <i class="bi bi-people-fill"></i> HR
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'sms_settings' ? 'active' : '' ?>" href="?page=sms_settings">
+                    <i class="bi bi-chat-dots"></i> SMS Settings
+                </a>
+            </li>
         </ul>
         <div class="mt-auto">
             <div class="sms-status <?= $sms->isEnabled() ? 'sms-enabled' : 'sms-disabled' ?> px-3 pb-2">
@@ -385,6 +518,12 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'tickets':
                 include __DIR__ . '/../templates/tickets.php';
+                break;
+            case 'hr':
+                include __DIR__ . '/../templates/hr.php';
+                break;
+            case 'sms_settings':
+                include __DIR__ . '/../templates/sms_settings.php';
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
