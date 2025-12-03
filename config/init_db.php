@@ -506,6 +506,37 @@ function runMigrations(PDO $db): void {
                 ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'salespersons' => "
+            CREATE TABLE IF NOT EXISTS salespersons (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100),
+                phone VARCHAR(20) NOT NULL,
+                commission_type VARCHAR(20) DEFAULT 'percentage',
+                commission_value DECIMAL(10, 2) DEFAULT 0,
+                total_sales DECIMAL(12, 2) DEFAULT 0,
+                total_commission DECIMAL(12, 2) DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'sales_commissions' => "
+            CREATE TABLE IF NOT EXISTS sales_commissions (
+                id SERIAL PRIMARY KEY,
+                salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE CASCADE,
+                order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+                order_amount DECIMAL(12, 2) NOT NULL,
+                commission_type VARCHAR(20) NOT NULL,
+                commission_rate DECIMAL(10, 2) NOT NULL,
+                commission_amount DECIMAL(12, 2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                paid_at TIMESTAMP,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
@@ -517,6 +548,23 @@ function runMigrations(PDO $db): void {
             }
         } catch (PDOException $e) {
             error_log("Migration error for $tableName: " . $e->getMessage());
+        }
+    }
+    
+    $columnMigrations = [
+        ['orders', 'salesperson_id', 'ALTER TABLE orders ADD COLUMN salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE SET NULL'],
+        ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE']
+    ];
+    
+    foreach ($columnMigrations as $migration) {
+        [$table, $column, $sql] = $migration;
+        try {
+            $check = $db->query("SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = '$table' AND column_name = '$column')");
+            if (!$check->fetchColumn()) {
+                $db->exec($sql);
+            }
+        } catch (PDOException $e) {
+            error_log("Column migration error for $table.$column: " . $e->getMessage());
         }
     }
 }
