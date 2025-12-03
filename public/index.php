@@ -64,6 +64,7 @@ $ticket = new \App\Ticket();
 $sms = new \App\SMS();
 $smsGateway = new \App\SMSGateway();
 $employee = new \App\Employee();
+$settings = new \App\Settings();
 $currentUser = \App\Auth::user();
 
 $message = '';
@@ -452,6 +453,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+
+            case 'save_company_settings':
+                try {
+                    $settings->saveCompanyInfo($_POST);
+                    $message = 'Company settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_template':
+                $name = trim($_POST['name'] ?? '');
+                $content = trim($_POST['content'] ?? '');
+                if (empty($name) || empty($content)) {
+                    $message = 'Template name and content are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $_POST['created_by'] = $currentUser['id'];
+                        $settings->createTemplate($_POST);
+                        $message = 'Template created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating template: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_template':
+                $name = trim($_POST['name'] ?? '');
+                $content = trim($_POST['content'] ?? '');
+                if (empty($name) || empty($content)) {
+                    $message = 'Template name and content are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $settings->updateTemplate((int)$_POST['id'], $_POST);
+                        $message = 'Template updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating template: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_template':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete templates.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $settings->deleteTemplate((int)$_POST['id']);
+                        $message = 'Template deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting template: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
         }
     }
 }
@@ -603,8 +672,8 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $page === 'sms_settings' ? 'active' : '' ?>" href="?page=sms_settings">
-                    <i class="bi bi-chat-dots"></i> SMS Settings
+                <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
+                    <i class="bi bi-gear"></i> Settings
                 </a>
             </li>
         </ul>
@@ -645,8 +714,8 @@ $csrfToken = \App\Auth::generateToken();
             case 'hr':
                 include __DIR__ . '/../templates/hr.php';
                 break;
-            case 'sms_settings':
-                include __DIR__ . '/../templates/sms_settings.php';
+            case 'settings':
+                include __DIR__ . '/../templates/settings.php';
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';

@@ -15,14 +15,15 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── Ticket.php        # Ticket model and operations
 │   ├── Employee.php      # HR/Employee management
 │   ├── SMS.php           # Twilio SMS integration
-│   └── SMSGateway.php    # Custom SMS gateway integration
+│   ├── SMSGateway.php    # Custom SMS gateway integration
+│   └── Settings.php      # Company settings and ticket templates
 ├── templates/
 │   ├── login.php         # Login page
 │   ├── dashboard.php     # Dashboard view
 │   ├── customers.php     # Customer management views
 │   ├── tickets.php       # Ticket management views
 │   ├── hr.php            # Human Resources module
-│   └── sms_settings.php  # SMS gateway configuration
+│   └── settings.php      # Settings (company, SMS, templates)
 ├── public/
 │   └── index.php         # Main application entry point
 ├── vendor/               # Composer dependencies
@@ -38,6 +39,10 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Attendance tracking (clock in/out, overtime, work-from-home)
   - Payroll management (salary, bonuses, deductions, tax calculations)
   - Performance reviews (ratings, goals, strengths, improvement areas)
+- **Settings Module**: Comprehensive configuration including:
+  - Company settings (name, contact info, branding)
+  - SMS gateway configuration (supports any POST/GET API)
+  - Ticket response templates (reusable templates with placeholders)
 - **SMS Notifications**: Automatic notifications via custom gateway or Twilio
 - **Dashboard**: Overview of ticket statistics and recent activity
 
@@ -52,6 +57,8 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **attendance**: Daily attendance records with clock in/out times
 - **payroll**: Payroll records with salary, bonuses, deductions
 - **performance_reviews**: Employee performance evaluations
+- **company_settings**: System configuration key-value pairs
+- **ticket_templates**: Reusable ticket response templates
 
 ## Authentication
 The system includes built-in authentication:
@@ -107,6 +114,7 @@ If no SMS credentials are configured, the system operates normally without SMS.
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added Settings page with company settings, SMS config, and ticket templates
 - December 2024: Enhanced HR module with attendance, payroll, and performance reviews
 - December 2024: Improved SMS gateway to support any POST or GET API
 - December 2024: Added Human Resources module (employees, departments)
