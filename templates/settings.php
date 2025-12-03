@@ -9,6 +9,10 @@ $currencies = $settings->getCurrencies();
 $dateFormats = $settings->getDateFormats();
 $timeFormats = $settings->getTimeFormats();
 $gatewayInfo = $smsGateway->getGatewayInfo();
+$whatsappSettings = $settings->getWhatsAppSettings();
+$templateEngine = new \App\TemplateEngine();
+$placeholderCategories = $templateEngine->getPlaceholderCategories();
+$whatsapp = new \App\WhatsApp();
 
 $editTemplate = null;
 if ($action === 'edit_template' && $id) {
@@ -29,6 +33,11 @@ if ($action === 'edit_template' && $id) {
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'sms' ? 'active' : '' ?>" href="?page=settings&subpage=sms">
             <i class="bi bi-chat-dots"></i> SMS Gateway
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'whatsapp' ? 'active' : '' ?>" href="?page=settings&subpage=whatsapp">
+            <i class="bi bi-whatsapp"></i> WhatsApp
         </a>
     </li>
     <li class="nav-item">
@@ -165,6 +174,11 @@ if ($action === 'edit_template' && $id) {
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" name="sms_enabled" id="smsEnabled" value="1" <?= $companyInfo['sms_enabled'] === '1' ? 'checked' : '' ?>>
                         <label class="form-check-label" for="smsEnabled">Enable SMS Notifications</label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="whatsapp_enabled" id="whatsappEnabled" value="1" <?= ($companyInfo['whatsapp_enabled'] ?? '1') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="whatsappEnabled">Enable WhatsApp Messaging</label>
+                        <small class="text-muted d-block">Opens WhatsApp Web for quick messaging</small>
                     </div>
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" name="email_notifications" id="emailNotifications" value="1" <?= $companyInfo['email_notifications'] === '1' ? 'checked' : '' ?>>
@@ -388,6 +402,155 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
     </div>
 </div>
 
+<?php elseif ($subpage === 'whatsapp'): ?>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-whatsapp text-success"></i> WhatsApp Web Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-icon bg-<?= $whatsapp->isEnabled() ? 'success' : 'secondary' ?> bg-opacity-10 text-<?= $whatsapp->isEnabled() ? 'success' : 'secondary' ?> me-3" style="width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                        <i class="bi bi-whatsapp"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0"><?= $whatsapp->isEnabled() ? 'Enabled' : 'Disabled' ?></h4>
+                        <small class="text-muted">Opens WhatsApp Web with pre-filled messages</small>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> WhatsApp Web integration allows you to send messages directly from ticket pages. Messages open in a new tab with WhatsApp Web, pre-filled with the customer's phone number and message.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent WhatsApp Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Recipient</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            try {
+                                $db = \Database::getConnection();
+                                $stmt = $db->query("SELECT * FROM whatsapp_logs ORDER BY sent_at DESC LIMIT 10");
+                                $waLogs = $stmt->fetchAll();
+                            } catch (Exception $e) {
+                                $waLogs = [];
+                            }
+                            foreach ($waLogs as $log):
+                            ?>
+                            <tr>
+                                <td><small><?= date('M j, g:i A', strtotime($log['sent_at'])) ?></small></td>
+                                <td><small>...<?= htmlspecialchars(substr($log['recipient_phone'], -4)) ?></small></td>
+                                <td><small><?= ucfirst($log['recipient_type']) ?></small></td>
+                                <td>
+                                    <span class="badge bg-<?= $log['status'] === 'opened' ? 'success' : 'warning' ?>"><?= ucfirst($log['status']) ?></span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($waLogs)): ?>
+                            <tr><td colspan="4" class="text-center text-muted py-3">No WhatsApp messages sent yet</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 border-success">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Settings</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_whatsapp_settings">
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Default Country Code</label>
+                    <div class="input-group">
+                        <span class="input-group-text">+</span>
+                        <input type="text" class="form-control" name="whatsapp_country_code" 
+                               value="<?= htmlspecialchars($whatsappSettings['whatsapp_country_code'] ?? '254') ?>" 
+                               placeholder="254">
+                    </div>
+                    <small class="text-muted">Country code to prepend to phone numbers (e.g., 254 for Kenya, 1 for USA)</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Default Greeting Message</label>
+                    <input type="text" class="form-control" name="whatsapp_default_message" 
+                           value="<?= htmlspecialchars($whatsappSettings['whatsapp_default_message'] ?? '') ?>" 
+                           placeholder="Hello from ISP Support!">
+                    <small class="text-muted">Optional greeting to prepend to WhatsApp messages</small>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg"></i> Save WhatsApp Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> How WhatsApp Web Integration Works</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>For Customers:</h6>
+                <ol class="mb-3">
+                    <li>Open a ticket in the system</li>
+                    <li>Click the <span class="badge bg-success"><i class="bi bi-whatsapp"></i> WhatsApp</span> button</li>
+                    <li>WhatsApp Web opens with the customer's phone number</li>
+                    <li>Message is pre-filled with ticket information</li>
+                    <li>Click send in WhatsApp Web</li>
+                </ol>
+            </div>
+            <div class="col-md-6">
+                <h6>For Technicians:</h6>
+                <ol class="mb-3">
+                    <li>When a ticket is assigned, you can message the customer</li>
+                    <li>Click the WhatsApp button next to the customer's phone</li>
+                    <li>Send updates, ask questions, or share information</li>
+                    <li>All from WhatsApp Web - no API key required!</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="alert alert-light border mb-0">
+            <strong>Note:</strong> WhatsApp Web integration requires:
+            <ul class="mb-0 mt-2">
+                <li>WhatsApp installed on your phone</li>
+                <li>WhatsApp Web linked to your phone (visit <a href="https://web.whatsapp.com" target="_blank">web.whatsapp.com</a>)</li>
+                <li>Customer phone numbers in international format (or system will auto-convert using country code)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
 <?php elseif ($subpage === 'templates'): ?>
 
 <?php if ($action === 'create_template' || $action === 'edit_template'): ?>
@@ -428,10 +591,28 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                 </div>
                 <div class="col-12">
                     <label class="form-label">Template Content *</label>
-                    <textarea class="form-control" name="content" rows="8" required><?= htmlspecialchars($editTemplate['content'] ?? '') ?></textarea>
-                    <small class="text-muted">
-                        Available placeholders: <code>{customer_name}</code>, <code>{ticket_number}</code>, <code>{ticket_status}</code>, <code>{technician_name}</code>, <code>{company_name}</code>
-                    </small>
+                    <textarea class="form-control" name="content" rows="8" required id="templateContent"><?= htmlspecialchars($editTemplate['content'] ?? '') ?></textarea>
+                    
+                    <div class="mt-3">
+                        <p class="text-muted mb-2"><strong>Available Placeholders:</strong> <small>(Click to insert)</small></p>
+                        <div class="row g-2">
+                            <?php foreach ($placeholderCategories as $category => $placeholders): ?>
+                            <div class="col-md-4 col-lg-2">
+                                <div class="border rounded p-2 h-100">
+                                    <h6 class="text-primary mb-2" style="font-size: 0.85rem;"><?= $category ?></h6>
+                                    <?php foreach ($placeholders as $placeholder => $desc): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mb-1 w-100 text-start placeholder-btn" 
+                                            data-placeholder="<?= htmlspecialchars($placeholder) ?>" 
+                                            title="<?= htmlspecialchars($desc) ?>"
+                                            style="font-size: 0.75rem; padding: 2px 6px;">
+                                        <code><?= htmlspecialchars($placeholder) ?></code>
+                                    </button>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-12">
                     <div class="form-check">
@@ -534,15 +715,30 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
         <div class="row g-3">
             <div class="col-md-6">
                 <div class="border rounded p-3">
-                    <h6>Ticket Acknowledgment</h6>
+                    <h6>Ticket Acknowledgment (SMS/WhatsApp)</h6>
                     <pre class="bg-light p-2 small mb-0">Dear {customer_name},
 
-Thank you for contacting us. Your ticket #{ticket_number} has been received and assigned to our team.
+Your ticket #{ticket_number} has been received.
+Status: {ticket_status}
+Technician: {technician_name}
+Tech Phone: {technician_phone}
 
-We will get back to you within 24 hours.
+We'll contact you soon.
+- {company_name}</pre>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="border rounded p-3">
+                    <h6>Technician Assignment</h6>
+                    <pre class="bg-light p-2 small mb-0">New Ticket Assigned:
+#{ticket_number} - {ticket_subject}
 
-Best regards,
-{company_name} Support</pre>
+Customer: {customer_name}
+Phone: {customer_phone}
+Priority: {ticket_priority}
+
+Please contact the customer ASAP.
+- {company_name}</pre>
                 </div>
             </div>
             <div class="col-md-6">
@@ -550,16 +746,46 @@ Best regards,
                     <h6>Issue Resolved</h6>
                     <pre class="bg-light p-2 small mb-0">Dear {customer_name},
 
-Great news! Your ticket #{ticket_number} has been resolved.
+Great news! Ticket #{ticket_number} is resolved.
 
-If you have any further questions, please don't hesitate to contact us.
+If you need help, call us at {company_phone} or WhatsApp your technician at {technician_phone}.
 
 Thank you for choosing {company_name}!</pre>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="border rounded p-3">
+                    <h6>Follow-up Message</h6>
+                    <pre class="bg-light p-2 small mb-0">Hi {customer_name},
+
+Following up on ticket #{ticket_number}.
+Current status: {ticket_status}
+
+Your technician {technician_name} can be reached at {technician_phone}.
+
+Call us at {company_phone} for any questions.
+- {company_name} Support</pre>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.querySelectorAll('.placeholder-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var textarea = document.getElementById('templateContent');
+        var placeholder = this.getAttribute('data-placeholder');
+        var startPos = textarea.selectionStart;
+        var endPos = textarea.selectionEnd;
+        var before = textarea.value.substring(0, startPos);
+        var after = textarea.value.substring(endPos);
+        textarea.value = before + placeholder + after;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = startPos + placeholder.length;
+    });
+});
+</script>
 
 <?php endif; ?>
 

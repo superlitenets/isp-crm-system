@@ -16,6 +16,9 @@ require_once __DIR__ . '/../src/Ticket.php';
 require_once __DIR__ . '/../src/SMS.php';
 require_once __DIR__ . '/../src/SMSGateway.php';
 require_once __DIR__ . '/../src/Employee.php';
+require_once __DIR__ . '/../src/Settings.php';
+require_once __DIR__ . '/../src/WhatsApp.php';
+require_once __DIR__ . '/../src/TemplateEngine.php';
 
 initializeDatabase();
 
@@ -483,6 +486,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving SMS settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_whatsapp_settings':
+                try {
+                    $whatsappData = $_POST;
+                    if (!isset($whatsappData['whatsapp_enabled'])) {
+                        $whatsappData['whatsapp_enabled'] = '0';
+                    }
+                    $settings->saveWhatsAppSettings($whatsappData);
+                    \App\Settings::clearCache();
+                    $message = 'WhatsApp settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving WhatsApp settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

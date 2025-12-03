@@ -190,6 +190,16 @@ function initializeDatabase(): void {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS whatsapp_logs (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+        recipient_phone VARCHAR(20) NOT NULL,
+        recipient_type VARCHAR(20) NOT NULL,
+        message TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
@@ -211,6 +221,8 @@ function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_performance_employee ON performance_reviews(employee_id);
     CREATE INDEX IF NOT EXISTS idx_ticket_templates_category ON ticket_templates(category);
     CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings(setting_key);
+    CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_ticket ON whatsapp_logs(ticket_id);
+    CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_sent ON whatsapp_logs(sent_at DESC);
     ";
 
     try {

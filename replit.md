@@ -16,7 +16,9 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── Employee.php      # HR/Employee management
 │   ├── SMS.php           # Twilio SMS integration
 │   ├── SMSGateway.php    # Custom SMS gateway integration
-│   └── Settings.php      # Company settings and ticket templates
+│   ├── Settings.php      # Company settings and ticket templates
+│   ├── WhatsApp.php      # WhatsApp Web messaging integration
+│   └── TemplateEngine.php # Template placeholder engine
 ├── templates/
 │   ├── login.php         # Login page
 │   ├── dashboard.php     # Dashboard view
@@ -42,8 +44,11 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **Settings Module**: Comprehensive configuration including:
   - Company settings (name, contact info, branding)
   - SMS gateway configuration (supports any POST/GET API)
-  - Ticket response templates (reusable templates with placeholders)
+  - WhatsApp Web integration (no API key required)
+  - Ticket response templates with rich placeholders
 - **SMS Notifications**: Automatic notifications via custom gateway or Twilio
+- **WhatsApp Web Messaging**: Send messages directly from tickets (opens WhatsApp Web)
+- **Template Placeholders**: Rich placeholder system for templates
 - **Dashboard**: Overview of ticket statistics and recent activity
 
 ## Database Schema
@@ -59,6 +64,7 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **performance_reviews**: Employee performance evaluations
 - **company_settings**: System configuration key-value pairs
 - **ticket_templates**: Reusable ticket response templates
+- **whatsapp_logs**: Log of WhatsApp messages sent
 
 ## Authentication
 The system includes built-in authentication:
@@ -113,6 +119,48 @@ The system supports:
 
 If no SMS credentials are configured, the system operates normally without SMS.
 
+## WhatsApp Web Integration
+WhatsApp messaging works alongside SMS. From any ticket, you can:
+- Send WhatsApp messages to customers with pre-filled ticket info
+- Contact assigned technicians via WhatsApp
+- No API key required - opens WhatsApp Web with pre-filled message
+
+Configure default country code in Settings > WhatsApp.
+
+## Template Placeholders
+Available placeholders for ticket templates:
+
+**Customer:**
+- `{customer_name}` - Customer's full name
+- `{customer_phone}` - Customer's phone number
+- `{customer_email}` - Customer's email address
+- `{customer_address}` - Customer's address
+- `{customer_account}` - Customer's account number
+
+**Ticket:**
+- `{ticket_number}` - Ticket reference number
+- `{ticket_status}` - Current ticket status
+- `{ticket_subject}` - Ticket subject/title
+- `{ticket_description}` - Ticket description
+- `{ticket_priority}` - Ticket priority level
+- `{ticket_category}` - Ticket category
+- `{ticket_created}` - Ticket creation date
+
+**Technician:**
+- `{technician_name}` - Assigned technician name
+- `{technician_phone}` - Assigned technician phone
+- `{technician_email}` - Assigned technician email
+
+**Company:**
+- `{company_name}` - Your company name
+- `{company_phone}` - Company phone number
+- `{company_email}` - Company email address
+- `{company_website}` - Company website URL
+
+**Date/Time:**
+- `{current_date}` - Current date
+- `{current_time}` - Current time
+
 ## Security Features
 - Session-based authentication with password hashing
 - CSRF protection on all forms
@@ -121,6 +169,9 @@ If no SMS credentials are configured, the system operates normally without SMS.
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added WhatsApp Web integration for messaging customers and technicians
+- December 2024: Added rich template placeholders including {customer_phone}, {technician_phone}
+- December 2024: Added TemplateEngine class for placeholder replacement
 - December 2024: Added Settings page with company settings, SMS config, and ticket templates
 - December 2024: Enhanced HR module with attendance, payroll, and performance reviews
 - December 2024: Improved SMS gateway to support any POST or GET API

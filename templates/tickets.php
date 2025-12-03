@@ -231,12 +231,62 @@ if (isset($_GET['customer_id'])) {
             <div class="card-body">
                 <p class="mb-1"><strong><?= htmlspecialchars($ticketData['customer_name']) ?></strong></p>
                 <p class="mb-1"><small class="text-muted"><?= htmlspecialchars($ticketData['account_number']) ?></small></p>
-                <p class="mb-0"><i class="bi bi-telephone"></i> <?= htmlspecialchars($ticketData['customer_phone']) ?></p>
-                <a href="?page=customers&action=view&id=<?= $ticketData['customer_id'] ?>" class="btn btn-sm btn-outline-primary mt-2">
-                    View Customer
-                </a>
+                <p class="mb-2"><i class="bi bi-telephone"></i> <?= htmlspecialchars($ticketData['customer_phone']) ?></p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="?page=customers&action=view&id=<?= $ticketData['customer_id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-person"></i> View
+                    </a>
+                    <?php if (!empty($ticketData['customer_phone'])): ?>
+                    <a href="tel:<?= htmlspecialchars($ticketData['customer_phone']) ?>" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-telephone"></i> Call
+                    </a>
+                    <?php 
+                    $waCustomer = new \App\WhatsApp();
+                    if ($waCustomer->isEnabled()):
+                        $customerMsg = "Hi " . $ticketData['customer_name'] . ",\n\nRegarding ticket #" . $ticketData['ticket_number'] . ":\n";
+                    ?>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $customerMsg)) ?>" 
+                       target="_blank" class="btn btn-sm btn-success">
+                        <i class="bi bi-whatsapp"></i> WhatsApp
+                    </a>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <span class="text-muted small">No phone number</span>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
+        
+        <?php if ($ticketData['assigned_to']): ?>
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Assigned Technician</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong><?= htmlspecialchars($ticketData['assigned_name']) ?></strong></p>
+                <?php if (!empty($ticketData['assigned_phone'])): ?>
+                <p class="mb-2"><i class="bi bi-telephone"></i> <?= htmlspecialchars($ticketData['assigned_phone']) ?></p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="tel:<?= htmlspecialchars($ticketData['assigned_phone']) ?>" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-telephone"></i> Call
+                    </a>
+                    <?php 
+                    if (!isset($waCustomer)) $waCustomer = new \App\WhatsApp();
+                    if ($waCustomer->isEnabled()):
+                        $techMsg = "Hi " . $ticketData['assigned_name'] . ",\n\nRegarding ticket #" . $ticketData['ticket_number'] . " for " . $ticketData['customer_name'] . ":\n";
+                    ?>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['assigned_phone'], $techMsg)) ?>" 
+                       target="_blank" class="btn btn-sm btn-success">
+                        <i class="bi bi-whatsapp"></i> WhatsApp
+                    </a>
+                    <?php endif; ?>
+                </div>
+                <?php else: ?>
+                <p class="text-muted small mb-0">No phone number on file</p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <div class="card">
             <div class="card-header bg-white">

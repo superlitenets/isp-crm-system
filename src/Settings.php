@@ -123,6 +123,7 @@ class Settings {
             'ticket_prefix' => $this->get('ticket_prefix', 'TKT'),
             'customer_prefix' => $this->get('customer_prefix', 'CUS'),
             'sms_enabled' => $this->get('sms_enabled', '1'),
+            'whatsapp_enabled' => $this->get('whatsapp_enabled', '1'),
             'email_notifications' => $this->get('email_notifications', '0'),
         ];
     }
@@ -132,7 +133,7 @@ class Settings {
             'company_name', 'company_email', 'company_phone', 'company_address',
             'company_website', 'company_logo', 'timezone', 'currency', 'currency_symbol',
             'date_format', 'time_format', 'working_hours_start', 'working_hours_end',
-            'ticket_prefix', 'customer_prefix', 'sms_enabled', 'email_notifications'
+            'ticket_prefix', 'customer_prefix', 'sms_enabled', 'whatsapp_enabled', 'email_notifications'
         ];
         
         foreach ($fields as $field) {
@@ -294,6 +295,27 @@ class Settings {
             'custom_sms_api_key' => $this->get('custom_sms_api_key', ''),
             'custom_sms_sender_id' => $this->get('custom_sms_sender_id', ''),
         ];
+    }
+
+    public function getWhatsAppSettings(): array {
+        return [
+            'whatsapp_enabled' => $this->get('whatsapp_enabled', '1'),
+            'whatsapp_country_code' => $this->get('whatsapp_country_code', '254'),
+            'whatsapp_default_message' => $this->get('whatsapp_default_message', ''),
+        ];
+    }
+
+    public function saveWhatsAppSettings(array $data): bool {
+        $fields = ['whatsapp_country_code', 'whatsapp_default_message'];
+        
+        $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '0');
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $this->set($field, $data[$field]);
+            }
+        }
+        return true;
     }
 
     public function saveSMSSettings(array $data): bool {
