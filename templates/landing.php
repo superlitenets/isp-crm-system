@@ -684,7 +684,7 @@
                         </ul>
                         <?php endif; ?>
                         
-                        <a href="#contact" class="btn btn-<?= $package['is_popular'] ? 'primary' : 'outline-primary' ?> w-100">
+                        <a href="?page=order&package=<?= $package['id'] ?>" class="btn btn-<?= $package['is_popular'] ? 'primary' : 'outline-primary' ?> w-100">
                             Get Started
                         </a>
                     </div>

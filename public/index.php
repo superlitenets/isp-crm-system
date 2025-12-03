@@ -121,6 +121,75 @@ if ($page === 'mpesa_callback') {
     exit;
 }
 
+if ($page === 'order') {
+    $settingsObj = new \App\Settings();
+    $company = $settingsObj->getCompanyInfo();
+    $landingSettings = $settingsObj->getLandingPageSettings();
+    
+    $packageId = isset($_GET['package']) ? (int)$_GET['package'] : null;
+    $package = null;
+    if ($packageId) {
+        $package = $settingsObj->getPackage($packageId);
+    }
+    
+    $orderSuccess = false;
+    $orderNumber = '';
+    $paymentInitiated = false;
+    $error = '';
+    
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'submit') {
+        $customerName = trim($_POST['customer_name'] ?? '');
+        $customerPhone = trim($_POST['customer_phone'] ?? '');
+        $customerEmail = trim($_POST['customer_email'] ?? '');
+        $customerAddress = trim($_POST['customer_address'] ?? '');
+        $notes = trim($_POST['notes'] ?? '');
+        $paymentMethod = $_POST['payment_method'] ?? 'later';
+        $amount = floatval($_POST['amount'] ?? 0);
+        $pkgId = isset($_POST['package_id']) ? (int)$_POST['package_id'] : null;
+        
+        if (empty($customerName) || empty($customerPhone) || empty($customerAddress)) {
+            $error = 'Please fill in all required fields.';
+        } else {
+            try {
+                $orderModel = new \App\Order();
+                $orderId = $orderModel->create([
+                    'package_id' => $pkgId,
+                    'customer_name' => $customerName,
+                    'customer_email' => $customerEmail,
+                    'customer_phone' => $customerPhone,
+                    'customer_address' => $customerAddress,
+                    'amount' => $amount,
+                    'payment_method' => $paymentMethod,
+                    'notes' => $notes
+                ]);
+                
+                $order = $orderModel->getById($orderId);
+                $orderNumber = $order['order_number'];
+                $orderSuccess = true;
+                
+                if ($paymentMethod === 'mpesa' && $amount > 0) {
+                    $mpesa = new \App\Mpesa();
+                    if ($mpesa->isConfigured()) {
+                        $result = $mpesa->stkPush($customerPhone, $amount, $orderNumber, 'Order Payment');
+                        if ($result['success']) {
+                            $paymentInitiated = true;
+                            if (!empty($result['transaction_id'])) {
+                                $orderModel->updatePaymentStatus($orderId, 'pending', $result['transaction_id']);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                $error = 'An error occurred. Please try again.';
+                error_log("Order creation error: " . $e->getMessage());
+            }
+        }
+    }
+    
+    include __DIR__ . '/../templates/order_form.php';
+    exit;
+}
+
 if ($page === 'login') {
     $loginError = '';
     $csrfToken = \App\Auth::generateToken();
@@ -1380,6 +1449,48 @@ if ($page === 'payments' && isset($_GET['action'])) {
     }
 }
 
+if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $orderAction = $_GET['action'] ?? '';
+    $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+    
+    $csrfValid = \App\Auth::validateToken($_POST['csrf_token'] ?? '');
+    if (!$csrfValid) {
+        $_SESSION['error_message'] = 'Invalid request. Please try again.';
+    } elseif ($orderId) {
+        try {
+            $orderModel = new \App\Order();
+            
+            switch ($orderAction) {
+                case 'confirm':
+                    $orderModel->updateStatus($orderId, 'confirmed');
+                    $_SESSION['success_message'] = 'Order confirmed successfully!';
+                    break;
+                    
+                case 'convert':
+                    $ticketId = $orderModel->convertToTicket($orderId, $currentUser['id']);
+                    if ($ticketId) {
+                        $_SESSION['success_message'] = 'Order converted to ticket successfully!';
+                        header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                        exit;
+                    } else {
+                        $_SESSION['error_message'] = 'Failed to convert order to ticket.';
+                    }
+                    break;
+                    
+                case 'cancel':
+                    $orderModel->updateStatus($orderId, 'cancelled');
+                    $_SESSION['success_message'] = 'Order cancelled.';
+                    break;
+            }
+            \App\Auth::regenerateToken();
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
+    header('Location: ?page=orders');
+    exit;
+}
+
 $search = $_GET['search'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
 $priorityFilter = $_GET['priority'] ?? '';
@@ -1537,6 +1648,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders">
+                    <i class="bi bi-cart3"></i> Orders
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -1580,6 +1696,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'payments':
                 include __DIR__ . '/../templates/payments.php';
+                break;
+            case 'orders':
+                include __DIR__ . '/../templates/orders.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();

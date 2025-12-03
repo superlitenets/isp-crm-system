@@ -486,6 +486,26 @@ function runMigrations(PDO $db): void {
                 is_encrypted BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'orders' => "
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                order_number VARCHAR(20) UNIQUE NOT NULL,
+                package_id INTEGER REFERENCES service_packages(id) ON DELETE SET NULL,
+                customer_name VARCHAR(100) NOT NULL,
+                customer_email VARCHAR(100),
+                customer_phone VARCHAR(20) NOT NULL,
+                customer_address TEXT,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                payment_status VARCHAR(20) DEFAULT 'pending',
+                payment_method VARCHAR(20),
+                mpesa_transaction_id INTEGER REFERENCES mpesa_transactions(id) ON DELETE SET NULL,
+                amount DECIMAL(12, 2),
+                order_status VARCHAR(20) DEFAULT 'new',
+                notes TEXT,
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

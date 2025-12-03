@@ -24,7 +24,8 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── ZKTecoDevice.php  # ZKTeco biometric device implementation
 │   ├── HikvisionDevice.php # Hikvision biometric device implementation
 │   ├── BiometricSyncService.php # Biometric sync and attendance import
-│   └── LateDeductionCalculator.php # Late arrival deduction calculations
+│   ├── LateDeductionCalculator.php # Late arrival deduction calculations
+│   └── Order.php         # Order management and processing
 ├── templates/
 │   ├── login.php         # Login page
 │   ├── dashboard.php     # Dashboard view
@@ -32,6 +33,8 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── tickets.php       # Ticket management views
 │   ├── hr.php            # Human Resources module
 │   ├── inventory.php     # Inventory management module
+│   ├── orders.php        # Orders management module
+│   ├── order_form.php    # Public order form
 │   └── settings.php      # Settings (company, SMS, templates)
 ├── public/
 │   └── index.php         # Main application entry point
@@ -96,6 +99,14 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Real-time callback processing for payment status updates
   - Auto-link payments to customers by phone or account number
   - Sandbox mode for testing before going live
+- **Order System**: Online ordering from landing page:
+  - Public order form accessible from service packages
+  - Customer details collection (name, phone, email, address)
+  - Optional M-Pesa payment at checkout
+  - Orders management in CRM with status tracking
+  - Order confirmation workflow
+  - Convert confirmed orders to installation tickets
+  - Automatic customer account creation on conversion
 
 ## Database Schema
 - **users**: Staff members (technicians, admins)
@@ -125,6 +136,7 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **mpesa_transactions**: STK Push payment transactions
 - **mpesa_c2b_transactions**: C2B payment transactions from customers
 - **mpesa_config**: M-Pesa API configuration settings
+- **orders**: Customer orders from landing page with package and payment info
 
 ## Authentication
 The system includes built-in authentication:
