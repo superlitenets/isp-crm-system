@@ -218,66 +218,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 <?php elseif ($tab === 'c2b'): ?>
 <div class="row">
-    <div class="col-lg-4">
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-gear"></i> C2B Configuration</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small">
-                    C2B (Customer to Business) allows customers to pay to your Paybill/Till number directly. 
-                    Register your callback URLs with Safaricom to receive payment notifications.
-                </p>
-                
-                <div class="mb-3">
-                    <label class="form-label">Validation URL</label>
-                    <input type="text" class="form-control form-control-sm" readonly 
-                           value="<?= htmlspecialchars($mpesa->getValidationUrl()) ?>">
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Confirmation URL</label>
-                    <input type="text" class="form-control form-control-sm" readonly 
-                           value="<?= htmlspecialchars($mpesa->getConfirmationUrl()) ?>">
-                </div>
-                
-                <?php 
-                $config = $mpesa->getConfig();
-                $lastRegistered = $config['c2b_urls_registered'] ?? null;
-                ?>
-                
-                <?php if ($lastRegistered): ?>
-                <div class="alert alert-success py-2 small">
-                    <i class="bi bi-check-circle"></i> URLs registered on <?= htmlspecialchars($lastRegistered) ?>
-                </div>
-                <?php endif; ?>
-                
-                <form method="POST" action="?page=payments&tab=c2b&action=register_urls">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    <button type="submit" class="btn btn-primary w-100" <?= !$isConfigured ? 'disabled' : '' ?>>
-                        <i class="bi bi-link-45deg"></i> Register C2B URLs
-                    </button>
-                </form>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-info-circle"></i> How C2B Works</h6>
-            </div>
-            <div class="card-body small">
-                <ol class="mb-0">
-                    <li>Customer dials USSD or uses M-Pesa app</li>
-                    <li>Enters your Paybill and account number</li>
-                    <li>M-Pesa sends validation request</li>
-                    <li>On success, confirmation is sent</li>
-                    <li>Transaction appears here automatically</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-8">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-arrow-down-circle"></i> C2B Transactions</h5>

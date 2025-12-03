@@ -707,6 +707,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'register_c2b':
+                try {
+                    $mpesa = new \App\Mpesa();
+                    $result = $mpesa->registerC2BUrls();
+                    if ($result['success']) {
+                        $mpesa->saveConfig('c2b_urls_registered', date('Y-m-d H:i:s'));
+                        $message = 'C2B URLs registered successfully!';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to register C2B URLs: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error registering C2B URLs: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_template':
                 $name = trim($_POST['name'] ?? '');
                 $content = trim($_POST['content'] ?? '');

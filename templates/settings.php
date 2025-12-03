@@ -1896,12 +1896,24 @@ $mpesaConfig = $mpesa->getConfig();
                                    value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
                         </div>
                     </div>
+                    
+                    <?php 
+                    $c2bRegistered = $mpesaConfig['c2b_urls_registered'] ?? null;
+                    ?>
+                    <?php if ($c2bRegistered): ?>
+                    <div class="alert alert-success py-2 small mb-3">
+                        <i class="bi bi-check-circle"></i> C2B URLs registered on <?= htmlspecialchars($c2bRegistered) ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-lg"></i> Save M-Pesa Settings
+                </button>
+                <button type="submit" formaction="?page=settings&subpage=mpesa&action=register_c2b" class="btn btn-outline-primary" <?= !$mpesa->isConfigured() ? 'disabled' : '' ?>>
+                    <i class="bi bi-link-45deg"></i> Register C2B URLs
                 </button>
                 <a href="?page=payments" class="btn btn-outline-success">
                     <i class="bi bi-arrow-right"></i> Go to Payments
