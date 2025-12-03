@@ -61,19 +61,48 @@ abstract class BiometricDevice {
     }
     
     public static function encryptPassword(string $password): string {
-        $key = getenv('SESSION_SECRET') ?: 'default_encryption_key_change_me';
+        if (empty($password)) return '';
+        
+        $secret = getenv('SESSION_SECRET') ?: 'default_encryption_key_change_me';
+        $key = hash('sha256', $secret, true);
         $iv = openssl_random_pseudo_bytes(16);
-        $encrypted = openssl_encrypt($password, 'AES-256-CBC', $key, 0, $iv);
-        return base64_encode($iv . '::' . $encrypted);
+        
+        if ($iv === false) {
+            error_log('Failed to generate IV for encryption');
+            return base64_encode($password);
+        }
+        
+        $encrypted = openssl_encrypt($password, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        
+        if ($encrypted === false) {
+            error_log('OpenSSL encrypt failed: ' . openssl_error_string());
+            return base64_encode($password);
+        }
+        
+        return base64_encode($iv . $encrypted);
     }
     
     public static function decryptPassword(string $encrypted): string {
         if (empty($encrypted)) return '';
-        $key = getenv('SESSION_SECRET') ?: 'default_encryption_key_change_me';
-        $parts = explode('::', base64_decode($encrypted), 2);
-        if (count($parts) !== 2) return '';
-        $iv = $parts[0];
-        $encryptedData = $parts[1];
-        return openssl_decrypt($encryptedData, 'AES-256-CBC', $key, 0, $iv) ?: '';
+        
+        $secret = getenv('SESSION_SECRET') ?: 'default_encryption_key_change_me';
+        $key = hash('sha256', $secret, true);
+        
+        $data = base64_decode($encrypted);
+        if ($data === false || strlen($data) < 17) {
+            return '';
+        }
+        
+        $iv = substr($data, 0, 16);
+        $encryptedData = substr($data, 16);
+        
+        $decrypted = openssl_decrypt($encryptedData, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        
+        if ($decrypted === false) {
+            error_log('OpenSSL decrypt failed: ' . openssl_error_string());
+            return '';
+        }
+        
+        return $decrypted;
     }
 }
