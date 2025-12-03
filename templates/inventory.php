@@ -330,9 +330,20 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Equipment List</h5>
-                <a href="?page=inventory&tab=equipment&action=add" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-lg"></i> Add Equipment
-                </a>
+                <div class="btn-group">
+                    <a href="?page=inventory&tab=import&action=download_template" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-file-earmark-arrow-down"></i> Template
+                    </a>
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+                        <i class="bi bi-upload"></i> Import
+                    </button>
+                    <a href="?page=inventory&tab=import&action=export" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-download"></i> Export
+                    </a>
+                    <a href="?page=inventory&tab=equipment&action=add" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg"></i> Add
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 <form method="GET" class="row g-3 mb-4">
@@ -422,6 +433,37 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             </div>
         </div>
     <?php endif; ?>
+    
+    <!-- Import Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-upload"></i> Import Equipment</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="?page=inventory&tab=import&action=import" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        
+                        <div class="alert alert-info py-2">
+                            <small><i class="bi bi-info-circle"></i> Download the <a href="?page=inventory&tab=import&action=download_template">import template</a> first to see the correct format.</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Select Excel or CSV File</label>
+                            <input type="file" class="form-control" name="import_file" accept=".xlsx,.xls,.csv" required>
+                            <div class="form-text">Supported: .xlsx, .xls, .csv (max 10MB)</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success"><i class="bi bi-upload"></i> Import</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <?php elseif ($tab === 'assignments'): ?>
     <!-- Assignments Tab -->
