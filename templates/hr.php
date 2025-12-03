@@ -2,6 +2,8 @@
 $employeeData = null;
 $departmentData = null;
 $subpage = $_GET['subpage'] ?? 'employees';
+$selectedDate = $_GET['date'] ?? date('Y-m-d');
+$selectedMonth = $_GET['month'] ?? date('Y-m');
 
 if ($action === 'edit_employee' && $id) {
     $employeeData = $employee->find($id);
@@ -17,6 +19,10 @@ $departments = $employee->getAllDepartments();
 $employmentStatuses = $employee->getEmploymentStatuses();
 $hrStats = $employee->getStats();
 $allEmployees = $employee->getAll();
+$attendanceStatuses = $employee->getAttendanceStatuses();
+$payrollStatuses = $employee->getPayrollStatuses();
+$paymentMethods = $employee->getPaymentMethods();
+$performanceStatuses = $employee->getPerformanceStatuses();
 ?>
 
 <?php if ($action === 'create_employee' || $action === 'edit_employee'): ?>
@@ -273,65 +279,19 @@ $allEmployees = $employee->getAll();
     </div>
 </div>
 
-<?php elseif ($subpage === 'departments'): ?>
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-building"></i> Departments</h2>
-    <a href="?page=hr&action=create_department" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Add Department
-    </a>
-</div>
-
-<ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <a class="nav-link" href="?page=hr&subpage=employees">Employees</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link active" href="?page=hr&subpage=departments">Departments</a>
-    </li>
-</ul>
-
-<div class="row g-4">
-    <?php foreach ($departments as $dept): ?>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title"><?= htmlspecialchars($dept['name']) ?></h5>
-                <p class="text-muted small mb-2"><?= htmlspecialchars($dept['description'] ?? 'No description') ?></p>
-                <p class="mb-1"><i class="bi bi-people"></i> <?= $dept['employee_count'] ?> Employees</p>
-                <p class="mb-3"><i class="bi bi-person-badge"></i> Manager: <?= htmlspecialchars($dept['manager_name'] ?? 'Not assigned') ?></p>
-                <a href="?page=hr&action=edit_department&id=<?= $dept['id'] ?>" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
-                <?php if (\App\Auth::isAdmin()): ?>
-                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this department?')">
-                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="action" value="delete_department">
-                    <input type="hidden" name="id" value="<?= $dept['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                        <i class="bi bi-trash"></i> Delete
-                    </button>
-                </form>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-    <?php endforeach; ?>
-    <?php if (empty($departments)): ?>
-    <div class="col-12">
-        <div class="text-center text-muted py-5">
-            <i class="bi bi-building" style="font-size: 3rem;"></i>
-            <p class="mt-3">No departments yet. <a href="?page=hr&action=create_department">Create your first department</a></p>
-        </div>
-    </div>
-    <?php endif; ?>
-</div>
-
 <?php else: ?>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-people-fill"></i> Human Resources</h2>
+    <?php if ($subpage === 'employees'): ?>
     <a href="?page=hr&action=create_employee" class="btn btn-primary">
         <i class="bi bi-person-plus"></i> Add Employee
     </a>
+    <?php elseif ($subpage === 'departments'): ?>
+    <a href="?page=hr&action=create_department" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Department
+    </a>
+    <?php endif; ?>
 </div>
 
 <div class="row g-4 mb-4">
@@ -391,12 +351,659 @@ $allEmployees = $employee->getAll();
 
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link active" href="?page=hr&subpage=employees">Employees</a>
+        <a class="nav-link <?= $subpage === 'employees' ? 'active' : '' ?>" href="?page=hr&subpage=employees">
+            <i class="bi bi-people"></i> Employees
+        </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="?page=hr&subpage=departments">Departments</a>
+        <a class="nav-link <?= $subpage === 'departments' ? 'active' : '' ?>" href="?page=hr&subpage=departments">
+            <i class="bi bi-building"></i> Departments
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'attendance' ? 'active' : '' ?>" href="?page=hr&subpage=attendance">
+            <i class="bi bi-clock-history"></i> Attendance
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'payroll' ? 'active' : '' ?>" href="?page=hr&subpage=payroll">
+            <i class="bi bi-cash-stack"></i> Payroll
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'performance' ? 'active' : '' ?>" href="?page=hr&subpage=performance">
+            <i class="bi bi-graph-up"></i> Performance
+        </a>
     </li>
 </ul>
+
+<?php if ($subpage === 'departments'): ?>
+
+<div class="row g-4">
+    <?php foreach ($departments as $dept): ?>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><?= htmlspecialchars($dept['name']) ?></h5>
+                <p class="text-muted small mb-2"><?= htmlspecialchars($dept['description'] ?? 'No description') ?></p>
+                <p class="mb-1"><i class="bi bi-people"></i> <?= $dept['employee_count'] ?> Employees</p>
+                <p class="mb-3"><i class="bi bi-person-badge"></i> Manager: <?= htmlspecialchars($dept['manager_name'] ?? 'Not assigned') ?></p>
+                <a href="?page=hr&action=edit_department&id=<?= $dept['id'] ?>" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <?php if (\App\Auth::isAdmin()): ?>
+                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this department?')">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="delete_department">
+                    <input type="hidden" name="id" value="<?= $dept['id'] ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </form>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+    <?php if (empty($departments)): ?>
+    <div class="col-12">
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-building" style="font-size: 3rem;"></i>
+            <p class="mt-3">No departments yet. <a href="?page=hr&action=create_department">Create your first department</a></p>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php elseif ($subpage === 'attendance'): ?>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <input type="hidden" name="page" value="hr">
+            <input type="hidden" name="subpage" value="attendance">
+            <div class="col-md-3">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-control" name="date" value="<?= $selectedDate ?>">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Filter
+                </button>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#attendanceModal">
+                    <i class="bi bi-plus-circle"></i> Record Attendance
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<?php $attendanceRecords = $employee->getAllAttendance($selectedDate); ?>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Attendance for <?= date('F j, Y', strtotime($selectedDate)) ?></h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Hours</th>
+                        <th>Overtime</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($attendanceRecords as $att): ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars($att['employee_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($att['emp_code']) ?></small>
+                        </td>
+                        <td><?= htmlspecialchars($att['department_name'] ?? '-') ?></td>
+                        <td><?= $att['clock_in'] ? date('h:i A', strtotime($att['clock_in'])) : '-' ?></td>
+                        <td><?= $att['clock_out'] ? date('h:i A', strtotime($att['clock_out'])) : '-' ?></td>
+                        <td><?= $att['hours_worked'] ? number_format($att['hours_worked'], 1) . 'h' : '-' ?></td>
+                        <td><?= $att['overtime_hours'] > 0 ? number_format($att['overtime_hours'], 1) . 'h' : '-' ?></td>
+                        <td>
+                            <span class="badge bg-<?= $att['status'] === 'present' ? 'success' : ($att['status'] === 'absent' ? 'danger' : ($att['status'] === 'late' ? 'warning' : 'info')) ?>">
+                                <?= ucfirst(str_replace('_', ' ', $att['status'])) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (\App\Auth::isAdmin()): ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this record?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="delete_attendance">
+                                <input type="hidden" name="id" value="<?= $att['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($attendanceRecords)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No attendance records for this date.
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="record_attendance">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record Attendance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Employee *</label>
+                        <select class="form-select" name="employee_id" required>
+                            <option value="">Select Employee</option>
+                            <?php foreach ($allEmployees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-control" name="date" value="<?= $selectedDate ?>" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label class="form-label">Clock In</label>
+                                <input type="time" class="form-control" name="clock_in">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label class="form-label">Clock Out</label>
+                                <input type="time" class="form-control" name="clock_out">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <?php foreach ($attendanceStatuses as $key => $label): ?>
+                            <option value="<?= $key ?>"><?= $label ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($subpage === 'payroll'): ?>
+
+<?php $payrollRecords = $employee->getAllPayroll(null, $selectedMonth); ?>
+<?php $payrollStats = $employee->getPayrollStats($selectedMonth); ?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h4>$<?= number_format($payrollStats['total_paid'] ?? 0, 2) ?></h4>
+                <small>Total Paid</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h4>$<?= number_format($payrollStats['total_pending'] ?? 0, 2) ?></h4>
+                <small>Pending Payment</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h4><?= $payrollStats['total_records'] ?? 0 ?></h4>
+                <small>Total Records</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <input type="hidden" name="page" value="hr">
+            <input type="hidden" name="subpage" value="payroll">
+            <div class="col-md-3">
+                <label class="form-label">Month</label>
+                <input type="month" class="form-control" name="month" value="<?= $selectedMonth ?>">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Filter
+                </button>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#payrollModal">
+                    <i class="bi bi-plus-circle"></i> Create Payroll
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Pay Period</th>
+                        <th>Base Salary</th>
+                        <th>Bonuses</th>
+                        <th>Deductions</th>
+                        <th>Net Pay</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($payrollRecords as $pay): ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars($pay['employee_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($pay['emp_code']) ?></small>
+                        </td>
+                        <td>
+                            <?= date('M j', strtotime($pay['pay_period_start'])) ?> - <?= date('M j, Y', strtotime($pay['pay_period_end'])) ?>
+                        </td>
+                        <td>$<?= number_format($pay['base_salary'], 2) ?></td>
+                        <td class="text-success">+$<?= number_format($pay['bonuses'] + $pay['overtime_pay'], 2) ?></td>
+                        <td class="text-danger">-$<?= number_format($pay['deductions'] + $pay['tax'], 2) ?></td>
+                        <td><strong>$<?= number_format($pay['net_pay'], 2) ?></strong></td>
+                        <td>
+                            <span class="badge bg-<?= $pay['status'] === 'paid' ? 'success' : ($pay['status'] === 'pending' ? 'warning' : 'secondary') ?>">
+                                <?= ucfirst($pay['status']) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (\App\Auth::isAdmin()): ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this payroll record?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="delete_payroll">
+                                <input type="hidden" name="id" value="<?= $pay['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($payrollRecords)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No payroll records found.
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="payrollModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_payroll">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Payroll Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Employee *</label>
+                            <select class="form-select" name="employee_id" required>
+                                <option value="">Select Employee</option>
+                                <?php foreach ($allEmployees as $emp): ?>
+                                <option value="<?= $emp['id'] ?>" data-salary="<?= $emp['salary'] ?? 0 ?>">
+                                    <?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>) - $<?= number_format($emp['salary'] ?? 0, 2) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Pay Period Start *</label>
+                            <input type="date" class="form-control" name="pay_period_start" value="<?= $selectedMonth ?>-01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Pay Period End *</label>
+                            <input type="date" class="form-control" name="pay_period_end" value="<?= date('Y-m-t', strtotime($selectedMonth . '-01')) ?>" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Base Salary *</label>
+                            <input type="number" step="0.01" class="form-control" name="base_salary" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Overtime Pay</label>
+                            <input type="number" step="0.01" class="form-control" name="overtime_pay" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Bonuses</label>
+                            <input type="number" step="0.01" class="form-control" name="bonuses" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Deductions</label>
+                            <input type="number" step="0.01" class="form-control" name="deductions" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tax</label>
+                            <input type="number" step="0.01" class="form-control" name="tax" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <?php foreach ($payrollStatuses as $key => $label): ?>
+                                <option value="<?= $key ?>"><?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Date</label>
+                            <input type="date" class="form-control" name="payment_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Method</label>
+                            <select class="form-select" name="payment_method">
+                                <option value="">Select Method</option>
+                                <?php foreach ($paymentMethods as $key => $label): ?>
+                                <option value="<?= $key ?>"><?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Payroll</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($subpage === 'performance'): ?>
+
+<?php $performanceReviews = $employee->getAllPerformanceReviews(); ?>
+<?php $performanceStats = $employee->getPerformanceStats(); ?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h4><?= $performanceStats['completed'] ?? 0 ?></h4>
+                <small>Completed Reviews</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h4><?= $performanceStats['pending'] ?? 0 ?></h4>
+                <small>Pending Reviews</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h4><?= number_format($performanceStats['avg_rating'] ?? 0, 1) ?>/5</h4>
+                <small>Average Rating</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body d-flex justify-content-end">
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#performanceModal">
+            <i class="bi bi-plus-circle"></i> Create Performance Review
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Review Period</th>
+                        <th>Reviewer</th>
+                        <th>Overall Rating</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($performanceReviews as $review): ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars($review['employee_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($review['department_name'] ?? 'No Department') ?></small>
+                        </td>
+                        <td>
+                            <?= date('M j, Y', strtotime($review['review_period_start'])) ?> - <?= date('M j, Y', strtotime($review['review_period_end'])) ?>
+                        </td>
+                        <td><?= htmlspecialchars($review['reviewer_name'] ?? 'Not assigned') ?></td>
+                        <td>
+                            <?php if ($review['overall_rating']): ?>
+                            <div class="d-flex align-items-center">
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <i class="bi bi-star<?= $i <= $review['overall_rating'] ? '-fill text-warning' : '' ?>"></i>
+                                <?php endfor; ?>
+                                <span class="ms-2"><?= $review['overall_rating'] ?>/5</span>
+                            </div>
+                            <?php else: ?>
+                            <span class="text-muted">Not rated</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <span class="badge bg-<?= $review['status'] === 'completed' || $review['status'] === 'acknowledged' ? 'success' : ($review['status'] === 'draft' ? 'secondary' : 'warning') ?>">
+                                <?= ucfirst(str_replace('_', ' ', $review['status'])) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (\App\Auth::isAdmin()): ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this performance review?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="delete_performance">
+                                <input type="hidden" name="id" value="<?= $review['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($performanceReviews)): ?>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No performance reviews found.
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="performanceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_performance">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Performance Review</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Employee *</label>
+                            <select class="form-select" name="employee_id" required>
+                                <option value="">Select Employee</option>
+                                <?php foreach ($allEmployees as $emp): ?>
+                                <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Reviewer</label>
+                            <select class="form-select" name="reviewer_id">
+                                <option value="">Select Reviewer</option>
+                                <?php foreach ($allEmployees as $emp): ?>
+                                <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Review Period Start *</label>
+                            <input type="date" class="form-control" name="review_period_start" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Review Period End *</label>
+                            <input type="date" class="form-control" name="review_period_end" required>
+                        </div>
+                        <div class="col-12">
+                            <h6 class="mt-3">Ratings (1-5)</h6>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Overall</label>
+                            <select class="form-select" name="overall_rating">
+                                <option value="">Not rated</option>
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?> - <?= ['Poor', 'Below Average', 'Average', 'Good', 'Excellent'][$i-1] ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Productivity</label>
+                            <select class="form-select" name="productivity_rating">
+                                <option value="">Not rated</option>
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Quality</label>
+                            <select class="form-select" name="quality_rating">
+                                <option value="">Not rated</option>
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Teamwork</label>
+                            <select class="form-select" name="teamwork_rating">
+                                <option value="">Not rated</option>
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Communication</label>
+                            <select class="form-select" name="communication_rating">
+                                <option value="">Not rated</option>
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Goals Achieved</label>
+                            <textarea class="form-control" name="goals_achieved" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Strengths</label>
+                            <textarea class="form-control" name="strengths" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Areas for Improvement</label>
+                            <textarea class="form-control" name="areas_for_improvement" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Goals for Next Period</label>
+                            <textarea class="form-control" name="goals_next_period" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Additional Comments</label>
+                            <textarea class="form-control" name="comments" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <?php foreach ($performanceStatuses as $key => $label): ?>
+                                <option value="<?= $key ?>"><?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php else: ?>
 
 <div class="card mb-4">
     <div class="card-body">
@@ -489,4 +1096,6 @@ $allEmployees = $employee->getAll();
         </div>
     </div>
 </div>
+<?php endif; ?>
+
 <?php endif; ?>

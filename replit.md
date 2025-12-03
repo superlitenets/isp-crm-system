@@ -33,7 +33,11 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 ## Features
 - **Customer Management**: Add, edit, view, and delete customers with ISP-specific fields
 - **Ticketing System**: Create and manage support tickets with priority levels and status tracking
-- **Human Resources**: Employee management, departments, positions, and salary tracking
+- **Human Resources**: Complete HR management including:
+  - Employee management with departments and positions
+  - Attendance tracking (clock in/out, overtime, work-from-home)
+  - Payroll management (salary, bonuses, deductions, tax calculations)
+  - Performance reviews (ratings, goals, strengths, improvement areas)
 - **SMS Notifications**: Automatic notifications via custom gateway or Twilio
 - **Dashboard**: Overview of ticket statistics and recent activity
 
@@ -45,6 +49,9 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **sms_logs**: Log of all SMS notifications sent
 - **departments**: Organization departments
 - **employees**: Employee records with HR data
+- **attendance**: Daily attendance records with clock in/out times
+- **payroll**: Payroll records with salary, bonuses, deductions
+- **performance_reviews**: Employee performance evaluations
 
 ## Authentication
 The system includes built-in authentication:
@@ -58,10 +65,13 @@ Admin users can delete customers. All users can manage tickets and customers.
 - `DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` - PostgreSQL connection (auto-configured)
 
 ### Custom SMS Gateway (Preferred)
+Supports any REST API with POST or GET methods:
 - `SMS_API_URL` - Your SMS gateway API endpoint
 - `SMS_API_KEY` - API key or authentication token
 - `SMS_SENDER_ID` - Sender ID or phone number (default: ISP-CRM)
-- `SMS_API_METHOD` - HTTP method POST or GET (default: POST)
+- `SMS_API_METHOD` - HTTP method: POST or GET (default: POST)
+- `SMS_CONTENT_TYPE` - Request content type: json or form (default: json)
+- `SMS_AUTH_HEADER` - Auth header type: Bearer, Basic, X-API-Key, or custom (default: Bearer)
 - `SMS_PHONE_PARAM` - Parameter name for phone number (default: phone)
 - `SMS_MESSAGE_PARAM` - Parameter name for message (default: message)
 - `SMS_SENDER_PARAM` - Parameter name for sender ID (default: sender)
@@ -97,6 +107,8 @@ If no SMS credentials are configured, the system operates normally without SMS.
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Enhanced HR module with attendance, payroll, and performance reviews
+- December 2024: Improved SMS gateway to support any POST or GET API
 - December 2024: Added Human Resources module (employees, departments)
 - December 2024: Added custom SMS gateway support with configurable API
 - December 2024: Added authentication system with CSRF protection

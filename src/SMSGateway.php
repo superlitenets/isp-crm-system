@@ -84,31 +84,51 @@ class SMSGateway {
                 $this->senderParam => $this->senderId
             ];
 
+            $url = $this->apiUrl;
+            $headers = [];
+
             if (strpos($this->apiUrl, 'twilio.com') !== false) {
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $this->customHeaders);
+                $headers = $this->customHeaders;
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+                curl_setopt($ch, CURLOPT_POST, true);
             } else {
-                $headers = ['Content-Type: application/json'];
-                if ($this->apiKey) {
-                    $headers[] = 'Authorization: Bearer ' . $this->apiKey;
-                    $headers[] = 'X-API-Key: ' . $this->apiKey;
-                }
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                $contentType = getenv('SMS_CONTENT_TYPE') ?: 'json';
                 
-                if ($this->method === 'POST') {
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                if ($this->apiKey) {
+                    $authHeader = getenv('SMS_AUTH_HEADER') ?: 'Bearer';
+                    if ($authHeader === 'Bearer') {
+                        $headers[] = 'Authorization: Bearer ' . $this->apiKey;
+                    } elseif ($authHeader === 'Basic') {
+                        $headers[] = 'Authorization: Basic ' . $this->apiKey;
+                    } elseif ($authHeader === 'X-API-Key') {
+                        $headers[] = 'X-API-Key: ' . $this->apiKey;
+                    } else {
+                        $headers[] = $authHeader . ': ' . $this->apiKey;
+                    }
+                }
+
+                $method = strtoupper($this->method);
+                
+                if ($method === 'GET') {
+                    $separator = (strpos($url, '?') !== false) ? '&' : '?';
+                    $url .= $separator . http_build_query($data);
                 } else {
-                    $this->apiUrl .= '?' . http_build_query($data);
+                    if ($contentType === 'form') {
+                        $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+                    } else {
+                        $headers[] = 'Content-Type: application/json';
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                    }
+                    curl_setopt($ch, CURLOPT_POST, true);
                 }
             }
 
-            curl_setopt($ch, CURLOPT_URL, $this->apiUrl);
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            
-            if ($this->method === 'POST') {
-                curl_setopt($ch, CURLOPT_POST, true);
-            }
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

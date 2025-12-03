@@ -329,6 +329,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+
+            case 'record_attendance':
+                try {
+                    $employee->recordAttendance($_POST);
+                    $message = 'Attendance recorded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error recording attendance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_attendance':
+                try {
+                    $employee->updateAttendance((int)$_POST['id'], $_POST);
+                    $message = 'Attendance updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating attendance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_attendance':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete attendance records.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->deleteAttendance((int)$_POST['id']);
+                        $message = 'Attendance record deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting attendance: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'create_payroll':
+                try {
+                    $employee->createPayroll($_POST);
+                    $message = 'Payroll record created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating payroll: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_payroll':
+                try {
+                    $employee->updatePayroll((int)$_POST['id'], $_POST);
+                    $message = 'Payroll record updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating payroll: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_payroll':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete payroll records.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->deletePayroll((int)$_POST['id']);
+                        $message = 'Payroll record deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting payroll: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'create_performance':
+                try {
+                    $employee->createPerformanceReview($_POST);
+                    $message = 'Performance review created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating performance review: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_performance':
+                try {
+                    $employee->updatePerformanceReview((int)$_POST['id'], $_POST);
+                    $message = 'Performance review updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating performance review: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_performance':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete performance reviews.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $employee->deletePerformanceReview((int)$_POST['id']);
+                        $message = 'Performance review deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting performance review: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
         }
     }
 }

@@ -101,12 +101,72 @@ function initializeDatabase(): void {
         END IF;
     END $$;
 
+    CREATE TABLE IF NOT EXISTS attendance (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        clock_in TIME,
+        clock_out TIME,
+        status VARCHAR(20) DEFAULT 'present',
+        hours_worked DECIMAL(5, 2),
+        overtime_hours DECIMAL(5, 2) DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(employee_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS payroll (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        pay_period_start DATE NOT NULL,
+        pay_period_end DATE NOT NULL,
+        base_salary DECIMAL(12, 2) NOT NULL,
+        overtime_pay DECIMAL(12, 2) DEFAULT 0,
+        bonuses DECIMAL(12, 2) DEFAULT 0,
+        deductions DECIMAL(12, 2) DEFAULT 0,
+        tax DECIMAL(12, 2) DEFAULT 0,
+        net_pay DECIMAL(12, 2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        payment_date DATE,
+        payment_method VARCHAR(50),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS performance_reviews (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        reviewer_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+        review_period_start DATE NOT NULL,
+        review_period_end DATE NOT NULL,
+        overall_rating INTEGER CHECK (overall_rating >= 1 AND overall_rating <= 5),
+        productivity_rating INTEGER CHECK (productivity_rating >= 1 AND productivity_rating <= 5),
+        quality_rating INTEGER CHECK (quality_rating >= 1 AND quality_rating <= 5),
+        teamwork_rating INTEGER CHECK (teamwork_rating >= 1 AND teamwork_rating <= 5),
+        communication_rating INTEGER CHECK (communication_rating >= 1 AND communication_rating <= 5),
+        goals_achieved TEXT,
+        strengths TEXT,
+        areas_for_improvement TEXT,
+        goals_next_period TEXT,
+        comments TEXT,
+        status VARCHAR(20) DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
     CREATE INDEX IF NOT EXISTS idx_customers_account ON customers(account_number);
     CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department_id);
     CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status);
+    CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+    CREATE INDEX IF NOT EXISTS idx_payroll_employee ON payroll(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_payroll_period ON payroll(pay_period_start, pay_period_end);
+    CREATE INDEX IF NOT EXISTS idx_performance_employee ON performance_reviews(employee_id);
     ";
 
     try {

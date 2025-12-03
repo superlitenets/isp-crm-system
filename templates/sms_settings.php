@@ -123,26 +123,46 @@ if ($_GET['action'] ?? '' === 'test') {
                 </tr>
                 <tr>
                     <td><code>SMS_API_METHOD</code></td>
-                    <td>HTTP method (POST or GET)</td>
-                    <td>POST</td>
+                    <td>HTTP method</td>
+                    <td><strong>POST</strong> or <strong>GET</strong></td>
+                </tr>
+                <tr>
+                    <td><code>SMS_CONTENT_TYPE</code></td>
+                    <td>Request content type (for POST)</td>
+                    <td><strong>json</strong> (default) or <strong>form</strong></td>
+                </tr>
+                <tr>
+                    <td><code>SMS_AUTH_HEADER</code></td>
+                    <td>Authorization header type</td>
+                    <td><strong>Bearer</strong> (default), <strong>Basic</strong>, <strong>X-API-Key</strong>, or custom</td>
                 </tr>
                 <tr>
                     <td><code>SMS_PHONE_PARAM</code></td>
                     <td>Parameter name for phone number</td>
-                    <td>phone, to, recipient</td>
+                    <td>phone, to, recipient, mobile</td>
                 </tr>
                 <tr>
                     <td><code>SMS_MESSAGE_PARAM</code></td>
                     <td>Parameter name for message</td>
-                    <td>message, text, body</td>
+                    <td>message, text, body, content</td>
                 </tr>
                 <tr>
                     <td><code>SMS_SENDER_PARAM</code></td>
                     <td>Parameter name for sender ID</td>
-                    <td>sender, from, sender_id</td>
+                    <td>sender, from, sender_id, source</td>
                 </tr>
             </tbody>
         </table>
+        
+        <div class="alert alert-info mt-3">
+            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> API Flexibility</h6>
+            <p class="mb-2">The SMS gateway supports any REST API that accepts phone number and message parameters:</p>
+            <ul class="mb-0">
+                <li><strong>POST with JSON:</strong> Set <code>SMS_API_METHOD=POST</code> and <code>SMS_CONTENT_TYPE=json</code></li>
+                <li><strong>POST with Form Data:</strong> Set <code>SMS_API_METHOD=POST</code> and <code>SMS_CONTENT_TYPE=form</code></li>
+                <li><strong>GET with Query Params:</strong> Set <code>SMS_API_METHOD=GET</code> (parameters added to URL)</li>
+            </ul>
+        </div>
         
         <hr>
         

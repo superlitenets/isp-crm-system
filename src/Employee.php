@@ -227,4 +227,410 @@ class Employee {
         ");
         return $stmt->fetchAll();
     }
+
+    public function recordAttendance(array $data): int {
+        $clockIn = $data['clock_in'] ?? null;
+        $clockOut = $data['clock_out'] ?? null;
+        $hoursWorked = null;
+        $overtimeHours = 0;
+
+        if ($clockIn && $clockOut) {
+            $start = new \DateTime($clockIn);
+            $end = new \DateTime($clockOut);
+            $diff = $start->diff($end);
+            $hoursWorked = $diff->h + ($diff->i / 60);
+            if ($hoursWorked > 8) {
+                $overtimeHours = $hoursWorked - 8;
+            }
+        }
+
+        $stmt = $this->db->prepare("
+            INSERT INTO attendance (employee_id, date, clock_in, clock_out, status, hours_worked, overtime_hours, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (employee_id, date) DO UPDATE SET
+                clock_in = EXCLUDED.clock_in,
+                clock_out = EXCLUDED.clock_out,
+                status = EXCLUDED.status,
+                hours_worked = EXCLUDED.hours_worked,
+                overtime_hours = EXCLUDED.overtime_hours,
+                notes = EXCLUDED.notes,
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        
+        $stmt->execute([
+            $data['employee_id'],
+            $data['date'],
+            $clockIn,
+            $clockOut,
+            $data['status'] ?? 'present',
+            $hoursWorked,
+            $overtimeHours,
+            $data['notes'] ?? null
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updateAttendance(int $id, array $data): bool {
+        $clockIn = $data['clock_in'] ?? null;
+        $clockOut = $data['clock_out'] ?? null;
+        $hoursWorked = null;
+        $overtimeHours = 0;
+
+        if ($clockIn && $clockOut) {
+            $start = new \DateTime($clockIn);
+            $end = new \DateTime($clockOut);
+            $diff = $start->diff($end);
+            $hoursWorked = $diff->h + ($diff->i / 60);
+            if ($hoursWorked > 8) {
+                $overtimeHours = $hoursWorked - 8;
+            }
+        }
+
+        $stmt = $this->db->prepare("
+            UPDATE attendance SET 
+                clock_in = ?, clock_out = ?, status = ?, hours_worked = ?, overtime_hours = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([$clockIn, $clockOut, $data['status'], $hoursWorked, $overtimeHours, $data['notes'] ?? null, $id]);
+    }
+
+    public function deleteAttendance(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM attendance WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function getAttendance(int $employeeId, ?string $startDate = null, ?string $endDate = null): array {
+        $sql = "SELECT a.*, e.name as employee_name FROM attendance a 
+                JOIN employees e ON a.employee_id = e.id 
+                WHERE a.employee_id = ?";
+        $params = [$employeeId];
+
+        if ($startDate) {
+            $sql .= " AND a.date >= ?";
+            $params[] = $startDate;
+        }
+        if ($endDate) {
+            $sql .= " AND a.date <= ?";
+            $params[] = $endDate;
+        }
+
+        $sql .= " ORDER BY a.date DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function getAllAttendance(string $date): array {
+        $stmt = $this->db->prepare("
+            SELECT a.*, e.name as employee_name, e.employee_id as emp_code, d.name as department_name
+            FROM attendance a
+            JOIN employees e ON a.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            WHERE a.date = ?
+            ORDER BY e.name ASC
+        ");
+        $stmt->execute([$date]);
+        return $stmt->fetchAll();
+    }
+
+    public function getTodayAttendance(): array {
+        return $this->getAllAttendance(date('Y-m-d'));
+    }
+
+    public function getAttendanceStatuses(): array {
+        return [
+            'present' => 'Present',
+            'absent' => 'Absent',
+            'late' => 'Late',
+            'half_day' => 'Half Day',
+            'leave' => 'On Leave',
+            'holiday' => 'Holiday',
+            'work_from_home' => 'Work From Home'
+        ];
+    }
+
+    public function getAttendanceStats(string $month): array {
+        $startDate = $month . '-01';
+        $endDate = date('Y-m-t', strtotime($startDate));
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) FILTER (WHERE status = 'present') as present,
+                COUNT(*) FILTER (WHERE status = 'absent') as absent,
+                COUNT(*) FILTER (WHERE status = 'late') as late,
+                COUNT(*) FILTER (WHERE status = 'leave') as on_leave,
+                COUNT(*) FILTER (WHERE status = 'work_from_home') as wfh,
+                SUM(COALESCE(hours_worked, 0)) as total_hours,
+                SUM(COALESCE(overtime_hours, 0)) as total_overtime
+            FROM attendance
+            WHERE date >= ? AND date <= ?
+        ");
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetch();
+    }
+
+    public function createPayroll(array $data): int {
+        $baseSalary = (float)($data['base_salary'] ?? 0);
+        $overtimePay = (float)($data['overtime_pay'] ?? 0);
+        $bonuses = (float)($data['bonuses'] ?? 0);
+        $deductions = (float)($data['deductions'] ?? 0);
+        $tax = (float)($data['tax'] ?? 0);
+        $netPay = $baseSalary + $overtimePay + $bonuses - $deductions - $tax;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO payroll (employee_id, pay_period_start, pay_period_end, base_salary, overtime_pay, bonuses, deductions, tax, net_pay, status, payment_date, payment_method, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $data['employee_id'],
+            $data['pay_period_start'],
+            $data['pay_period_end'],
+            $baseSalary,
+            $overtimePay,
+            $bonuses,
+            $deductions,
+            $tax,
+            $netPay,
+            $data['status'] ?? 'pending',
+            $data['payment_date'] ?: null,
+            $data['payment_method'] ?? null,
+            $data['notes'] ?? null
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updatePayroll(int $id, array $data): bool {
+        $baseSalary = (float)($data['base_salary'] ?? 0);
+        $overtimePay = (float)($data['overtime_pay'] ?? 0);
+        $bonuses = (float)($data['bonuses'] ?? 0);
+        $deductions = (float)($data['deductions'] ?? 0);
+        $tax = (float)($data['tax'] ?? 0);
+        $netPay = $baseSalary + $overtimePay + $bonuses - $deductions - $tax;
+
+        $stmt = $this->db->prepare("
+            UPDATE payroll SET 
+                base_salary = ?, overtime_pay = ?, bonuses = ?, deductions = ?, tax = ?, net_pay = ?,
+                status = ?, payment_date = ?, payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $baseSalary, $overtimePay, $bonuses, $deductions, $tax, $netPay,
+            $data['status'], $data['payment_date'] ?: null, $data['payment_method'] ?? null, $data['notes'] ?? null, $id
+        ]);
+    }
+
+    public function deletePayroll(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM payroll WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function getPayroll(int $employeeId): array {
+        $stmt = $this->db->prepare("
+            SELECT p.*, e.name as employee_name
+            FROM payroll p
+            JOIN employees e ON p.employee_id = e.id
+            WHERE p.employee_id = ?
+            ORDER BY p.pay_period_end DESC
+        ");
+        $stmt->execute([$employeeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getAllPayroll(?string $status = null, ?string $month = null): array {
+        $sql = "SELECT p.*, e.name as employee_name, e.employee_id as emp_code, d.name as department_name
+                FROM payroll p
+                JOIN employees e ON p.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                WHERE 1=1";
+        $params = [];
+
+        if ($status) {
+            $sql .= " AND p.status = ?";
+            $params[] = $status;
+        }
+
+        if ($month) {
+            $sql .= " AND p.pay_period_start <= ? AND p.pay_period_end >= ?";
+            $monthStart = $month . '-01';
+            $monthEnd = date('Y-m-t', strtotime($monthStart));
+            $params[] = $monthEnd;
+            $params[] = $monthStart;
+        }
+
+        $sql .= " ORDER BY p.pay_period_end DESC, e.name ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function getPayrollStatuses(): array {
+        return [
+            'pending' => 'Pending',
+            'processing' => 'Processing',
+            'paid' => 'Paid',
+            'cancelled' => 'Cancelled'
+        ];
+    }
+
+    public function getPaymentMethods(): array {
+        return [
+            'bank_transfer' => 'Bank Transfer',
+            'check' => 'Check',
+            'cash' => 'Cash',
+            'mobile_money' => 'Mobile Money'
+        ];
+    }
+
+    public function getPayrollStats(?string $month = null): array {
+        $sql = "SELECT 
+                    COUNT(*) as total_records,
+                    COUNT(*) FILTER (WHERE status = 'pending') as pending,
+                    COUNT(*) FILTER (WHERE status = 'paid') as paid,
+                    SUM(CASE WHEN status = 'paid' THEN net_pay ELSE 0 END) as total_paid,
+                    SUM(CASE WHEN status = 'pending' THEN net_pay ELSE 0 END) as total_pending
+                FROM payroll";
+        $params = [];
+
+        if ($month) {
+            $sql .= " WHERE pay_period_start >= ? AND pay_period_end <= ?";
+            $monthStart = $month . '-01';
+            $monthEnd = date('Y-m-t', strtotime($monthStart));
+            $params = [$monthStart, $monthEnd];
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch();
+    }
+
+    public function createPerformanceReview(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO performance_reviews (
+                employee_id, reviewer_id, review_period_start, review_period_end,
+                overall_rating, productivity_rating, quality_rating, teamwork_rating, communication_rating,
+                goals_achieved, strengths, areas_for_improvement, goals_next_period, comments, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            $data['employee_id'],
+            $data['reviewer_id'] ?: null,
+            $data['review_period_start'],
+            $data['review_period_end'],
+            $data['overall_rating'] ?: null,
+            $data['productivity_rating'] ?: null,
+            $data['quality_rating'] ?: null,
+            $data['teamwork_rating'] ?: null,
+            $data['communication_rating'] ?: null,
+            $data['goals_achieved'] ?? null,
+            $data['strengths'] ?? null,
+            $data['areas_for_improvement'] ?? null,
+            $data['goals_next_period'] ?? null,
+            $data['comments'] ?? null,
+            $data['status'] ?? 'draft'
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updatePerformanceReview(int $id, array $data): bool {
+        $stmt = $this->db->prepare("
+            UPDATE performance_reviews SET 
+                reviewer_id = ?, overall_rating = ?, productivity_rating = ?, quality_rating = ?,
+                teamwork_rating = ?, communication_rating = ?, goals_achieved = ?, strengths = ?,
+                areas_for_improvement = ?, goals_next_period = ?, comments = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $data['reviewer_id'] ?: null,
+            $data['overall_rating'] ?: null,
+            $data['productivity_rating'] ?: null,
+            $data['quality_rating'] ?: null,
+            $data['teamwork_rating'] ?: null,
+            $data['communication_rating'] ?: null,
+            $data['goals_achieved'] ?? null,
+            $data['strengths'] ?? null,
+            $data['areas_for_improvement'] ?? null,
+            $data['goals_next_period'] ?? null,
+            $data['comments'] ?? null,
+            $data['status'],
+            $id
+        ]);
+    }
+
+    public function deletePerformanceReview(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM performance_reviews WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function getPerformanceReview(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT pr.*, e.name as employee_name, r.name as reviewer_name
+            FROM performance_reviews pr
+            JOIN employees e ON pr.employee_id = e.id
+            LEFT JOIN employees r ON pr.reviewer_id = r.id
+            WHERE pr.id = ?
+        ");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    public function getEmployeePerformanceReviews(int $employeeId): array {
+        $stmt = $this->db->prepare("
+            SELECT pr.*, e.name as employee_name, r.name as reviewer_name
+            FROM performance_reviews pr
+            JOIN employees e ON pr.employee_id = e.id
+            LEFT JOIN employees r ON pr.reviewer_id = r.id
+            WHERE pr.employee_id = ?
+            ORDER BY pr.review_period_end DESC
+        ");
+        $stmt->execute([$employeeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getAllPerformanceReviews(?string $status = null): array {
+        $sql = "SELECT pr.*, e.name as employee_name, e.employee_id as emp_code, r.name as reviewer_name, d.name as department_name
+                FROM performance_reviews pr
+                JOIN employees e ON pr.employee_id = e.id
+                LEFT JOIN employees r ON pr.reviewer_id = r.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                WHERE 1=1";
+        $params = [];
+
+        if ($status) {
+            $sql .= " AND pr.status = ?";
+            $params[] = $status;
+        }
+
+        $sql .= " ORDER BY pr.review_period_end DESC, e.name ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function getPerformanceStatuses(): array {
+        return [
+            'draft' => 'Draft',
+            'pending_review' => 'Pending Review',
+            'in_progress' => 'In Progress',
+            'completed' => 'Completed',
+            'acknowledged' => 'Acknowledged'
+        ];
+    }
+
+    public function getPerformanceStats(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total_reviews,
+                COUNT(*) FILTER (WHERE status = 'completed' OR status = 'acknowledged') as completed,
+                COUNT(*) FILTER (WHERE status = 'draft' OR status = 'pending_review' OR status = 'in_progress') as pending,
+                AVG(overall_rating) FILTER (WHERE overall_rating IS NOT NULL) as avg_rating
+            FROM performance_reviews
+        ");
+        return $stmt->fetch();
+    }
 }
