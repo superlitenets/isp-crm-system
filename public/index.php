@@ -39,6 +39,33 @@ if ($page === 'logout') {
     exit;
 }
 
+if ($page === 'api' && $action === 'late_deductions') {
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $employeeId = isset($_GET['employee_id']) ? (int)$_GET['employee_id'] : 0;
+    $month = $_GET['month'] ?? date('Y-m');
+    
+    if (!$employeeId) {
+        echo json_encode(['error' => 'Employee ID required']);
+        exit;
+    }
+    
+    try {
+        $apiDb = Database::getConnection();
+        $lateCalculator = new \App\LateDeductionCalculator($apiDb);
+        $deductions = $lateCalculator->calculateMonthlyDeductions($employeeId, $month);
+        echo json_encode($deductions);
+    } catch (Exception $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'login') {
     $loginError = '';
     $csrfToken = \App\Auth::generateToken();
@@ -390,8 +417,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'create_payroll':
                 try {
-                    $employee->createPayroll($_POST);
-                    $message = 'Payroll record created successfully!';
+                    $payrollId = $employee->createPayroll($_POST);
+                    
+                    if ($payrollId && !empty($_POST['include_late_deductions']) && !empty($_POST['employee_id']) && !empty($_POST['pay_period_start'])) {
+                        $payrollDb = Database::getConnection();
+                        $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
+                        $payPeriodMonth = date('Y-m', strtotime($_POST['pay_period_start']));
+                        $lateCalculator->applyDeductionsToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
+                        $message = 'Payroll record created with late deductions applied!';
+                    } else {
+                        $message = 'Payroll record created successfully!';
+                    }
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {

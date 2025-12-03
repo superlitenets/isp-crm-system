@@ -758,8 +758,8 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                             <input type="number" step="0.01" class="form-control" name="bonuses" value="0">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Deductions</label>
-                            <input type="number" step="0.01" class="form-control" name="deductions" value="0">
+                            <label class="form-label">Manual Deductions</label>
+                            <input type="number" step="0.01" class="form-control" name="deductions" value="0" id="manualDeductions">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Tax</label>
@@ -772,6 +772,20 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                                 <option value="<?= $key ?>"><?= $label ?></option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_late_deductions" id="includeLateDeductions" value="1" checked>
+                                <label class="form-check-label" for="includeLateDeductions">
+                                    <i class="bi bi-alarm text-warning"></i> Include late arrival deductions automatically
+                                </label>
+                            </div>
+                            <div id="lateDeductionPreview" class="alert alert-info mt-2 d-none">
+                                <small>
+                                    <strong><i class="bi bi-info-circle"></i> Late Deduction Preview</strong>
+                                    <div id="lateDeductionInfo">Select an employee and pay period to see estimated late deductions</div>
+                                </small>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Payment Date</label>
@@ -1350,6 +1364,78 @@ document.addEventListener('DOMContentLoaded', function() {
                 newAccountFields.style.display = 'none';
             }
         });
+    }
+    
+    const payrollModal = document.getElementById('payrollModal');
+    if (payrollModal) {
+        const employeeSelect = payrollModal.querySelector('[name="employee_id"]');
+        const payPeriodStart = payrollModal.querySelector('[name="pay_period_start"]');
+        const baseSalaryInput = payrollModal.querySelector('[name="base_salary"]');
+        const includeLateCheckbox = document.getElementById('includeLateDeductions');
+        const previewBox = document.getElementById('lateDeductionPreview');
+        const previewInfo = document.getElementById('lateDeductionInfo');
+        
+        function updateLateDeductionPreview() {
+            if (!employeeSelect || !payPeriodStart || !previewBox || !previewInfo) return;
+            
+            const employeeId = employeeSelect.value;
+            const periodDate = payPeriodStart.value;
+            
+            if (!employeeId || !periodDate) {
+                previewBox.classList.add('d-none');
+                return;
+            }
+            
+            const month = periodDate.substring(0, 7);
+            
+            fetch(`?page=api&action=late_deductions&employee_id=${employeeId}&month=${month}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        previewBox.classList.add('d-none');
+                        return;
+                    }
+                    
+                    if (data.total_late_days > 0) {
+                        previewBox.classList.remove('d-none');
+                        previewInfo.innerHTML = `
+                            <strong>${data.total_late_days}</strong> late arrival(s) totaling 
+                            <strong>${data.total_late_minutes}</strong> minutes<br>
+                            Estimated deduction: <strong class="text-danger">${data.currency} ${parseFloat(data.total_deduction).toFixed(2)}</strong>
+                        `;
+                    } else {
+                        previewBox.classList.remove('d-none');
+                        previewInfo.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> No late arrivals for this period</span>';
+                    }
+                })
+                .catch(err => {
+                    previewBox.classList.add('d-none');
+                });
+        }
+        
+        if (employeeSelect) {
+            employeeSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const salary = selectedOption.dataset.salary || 0;
+                if (baseSalaryInput) baseSalaryInput.value = salary;
+                updateLateDeductionPreview();
+            });
+        }
+        
+        if (payPeriodStart) {
+            payPeriodStart.addEventListener('change', updateLateDeductionPreview);
+        }
+        
+        if (includeLateCheckbox) {
+            includeLateCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    updateLateDeductionPreview();
+                    if (previewBox) previewBox.classList.remove('d-none');
+                } else {
+                    if (previewBox) previewBox.classList.add('d-none');
+                }
+            });
+        }
     }
 });
 </script>
