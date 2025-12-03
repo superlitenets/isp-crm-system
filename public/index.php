@@ -1514,7 +1514,7 @@ $csrfToken = \App\Auth::generateToken();
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments">
-                    <i class="bi bi-phone"></i> M-Pesa
+                    <i class="bi bi-cash-stack"></i> Payments
                 </a>
             </li>
             <li class="nav-item">
