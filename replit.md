@@ -67,6 +67,13 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **WhatsApp Web Messaging**: Send messages directly from tickets (opens WhatsApp Web)
 - **Template Placeholders**: Rich placeholder system for templates
 - **Dashboard**: Overview of ticket statistics and recent activity
+- **Public Landing Page**: Beautiful public-facing website with:
+  - Dynamic service packages managed from CRM
+  - Customizable hero section, colors, and content
+  - Responsive design with modern animations
+  - Package cards with features, pricing, and badges
+  - Contact section with company details
+  - Accessible at `/` without login
 
 ## Database Schema
 - **users**: Staff members (technicians, admins)
@@ -87,6 +94,7 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **biometric_attendance_logs**: Raw attendance logs from devices
 - **device_user_mapping**: Maps device user IDs to employees
 - **late_rules**: Late arrival deduction rules configuration
+- **service_packages**: ISP service plans displayed on landing page
 
 ## Authentication
 The system includes built-in authentication:
@@ -191,6 +199,10 @@ Available placeholders for ticket templates:
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added public landing page with dynamic service packages
+- December 2024: Added package management in Settings (Service Packages tab)
+- December 2024: Added landing page customization in Settings (Landing Page tab)
+- December 2024: Added automatic database migrations for existing installations
 - December 2024: Added biometric device integration (ZKTeco, Hikvision) for attendance import
 - December 2024: Added late arrival deduction system with configurable rules
 - December 2024: Integrated late deductions with payroll system (automatic application)

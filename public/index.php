@@ -66,12 +66,13 @@ if ($page === 'api' && $action === 'late_deductions') {
     exit;
 }
 
-if ($page === 'landing' || (empty($_GET['page']) && !isset($_GET['action']) && $_SERVER['REQUEST_URI'] === '/' || $_SERVER['REQUEST_URI'] === '')) {
-    $landingSettings = new \App\Settings();
-    $packages = $landingSettings->getActivePackagesForLanding();
-    $company = $landingSettings->getCompanyInfo();
-    $landingPageSettings = $landingSettings->getLandingPageSettings();
-    $landingSettings = $landingPageSettings;
+$requestUri = strtok($_SERVER['REQUEST_URI'], '?');
+$isHomepage = ($requestUri === '/' || $requestUri === '/index.php') && !isset($_GET['page']);
+if ($page === 'landing' || $isHomepage) {
+    $settingsObj = new \App\Settings();
+    $packages = $settingsObj->getActivePackagesForLanding();
+    $company = $settingsObj->getCompanyInfo();
+    $landingSettings = $settingsObj->getLandingPageSettings();
     include __DIR__ . '/../templates/landing.php';
     exit;
 }

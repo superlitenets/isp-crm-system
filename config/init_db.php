@@ -14,6 +14,7 @@ function initializeDatabase(): void {
     $tablesExist = $checkTable->fetchColumn();
     
     if ($tablesExist) {
+        runMigrations($db);
         $initialized = true;
         return;
     }
@@ -355,6 +356,46 @@ function initializeDatabase(): void {
             die("Database initialization failed: " . $e->getMessage());
         }
         error_log("Database initialization failed: " . $e->getMessage());
+    }
+}
+
+function runMigrations(PDO $db): void {
+    $migrations = [];
+    
+    $checkServicePackages = $db->query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'service_packages')");
+    if (!$checkServicePackages->fetchColumn()) {
+        $migrations[] = "
+            CREATE TABLE IF NOT EXISTS service_packages (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                slug VARCHAR(100) UNIQUE NOT NULL,
+                description TEXT,
+                speed VARCHAR(50) NOT NULL,
+                speed_unit VARCHAR(10) DEFAULT 'Mbps',
+                price DECIMAL(10, 2) NOT NULL,
+                currency VARCHAR(10) DEFAULT 'KES',
+                billing_cycle VARCHAR(20) DEFAULT 'monthly',
+                features JSONB DEFAULT '[]',
+                is_popular BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                display_order INTEGER DEFAULT 0,
+                badge_text VARCHAR(50),
+                badge_color VARCHAR(20),
+                icon VARCHAR(50) DEFAULT 'wifi',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_service_packages_active ON service_packages(is_active);
+            CREATE INDEX IF NOT EXISTS idx_service_packages_order ON service_packages(display_order);
+        ";
+    }
+    
+    foreach ($migrations as $sql) {
+        try {
+            $db->exec($sql);
+        } catch (PDOException $e) {
+            error_log("Migration error: " . $e->getMessage());
+        }
     }
 }
 
