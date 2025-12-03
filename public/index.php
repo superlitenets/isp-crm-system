@@ -24,6 +24,7 @@ require_once __DIR__ . '/../src/ZKTecoDevice.php';
 require_once __DIR__ . '/../src/HikvisionDevice.php';
 require_once __DIR__ . '/../src/BiometricSyncService.php';
 require_once __DIR__ . '/../src/LateDeductionCalculator.php';
+require_once __DIR__ . '/../src/Salesperson.php';
 
 initializeDatabase();
 
@@ -1011,6 +1012,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+
+            case 'save_salesperson':
+                $salesperson = new \App\Salesperson($db);
+                $name = trim($_POST['name'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                if (empty($name) || empty($phone)) {
+                    $message = 'Salesperson name and phone are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $spData = [
+                            'name' => $name,
+                            'email' => $_POST['email'] ?? null,
+                            'phone' => $phone,
+                            'commission_type' => $_POST['commission_type'] ?? 'percentage',
+                            'commission_value' => floatval($_POST['commission_value'] ?? 10),
+                            'is_active' => isset($_POST['is_active']) ? 1 : 0
+                        ];
+                        $salesperson->create($spData);
+                        $message = 'Salesperson added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=sales&tab=salespersons');
+                        exit;
+                    } catch (Exception $e) {
+                        $message = 'Error adding salesperson: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_salesperson':
+                $salesperson = new \App\Salesperson($db);
+                $spId = (int)($_POST['salesperson_id'] ?? 0);
+                $name = trim($_POST['name'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                if (!$spId || empty($name) || empty($phone)) {
+                    $message = 'Salesperson ID, name and phone are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $spData = [
+                            'name' => $name,
+                            'email' => $_POST['email'] ?? null,
+                            'phone' => $phone,
+                            'commission_type' => $_POST['commission_type'] ?? 'percentage',
+                            'commission_value' => floatval($_POST['commission_value'] ?? 10),
+                            'is_active' => isset($_POST['is_active']) ? 1 : 0
+                        ];
+                        $salesperson->update($spId, $spData);
+                        $message = 'Salesperson updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=sales&tab=salespersons');
+                        exit;
+                    } catch (Exception $e) {
+                        $message = 'Error updating salesperson: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_salesperson':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete salespersons.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $salesperson = new \App\Salesperson($db);
+                        $spId = (int)($_POST['salesperson_id'] ?? 0);
+                        if ($spId) {
+                            $salesperson->delete($spId);
+                            $message = 'Salesperson deleted successfully!';
+                            $messageType = 'success';
+                            \App\Auth::regenerateToken();
+                        }
+                    } catch (Exception $e) {
+                        $message = 'Error deleting salesperson: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'pay_commission':
+                try {
+                    $salesperson = new \App\Salesperson($db);
+                    $commissionId = (int)($_POST['commission_id'] ?? 0);
+                    if ($commissionId) {
+                        $salesperson->markCommissionPaid($commissionId);
+                        $message = 'Commission marked as paid!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error marking commission as paid: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'pay_all_commissions':
+                try {
+                    $salesperson = new \App\Salesperson($db);
+                    $spId = (int)($_POST['salesperson_id'] ?? 0);
+                    if ($spId) {
+                        $salesperson->markAllCommissionsPaid($spId);
+                        $message = 'All pending commissions marked as paid!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error marking commissions as paid: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
         }
     }
 }
@@ -1653,6 +1768,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'sales' ? 'active' : '' ?>" href="?page=sales">
+                    <i class="bi bi-graph-up-arrow"></i> Sales
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -1699,6 +1819,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'orders':
                 include __DIR__ . '/../templates/orders.php';
+                break;
+            case 'sales':
+                include __DIR__ . '/../templates/sales.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();

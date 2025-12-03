@@ -21,8 +21,8 @@ class Order {
         
         $stmt = $this->db->prepare("
             INSERT INTO orders (order_number, package_id, customer_name, customer_email, 
-                               customer_phone, customer_address, amount, payment_method, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               customer_phone, customer_address, amount, payment_method, notes, salesperson_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
         ");
         
@@ -35,10 +35,51 @@ class Order {
             $data['customer_address'] ?? null,
             $data['amount'] ?? null,
             $data['payment_method'] ?? null,
-            $data['notes'] ?? null
+            $data['notes'] ?? null,
+            $data['salesperson_id'] ?? null
         ]);
         
-        return (int) $stmt->fetchColumn();
+        $orderId = (int) $stmt->fetchColumn();
+        
+        if (!empty($data['salesperson_id']) && $orderId) {
+            $this->createCommission($orderId, (int)$data['salesperson_id'], (float)($data['amount'] ?? 0));
+        }
+        
+        return $orderId;
+    }
+    
+    private function createCommission(int $orderId, int $salespersonId, float $amount): void {
+        if ($amount <= 0) return;
+        
+        $stmt = $this->db->prepare("SELECT commission_type, commission_value FROM salespersons WHERE id = ?");
+        $stmt->execute([$salespersonId]);
+        $sp = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$sp) return;
+        
+        $commissionType = $sp['commission_type'];
+        $commissionRate = (float) $sp['commission_value'];
+        
+        if ($commissionType === 'percentage') {
+            $commissionAmount = ($amount * $commissionRate) / 100;
+        } else {
+            $commissionAmount = $commissionRate;
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO sales_commissions (salesperson_id, order_id, order_amount, commission_type, commission_rate, commission_amount, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
+        ");
+        $stmt->execute([$salespersonId, $orderId, $amount, $commissionType, $commissionRate, $commissionAmount]);
+        
+        $stmt = $this->db->prepare("
+            UPDATE salespersons 
+            SET total_sales = total_sales + ?,
+                total_commission = total_commission + ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$amount, $commissionAmount, $salespersonId]);
     }
     
     public function getById(int $id): ?array {
@@ -46,11 +87,15 @@ class Order {
             SELECT o.*, 
                    p.name as package_name, p.speed, p.speed_unit, p.price as package_price,
                    c.name as linked_customer_name, c.account_number,
-                   t.ticket_number
+                   t.ticket_number,
+                   s.name as salesperson_name, s.phone as salesperson_phone,
+                   sc.commission_amount, sc.status as commission_status
             FROM orders o
             LEFT JOIN service_packages p ON o.package_id = p.id
             LEFT JOIN customers c ON o.customer_id = c.id
             LEFT JOIN tickets t ON o.ticket_id = t.id
+            LEFT JOIN salespersons s ON o.salesperson_id = s.id
+            LEFT JOIN sales_commissions sc ON sc.order_id = o.id
             WHERE o.id = ?
         ");
         $stmt->execute([$id]);
@@ -98,11 +143,13 @@ class Order {
             SELECT o.*, 
                    p.name as package_name, p.speed, p.price as package_price,
                    c.name as linked_customer_name,
-                   t.ticket_number
+                   t.ticket_number,
+                   s.name as salesperson_name
             FROM orders o
             LEFT JOIN service_packages p ON o.package_id = p.id
             LEFT JOIN customers c ON o.customer_id = c.id
             LEFT JOIN tickets t ON o.ticket_id = t.id
+            LEFT JOIN salespersons s ON o.salesperson_id = s.id
             $whereClause
             ORDER BY o.created_at DESC
             LIMIT $limit
@@ -233,7 +280,7 @@ class Order {
         $params = [];
         
         $allowedFields = ['customer_name', 'customer_email', 'customer_phone', 'customer_address', 
-                          'package_id', 'amount', 'order_status', 'payment_status', 'notes'];
+                          'package_id', 'amount', 'order_status', 'payment_status', 'notes', 'salesperson_id'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
