@@ -537,6 +537,72 @@ function runMigrations(PDO $db): void {
                 paid_at TIMESTAMP,
                 notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment_categories' => "
+            CREATE TABLE IF NOT EXISTS equipment_categories (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment' => "
+            CREATE TABLE IF NOT EXISTS equipment (
+                id SERIAL PRIMARY KEY,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                name VARCHAR(100) NOT NULL,
+                brand VARCHAR(100),
+                model VARCHAR(100),
+                serial_number VARCHAR(100),
+                mac_address VARCHAR(50),
+                purchase_date DATE,
+                purchase_price DECIMAL(12, 2),
+                warranty_expiry DATE,
+                condition VARCHAR(20) DEFAULT 'new',
+                status VARCHAR(20) DEFAULT 'available',
+                location VARCHAR(200),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment_assignments' => "
+            CREATE TABLE IF NOT EXISTS equipment_assignments (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                assignment_date DATE NOT NULL,
+                return_date DATE,
+                status VARCHAR(20) DEFAULT 'assigned',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment_loans' => "
+            CREATE TABLE IF NOT EXISTS equipment_loans (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                loaned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                loan_date DATE NOT NULL,
+                expected_return_date DATE,
+                actual_return_date DATE,
+                deposit_amount DECIMAL(12, 2) DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'on_loan',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment_faults' => "
+            CREATE TABLE IF NOT EXISTS equipment_faults (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                reported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                fault_date DATE NOT NULL,
+                description TEXT NOT NULL,
+                severity VARCHAR(20) DEFAULT 'medium',
+                repair_status VARCHAR(20) DEFAULT 'pending',
+                repair_date DATE,
+                repair_cost DECIMAL(12, 2),
+                repair_notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
