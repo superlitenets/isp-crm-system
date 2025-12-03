@@ -62,10 +62,18 @@ if ($page === 'login') {
 $customer = new \App\Customer();
 $ticket = new \App\Ticket();
 $sms = new \App\SMS();
-$smsGateway = new \App\SMSGateway();
+$smsGateway = null;
 $employee = new \App\Employee();
 $settings = new \App\Settings();
 $currentUser = \App\Auth::user();
+
+function getSMSGateway() {
+    static $gateway = null;
+    if ($gateway === null) {
+        $gateway = new \App\SMSGateway();
+    }
+    return $gateway;
+}
 
 $message = '';
 $messageType = '';
@@ -469,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'save_sms_settings':
                 try {
                     $settings->saveSMSSettings($_POST);
-                    $smsGateway = new \App\SMSGateway();
+                    \App\Settings::clearCache();
                     $message = 'SMS settings saved successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -728,6 +736,7 @@ $csrfToken = \App\Auth::generateToken();
                 include __DIR__ . '/../templates/hr.php';
                 break;
             case 'settings':
+                $smsGateway = getSMSGateway();
                 include __DIR__ . '/../templates/settings.php';
                 break;
             default:

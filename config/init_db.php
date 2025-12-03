@@ -3,7 +3,20 @@
 require_once __DIR__ . '/database.php';
 
 function initializeDatabase(): void {
+    static $initialized = false;
+    if ($initialized) {
+        return;
+    }
+    
     $db = Database::getConnection();
+    
+    $checkTable = $db->query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')");
+    $tablesExist = $checkTable->fetchColumn();
+    
+    if ($tablesExist) {
+        $initialized = true;
+        return;
+    }
 
     $sql = "
     CREATE TABLE IF NOT EXISTS users (
@@ -180,15 +193,24 @@ function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_tickets_created ON tickets(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket ON ticket_comments(ticket_id);
+    CREATE INDEX IF NOT EXISTS idx_sms_logs_ticket ON sms_logs(ticket_id);
+    CREATE INDEX IF NOT EXISTS idx_sms_logs_sent ON sms_logs(sent_at DESC);
     CREATE INDEX IF NOT EXISTS idx_customers_account ON customers(account_number);
+    CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+    CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
     CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department_id);
     CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status);
+    CREATE INDEX IF NOT EXISTS idx_employees_emp_id ON employees(employee_id);
     CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance(employee_id);
     CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
     CREATE INDEX IF NOT EXISTS idx_payroll_employee ON payroll(employee_id);
     CREATE INDEX IF NOT EXISTS idx_payroll_period ON payroll(pay_period_start, pay_period_end);
+    CREATE INDEX IF NOT EXISTS idx_payroll_status ON payroll(status);
     CREATE INDEX IF NOT EXISTS idx_performance_employee ON performance_reviews(employee_id);
     CREATE INDEX IF NOT EXISTS idx_ticket_templates_category ON ticket_templates(category);
+    CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings(setting_key);
     ";
 
     try {
@@ -206,6 +228,8 @@ function initializeDatabase(): void {
             ");
             $stmt->execute([$adminPass, $techPass, $techPass]);
         }
+        
+        $initialized = true;
         
         if (php_sapi_name() === 'cli') {
             echo "Database initialized successfully!\n";

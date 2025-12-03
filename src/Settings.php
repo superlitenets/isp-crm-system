@@ -5,10 +5,37 @@ namespace App;
 class Settings {
     private \PDO $db;
     private string $encryptionKey;
+    private static array $cache = [];
+    private static bool $cacheLoaded = false;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->encryptionKey = $this->getEncryptionKey();
+        $this->loadCache();
+    }
+
+    private function loadCache(): void {
+        if (self::$cacheLoaded) {
+            return;
+        }
+        try {
+            $stmt = $this->db->query("SELECT setting_key, setting_value, setting_type FROM company_settings");
+            $results = $stmt->fetchAll();
+            foreach ($results as $row) {
+                self::$cache[$row['setting_key']] = [
+                    'value' => $row['setting_value'],
+                    'type' => $row['setting_type']
+                ];
+            }
+            self::$cacheLoaded = true;
+        } catch (\Exception $e) {
+            self::$cacheLoaded = true;
+        }
+    }
+
+    public static function clearCache(): void {
+        self::$cache = [];
+        self::$cacheLoaded = false;
     }
 
     private function getEncryptionKey(): string {
@@ -38,16 +65,14 @@ class Settings {
     }
 
     public function get(string $key, $default = null) {
-        $stmt = $this->db->prepare("SELECT setting_value, setting_type FROM company_settings WHERE setting_key = ?");
-        $stmt->execute([$key]);
-        $result = $stmt->fetch();
-        if ($result === false) {
-            return $default;
+        if (isset(self::$cache[$key])) {
+            $cached = self::$cache[$key];
+            if ($cached['type'] === 'secret') {
+                return $this->decrypt($cached['value']);
+            }
+            return $cached['value'];
         }
-        if ($result['setting_type'] === 'secret') {
-            return $this->decrypt($result['setting_value']);
-        }
-        return $result['setting_value'];
+        return $default;
     }
 
     public function set(string $key, $value, string $type = 'text'): bool {
@@ -63,7 +88,11 @@ class Settings {
                 setting_type = EXCLUDED.setting_type,
                 updated_at = CURRENT_TIMESTAMP
         ");
-        return $stmt->execute([$key, $storedValue, $type]);
+        $result = $stmt->execute([$key, $storedValue, $type]);
+        if ($result) {
+            self::$cache[$key] = ['value' => $storedValue, 'type' => $type];
+        }
+        return $result;
     }
 
     public function getAll(): array {
