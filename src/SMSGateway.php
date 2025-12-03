@@ -6,24 +6,36 @@ class SMSGateway {
     private ?string $apiUrl = null;
     private ?string $apiKey = null;
     private ?string $senderId = null;
+    private ?string $partnerId = null;
     private string $method = 'POST';
     private bool $enabled = false;
+    private string $provider = 'custom';
     private array $customHeaders = [];
     private string $messageParam = 'message';
     private string $phoneParam = 'phone';
     private string $senderParam = 'sender';
 
     public function __construct() {
-        $this->apiUrl = getenv('SMS_API_URL') ?: null;
-        $this->apiKey = getenv('SMS_API_KEY') ?: null;
-        $this->senderId = getenv('SMS_SENDER_ID') ?: 'ISP-CRM';
-        $this->method = getenv('SMS_API_METHOD') ?: 'POST';
-        $this->messageParam = getenv('SMS_MESSAGE_PARAM') ?: 'message';
-        $this->phoneParam = getenv('SMS_PHONE_PARAM') ?: 'phone';
-        $this->senderParam = getenv('SMS_SENDER_PARAM') ?: 'sender';
+        $advantaApiKey = getenv('ADVANTA_API_KEY');
+        $advantaPartnerId = getenv('ADVANTA_PARTNER_ID');
+        $advantaShortcode = getenv('ADVANTA_SHORTCODE');
+        $advantaUrl = getenv('ADVANTA_URL') ?: 'https://quicksms.advantasms.com/api/services/sendsms/';
 
-        if ($this->apiUrl && $this->apiKey) {
-            $this->enabled = true;
+        if ($advantaApiKey && $advantaPartnerId && $advantaShortcode) {
+            $this->setupAdvanta($advantaUrl, $advantaApiKey, $advantaPartnerId, $advantaShortcode);
+        } else {
+            $this->apiUrl = getenv('SMS_API_URL') ?: null;
+            $this->apiKey = getenv('SMS_API_KEY') ?: null;
+            $this->senderId = getenv('SMS_SENDER_ID') ?: 'ISP-CRM';
+            $this->method = getenv('SMS_API_METHOD') ?: 'POST';
+            $this->messageParam = getenv('SMS_MESSAGE_PARAM') ?: 'message';
+            $this->phoneParam = getenv('SMS_PHONE_PARAM') ?: 'phone';
+            $this->senderParam = getenv('SMS_SENDER_PARAM') ?: 'sender';
+
+            if ($this->apiUrl && $this->apiKey) {
+                $this->enabled = true;
+                $this->provider = 'custom';
+            }
         }
 
         $twilioSid = getenv('TWILIO_ACCOUNT_SID');
@@ -33,6 +45,19 @@ class SMSGateway {
         if ($twilioSid && $twilioToken && $twilioPhone && !$this->enabled) {
             $this->setupTwilio($twilioSid, $twilioToken, $twilioPhone);
         }
+    }
+
+    private function setupAdvanta(string $url, string $apiKey, string $partnerId, string $shortcode): void {
+        $this->apiUrl = $url;
+        $this->apiKey = $apiKey;
+        $this->partnerId = $partnerId;
+        $this->senderId = $shortcode;
+        $this->method = 'POST';
+        $this->phoneParam = 'mobile';
+        $this->messageParam = 'message';
+        $this->senderParam = 'shortcode';
+        $this->provider = 'advanta';
+        $this->enabled = true;
     }
 
     private function setupTwilio(string $sid, string $token, string $phone): void {
@@ -56,14 +81,22 @@ class SMSGateway {
 
     public function getGatewayInfo(): array {
         if (!$this->enabled) {
-            return ['status' => 'Not Configured', 'type' => 'None'];
+            return ['status' => 'Not Configured', 'type' => 'None', 'provider' => 'none'];
+        }
+        
+        if ($this->provider === 'advanta') {
+            return ['status' => 'Enabled', 'type' => 'Advanta SMS', 'provider' => 'advanta'];
         }
         
         if (strpos($this->apiUrl, 'twilio.com') !== false) {
-            return ['status' => 'Enabled', 'type' => 'Twilio'];
+            return ['status' => 'Enabled', 'type' => 'Twilio', 'provider' => 'twilio'];
         }
         
-        return ['status' => 'Enabled', 'type' => 'Custom Gateway'];
+        return ['status' => 'Enabled', 'type' => 'Custom Gateway', 'provider' => 'custom'];
+    }
+
+    public function getProvider(): string {
+        return $this->provider;
     }
 
     public function send(string $to, string $message): array {
@@ -77,21 +110,36 @@ class SMSGateway {
 
         try {
             $ch = curl_init();
-            
-            $data = [
-                $this->phoneParam => $to,
-                $this->messageParam => $message,
-                $this->senderParam => $this->senderId
-            ];
-
             $url = $this->apiUrl;
             $headers = [];
 
-            if (strpos($this->apiUrl, 'twilio.com') !== false) {
+            if ($this->provider === 'advanta') {
+                $data = [
+                    'apikey' => $this->apiKey,
+                    'partnerID' => $this->partnerId,
+                    'shortcode' => $this->senderId,
+                    'mobile' => $to,
+                    'message' => $message
+                ];
+                $headers[] = 'Content-Type: application/json';
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                curl_setopt($ch, CURLOPT_POST, true);
+            } elseif (strpos($this->apiUrl, 'twilio.com') !== false) {
+                $data = [
+                    $this->phoneParam => $to,
+                    $this->messageParam => $message,
+                    $this->senderParam => $this->senderId
+                ];
                 $headers = $this->customHeaders;
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
                 curl_setopt($ch, CURLOPT_POST, true);
             } else {
+                $data = [
+                    $this->phoneParam => $to,
+                    $this->messageParam => $message,
+                    $this->senderParam => $this->senderId
+                ];
+
                 $contentType = getenv('SMS_CONTENT_TYPE') ?: 'json';
                 
                 if ($this->apiKey) {
@@ -145,8 +193,16 @@ class SMSGateway {
             $responseData = json_decode($response, true);
 
             if ($httpCode >= 200 && $httpCode < 300) {
+                $success = true;
+                if ($this->provider === 'advanta' && isset($responseData['responses'])) {
+                    foreach ($responseData['responses'] as $resp) {
+                        if (isset($resp['response-code']) && $resp['response-code'] != 200) {
+                            $success = false;
+                        }
+                    }
+                }
                 return [
-                    'success' => true,
+                    'success' => $success,
                     'response' => $responseData,
                     'http_code' => $httpCode
                 ];

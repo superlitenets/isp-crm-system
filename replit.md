@@ -71,7 +71,14 @@ Admin users can delete customers. All users can manage tickets and customers.
 ## Environment Variables Required
 - `DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` - PostgreSQL connection (auto-configured)
 
-### Custom SMS Gateway (Preferred)
+### Advanta SMS (Recommended)
+The system has built-in support for Advanta SMS Kenya:
+- `ADVANTA_API_KEY` - Your Advanta API Key
+- `ADVANTA_PARTNER_ID` - Your Partner ID (numeric)
+- `ADVANTA_SHORTCODE` - Sender ID (appears as sender name, e.g., "MyISP")
+- `ADVANTA_URL` - API Endpoint (optional, defaults to https://quicksms.advantasms.com/api/services/sendsms/)
+
+### Custom SMS Gateway (Alternative)
 Supports any REST API with POST or GET methods:
 - `SMS_API_URL` - Your SMS gateway API endpoint
 - `SMS_API_KEY` - API key or authentication token

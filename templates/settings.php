@@ -203,16 +203,16 @@ if (($_GET['action'] ?? '') === 'test') {
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-white">
-                <h5 class="mb-0">Gateway Status</h5>
+                <h5 class="mb-0"><i class="bi bi-broadcast"></i> Gateway Status</h5>
             </div>
             <div class="card-body">
                 <div class="d-flex align-items-center mb-3">
-                    <div class="stat-icon bg-<?= $gatewayInfo['status'] === 'Enabled' ? 'success' : 'danger' ?> bg-opacity-10 text-<?= $gatewayInfo['status'] === 'Enabled' ? 'success' : 'danger' ?> me-3" style="width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <i class="bi bi-<?= $gatewayInfo['status'] === 'Enabled' ? 'check-circle' : 'x-circle' ?>"></i>
+                    <div class="stat-icon bg-<?= $gatewayInfo['status'] === 'Enabled' ? 'success' : 'danger' ?> bg-opacity-10 text-<?= $gatewayInfo['status'] === 'Enabled' ? 'success' : 'danger' ?> me-3" style="width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                        <i class="bi bi-<?= $gatewayInfo['status'] === 'Enabled' ? 'check-circle-fill' : 'x-circle-fill' ?>"></i>
                     </div>
                     <div>
                         <h4 class="mb-0"><?= $gatewayInfo['status'] ?></h4>
-                        <small class="text-muted">Gateway Type: <?= $gatewayInfo['type'] ?></small>
+                        <small class="text-muted">Provider: <?= $gatewayInfo['type'] ?></small>
                     </div>
                 </div>
                 
@@ -226,7 +226,7 @@ if (($_GET['action'] ?? '') === 'test') {
                 <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> mt-3">
                     <?php if ($testResult['success']): ?>
                     <strong>Connection Successful!</strong><br>
-                    Gateway: <?= $testResult['gateway']['type'] ?>
+                    Provider: <?= $testResult['gateway']['type'] ?>
                     <?php else: ?>
                     <strong>Connection Failed:</strong> <?= htmlspecialchars($testResult['error']) ?>
                     <?php endif; ?>
@@ -239,7 +239,7 @@ if (($_GET['action'] ?? '') === 'test') {
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-white">
-                <h5 class="mb-0">Recent SMS Activity</h5>
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent SMS Activity</h5>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -279,89 +279,118 @@ if (($_GET['action'] ?? '') === 'test') {
     </div>
 </div>
 
-<div class="card mt-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">Configuration Guide</h5>
+<div class="card mt-4 border-primary">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-send-fill"></i> Advanta SMS Configuration</h5>
     </div>
     <div class="card-body">
-        <h6>Custom SMS Gateway</h6>
-        <p>Set these environment variables to use a custom SMS gateway:</p>
+        <div class="alert alert-info">
+            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> How to Configure Advanta SMS</h6>
+            <p>Go to the <strong>Secrets</strong> tab in Replit and add these 4 values from your Advanta account:</p>
+        </div>
+        
         <table class="table table-bordered">
             <thead class="table-light">
                 <tr>
-                    <th>Variable</th>
+                    <th style="width: 200px;">Secret Name</th>
                     <th>Description</th>
-                    <th>Example</th>
+                    <th>Where to Find</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><code>SMS_API_URL</code></td>
-                    <td>Your SMS gateway API endpoint</td>
-                    <td>https://api.yoursms.com/send</td>
+                    <td><code class="bg-light p-1">ADVANTA_API_KEY</code></td>
+                    <td>Your Advanta API Key</td>
+                    <td>Advanta Dashboard > API Settings</td>
                 </tr>
                 <tr>
-                    <td><code>SMS_API_KEY</code></td>
-                    <td>API key or authentication token</td>
-                    <td>your-api-key-here</td>
+                    <td><code class="bg-light p-1">ADVANTA_PARTNER_ID</code></td>
+                    <td>Your Partner ID (numeric)</td>
+                    <td>Advanta Dashboard > Account Info</td>
                 </tr>
                 <tr>
-                    <td><code>SMS_SENDER_ID</code></td>
-                    <td>Sender ID or phone number</td>
-                    <td>ISP-CRM or +1234567890</td>
+                    <td><code class="bg-light p-1">ADVANTA_SHORTCODE</code></td>
+                    <td>Sender ID (appears as sender name)</td>
+                    <td>Your registered Sender ID, e.g., "MyISP"</td>
                 </tr>
                 <tr>
-                    <td><code>SMS_API_METHOD</code></td>
-                    <td>HTTP method</td>
-                    <td><strong>POST</strong> or <strong>GET</strong></td>
-                </tr>
-                <tr>
-                    <td><code>SMS_CONTENT_TYPE</code></td>
-                    <td>Request content type (for POST)</td>
-                    <td><strong>json</strong> (default) or <strong>form</strong></td>
-                </tr>
-                <tr>
-                    <td><code>SMS_AUTH_HEADER</code></td>
-                    <td>Authorization header type</td>
-                    <td><strong>Bearer</strong>, <strong>Basic</strong>, <strong>X-API-Key</strong></td>
-                </tr>
-                <tr>
-                    <td><code>SMS_PHONE_PARAM</code></td>
-                    <td>Parameter name for phone number</td>
-                    <td>phone, to, recipient</td>
-                </tr>
-                <tr>
-                    <td><code>SMS_MESSAGE_PARAM</code></td>
-                    <td>Parameter name for message</td>
-                    <td>message, text, body</td>
-                </tr>
-                <tr>
-                    <td><code>SMS_SENDER_PARAM</code></td>
-                    <td>Parameter name for sender ID</td>
-                    <td>sender, from, sender_id</td>
+                    <td><code class="bg-light p-1">ADVANTA_URL</code></td>
+                    <td>API Endpoint (optional)</td>
+                    <td>Default: <code>https://quicksms.advantasms.com/api/services/sendsms/</code></td>
                 </tr>
             </tbody>
         </table>
         
-        <div class="alert alert-info mt-3">
-            <h6 class="alert-heading"><i class="bi bi-info-circle"></i> API Flexibility</h6>
-            <p class="mb-2">The SMS gateway supports any REST API:</p>
-            <ul class="mb-0">
-                <li><strong>POST with JSON:</strong> <code>SMS_API_METHOD=POST</code> + <code>SMS_CONTENT_TYPE=json</code></li>
-                <li><strong>POST with Form Data:</strong> <code>SMS_API_METHOD=POST</code> + <code>SMS_CONTENT_TYPE=form</code></li>
-                <li><strong>GET with Query Params:</strong> <code>SMS_API_METHOD=GET</code></li>
-            </ul>
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6><i class="bi bi-1-circle"></i> Step 1: Get Credentials</h6>
+                        <p class="mb-0 small">Log in to <a href="https://quicksms.advantasms.com" target="_blank">quicksms.advantasms.com</a> and get your API Key, Partner ID, and Shortcode.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6><i class="bi bi-2-circle"></i> Step 2: Add Secrets</h6>
+                        <p class="mb-0 small">In Replit, go to <strong>Tools > Secrets</strong> and add each value with the exact names shown above.</p>
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <hr>
+        <div class="alert alert-success mt-4 mb-0">
+            <strong><i class="bi bi-check-circle"></i> That's it!</strong> Once all secrets are added, the system will automatically use Advanta SMS for notifications.
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-question-circle"></i> Alternative Providers</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">If you don't use Advanta SMS, you can configure other providers:</p>
         
-        <h6>Twilio (Fallback)</h6>
-        <p>If custom gateway is not configured, the system will fall back to Twilio:</p>
-        <ul>
-            <li><code>TWILIO_ACCOUNT_SID</code> - Your Twilio Account SID</li>
-            <li><code>TWILIO_AUTH_TOKEN</code> - Your Twilio Auth Token</li>
-            <li><code>TWILIO_PHONE_NUMBER</code> - Your Twilio phone number</li>
-        </ul>
+        <div class="accordion" id="altProviders">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#twilioConfig">
+                        Twilio SMS
+                    </button>
+                </h2>
+                <div id="twilioConfig" class="accordion-collapse collapse" data-bs-parent="#altProviders">
+                    <div class="accordion-body">
+                        <ul class="mb-0">
+                            <li><code>TWILIO_ACCOUNT_SID</code> - Your Twilio Account SID</li>
+                            <li><code>TWILIO_AUTH_TOKEN</code> - Your Twilio Auth Token</li>
+                            <li><code>TWILIO_PHONE_NUMBER</code> - Your Twilio phone number</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#customConfig">
+                        Custom SMS API
+                    </button>
+                </h2>
+                <div id="customConfig" class="accordion-collapse collapse" data-bs-parent="#altProviders">
+                    <div class="accordion-body">
+                        <ul class="mb-0">
+                            <li><code>SMS_API_URL</code> - Your SMS gateway API endpoint</li>
+                            <li><code>SMS_API_KEY</code> - API key or authentication token</li>
+                            <li><code>SMS_SENDER_ID</code> - Sender ID</li>
+                            <li><code>SMS_API_METHOD</code> - POST or GET</li>
+                            <li><code>SMS_CONTENT_TYPE</code> - json or form</li>
+                            <li><code>SMS_PHONE_PARAM</code> - Parameter name for phone</li>
+                            <li><code>SMS_MESSAGE_PARAM</code> - Parameter name for message</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
