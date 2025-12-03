@@ -19,6 +19,11 @@ require_once __DIR__ . '/../src/Employee.php';
 require_once __DIR__ . '/../src/Settings.php';
 require_once __DIR__ . '/../src/WhatsApp.php';
 require_once __DIR__ . '/../src/TemplateEngine.php';
+require_once __DIR__ . '/../src/BiometricDevice.php';
+require_once __DIR__ . '/../src/ZKTecoDevice.php';
+require_once __DIR__ . '/../src/HikvisionDevice.php';
+require_once __DIR__ . '/../src/BiometricSyncService.php';
+require_once __DIR__ . '/../src/LateDeductionCalculator.php';
 
 initializeDatabase();
 
@@ -562,6 +567,218 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+
+            case 'add_biometric_device':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can add biometric devices.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $biometricService = new \App\BiometricSyncService($db);
+                        $deviceData = [
+                            'name' => $_POST['name'],
+                            'device_type' => $_POST['device_type'],
+                            'ip_address' => $_POST['ip_address'],
+                            'port' => (int)$_POST['port'],
+                            'username' => $_POST['username'] ?? null,
+                            'password' => $_POST['password'] ?? null,
+                            'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
+                            'is_active' => isset($_POST['is_active'])
+                        ];
+                        $biometricService->addDevice($deviceData);
+                        $message = 'Biometric device added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error adding device: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_biometric_device':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update biometric devices.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $biometricService = new \App\BiometricSyncService($db);
+                        $deviceData = [
+                            'name' => $_POST['name'],
+                            'device_type' => $_POST['device_type'],
+                            'ip_address' => $_POST['ip_address'],
+                            'port' => (int)$_POST['port'],
+                            'username' => $_POST['username'] ?? null,
+                            'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
+                            'is_active' => isset($_POST['is_active'])
+                        ];
+                        if (!empty($_POST['password'])) {
+                            $deviceData['password'] = $_POST['password'];
+                        }
+                        $biometricService->updateDevice((int)$_POST['device_id'], $deviceData);
+                        $message = 'Biometric device updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating device: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'save_user_mapping':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can manage user mappings.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $biometricService = new \App\BiometricSyncService($db);
+                        $biometricService->saveUserMapping(
+                            (int)$_POST['device_id'],
+                            $_POST['device_user_id'],
+                            (int)$_POST['employee_id'],
+                            $_POST['device_user_name'] ?? null
+                        );
+                        $message = 'User mapping saved successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error saving mapping: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'add_late_rule':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can add late rules.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $lateCalculator = new \App\LateDeductionCalculator($db);
+                        $tiers = [];
+                        if (!empty($_POST['tier_min']) && is_array($_POST['tier_min'])) {
+                            foreach ($_POST['tier_min'] as $i => $min) {
+                                if ($min !== '' && isset($_POST['tier_max'][$i]) && isset($_POST['tier_amount'][$i])) {
+                                    $tiers[] = [
+                                        'min_minutes' => (int)$min,
+                                        'max_minutes' => (int)$_POST['tier_max'][$i],
+                                        'amount' => (float)$_POST['tier_amount'][$i]
+                                    ];
+                                }
+                            }
+                        }
+                        $ruleData = [
+                            'name' => $_POST['name'],
+                            'work_start_time' => $_POST['work_start_time'],
+                            'grace_minutes' => (int)($_POST['grace_minutes'] ?? 15),
+                            'deduction_tiers' => $tiers,
+                            'currency' => $_POST['currency'] ?? 'KES',
+                            'apply_to_department_id' => $_POST['apply_to_department_id'] ?: null,
+                            'is_default' => isset($_POST['is_default']),
+                            'is_active' => isset($_POST['is_active'])
+                        ];
+                        $lateCalculator->addRule($ruleData);
+                        $message = 'Late deduction rule added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error adding rule: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_late_rule':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update late rules.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $lateCalculator = new \App\LateDeductionCalculator($db);
+                        $tiers = [];
+                        if (!empty($_POST['tier_min']) && is_array($_POST['tier_min'])) {
+                            foreach ($_POST['tier_min'] as $i => $min) {
+                                if ($min !== '' && isset($_POST['tier_max'][$i]) && isset($_POST['tier_amount'][$i])) {
+                                    $tiers[] = [
+                                        'min_minutes' => (int)$min,
+                                        'max_minutes' => (int)$_POST['tier_max'][$i],
+                                        'amount' => (float)$_POST['tier_amount'][$i]
+                                    ];
+                                }
+                            }
+                        }
+                        $ruleData = [
+                            'name' => $_POST['name'],
+                            'work_start_time' => $_POST['work_start_time'],
+                            'grace_minutes' => (int)($_POST['grace_minutes'] ?? 15),
+                            'deduction_tiers' => $tiers,
+                            'currency' => $_POST['currency'] ?? 'KES',
+                            'apply_to_department_id' => $_POST['apply_to_department_id'] ?: null,
+                            'is_default' => isset($_POST['is_default']),
+                            'is_active' => isset($_POST['is_active'])
+                        ];
+                        $lateCalculator->updateRule((int)$_POST['rule_id'], $ruleData);
+                        $message = 'Late deduction rule updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating rule: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+        }
+    }
+}
+
+if ($page === 'settings' && $action === 'delete_device' && isset($_GET['id'])) {
+    if (!\App\Auth::isAdmin()) {
+        $message = 'Only administrators can delete devices.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $biometricService = new \App\BiometricSyncService($db);
+            $biometricService->deleteDevice((int)$_GET['id']);
+            $message = 'Biometric device deleted successfully!';
+            $messageType = 'success';
+        } catch (Exception $e) {
+            $message = 'Error deleting device: ' . $e->getMessage();
+            $messageType = 'danger';
+        }
+    }
+}
+
+if ($page === 'settings' && $action === 'delete_mapping' && isset($_GET['device_id']) && isset($_GET['device_user_id'])) {
+    if (!\App\Auth::isAdmin()) {
+        $message = 'Only administrators can delete mappings.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $biometricService = new \App\BiometricSyncService($db);
+            $biometricService->deleteUserMapping((int)$_GET['device_id'], $_GET['device_user_id']);
+            $message = 'User mapping deleted successfully!';
+            $messageType = 'success';
+        } catch (Exception $e) {
+            $message = 'Error deleting mapping: ' . $e->getMessage();
+            $messageType = 'danger';
+        }
+    }
+}
+
+if ($page === 'settings' && $action === 'delete_rule' && isset($_GET['id'])) {
+    if (!\App\Auth::isAdmin()) {
+        $message = 'Only administrators can delete rules.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $lateCalculator = new \App\LateDeductionCalculator($db);
+            $lateCalculator->deleteRule((int)$_GET['id']);
+            $message = 'Late deduction rule deleted successfully!';
+            $messageType = 'success';
+        } catch (Exception $e) {
+            $message = 'Error deleting rule: ' . $e->getMessage();
+            $messageType = 'danger';
         }
     }
 }

@@ -13,6 +13,11 @@ $whatsappSettings = $settings->getWhatsAppSettings();
 $templateEngine = new \App\TemplateEngine();
 $placeholderCategories = $templateEngine->getPlaceholderCategories();
 $whatsapp = new \App\WhatsApp();
+$biometricService = new \App\BiometricSyncService($db);
+$lateCalculator = new \App\LateDeductionCalculator($db);
+$biometricDevices = $biometricService->getDevices(false);
+$lateRules = $lateCalculator->getLateRules();
+$departments = (new \App\Employee($db))->getAllDepartments();
 
 $editTemplate = null;
 if ($action === 'edit_template' && $id) {
@@ -43,6 +48,16 @@ if ($action === 'edit_template' && $id) {
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'templates' ? 'active' : '' ?>" href="?page=settings&subpage=templates">
             <i class="bi bi-file-text"></i> Ticket Templates
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'biometric' ? 'active' : '' ?>" href="?page=settings&subpage=biometric">
+            <i class="bi bi-fingerprint"></i> Biometric Devices
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'late_rules' ? 'active' : '' ?>" href="?page=settings&subpage=late_rules">
+            <i class="bi bi-clock-history"></i> Late Deductions
         </a>
     </li>
 </ul>
@@ -788,5 +803,616 @@ document.querySelectorAll('.placeholder-btn').forEach(function(btn) {
 </script>
 
 <?php endif; ?>
+
+<?php elseif ($subpage === 'biometric'): ?>
+
+<?php
+$editDevice = null;
+if ($action === 'edit_device' && $id) {
+    $editDevice = $biometricService->getDevice($id);
+}
+$testDeviceResult = null;
+if ($action === 'test_device' && $id) {
+    $testDeviceResult = $biometricService->testDevice($id);
+}
+$syncResult = null;
+if ($action === 'sync_device' && $id) {
+    $syncResult = $biometricService->syncDevice($id);
+}
+?>
+
+<div class="row g-4">
+    <div class="col-md-<?= ($action === 'add_device' || $editDevice || $action === 'map_users') ? '8' : '12' ?>">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-fingerprint"></i> Biometric Attendance Devices</h5>
+                <a href="?page=settings&subpage=biometric&action=add_device" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> Add Device
+                </a>
+            </div>
+            <div class="card-body">
+                <?php if ($testDeviceResult): ?>
+                <div class="alert alert-<?= $testDeviceResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <strong><?= $testDeviceResult['success'] ? 'Connection Successful!' : 'Connection Failed' ?></strong><br>
+                    <?php if ($testDeviceResult['success']): ?>
+                    Device: <?= htmlspecialchars($testDeviceResult['device_name']) ?><br>
+                    Serial: <?= htmlspecialchars($testDeviceResult['serial_number']) ?><br>
+                    Version: <?= htmlspecialchars($testDeviceResult['version']) ?>
+                    <?php else: ?>
+                    <?= htmlspecialchars($testDeviceResult['message']) ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($syncResult): ?>
+                <div class="alert alert-<?= $syncResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <strong><?= $syncResult['success'] ? 'Sync Completed!' : 'Sync Failed' ?></strong><br>
+                    <?= htmlspecialchars($syncResult['message']) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+                
+                <?php if (empty($biometricDevices)): ?>
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-fingerprint fs-1"></i>
+                    <p class="mb-0">No biometric devices configured</p>
+                    <p class="small">Add a ZKTeco or Hikvision device to sync attendance</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Device Name</th>
+                                <th>Type</th>
+                                <th>IP Address</th>
+                                <th>Port</th>
+                                <th>Status</th>
+                                <th>Last Sync</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($biometricDevices as $device): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($device['name']) ?></strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<?= $device['device_type'] === 'zkteco' ? 'info' : 'warning' ?>">
+                                        <?= strtoupper($device['device_type']) ?>
+                                    </span>
+                                </td>
+                                <td><?= htmlspecialchars($device['ip_address']) ?></td>
+                                <td><?= $device['port'] ?></td>
+                                <td>
+                                    <?php if ($device['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($device['last_sync_at']): ?>
+                                    <small>
+                                        <?= date('M j, g:i A', strtotime($device['last_sync_at'])) ?><br>
+                                        <span class="text-<?= $device['last_sync_status'] === 'success' ? 'success' : 'danger' ?>">
+                                            <?= ucfirst($device['last_sync_status'] ?? 'N/A') ?>
+                                        </span>
+                                    </small>
+                                    <?php else: ?>
+                                    <small class="text-muted">Never</small>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="?page=settings&subpage=biometric&action=test_device&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-info" title="Test Connection">
+                                            <i class="bi bi-plug"></i>
+                                        </a>
+                                        <a href="?page=settings&subpage=biometric&action=sync_device&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-success" title="Sync Now">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </a>
+                                        <a href="?page=settings&subpage=biometric&action=map_users&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-primary" title="Map Users">
+                                            <i class="bi bi-people"></i>
+                                        </a>
+                                        <a href="?page=settings&subpage=biometric&action=edit_device&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-secondary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="?page=settings&subpage=biometric&action=delete_device&id=<?= $device['id'] ?>" 
+                                           class="btn btn-outline-danger" title="Delete"
+                                           onclick="return confirm('Are you sure you want to delete this device?')">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Device Setup Guide</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-fingerprint text-info"></i> ZKTeco Devices</h6>
+                        <ul class="small">
+                            <li>Connect device to same network as server</li>
+                            <li>Default port: <code>4370</code> (UDP)</li>
+                            <li>Enable network communication in device settings</li>
+                            <li>Assign a static IP to the device</li>
+                            <li>Supported: F18, K40, X7, ZK-MB360, etc.</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-camera-video text-warning"></i> Hikvision Devices</h6>
+                        <ul class="small">
+                            <li>Uses ISAPI REST API (HTTP)</li>
+                            <li>Default port: <code>80</code></li>
+                            <li>Username: Usually <code>admin</code></li>
+                            <li>Supports digest authentication</li>
+                            <li>Supported: DS-K1T343, MinMoe Series, etc.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <?php if ($action === 'add_device' || $editDevice): ?>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><?= $editDevice ? 'Edit' : 'Add' ?> Device</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editDevice ? 'update_biometric_device' : 'add_biometric_device' ?>">
+                    <?php if ($editDevice): ?>
+                    <input type="hidden" name="device_id" value="<?= $editDevice['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Device Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required
+                               value="<?= htmlspecialchars($editDevice['name'] ?? '') ?>"
+                               placeholder="e.g., Main Office Entrance">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Device Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="device_type" id="deviceType" required>
+                            <option value="zkteco" <?= ($editDevice['device_type'] ?? '') === 'zkteco' ? 'selected' : '' ?>>ZKTeco</option>
+                            <option value="hikvision" <?= ($editDevice['device_type'] ?? '') === 'hikvision' ? 'selected' : '' ?>>Hikvision</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">IP Address <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="ip_address" required
+                               value="<?= htmlspecialchars($editDevice['ip_address'] ?? '') ?>"
+                               placeholder="192.168.1.201"
+                               pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Port</label>
+                        <input type="number" class="form-control" name="port" id="devicePort"
+                               value="<?= $editDevice['port'] ?? '4370' ?>"
+                               min="1" max="65535">
+                        <small class="text-muted">ZKTeco: 4370, Hikvision: 80</small>
+                    </div>
+                    
+                    <div class="mb-3" id="usernameField">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" name="username"
+                               value="<?= htmlspecialchars($editDevice['username'] ?? '') ?>"
+                               placeholder="admin">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="password"
+                               placeholder="<?= $editDevice ? 'Leave blank to keep current' : 'Device password' ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Sync Interval (minutes)</label>
+                        <input type="number" class="form-control" name="sync_interval_minutes"
+                               value="<?= $editDevice['sync_interval_minutes'] ?? 15 ?>"
+                               min="5" max="1440">
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="deviceActive" value="1"
+                               <?= ($editDevice['is_active'] ?? true) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="deviceActive">Active</label>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editDevice ? 'Update' : 'Add' ?> Device
+                        </button>
+                        <a href="?page=settings&subpage=biometric" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    document.getElementById('deviceType').addEventListener('change', function() {
+        var port = this.value === 'zkteco' ? 4370 : 80;
+        document.getElementById('devicePort').value = port;
+    });
+    </script>
+    <?php endif; ?>
+    
+    <?php if ($action === 'map_users' && $id): ?>
+    <?php
+    $deviceUsers = $biometricService->getDeviceUsers($id);
+    $mappings = $biometricService->getUserMappings($id);
+    $employees = (new \App\Employee($db))->getAllEmployees();
+    $mappedDeviceUsers = array_column($mappings, 'device_user_id');
+    ?>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> User Mappings</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">Map device users to employees to sync their attendance.</p>
+                
+                <?php if (!empty($mappings)): ?>
+                <h6>Current Mappings</h6>
+                <div class="list-group mb-3">
+                    <?php foreach ($mappings as $map): ?>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted">Device: <?= htmlspecialchars($map['device_user_id']) ?></small><br>
+                            <strong><?= htmlspecialchars($map['employee_name'] ?? 'Unknown') ?></strong>
+                            <small class="text-muted">(<?= htmlspecialchars($map['employee_code'] ?? '') ?>)</small>
+                        </div>
+                        <a href="?page=settings&subpage=biometric&action=delete_mapping&device_id=<?= $id ?>&device_user_id=<?= urlencode($map['device_user_id']) ?>" 
+                           class="btn btn-sm btn-outline-danger"
+                           onclick="return confirm('Remove this mapping?')">
+                            <i class="bi bi-x"></i>
+                        </a>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+                <h6>Add Mapping</h6>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_user_mapping">
+                    <input type="hidden" name="device_id" value="<?= $id ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Device User ID</label>
+                        <?php if (!empty($deviceUsers)): ?>
+                        <select class="form-select" name="device_user_id" required>
+                            <option value="">Select user from device...</option>
+                            <?php foreach ($deviceUsers as $du): ?>
+                            <?php if (!in_array($du['device_user_id'], $mappedDeviceUsers)): ?>
+                            <option value="<?= htmlspecialchars($du['device_user_id']) ?>">
+                                <?= htmlspecialchars($du['device_user_id']) ?> - <?= htmlspecialchars($du['name'] ?: 'No Name') ?>
+                            </option>
+                            <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php else: ?>
+                        <input type="text" class="form-control" name="device_user_id" required placeholder="e.g., 001">
+                        <small class="text-muted">Could not fetch users from device. Enter manually.</small>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Employee</label>
+                        <select class="form-select" name="employee_id" required>
+                            <option value="">Select employee...</option>
+                            <?php foreach ($employees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>">
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['employee_id']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-link"></i> Add Mapping
+                    </button>
+                    <a href="?page=settings&subpage=biometric" class="btn btn-outline-secondary btn-sm">Close</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php elseif ($subpage === 'late_rules'): ?>
+
+<?php
+$editRule = null;
+if ($action === 'edit_rule' && $id) {
+    $editRule = $lateCalculator->getRule($id);
+    if ($editRule && is_string($editRule['deduction_tiers'])) {
+        $editRule['deduction_tiers'] = json_decode($editRule['deduction_tiers'], true);
+    }
+}
+?>
+
+<div class="row g-4">
+    <div class="col-md-<?= ($action === 'add_rule' || $editRule) ? '7' : '12' ?>">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Late Arrival Deduction Rules</h5>
+                <a href="?page=settings&subpage=late_rules&action=add_rule" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> Add Rule
+                </a>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Configure automatic deductions for employees who arrive late. Rules can apply to specific departments or as a default for all employees.
+                </p>
+                
+                <?php if (empty($lateRules)): ?>
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-clock-history fs-1"></i>
+                    <p class="mb-0">No late deduction rules configured</p>
+                    <p class="small">Add a rule to automatically calculate deductions for late arrivals</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Rule Name</th>
+                                <th>Work Start</th>
+                                <th>Grace Period</th>
+                                <th>Applies To</th>
+                                <th>Deduction Tiers</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($lateRules as $rule): ?>
+                            <?php 
+                            $tiers = is_string($rule['deduction_tiers']) ? json_decode($rule['deduction_tiers'], true) : $rule['deduction_tiers'];
+                            ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($rule['name']) ?></strong>
+                                    <?php if ($rule['is_default']): ?>
+                                    <span class="badge bg-primary">Default</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= date('g:i A', strtotime($rule['work_start_time'])) ?></td>
+                                <td><?= $rule['grace_minutes'] ?> min</td>
+                                <td>
+                                    <?php if ($rule['department_name']): ?>
+                                    <span class="badge bg-info"><?= htmlspecialchars($rule['department_name']) ?></span>
+                                    <?php else: ?>
+                                    <span class="text-muted">All Departments</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <small>
+                                    <?php if (!empty($tiers)): ?>
+                                        <?php foreach ($tiers as $tier): ?>
+                                        <?= $tier['min_minutes'] ?? 0 ?>-<?= $tier['max_minutes'] ?? '∞' ?> min: <?= $rule['currency'] ?> <?= number_format($tier['amount'] ?? 0) ?><br>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">No tiers</span>
+                                    <?php endif; ?>
+                                    </small>
+                                </td>
+                                <td>
+                                    <?php if ($rule['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="?page=settings&subpage=late_rules&action=edit_rule&id=<?= $rule['id'] ?>" 
+                                           class="btn btn-outline-secondary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="?page=settings&subpage=late_rules&action=delete_rule&id=<?= $rule['id'] ?>" 
+                                           class="btn btn-outline-danger" title="Delete"
+                                           onclick="return confirm('Are you sure you want to delete this rule?')">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightbulb"></i> How Late Deductions Work</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Calculation Process</h6>
+                        <ol class="small">
+                            <li>Employee clocks in via biometric device</li>
+                            <li>System compares clock-in time to work start time</li>
+                            <li>If late beyond grace period, late minutes are calculated</li>
+                            <li>Deduction amount is determined from tier rules</li>
+                            <li>Monthly deductions are applied to payroll</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Example Configuration</h6>
+                        <ul class="small">
+                            <li>Work Start: <strong>9:00 AM</strong></li>
+                            <li>Grace Period: <strong>15 minutes</strong></li>
+                            <li>15-30 min late: <strong>KES 100</strong></li>
+                            <li>31-60 min late: <strong>KES 200</strong></li>
+                            <li>61+ min late: <strong>KES 500</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <?php if ($action === 'add_rule' || $editRule): ?>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><?= $editRule ? 'Edit' : 'Add' ?> Late Deduction Rule</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="lateRuleForm">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editRule ? 'update_late_rule' : 'add_late_rule' ?>">
+                    <?php if ($editRule): ?>
+                    <input type="hidden" name="rule_id" value="<?= $editRule['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Rule Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required
+                               value="<?= htmlspecialchars($editRule['name'] ?? '') ?>"
+                               placeholder="e.g., Standard Late Policy">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Work Start Time <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" name="work_start_time" required
+                                   value="<?= $editRule['work_start_time'] ?? '09:00' ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Grace Period (min)</label>
+                            <input type="number" class="form-control" name="grace_minutes"
+                                   value="<?= $editRule['grace_minutes'] ?? 15 ?>"
+                                   min="0" max="120">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Currency</label>
+                            <select class="form-select" name="currency">
+                                <option value="KES" <?= ($editRule['currency'] ?? 'KES') === 'KES' ? 'selected' : '' ?>>KES</option>
+                                <option value="USD" <?= ($editRule['currency'] ?? '') === 'USD' ? 'selected' : '' ?>>USD</option>
+                                <option value="EUR" <?= ($editRule['currency'] ?? '') === 'EUR' ? 'selected' : '' ?>>EUR</option>
+                                <option value="GBP" <?= ($editRule['currency'] ?? '') === 'GBP' ? 'selected' : '' ?>>GBP</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Apply to Department</label>
+                            <select class="form-select" name="apply_to_department_id">
+                                <option value="">All Departments</option>
+                                <?php foreach ($departments as $dept): ?>
+                                <option value="<?= $dept['id'] ?>" <?= ($editRule['apply_to_department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($dept['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Deduction Tiers</label>
+                        <div id="deductionTiers">
+                            <?php 
+                            $tiers = $editRule['deduction_tiers'] ?? [
+                                ['min_minutes' => 16, 'max_minutes' => 30, 'amount' => 100],
+                                ['min_minutes' => 31, 'max_minutes' => 60, 'amount' => 200],
+                                ['min_minutes' => 61, 'max_minutes' => 9999, 'amount' => 500]
+                            ];
+                            foreach ($tiers as $i => $tier): 
+                            ?>
+                            <div class="tier-row mb-2">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control" name="tier_min[]" 
+                                           value="<?= $tier['min_minutes'] ?? 0 ?>" placeholder="From (min)" min="0">
+                                    <span class="input-group-text">-</span>
+                                    <input type="number" class="form-control" name="tier_max[]" 
+                                           value="<?= $tier['max_minutes'] ?? 9999 ?>" placeholder="To (min)" min="0">
+                                    <span class="input-group-text">min =</span>
+                                    <input type="number" class="form-control" name="tier_amount[]" 
+                                           value="<?= $tier['amount'] ?? 0 ?>" placeholder="Amount" min="0" step="0.01">
+                                    <button type="button" class="btn btn-outline-danger remove-tier" onclick="this.closest('.tier-row').remove()">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="addTierRow()">
+                            <i class="bi bi-plus"></i> Add Tier
+                        </button>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_default" id="isDefault" value="1"
+                               <?= ($editRule['is_default'] ?? false) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="isDefault">Set as Default Rule</label>
+                        <small class="text-muted d-block">Applies to employees without department-specific rules</small>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive" value="1"
+                               <?= ($editRule['is_active'] ?? true) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="isActive">Active</label>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editRule ? 'Update' : 'Add' ?> Rule
+                        </button>
+                        <a href="?page=settings&subpage=late_rules" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function addTierRow() {
+        var container = document.getElementById('deductionTiers');
+        var row = document.createElement('div');
+        row.className = 'tier-row mb-2';
+        row.innerHTML = '<div class="input-group input-group-sm">' +
+            '<input type="number" class="form-control" name="tier_min[]" placeholder="From (min)" min="0">' +
+            '<span class="input-group-text">-</span>' +
+            '<input type="number" class="form-control" name="tier_max[]" placeholder="To (min)" min="0">' +
+            '<span class="input-group-text">min =</span>' +
+            '<input type="number" class="form-control" name="tier_amount[]" placeholder="Amount" min="0" step="0.01">' +
+            '<button type="button" class="btn btn-outline-danger remove-tier" onclick="this.closest(\'.tier-row\').remove()">' +
+            '<i class="bi bi-x"></i></button></div>';
+        container.appendChild(row);
+    }
+    </script>
+    <?php endif; ?>
+</div>
 
 <?php endif; ?>
