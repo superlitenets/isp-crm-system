@@ -60,6 +60,16 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-clock-history"></i> Late Deductions
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'packages' ? 'active' : '' ?>" href="?page=settings&subpage=packages">
+            <i class="bi bi-box-seam"></i> Service Packages
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'landing' ? 'active' : '' ?>" href="?page=settings&subpage=landing">
+            <i class="bi bi-globe"></i> Landing Page
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -1414,5 +1424,376 @@ if ($action === 'edit_rule' && $id) {
     </script>
     <?php endif; ?>
 </div>
+
+<?php elseif ($subpage === 'packages'): ?>
+
+<?php
+$packages = $settings->getAllPackages();
+$billingCycles = $settings->getBillingCycles();
+$packageIcons = $settings->getPackageIcons();
+$editPackage = null;
+if ($action === 'edit_package' && $id) {
+    $editPackage = $settings->getPackage($id);
+}
+?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Service Packages</h5>
+                <a href="?page=landing" target="_blank" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-eye"></i> Preview Landing Page
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <?php if (empty($packages)): ?>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-box-seam display-4"></i>
+                    <p class="mt-3">No packages yet. Create your first package!</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Order</th>
+                                <th>Name</th>
+                                <th>Speed</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($packages as $pkg): ?>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary"><?= $pkg['display_order'] ?></span>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                                    <?php if ($pkg['is_popular']): ?>
+                                    <span class="badge bg-warning text-dark ms-1">Popular</span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($pkg['badge_text'])): ?>
+                                    <span class="badge bg-info ms-1"><?= htmlspecialchars($pkg['badge_text']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($pkg['speed']) ?> <?= htmlspecialchars($pkg['speed_unit']) ?></td>
+                                <td><?= htmlspecialchars($pkg['currency']) ?> <?= number_format($pkg['price'], 2) ?>/<?= $pkg['billing_cycle'] ?></td>
+                                <td>
+                                    <?php if ($pkg['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=packages&action=edit_package&id=<?= $pkg['id'] ?>" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this package?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_package">
+                                        <input type="hidden" name="package_id" value="<?= $pkg['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-<?= $editPackage ? 'pencil' : 'plus-circle' ?>"></i>
+                    <?= $editPackage ? 'Edit' : 'Add' ?> Package
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editPackage ? 'update_package' : 'create_package' ?>">
+                    <?php if ($editPackage): ?>
+                    <input type="hidden" name="package_id" value="<?= $editPackage['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Package Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required
+                               value="<?= htmlspecialchars($editPackage['name'] ?? '') ?>"
+                               placeholder="e.g., Home Basic, Business Pro">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label class="form-label">Speed <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="speed" required
+                                   value="<?= htmlspecialchars($editPackage['speed'] ?? '') ?>"
+                                   placeholder="e.g., 10, 50, 100">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Unit</label>
+                            <select class="form-select" name="speed_unit">
+                                <option value="Mbps" <?= ($editPackage['speed_unit'] ?? 'Mbps') === 'Mbps' ? 'selected' : '' ?>>Mbps</option>
+                                <option value="Gbps" <?= ($editPackage['speed_unit'] ?? '') === 'Gbps' ? 'selected' : '' ?>>Gbps</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Price <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" name="price" required step="0.01" min="0"
+                                   value="<?= $editPackage['price'] ?? '' ?>"
+                                   placeholder="e.g., 2500">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Currency</label>
+                            <select class="form-select" name="currency">
+                                <?php foreach ($currencies as $code => $info): ?>
+                                <option value="<?= $code ?>" <?= ($editPackage['currency'] ?? 'KES') === $code ? 'selected' : '' ?>>
+                                    <?= $code ?> (<?= $info['symbol'] ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Billing Cycle</label>
+                        <select class="form-select" name="billing_cycle">
+                            <?php foreach ($billingCycles as $value => $label): ?>
+                            <option value="<?= $value ?>" <?= ($editPackage['billing_cycle'] ?? 'monthly') === $value ? 'selected' : '' ?>>
+                                <?= $label ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"
+                                  placeholder="Brief description of the package"><?= htmlspecialchars($editPackage['description'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Features (one per line)</label>
+                        <textarea class="form-control" name="features_text" rows="4"
+                                  placeholder="Unlimited data&#10;Free router&#10;24/7 support"><?php
+                            if (!empty($editPackage['features']) && is_array($editPackage['features'])) {
+                                echo htmlspecialchars(implode("\n", $editPackage['features']));
+                            }
+                        ?></textarea>
+                        <small class="text-muted">Enter each feature on a new line</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Icon</label>
+                            <select class="form-select" name="icon">
+                                <?php foreach ($packageIcons as $value => $label): ?>
+                                <option value="<?= $value ?>" <?= ($editPackage['icon'] ?? 'wifi') === $value ? 'selected' : '' ?>>
+                                    <?= $label ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" class="form-control" name="display_order" min="0"
+                                   value="<?= $editPackage['display_order'] ?? 0 ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Badge Text</label>
+                            <input type="text" class="form-control" name="badge_text"
+                                   value="<?= htmlspecialchars($editPackage['badge_text'] ?? '') ?>"
+                                   placeholder="e.g., Best Value">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Badge Color</label>
+                            <input type="color" class="form-control form-control-color w-100" name="badge_color"
+                                   value="<?= htmlspecialchars($editPackage['badge_color'] ?? '#2563eb') ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="is_popular" id="isPopular" value="1"
+                               <?= ($editPackage['is_popular'] ?? false) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="isPopular">Mark as Popular</label>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="isPackageActive" value="1"
+                               <?= ($editPackage['is_active'] ?? true) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="isPackageActive">Active (show on landing page)</label>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editPackage ? 'Update' : 'Create' ?> Package
+                        </button>
+                        <?php if ($editPackage): ?>
+                        <a href="?page=settings&subpage=packages" class="btn btn-outline-secondary">Cancel</a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($subpage === 'landing'): ?>
+
+<?php
+$landingSettings = $settings->getLandingPageSettings();
+?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_landing_settings">
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-stars"></i> Hero Section</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Hero Title</label>
+                        <input type="text" class="form-control" name="landing_hero_title"
+                               value="<?= htmlspecialchars($landingSettings['hero_title']) ?>"
+                               placeholder="Lightning Fast Internet">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hero Subtitle</label>
+                        <textarea class="form-control" name="landing_hero_subtitle" rows="2"
+                                  placeholder="Experience blazing fast fiber internet..."><?= htmlspecialchars($landingSettings['hero_subtitle']) ?></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CTA Button Text</label>
+                            <input type="text" class="form-control" name="landing_hero_cta"
+                                   value="<?= htmlspecialchars($landingSettings['hero_cta_text']) ?>"
+                                   placeholder="Get Started">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">CTA Button Link</label>
+                            <input type="text" class="form-control" name="landing_hero_cta_link"
+                                   value="<?= htmlspecialchars($landingSettings['hero_cta_link']) ?>"
+                                   placeholder="#packages">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Section</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Section Title</label>
+                        <input type="text" class="form-control" name="landing_about_title"
+                               value="<?= htmlspecialchars($landingSettings['about_title']) ?>"
+                               placeholder="Why Choose Us?">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Section Description</label>
+                        <textarea class="form-control" name="landing_about_description" rows="3"><?= htmlspecialchars($landingSettings['about_description']) ?></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-palette"></i> Appearance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Primary Color</label>
+                            <input type="color" class="form-control form-control-color w-100" name="landing_primary_color"
+                                   value="<?= htmlspecialchars($landingSettings['primary_color']) ?>">
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Footer Text</label>
+                            <input type="text" class="form-control" name="landing_footer_text"
+                                   value="<?= htmlspecialchars($landingSettings['footer_text']) ?>"
+                                   placeholder="Your trusted partner for fast, reliable internet.">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Settings
+                </button>
+                <a href="?page=landing" target="_blank" class="btn btn-outline-secondary">
+                    <i class="bi bi-eye"></i> Preview Landing Page
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Tips</h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li class="mb-2">The landing page is public and doesn't require login</li>
+                    <li class="mb-2">Access it at: <code>/?page=landing</code> or the homepage</li>
+                    <li class="mb-2">Add packages in the "Service Packages" tab</li>
+                    <li class="mb-2">Company info (phone, email, address) is taken from Company Settings</li>
+                    <li class="mb-2">Only active packages are displayed</li>
+                    <li class="mb-2">Use the display order to control package arrangement</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Landing Page URL</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-2">Share this link with your customers:</p>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="landingUrl" readonly
+                           value="<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] ?>/?page=landing">
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyLandingUrl()">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyLandingUrl() {
+    var urlInput = document.getElementById('landingUrl');
+    urlInput.select();
+    document.execCommand('copy');
+    alert('URL copied to clipboard!');
+}
+</script>
 
 <?php endif; ?>

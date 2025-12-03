@@ -66,6 +66,16 @@ if ($page === 'api' && $action === 'late_deductions') {
     exit;
 }
 
+if ($page === 'landing' || (empty($_GET['page']) && !isset($_GET['action']) && $_SERVER['REQUEST_URI'] === '/' || $_SERVER['REQUEST_URI'] === '')) {
+    $landingSettings = new \App\Settings();
+    $packages = $landingSettings->getActivePackagesForLanding();
+    $company = $landingSettings->getCompanyInfo();
+    $landingPageSettings = $landingSettings->getLandingPageSettings();
+    $landingSettings = $landingPageSettings;
+    include __DIR__ . '/../templates/landing.php';
+    exit;
+}
+
 if ($page === 'login') {
     $loginError = '';
     $csrfToken = \App\Auth::generateToken();
@@ -544,6 +554,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving WhatsApp settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_package':
+                $name = trim($_POST['name'] ?? '');
+                $speed = trim($_POST['speed'] ?? '');
+                $price = floatval($_POST['price'] ?? 0);
+                if (empty($name) || empty($speed) || $price <= 0) {
+                    $message = 'Package name, speed, and price are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $featuresText = trim($_POST['features_text'] ?? '');
+                        $features = array_filter(array_map('trim', explode("\n", $featuresText)));
+                        $_POST['features'] = $features;
+                        $settings->createPackage($_POST);
+                        $message = 'Package created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=settings&subpage=packages');
+                        exit;
+                    } catch (Exception $e) {
+                        $message = 'Error creating package: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_package':
+                $packageId = (int)($_POST['package_id'] ?? 0);
+                $name = trim($_POST['name'] ?? '');
+                $speed = trim($_POST['speed'] ?? '');
+                $price = floatval($_POST['price'] ?? 0);
+                if (!$packageId || empty($name) || empty($speed) || $price <= 0) {
+                    $message = 'Package name, speed, and price are required.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $featuresText = trim($_POST['features_text'] ?? '');
+                        $features = array_filter(array_map('trim', explode("\n", $featuresText)));
+                        $_POST['features'] = $features;
+                        $settings->updatePackage($packageId, $_POST);
+                        $message = 'Package updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=settings&subpage=packages');
+                        exit;
+                    } catch (Exception $e) {
+                        $message = 'Error updating package: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_package':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete packages.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $packageId = (int)($_POST['package_id'] ?? 0);
+                        if ($packageId) {
+                            $settings->deletePackage($packageId);
+                            $message = 'Package deleted successfully!';
+                            $messageType = 'success';
+                            \App\Auth::regenerateToken();
+                        }
+                    } catch (Exception $e) {
+                        $message = 'Error deleting package: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'save_landing_settings':
+                try {
+                    $settings->saveLandingPageSettings($_POST);
+                    \App\Settings::clearCache();
+                    $message = 'Landing page settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving landing page settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;
