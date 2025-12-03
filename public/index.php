@@ -783,6 +783,33 @@ if ($page === 'settings' && $action === 'delete_rule' && isset($_GET['id'])) {
     }
 }
 
+if ($page === 'hr' && $action === 'sync_biometric') {
+    if (!\App\Auth::isAdmin()) {
+        $message = 'Only administrators can sync biometric devices.';
+        $messageType = 'danger';
+    } else {
+        try {
+            $biometricService = new \App\BiometricSyncService($db);
+            $syncResults = $biometricService->syncAllDevices();
+            $successCount = count(array_filter($syncResults, fn($r) => $r['success']));
+            $totalCount = count($syncResults);
+            if ($successCount === $totalCount) {
+                $message = "All {$totalCount} device(s) synced successfully!";
+                $messageType = 'success';
+            } elseif ($successCount > 0) {
+                $message = "{$successCount} of {$totalCount} device(s) synced successfully. Some devices failed to sync.";
+                $messageType = 'warning';
+            } else {
+                $message = "Failed to sync devices. Please check device configuration.";
+                $messageType = 'danger';
+            }
+        } catch (Exception $e) {
+            $message = 'Error syncing devices: ' . $e->getMessage();
+            $messageType = 'danger';
+        }
+    }
+}
+
 $search = $_GET['search'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
 $priorityFilter = $_GET['priority'] ?? '';

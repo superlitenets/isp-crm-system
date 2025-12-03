@@ -402,6 +402,11 @@ $performanceStatuses = $employee->getPerformanceStatuses();
             <i class="bi bi-graph-up"></i> Performance
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'late_arrivals' ? 'active' : '' ?>" href="?page=hr&subpage=late_arrivals">
+            <i class="bi bi-alarm"></i> Late Arrivals
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'departments'): ?>
@@ -1030,6 +1035,210 @@ $performanceStatuses = $employee->getPerformanceStatuses();
     </div>
 </div>
 
+<?php elseif ($subpage === 'late_arrivals'): ?>
+
+<?php
+$lateCalculator = new \App\LateDeductionCalculator($db);
+$biometricService = new \App\BiometricSyncService($db);
+$lateReportMonth = $_GET['late_month'] ?? date('Y-m');
+$lateReportDept = $_GET['late_dept'] ?? '';
+$lateArrivals = $lateCalculator->getMonthlyLateArrivals($lateReportMonth, $lateReportDept ?: null);
+$lateStats = $lateCalculator->getMonthlyLateStats($lateReportMonth, $lateReportDept ?: null);
+$lastSync = $biometricService->getLastSyncTime();
+?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-warning bg-opacity-10">
+            <div class="card-body">
+                <h3 class="mb-0"><?= $lateStats['total_late_days'] ?? 0 ?></h3>
+                <small class="text-muted">Late Arrivals</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger bg-opacity-10">
+            <div class="card-body">
+                <h3 class="mb-0"><?= number_format($lateStats['total_late_minutes'] ?? 0) ?></h3>
+                <small class="text-muted">Total Late Minutes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info bg-opacity-10">
+            <div class="card-body">
+                <h3 class="mb-0"><?= $lateStats['employees_affected'] ?? 0 ?></h3>
+                <small class="text-muted">Employees Affected</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary bg-opacity-10">
+            <div class="card-body">
+                <h3 class="mb-0"><?= $lateStats['currency'] ?? 'KES' ?> <?= number_format($lateStats['total_deductions'] ?? 0, 2) ?></h3>
+                <small class="text-muted">Total Deductions</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <input type="hidden" name="page" value="hr">
+            <input type="hidden" name="subpage" value="late_arrivals">
+            <div class="col-md-3">
+                <label class="form-label">Month</label>
+                <input type="month" class="form-control" name="late_month" value="<?= $lateReportMonth ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Department</label>
+                <select class="form-select" name="late_dept">
+                    <option value="">All Departments</option>
+                    <?php foreach ($departments as $dept): ?>
+                    <option value="<?= $dept['id'] ?>" <?= $lateReportDept == $dept['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($dept['name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-filter"></i> Filter
+                </button>
+                <a href="?page=hr&subpage=late_arrivals&action=sync_biometric" class="btn btn-outline-success">
+                    <i class="bi bi-arrow-repeat"></i> Sync Devices
+                </a>
+            </div>
+            <div class="col-md-3 text-end">
+                <small class="text-muted">
+                    <?php if ($lastSync): ?>
+                    Last sync: <?= date('M j, g:i A', strtotime($lastSync)) ?>
+                    <?php else: ?>
+                    Never synced
+                    <?php endif; ?>
+                </small>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-alarm text-warning"></i> Late Arrival Report - <?= date('F Y', strtotime($lateReportMonth . '-01')) ?></h5>
+        <a href="?page=settings&subpage=late_rules" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-gear"></i> Configure Rules
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Expected</th>
+                        <th>Actual</th>
+                        <th>Late By</th>
+                        <th>Deduction</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($lateArrivals)): ?>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2">No late arrivals for this period</p>
+                        </td>
+                    </tr>
+                    <?php else: ?>
+                    <?php foreach ($lateArrivals as $late): ?>
+                    <tr>
+                        <td><?= date('M j, Y', strtotime($late['date'])) ?></td>
+                        <td>
+                            <strong><?= htmlspecialchars($late['employee_name']) ?></strong>
+                            <small class="text-muted d-block"><?= htmlspecialchars($late['employee_code'] ?? '') ?></small>
+                        </td>
+                        <td><?= htmlspecialchars($late['department_name'] ?? '-') ?></td>
+                        <td><?= date('g:i A', strtotime($late['expected_time'])) ?></td>
+                        <td>
+                            <span class="text-danger"><?= date('g:i A', strtotime($late['actual_time'])) ?></span>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">
+                                <?= $late['late_minutes'] ?> min
+                            </span>
+                        </td>
+                        <td>
+                            <?php if ($late['deduction_amount'] > 0): ?>
+                            <span class="text-danger"><?= $late['currency'] ?? 'KES' ?> <?= number_format($late['deduction_amount'], 2) ?></span>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php if (!empty($lateArrivals)): ?>
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Summary by Employee</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Late Days</th>
+                        <th>Total Late Minutes</th>
+                        <th>Avg. Late (min)</th>
+                        <th>Total Deduction</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $employeeSummary = [];
+                    foreach ($lateArrivals as $late) {
+                        $empId = $late['employee_id'];
+                        if (!isset($employeeSummary[$empId])) {
+                            $employeeSummary[$empId] = [
+                                'name' => $late['employee_name'],
+                                'days' => 0,
+                                'minutes' => 0,
+                                'deductions' => 0,
+                                'currency' => $late['currency'] ?? 'KES'
+                            ];
+                        }
+                        $employeeSummary[$empId]['days']++;
+                        $employeeSummary[$empId]['minutes'] += $late['late_minutes'];
+                        $employeeSummary[$empId]['deductions'] += $late['deduction_amount'];
+                    }
+                    usort($employeeSummary, fn($a, $b) => $b['deductions'] <=> $a['deductions']);
+                    ?>
+                    <?php foreach ($employeeSummary as $summary): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($summary['name']) ?></strong></td>
+                        <td><?= $summary['days'] ?></td>
+                        <td><?= $summary['minutes'] ?></td>
+                        <td><?= round($summary['minutes'] / $summary['days']) ?></td>
+                        <td class="text-danger"><?= $summary['currency'] ?> <?= number_format($summary['deductions'], 2) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php else: ?>
 
 <div class="card mb-4">
@@ -1123,6 +1332,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
         </div>
     </div>
 </div>
+
 <?php endif; ?>
 
 <?php endif; ?>
