@@ -1,5 +1,5 @@
 <?php
-$inventory = new \App\Inventory($db);
+$inventory = new \App\Inventory();
 $stats = $inventory->getStats();
 $categories = $inventory->getCategories();
 
