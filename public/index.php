@@ -1543,10 +1543,6 @@ $csrfToken = \App\Auth::generateToken();
             </li>
         </ul>
         <div class="mt-auto">
-            <div class="sms-status <?= $sms->isEnabled() ? 'sms-enabled' : 'sms-disabled' ?> px-3 pb-2">
-                <i class="bi bi-chat-dots"></i>
-                SMS: <?= $sms->isEnabled() ? 'Enabled' : 'Not Configured' ?>
-            </div>
             <div class="user-info">
                 <i class="bi bi-person-circle"></i> <?= htmlspecialchars($currentUser['name']) ?>
                 <br>
