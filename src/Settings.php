@@ -347,4 +347,177 @@ class Settings {
             'configured' => !empty($apiKey) && !empty($partnerId) && !empty($shortcode)
         ];
     }
+
+    public function createPackage(array $data): int {
+        $slug = $this->generateSlug($data['name']);
+        $features = isset($data['features']) ? (is_array($data['features']) ? json_encode($data['features']) : $data['features']) : '[]';
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO service_packages (name, slug, description, speed, speed_unit, price, currency, billing_cycle, features, is_popular, is_active, display_order, badge_text, badge_color, icon)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['name'],
+            $slug,
+            $data['description'] ?? '',
+            $data['speed'],
+            $data['speed_unit'] ?? 'Mbps',
+            $data['price'],
+            $data['currency'] ?? 'KES',
+            $data['billing_cycle'] ?? 'monthly',
+            $features,
+            isset($data['is_popular']) ? 1 : 0,
+            isset($data['is_active']) ? 1 : 1,
+            $data['display_order'] ?? 0,
+            $data['badge_text'] ?? null,
+            $data['badge_color'] ?? null,
+            $data['icon'] ?? 'wifi'
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updatePackage(int $id, array $data): bool {
+        $features = isset($data['features']) ? (is_array($data['features']) ? json_encode($data['features']) : $data['features']) : '[]';
+        
+        $stmt = $this->db->prepare("
+            UPDATE service_packages SET
+                name = ?, description = ?, speed = ?, speed_unit = ?, price = ?, currency = ?,
+                billing_cycle = ?, features = ?, is_popular = ?, is_active = ?, display_order = ?,
+                badge_text = ?, badge_color = ?, icon = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $data['name'],
+            $data['description'] ?? '',
+            $data['speed'],
+            $data['speed_unit'] ?? 'Mbps',
+            $data['price'],
+            $data['currency'] ?? 'KES',
+            $data['billing_cycle'] ?? 'monthly',
+            $features,
+            isset($data['is_popular']) ? 1 : 0,
+            isset($data['is_active']) ? 1 : 0,
+            $data['display_order'] ?? 0,
+            $data['badge_text'] ?? null,
+            $data['badge_color'] ?? null,
+            $data['icon'] ?? 'wifi',
+            $id
+        ]);
+    }
+
+    public function deletePackage(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM service_packages WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function getPackage(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM service_packages WHERE id = ?");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch();
+        if ($result && $result['features']) {
+            $result['features'] = json_decode($result['features'], true) ?: [];
+        }
+        return $result ?: null;
+    }
+
+    public function getAllPackages(bool $activeOnly = false): array {
+        $sql = "SELECT * FROM service_packages";
+        if ($activeOnly) {
+            $sql .= " WHERE is_active = true";
+        }
+        $sql .= " ORDER BY display_order ASC, price ASC";
+        
+        $stmt = $this->db->query($sql);
+        $packages = $stmt->fetchAll();
+        
+        foreach ($packages as &$package) {
+            if ($package['features']) {
+                $package['features'] = json_decode($package['features'], true) ?: [];
+            } else {
+                $package['features'] = [];
+            }
+        }
+        
+        return $packages;
+    }
+
+    public function getActivePackagesForLanding(): array {
+        return $this->getAllPackages(true);
+    }
+
+    private function generateSlug(string $name): string {
+        $slug = strtolower(trim($name));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        $slug = trim($slug, '-');
+        
+        $baseSlug = $slug;
+        $counter = 1;
+        
+        while ($this->slugExists($slug)) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+        
+        return $slug;
+    }
+
+    private function slugExists(string $slug): bool {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM service_packages WHERE slug = ?");
+        $stmt->execute([$slug]);
+        return $stmt->fetchColumn() > 0;
+    }
+
+    public function getLandingPageSettings(): array {
+        return [
+            'hero_title' => $this->get('landing_hero_title', 'Lightning Fast Internet'),
+            'hero_subtitle' => $this->get('landing_hero_subtitle', 'Experience blazing fast fiber internet for your home and business'),
+            'hero_cta_text' => $this->get('landing_hero_cta', 'Get Started'),
+            'hero_cta_link' => $this->get('landing_hero_cta_link', '#packages'),
+            'about_title' => $this->get('landing_about_title', 'Why Choose Us?'),
+            'about_description' => $this->get('landing_about_description', 'We deliver reliable, high-speed internet with exceptional customer support.'),
+            'contact_phone' => $this->get('company_phone', ''),
+            'contact_email' => $this->get('company_email', ''),
+            'contact_address' => $this->get('company_address', ''),
+            'footer_text' => $this->get('landing_footer_text', ''),
+            'primary_color' => $this->get('landing_primary_color', '#2563eb'),
+            'show_testimonials' => $this->get('landing_show_testimonials', '1'),
+        ];
+    }
+
+    public function saveLandingPageSettings(array $data): bool {
+        $fields = [
+            'landing_hero_title', 'landing_hero_subtitle', 'landing_hero_cta', 'landing_hero_cta_link',
+            'landing_about_title', 'landing_about_description', 'landing_footer_text',
+            'landing_primary_color', 'landing_show_testimonials'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $this->set($field, $data[$field]);
+            }
+        }
+        return true;
+    }
+
+    public function getBillingCycles(): array {
+        return [
+            'monthly' => 'Monthly',
+            'quarterly' => 'Quarterly',
+            'semi-annual' => 'Semi-Annual',
+            'annual' => 'Annual'
+        ];
+    }
+
+    public function getPackageIcons(): array {
+        return [
+            'wifi' => 'WiFi',
+            'rocket' => 'Rocket',
+            'lightning' => 'Lightning',
+            'globe' => 'Globe',
+            'building' => 'Building',
+            'house' => 'House',
+            'speedometer' => 'Speedometer',
+            'star' => 'Star'
+        ];
+    }
 }
