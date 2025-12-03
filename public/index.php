@@ -70,6 +70,78 @@ if ($page === 'api' && $action === 'late_deductions') {
     exit;
 }
 
+if ($page === 'api' && $action === 'test_biometric_device') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'message' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized - Admin access required']);
+        exit;
+    }
+    
+    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'message' => 'Device ID required']);
+        exit;
+    }
+    
+    try {
+        if (!function_exists('socket_create')) {
+            echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled. Please enable php-sockets in php.ini or rebuild Docker with sockets extension.']);
+            exit;
+        }
+        
+        $biometricService = new \App\BiometricSyncService($db);
+        $result = $biometricService->testDevice($deviceId);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($page === 'api' && $action === 'sync_biometric_device') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'message' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized - Admin access required']);
+        exit;
+    }
+    
+    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'message' => 'Device ID required']);
+        exit;
+    }
+    
+    try {
+        if (!function_exists('socket_create')) {
+            echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled']);
+            exit;
+        }
+        
+        $biometricService = new \App\BiometricSyncService($db);
+        $result = $biometricService->syncDevice($deviceId);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 $requestUri = strtok($_SERVER['REQUEST_URI'], '?');
 $isHomepage = ($requestUri === '/' || $requestUri === '/index.php') && !isset($_GET['page']);
 if ($page === 'landing' || $isHomepage) {
@@ -1224,78 +1296,6 @@ if ($page === 'settings' && $action === 'delete_device' && isset($_GET['id'])) {
             $messageType = 'danger';
         }
     }
-}
-
-if ($page === 'api' && $action === 'test_biometric_device') {
-    ob_clean();
-    header('Content-Type: application/json');
-    
-    if (!\App\Auth::isLoggedIn()) {
-        echo json_encode(['success' => false, 'message' => 'Not logged in']);
-        exit;
-    }
-    
-    if (!\App\Auth::isAdmin()) {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized - Admin access required']);
-        exit;
-    }
-    
-    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
-    
-    if (!$deviceId) {
-        echo json_encode(['success' => false, 'message' => 'Device ID required']);
-        exit;
-    }
-    
-    try {
-        if (!function_exists('socket_create')) {
-            echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled. Please enable php-sockets in php.ini']);
-            exit;
-        }
-        
-        $biometricService = new \App\BiometricSyncService($db);
-        $result = $biometricService->testDevice($deviceId);
-        echo json_encode($result);
-    } catch (Throwable $e) {
-        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
-    }
-    exit;
-}
-
-if ($page === 'api' && $action === 'sync_biometric_device') {
-    ob_clean();
-    header('Content-Type: application/json');
-    
-    if (!\App\Auth::isLoggedIn()) {
-        echo json_encode(['success' => false, 'message' => 'Not logged in']);
-        exit;
-    }
-    
-    if (!\App\Auth::isAdmin()) {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized - Admin access required']);
-        exit;
-    }
-    
-    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
-    
-    if (!$deviceId) {
-        echo json_encode(['success' => false, 'message' => 'Device ID required']);
-        exit;
-    }
-    
-    try {
-        if (!function_exists('socket_create')) {
-            echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled']);
-            exit;
-        }
-        
-        $biometricService = new \App\BiometricSyncService($db);
-        $result = $biometricService->syncDevice($deviceId);
-        echo json_encode($result);
-    } catch (Throwable $e) {
-        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
-    }
-    exit;
 }
 
 if ($page === 'settings' && $action === 'delete_mapping' && isset($_GET['device_id']) && isset($_GET['device_user_id'])) {
