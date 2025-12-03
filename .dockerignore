@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+*.md
+*.zip
+*.log
+.DS_Store
+Thumbs.db
+node_modules/
+.idea/
+.vscode/
+*.swp
+*.swo
+replit.md
+.replit
+replit.nix
