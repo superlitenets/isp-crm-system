@@ -1341,102 +1341,6 @@ $lastSync = $biometricService->getLastSyncTime();
 </div>
 <?php endif; ?>
 
-<?php else: ?>
-
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-3">
-            <input type="hidden" name="page" value="hr">
-            <div class="col-md-6">
-                <input type="text" class="form-control" name="search" placeholder="Search employees..." value="<?= htmlspecialchars($search) ?>">
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" name="department">
-                    <option value="">All Departments</option>
-                    <?php foreach ($departments as $dept): ?>
-                    <option value="<?= $dept['id'] ?>" <?= ($_GET['department'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($dept['name']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Search
-                </button>
-                <a href="?page=hr" class="btn btn-outline-secondary">Clear</a>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Employee ID</th>
-                        <th>Name</th>
-                        <th>Position</th>
-                        <th>Department</th>
-                        <th>Phone</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $deptFilter = isset($_GET['department']) ? (int)$_GET['department'] : null;
-                    $employees = $employee->getAll($search, $deptFilter);
-                    foreach ($employees as $emp):
-                    ?>
-                    <tr>
-                        <td><strong><?= htmlspecialchars($emp['employee_id']) ?></strong></td>
-                        <td><?= htmlspecialchars($emp['name']) ?></td>
-                        <td><?= htmlspecialchars($emp['position']) ?></td>
-                        <td><?= htmlspecialchars($emp['department_name'] ?? '-') ?></td>
-                        <td><?= htmlspecialchars($emp['phone']) ?></td>
-                        <td>
-                            <span class="badge bg-<?= $emp['employment_status'] === 'active' ? 'success' : ($emp['employment_status'] === 'on_leave' ? 'warning' : ($emp['employment_status'] === 'terminated' ? 'danger' : 'secondary')) ?>">
-                                <?= ucfirst(str_replace('_', ' ', $emp['employment_status'])) ?>
-                            </span>
-                        </td>
-                        <td>
-                            <a href="?page=hr&action=view_employee&id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-primary" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            <a href="?page=hr&action=edit_employee&id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <?php if (\App\Auth::isAdmin()): ?>
-                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this employee?')">
-                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                                <input type="hidden" name="action" value="delete_employee">
-                                <input type="hidden" name="id" value="<?= $emp['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($employees)): ?>
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            No employees found. <a href="?page=hr&action=create_employee">Add your first employee</a>
-                        </td>
-                    </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<?php endif; ?>
-
 <?php elseif ($subpage === 'salespeople'): ?>
 <?php
 $salespersonModel = new \App\Salesperson($db);
@@ -1627,6 +1531,100 @@ $defaultCommission = $salespersonModel->getDefaultCommission();
     </div>
 </div>
 <?php endif; ?>
+
+<?php else: ?>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <input type="hidden" name="page" value="hr">
+            <div class="col-md-6">
+                <input type="text" class="form-control" name="search" placeholder="Search employees..." value="<?= htmlspecialchars($search) ?>">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="department">
+                    <option value="">All Departments</option>
+                    <?php foreach ($departments as $dept): ?>
+                    <option value="<?= $dept['id'] ?>" <?= ($_GET['department'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($dept['name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Search
+                </button>
+                <a href="?page=hr" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Department</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $deptFilter = isset($_GET['department']) ? (int)$_GET['department'] : null;
+                    $employees = $employee->getAll($search, $deptFilter);
+                    foreach ($employees as $emp):
+                    ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($emp['employee_id']) ?></strong></td>
+                        <td><?= htmlspecialchars($emp['name']) ?></td>
+                        <td><?= htmlspecialchars($emp['position']) ?></td>
+                        <td><?= htmlspecialchars($emp['department_name'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($emp['phone']) ?></td>
+                        <td>
+                            <span class="badge bg-<?= $emp['employment_status'] === 'active' ? 'success' : ($emp['employment_status'] === 'on_leave' ? 'warning' : ($emp['employment_status'] === 'terminated' ? 'danger' : 'secondary')) ?>">
+                                <?= ucfirst(str_replace('_', ' ', $emp['employment_status'])) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <a href="?page=hr&action=view_employee&id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-primary" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="?page=hr&action=edit_employee&id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <?php if (\App\Auth::isAdmin()): ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this employee?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="delete_employee">
+                                <input type="hidden" name="id" value="<?= $emp['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($employees)): ?>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No employees found. <a href="?page=hr&action=create_employee">Add your first employee</a>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <?php endif; ?>
 
