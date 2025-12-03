@@ -110,6 +110,26 @@ class Customer {
     }
 
     public function getServicePlans(): array {
+        try {
+            $stmt = $this->db->query("
+                SELECT slug, name, speed, speed_unit 
+                FROM service_packages 
+                WHERE is_active = true 
+                ORDER BY display_order ASC, price ASC
+            ");
+            $packages = $stmt->fetchAll();
+            
+            if (!empty($packages)) {
+                $plans = [];
+                foreach ($packages as $pkg) {
+                    $label = $pkg['name'] . ' (' . $pkg['speed'] . ' ' . $pkg['speed_unit'] . ')';
+                    $plans[$pkg['slug']] = $label;
+                }
+                return $plans;
+            }
+        } catch (\Exception $e) {
+        }
+        
         return [
             'basic' => 'Basic (10 Mbps)',
             'standard' => 'Standard (50 Mbps)',
