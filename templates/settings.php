@@ -13,11 +13,12 @@ $whatsappSettings = $settings->getWhatsAppSettings();
 $templateEngine = new \App\TemplateEngine();
 $placeholderCategories = $templateEngine->getPlaceholderCategories();
 $whatsapp = new \App\WhatsApp();
-$biometricService = new \App\BiometricSyncService($db);
-$lateCalculator = new \App\LateDeductionCalculator($db);
+$dbConn = \Database::getConnection();
+$biometricService = new \App\BiometricSyncService($dbConn);
+$lateCalculator = new \App\LateDeductionCalculator($dbConn);
 $biometricDevices = $biometricService->getDevices(false);
 $lateRules = $lateCalculator->getLateRules();
-$departments = (new \App\Employee($db))->getAllDepartments();
+$departments = (new \App\Employee($dbConn))->getAllDepartments();
 
 $editTemplate = null;
 if ($action === 'edit_template' && $id) {

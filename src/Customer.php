@@ -109,7 +109,13 @@ class Customer {
         return (int) $stmt->fetchColumn();
     }
 
+    private static ?array $servicePlansCache = null;
+    
     public function getServicePlans(): array {
+        if (self::$servicePlansCache !== null) {
+            return self::$servicePlansCache;
+        }
+        
         try {
             $stmt = $this->db->query("
                 SELECT slug, name, speed, speed_unit 
@@ -125,18 +131,21 @@ class Customer {
                     $label = $pkg['name'] . ' (' . $pkg['speed'] . ' ' . $pkg['speed_unit'] . ')';
                     $plans[$pkg['slug']] = $label;
                 }
+                self::$servicePlansCache = $plans;
                 return $plans;
             }
         } catch (\Exception $e) {
         }
         
-        return [
+        $defaults = [
             'basic' => 'Basic (10 Mbps)',
             'standard' => 'Standard (50 Mbps)',
             'premium' => 'Premium (100 Mbps)',
             'business' => 'Business (200 Mbps)',
             'enterprise' => 'Enterprise (500 Mbps)'
         ];
+        self::$servicePlansCache = $defaults;
+        return $defaults;
     }
 
     public function getConnectionStatuses(): array {
