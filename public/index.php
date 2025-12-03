@@ -1097,10 +1097,96 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit;
                     }
                     break;
+                    
+                case 'import':
+                    if ($inventoryAction === 'import') {
+                        if (!isset($_FILES['import_file']) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK) {
+                            $uploadErrors = [
+                                UPLOAD_ERR_INI_SIZE => 'File exceeds maximum upload size.',
+                                UPLOAD_ERR_FORM_SIZE => 'File exceeds maximum form size.',
+                                UPLOAD_ERR_PARTIAL => 'File was only partially uploaded.',
+                                UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+                                UPLOAD_ERR_NO_TMP_DIR => 'Server configuration error (no temp folder).',
+                                UPLOAD_ERR_CANT_WRITE => 'Server error (cannot write file).',
+                            ];
+                            $errorCode = $_FILES['import_file']['error'] ?? UPLOAD_ERR_NO_FILE;
+                            throw new Exception($uploadErrors[$errorCode] ?? 'Please select a valid file to import.');
+                        }
+                        $file = $_FILES['import_file'];
+                        $maxSize = 10 * 1024 * 1024; // 10MB max
+                        if ($file['size'] > $maxSize) {
+                            throw new Exception('File is too large. Maximum size is 10MB.');
+                        }
+                        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                        if (!in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                            throw new Exception('Invalid file format. Please use Excel (.xlsx, .xls) or CSV (.csv) files.');
+                        }
+                        $results = $inventory->importFromExcel($file['tmp_name']);
+                        if ($results['success'] > 0) {
+                            $msg = "Successfully imported {$results['success']} equipment item(s).";
+                            if ($results['failed'] > 0) {
+                                $msg .= " {$results['failed']} row(s) failed.";
+                            }
+                            $_SESSION['success_message'] = $msg;
+                        } else {
+                            $_SESSION['error_message'] = 'Import failed. ' . implode('; ', $results['errors']);
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=import');
+                        exit;
+                    } elseif ($inventoryAction === 'bulk_add') {
+                        $items = $_POST['items'] ?? [];
+                        $items = array_filter($items, fn($item) => !empty($item['name']));
+                        if (empty($items)) {
+                            throw new Exception('Please add at least one equipment item with a name.');
+                        }
+                        $results = $inventory->bulkAddEquipment($items);
+                        if ($results['success'] > 0) {
+                            $msg = "Successfully added {$results['success']} equipment item(s).";
+                            if ($results['failed'] > 0) {
+                                $msg .= " {$results['failed']} row(s) failed.";
+                            }
+                            $_SESSION['success_message'] = $msg;
+                        } else {
+                            $_SESSION['error_message'] = 'Bulk add failed. ' . implode('; ', $results['errors']);
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=import');
+                        exit;
+                    }
+                    break;
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
         }
+    }
+}
+
+// Handle inventory GET actions (template download and export)
+if ($page === 'inventory' && isset($_GET['action'])) {
+    $inventory = new \App\Inventory();
+    $inventoryAction = $_GET['action'];
+    
+    if ($inventoryAction === 'download_template') {
+        $spreadsheet = $inventory->generateImportTemplate();
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="equipment_import_template.xlsx"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    } elseif ($inventoryAction === 'export') {
+        $filters = [];
+        if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
+        if (!empty($_GET['category_id'])) $filters['category_id'] = (int)$_GET['category_id'];
+        $spreadsheet = $inventory->exportEquipment($filters);
+        $filename = 'equipment_export_' . date('Y-m-d_His') . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
     }
 }
 

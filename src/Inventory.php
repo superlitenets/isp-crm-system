@@ -531,4 +531,258 @@ class Inventory {
         $stmt->execute([$equipmentId, $equipmentId, $equipmentId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
+    
+    // ==================== IMPORT/EXPORT ====================
+    
+    public function bulkAddEquipment(array $items): array {
+        $results = ['success' => 0, 'failed' => 0, 'errors' => []];
+        
+        foreach ($items as $index => $item) {
+            try {
+                if (empty($item['name'])) {
+                    $results['failed']++;
+                    $results['errors'][] = "Row " . ($index + 1) . ": Name is required";
+                    continue;
+                }
+                
+                $categoryId = null;
+                if (!empty($item['category'])) {
+                    $categoryId = $this->getCategoryIdByName($item['category']);
+                }
+                
+                $data = [
+                    'category_id' => $categoryId,
+                    'name' => trim($item['name']),
+                    'brand' => trim($item['brand'] ?? ''),
+                    'model' => trim($item['model'] ?? ''),
+                    'serial_number' => trim($item['serial_number'] ?? ''),
+                    'mac_address' => trim($item['mac_address'] ?? ''),
+                    'purchase_date' => $this->parseDate($item['purchase_date'] ?? ''),
+                    'purchase_price' => $this->parseNumber($item['purchase_price'] ?? ''),
+                    'warranty_expiry' => $this->parseDate($item['warranty_expiry'] ?? ''),
+                    'condition' => $this->validateCondition($item['condition'] ?? 'new'),
+                    'status' => $this->validateStatus($item['status'] ?? 'available'),
+                    'location' => trim($item['location'] ?? ''),
+                    'notes' => trim($item['notes'] ?? '')
+                ];
+                
+                $this->addEquipment($data);
+                $results['success']++;
+            } catch (\Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = "Row " . ($index + 1) . ": " . $e->getMessage();
+            }
+        }
+        
+        return $results;
+    }
+    
+    public function importFromExcel(string $filePath): array {
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+        } catch (\Exception $e) {
+            return ['success' => 0, 'failed' => 0, 'errors' => ['Invalid or corrupted file. Please ensure the file is a valid Excel (.xlsx, .xls) or CSV file.']];
+        }
+        
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray();
+        
+        if (count($rows) < 2) {
+            return ['success' => 0, 'failed' => 0, 'errors' => ['File is empty or has no data rows. The file must have a header row and at least one data row.']];
+        }
+        
+        $headers = array_map('strtolower', array_map('trim', $rows[0]));
+        
+        if (empty(array_filter($headers))) {
+            return ['success' => 0, 'failed' => 0, 'errors' => ['No column headers found in the first row. Please ensure the file has column headers.']];
+        }
+        
+        $headerMap = [
+            'name' => ['name', 'equipment name', 'item name', 'item'],
+            'category' => ['category', 'type', 'equipment type'],
+            'brand' => ['brand', 'manufacturer', 'make'],
+            'model' => ['model', 'model number', 'model no'],
+            'serial_number' => ['serial number', 'serial', 'serial no', 's/n', 'sn'],
+            'mac_address' => ['mac address', 'mac', 'mac id'],
+            'purchase_date' => ['purchase date', 'date purchased', 'bought on'],
+            'purchase_price' => ['purchase price', 'price', 'cost', 'amount'],
+            'warranty_expiry' => ['warranty expiry', 'warranty', 'warranty date', 'warranty end'],
+            'condition' => ['condition', 'state'],
+            'status' => ['status', 'availability'],
+            'location' => ['location', 'place', 'stored at'],
+            'notes' => ['notes', 'remarks', 'comments', 'description']
+        ];
+        
+        $columnMap = [];
+        foreach ($headerMap as $field => $aliases) {
+            foreach ($headers as $colIndex => $header) {
+                if (in_array($header, $aliases)) {
+                    $columnMap[$field] = $colIndex;
+                    break;
+                }
+            }
+        }
+        
+        if (!isset($columnMap['name'])) {
+            $foundHeaders = implode(', ', array_filter($headers));
+            return ['success' => 0, 'failed' => 0, 'errors' => ["Could not find 'Name' column. Found columns: {$foundHeaders}. Please ensure your file has a column named 'Name', 'Equipment Name', 'Item Name', or 'Item'."]];
+        }
+        
+        $items = [];
+        for ($i = 1; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            if (empty(array_filter($row))) continue;
+            
+            $item = [];
+            foreach ($columnMap as $field => $colIndex) {
+                $item[$field] = $row[$colIndex] ?? '';
+            }
+            $items[] = $item;
+        }
+        
+        return $this->bulkAddEquipment($items);
+    }
+    
+    public function generateImportTemplate(): \PhpOffice\PhpSpreadsheet\Spreadsheet {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Equipment Import');
+        
+        $headers = ['Name', 'Category', 'Brand', 'Model', 'Serial Number', 'MAC Address', 
+                    'Purchase Date', 'Purchase Price', 'Warranty Expiry', 'Condition', 
+                    'Status', 'Location', 'Notes'];
+        
+        foreach ($headers as $col => $header) {
+            $cell = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1) . '1';
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->getFont()->setBold(true);
+            $sheet->getColumnDimensionByColumn($col + 1)->setAutoSize(true);
+        }
+        
+        $categories = $this->getCategories();
+        $categoryNames = array_map(fn($c) => $c['name'], $categories);
+        
+        $sheet->setCellValue('A2', 'Fiber Router');
+        $sheet->setCellValue('B2', count($categoryNames) > 0 ? $categoryNames[0] : 'Router');
+        $sheet->setCellValue('C2', 'TP-Link');
+        $sheet->setCellValue('D2', 'AX1800');
+        $sheet->setCellValue('E2', 'SN123456789');
+        $sheet->setCellValue('F2', 'AA:BB:CC:DD:EE:FF');
+        $sheet->setCellValue('G2', date('Y-m-d'));
+        $sheet->setCellValue('H2', '150.00');
+        $sheet->setCellValue('I2', date('Y-m-d', strtotime('+1 year')));
+        $sheet->setCellValue('J2', 'new');
+        $sheet->setCellValue('K2', 'available');
+        $sheet->setCellValue('L2', 'Main Warehouse');
+        $sheet->setCellValue('M2', 'Sample equipment entry');
+        
+        $instructionSheet = $spreadsheet->createSheet();
+        $instructionSheet->setTitle('Instructions');
+        $instructionSheet->setCellValue('A1', 'Import Instructions');
+        $instructionSheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        
+        $instructions = [
+            'A3' => 'Required Fields:',
+            'A4' => '- Name: Equipment name (required)',
+            'A6' => 'Optional Fields:',
+            'A7' => '- Category: Must match existing category name',
+            'A8' => '- Brand, Model: Manufacturer details',
+            'A9' => '- Serial Number, MAC Address: Unique identifiers',
+            'A10' => '- Purchase Date: YYYY-MM-DD format',
+            'A11' => '- Purchase Price: Numeric value',
+            'A12' => '- Warranty Expiry: YYYY-MM-DD format',
+            'A13' => '- Condition: new, good, fair, poor',
+            'A14' => '- Status: available, assigned, loaned, maintenance, faulty, retired',
+            'A15' => '- Location: Storage location',
+            'A16' => '- Notes: Additional information',
+            'A18' => 'Available Categories:',
+        ];
+        
+        foreach ($instructions as $cell => $text) {
+            $instructionSheet->setCellValue($cell, $text);
+        }
+        
+        $row = 19;
+        foreach ($categoryNames as $catName) {
+            $instructionSheet->setCellValue('A' . $row++, '- ' . $catName);
+        }
+        
+        $spreadsheet->setActiveSheetIndex(0);
+        return $spreadsheet;
+    }
+    
+    public function exportEquipment(array $filters = []): \PhpOffice\PhpSpreadsheet\Spreadsheet {
+        $equipment = $this->getEquipment($filters);
+        
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Equipment Export');
+        
+        $headers = ['ID', 'Name', 'Category', 'Brand', 'Model', 'Serial Number', 'MAC Address',
+                    'Purchase Date', 'Purchase Price', 'Warranty Expiry', 'Condition', 
+                    'Status', 'Location', 'Notes', 'Created At'];
+        
+        foreach ($headers as $col => $header) {
+            $cell = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1) . '1';
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->getFont()->setBold(true);
+        }
+        
+        $row = 2;
+        foreach ($equipment as $item) {
+            $sheet->setCellValue('A' . $row, $item['id']);
+            $sheet->setCellValue('B' . $row, $item['name']);
+            $sheet->setCellValue('C' . $row, $item['category_name'] ?? '');
+            $sheet->setCellValue('D' . $row, $item['brand']);
+            $sheet->setCellValue('E' . $row, $item['model']);
+            $sheet->setCellValue('F' . $row, $item['serial_number']);
+            $sheet->setCellValue('G' . $row, $item['mac_address']);
+            $sheet->setCellValue('H' . $row, $item['purchase_date']);
+            $sheet->setCellValue('I' . $row, $item['purchase_price']);
+            $sheet->setCellValue('J' . $row, $item['warranty_expiry']);
+            $sheet->setCellValue('K' . $row, $item['condition']);
+            $sheet->setCellValue('L' . $row, $item['status']);
+            $sheet->setCellValue('M' . $row, $item['location']);
+            $sheet->setCellValue('N' . $row, $item['notes']);
+            $sheet->setCellValue('O' . $row, $item['created_at']);
+            $row++;
+        }
+        
+        foreach (range('A', 'O') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+        
+        return $spreadsheet;
+    }
+    
+    private function getCategoryIdByName(string $name): ?int {
+        $stmt = $this->db->prepare("SELECT id FROM equipment_categories WHERE LOWER(name) = LOWER(?)");
+        $stmt->execute([trim($name)]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result ? (int)$result['id'] : null;
+    }
+    
+    private function parseDate(string $value): ?string {
+        if (empty($value)) return null;
+        $timestamp = strtotime($value);
+        return $timestamp ? date('Y-m-d', $timestamp) : null;
+    }
+    
+    private function parseNumber(string $value): ?float {
+        if (empty($value)) return null;
+        $clean = preg_replace('/[^0-9.]/', '', $value);
+        return is_numeric($clean) ? (float)$clean : null;
+    }
+    
+    private function validateCondition(string $value): string {
+        $valid = ['new', 'good', 'fair', 'poor'];
+        $lower = strtolower(trim($value));
+        return in_array($lower, $valid) ? $lower : 'new';
+    }
+    
+    private function validateStatus(string $value): string {
+        $valid = ['available', 'assigned', 'loaned', 'maintenance', 'faulty', 'retired'];
+        $lower = strtolower(trim($value));
+        return in_array($lower, $valid) ? $lower : 'available';
+    }
 }

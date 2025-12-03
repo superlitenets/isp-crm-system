@@ -62,6 +62,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 <i class="bi bi-tags"></i> Categories
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $tab === 'import' ? 'active' : '' ?>" href="?page=inventory&tab=import">
+                <i class="bi bi-upload"></i> Import/Export
+            </a>
+        </li>
     </ul>
 
     <?php if ($tab === 'overview'): ?>
@@ -961,5 +966,210 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             </div>
         </div>
     <?php endif; ?>
+    
+    <?php elseif ($tab === 'import'): ?>
+    <!-- Import/Export Tab -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-upload"></i> Import Equipment</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Import multiple equipment items from an Excel or CSV file.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Before importing:</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Download the template file below</li>
+                            <li>Fill in your equipment data (Name is required)</li>
+                            <li>Make sure category names match existing categories</li>
+                            <li>Save and upload the file</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <a href="?page=inventory&tab=import&action=download_template" class="btn btn-outline-primary">
+                            <i class="bi bi-download"></i> Download Import Template
+                        </a>
+                    </div>
+                    
+                    <form method="POST" action="?page=inventory&tab=import&action=import" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Select File</label>
+                            <input type="file" class="form-control" name="import_file" accept=".xlsx,.xls,.csv" required>
+                            <div class="form-text">Supported formats: Excel (.xlsx, .xls) and CSV (.csv)</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Import Equipment
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-download"></i> Export Equipment</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Export all equipment to an Excel file for backup or analysis.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Filter by Status</label>
+                        <select class="form-select" id="exportStatus">
+                            <option value="">All Equipment</option>
+                            <option value="available">Available Only</option>
+                            <option value="assigned">Assigned Only</option>
+                            <option value="loaned">On Loan Only</option>
+                            <option value="faulty">Faulty Only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Filter by Category</label>
+                        <select class="form-select" id="exportCategory">
+                            <option value="">All Categories</option>
+                            <?php foreach ($categories as $cat): ?>
+                            <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <a href="?page=inventory&tab=import&action=export" class="btn btn-success" id="exportBtn">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Bulk Add Equipment</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Quickly add multiple equipment items manually.</p>
+            
+            <form method="POST" action="?page=inventory&tab=import&action=bulk_add" id="bulkAddForm">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="bulkAddTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 15%">Name <span class="text-danger">*</span></th>
+                                <th style="width: 12%">Category</th>
+                                <th style="width: 10%">Brand</th>
+                                <th style="width: 10%">Model</th>
+                                <th style="width: 13%">Serial Number</th>
+                                <th style="width: 13%">MAC Address</th>
+                                <th style="width: 10%">Price</th>
+                                <th style="width: 10%">Location</th>
+                                <th style="width: 7%">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="bulk-row">
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][name]" required></td>
+                                <td>
+                                    <select class="form-select form-select-sm" name="items[0][category]">
+                                        <option value="">-</option>
+                                        <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= htmlspecialchars($cat['name']) ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][brand]"></td>
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][model]"></td>
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][serial_number]"></td>
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][mac_address]"></td>
+                                <td><input type="number" step="0.01" class="form-control form-control-sm" name="items[0][purchase_price]"></td>
+                                <td><input type="text" class="form-control form-control-sm" name="items[0][location]"></td>
+                                <td><button type="button" class="btn btn-sm btn-outline-danger remove-row" disabled><i class="bi bi-x"></i></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary" id="addRowBtn">
+                        <i class="bi bi-plus"></i> Add Row
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save All Equipment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let rowCount = 1;
+        const table = document.getElementById('bulkAddTable').getElementsByTagName('tbody')[0];
+        const categories = <?= json_encode(array_map(fn($c) => $c['name'], $categories)) ?>;
+        
+        document.getElementById('addRowBtn').addEventListener('click', function() {
+            const categoryOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            const newRow = document.createElement('tr');
+            newRow.className = 'bulk-row';
+            newRow.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][name]" required></td>
+                <td>
+                    <select class="form-select form-select-sm" name="items[${rowCount}][category]">
+                        <option value="">-</option>
+                        ${categoryOptions}
+                    </select>
+                </td>
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][brand]"></td>
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][model]"></td>
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][serial_number]"></td>
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][mac_address]"></td>
+                <td><input type="number" step="0.01" class="form-control form-control-sm" name="items[${rowCount}][purchase_price]"></td>
+                <td><input type="text" class="form-control form-control-sm" name="items[${rowCount}][location]"></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-x"></i></button></td>
+            `;
+            table.appendChild(newRow);
+            rowCount++;
+            updateRemoveButtons();
+        });
+        
+        table.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-row')) {
+                e.target.closest('tr').remove();
+                updateRemoveButtons();
+            }
+        });
+        
+        function updateRemoveButtons() {
+            const rows = table.querySelectorAll('.bulk-row');
+            rows.forEach((row, index) => {
+                const btn = row.querySelector('.remove-row');
+                btn.disabled = rows.length === 1;
+            });
+        }
+        
+        // Export link update
+        const exportBtn = document.getElementById('exportBtn');
+        const statusSelect = document.getElementById('exportStatus');
+        const categorySelect = document.getElementById('exportCategory');
+        
+        function updateExportLink() {
+            let url = '?page=inventory&tab=import&action=export';
+            if (statusSelect.value) url += '&status=' + statusSelect.value;
+            if (categorySelect.value) url += '&category_id=' + categorySelect.value;
+            exportBtn.href = url;
+        }
+        
+        statusSelect.addEventListener('change', updateExportLink);
+        categorySelect.addEventListener('change', updateExportLink);
+    });
+    </script>
     <?php endif; ?>
 </div>
