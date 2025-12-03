@@ -89,15 +89,42 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                     <input type="date" class="form-control" name="hire_date" value="<?= htmlspecialchars($employeeData['hire_date'] ?? '') ?>">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Link to User Account</label>
-                    <select class="form-select" name="user_id">
-                        <option value="">Not Linked</option>
+                    <label class="form-label">System Access</label>
+                    <select class="form-select" name="user_id" id="userAccountSelect">
+                        <option value="">No System Access</option>
+                        <option value="create_new" <?= ($action === 'create_employee') ? '' : 'style="display:none"' ?>>+ Create New Login Account</option>
                         <?php foreach ($users as $u): ?>
                         <option value="<?= $u['id'] ?>" <?= ($employeeData['user_id'] ?? '') == $u['id'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
                         </option>
                         <?php endforeach; ?>
                     </select>
+                    <small class="text-muted">Required for ticket assignment</small>
+                </div>
+                
+                <div class="col-12" id="newAccountFields" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-person-plus"></i> New Login Account</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Login Email *</label>
+                                    <input type="email" class="form-control" name="new_user_email" placeholder="user@company.com">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Password *</label>
+                                    <input type="password" class="form-control" name="new_user_password" placeholder="Min 6 characters">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Role</label>
+                                    <select class="form-select" name="new_user_role">
+                                        <option value="technician">Technician</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-12">
                     <label class="form-label">Address</label>
@@ -1099,3 +1126,20 @@ $performanceStatuses = $employee->getPerformanceStatuses();
 <?php endif; ?>
 
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userSelect = document.getElementById('userAccountSelect');
+    const newAccountFields = document.getElementById('newAccountFields');
+    
+    if (userSelect && newAccountFields) {
+        userSelect.addEventListener('change', function() {
+            if (this.value === 'create_new') {
+                newAccountFields.style.display = 'block';
+            } else {
+                newAccountFields.style.display = 'none';
+            }
+        });
+    }
+});
+</script>

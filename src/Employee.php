@@ -13,14 +13,46 @@ class Employee {
         return 'EMP-' . date('Y') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT);
     }
 
-    public function create(array $data): int {
+    public function createUserAccount(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO employees (employee_id, name, email, phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (name, email, phone, password_hash, role)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['name'],
+            $data['email'],
+            $data['phone'],
+            password_hash($data['password'], PASSWORD_DEFAULT),
+            $data['role'] ?? 'technician'
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function create(array $data): int {
+        $userId = null;
+        
+        if (isset($data['user_id']) && $data['user_id'] === 'create_new') {
+            if (!empty($data['new_user_email']) && !empty($data['new_user_password'])) {
+                $userId = $this->createUserAccount([
+                    'name' => $data['name'],
+                    'email' => $data['new_user_email'],
+                    'phone' => $data['phone'],
+                    'password' => $data['new_user_password'],
+                    'role' => $data['new_user_role'] ?? 'technician'
+                ]);
+            }
+        } elseif (!empty($data['user_id'])) {
+            $userId = (int)$data['user_id'];
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO employees (employee_id, user_id, name, email, phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $data['employee_id'] ?? $this->generateEmployeeId(),
+            $userId,
             $data['name'],
             $data['email'],
             $data['phone'],
@@ -42,12 +74,19 @@ class Employee {
         $fields = [];
         $values = [];
         
-        $allowedFields = ['name', 'email', 'phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes'];
+        $allowedFields = ['name', 'email', 'phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
+                if ($field === 'user_id' && $data[$field] === 'create_new') {
+                    continue;
+                }
                 $fields[] = "$field = ?";
-                $values[] = $data[$field] === '' ? null : $data[$field];
+                $value = $data[$field] === '' ? null : $data[$field];
+                if ($field === 'user_id' && $value !== null) {
+                    $value = (int)$value;
+                }
+                $values[] = $value;
             }
         }
         
