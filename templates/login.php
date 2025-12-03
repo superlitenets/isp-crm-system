@@ -43,17 +43,6 @@
             padding: 0.75rem;
             font-size: 1rem;
         }
-        .demo-credentials {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1.5rem;
-            font-size: 0.875rem;
-        }
-        .demo-credentials h6 {
-            margin-bottom: 0.5rem;
-            color: #666;
-        }
     </style>
 </head>
 <body>
@@ -90,12 +79,6 @@
                 <i class="bi bi-box-arrow-in-right"></i> Sign In
             </button>
         </form>
-
-        <div class="demo-credentials">
-            <h6><i class="bi bi-info-circle"></i> Demo Credentials</h6>
-            <p class="mb-1"><strong>Admin:</strong> admin@isp.com / admin123</p>
-            <p class="mb-0"><strong>Technician:</strong> john@isp.com / tech123</p>
-        </div>
     </div>
 </body>
 </html>
