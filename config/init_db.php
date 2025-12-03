@@ -360,11 +360,62 @@ function initializeDatabase(): void {
 }
 
 function runMigrations(PDO $db): void {
-    $migrations = [];
-    
-    $checkServicePackages = $db->query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'service_packages')");
-    if (!$checkServicePackages->fetchColumn()) {
-        $migrations[] = "
+    $tables = [
+        'biometric_devices' => "
+            CREATE TABLE IF NOT EXISTS biometric_devices (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                device_type VARCHAR(20) NOT NULL,
+                ip_address VARCHAR(45) NOT NULL,
+                port INTEGER DEFAULT 4370,
+                username VARCHAR(100),
+                password_encrypted TEXT,
+                sync_interval_minutes INTEGER DEFAULT 15,
+                is_active BOOLEAN DEFAULT TRUE,
+                last_sync_at TIMESTAMP,
+                last_sync_status VARCHAR(50),
+                last_sync_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'biometric_attendance_logs' => "
+            CREATE TABLE IF NOT EXISTS biometric_attendance_logs (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER,
+                employee_id INTEGER,
+                device_user_id VARCHAR(50),
+                log_time TIMESTAMP NOT NULL,
+                log_type VARCHAR(20) DEFAULT 'check',
+                verify_mode VARCHAR(20),
+                raw_data JSONB,
+                processed BOOLEAN DEFAULT FALSE,
+                attendance_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'device_user_mapping' => "
+            CREATE TABLE IF NOT EXISTS device_user_mapping (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER,
+                device_user_id VARCHAR(50) NOT NULL,
+                employee_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(device_id, device_user_id)
+            )",
+        'late_rules' => "
+            CREATE TABLE IF NOT EXISTS late_rules (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                department_id INTEGER,
+                work_start_time TIME DEFAULT '09:00',
+                grace_period_minutes INTEGER DEFAULT 15,
+                deduction_type VARCHAR(20) DEFAULT 'fixed',
+                deduction_tiers JSONB DEFAULT '[]',
+                is_default BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'service_packages' => "
             CREATE TABLE IF NOT EXISTS service_packages (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
@@ -384,17 +435,17 @@ function runMigrations(PDO $db): void {
                 icon VARCHAR(50) DEFAULT 'wifi',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_service_packages_active ON service_packages(is_active);
-            CREATE INDEX IF NOT EXISTS idx_service_packages_order ON service_packages(display_order);
-        ";
-    }
+            )"
+    ];
     
-    foreach ($migrations as $sql) {
+    foreach ($tables as $tableName => $createSql) {
         try {
-            $db->exec($sql);
+            $check = $db->query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '$tableName')");
+            if (!$check->fetchColumn()) {
+                $db->exec($createSql);
+            }
         } catch (PDOException $e) {
-            error_log("Migration error: " . $e->getMessage());
+            error_log("Migration error for $tableName: " . $e->getMessage());
         }
     }
 }
