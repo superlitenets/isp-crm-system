@@ -39,20 +39,24 @@ services:
       - ADVANTA_URL=${ADVANTA_URL:-}
     volumes:
       - ./:/var/www/html:cached
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   nginx:
     image: nginx:stable-alpine
     container_name: isp_crm_nginx
     restart: unless-stopped
     depends_on:
-      - php
+      php:
+        condition: service_healthy
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./:/var/www/html:ro
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/ssl:/etc/nginx/ssl:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
     
 volumes:
   db_data:
