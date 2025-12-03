@@ -945,6 +945,12 @@ if ($action === 'sync_device' && $id) {
                                            class="btn btn-outline-primary" title="Map Users">
                                             <i class="bi bi-people"></i>
                                         </a>
+                                        <button type="button" class="btn btn-outline-info test-connection-btn" 
+                                                data-device-id="<?= $device['id'] ?>" 
+                                                data-device-name="<?= htmlspecialchars($device['name']) ?>"
+                                                title="Test Connection">
+                                            <i class="bi bi-plug"></i>
+                                        </button>
                                         <a href="?page=settings&subpage=biometric&action=edit_device&id=<?= $device['id'] ?>" 
                                            class="btn btn-outline-secondary" title="Edit">
                                             <i class="bi bi-pencil"></i>
@@ -1168,6 +1174,96 @@ if ($action === 'sync_device' && $id) {
     </div>
     <?php endif; ?>
 </div>
+
+<div class="modal fade" id="testConnectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plug"></i> Test Biometric Connection</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="testConnectionLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Testing...</span>
+                    </div>
+                    <p class="mt-2 mb-0">Testing connection to <strong id="testDeviceName"></strong>...</p>
+                </div>
+                <div id="testConnectionResult" class="d-none">
+                    <div id="testSuccess" class="d-none">
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle-fill"></i> Connection Successful!
+                        </div>
+                        <table class="table table-sm mb-0">
+                            <tr>
+                                <th width="40%">Device Name</th>
+                                <td id="resultDeviceName">-</td>
+                            </tr>
+                            <tr>
+                                <th>Serial Number</th>
+                                <td id="resultSerial">-</td>
+                            </tr>
+                            <tr>
+                                <th>Firmware Version</th>
+                                <td id="resultVersion">-</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div id="testFailed" class="d-none">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle-fill"></i> Connection Failed
+                            <p class="mb-0 mt-2 small" id="testErrorMessage"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.test-connection-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const deviceId = this.dataset.deviceId;
+        const deviceName = this.dataset.deviceName;
+        
+        document.getElementById('testDeviceName').textContent = deviceName;
+        document.getElementById('testConnectionLoading').classList.remove('d-none');
+        document.getElementById('testConnectionResult').classList.add('d-none');
+        document.getElementById('testSuccess').classList.add('d-none');
+        document.getElementById('testFailed').classList.add('d-none');
+        
+        const modal = new bootstrap.Modal(document.getElementById('testConnectionModal'));
+        modal.show();
+        
+        try {
+            const response = await fetch(`?page=api&action=test_biometric_device&device_id=${deviceId}`);
+            const result = await response.json();
+            
+            document.getElementById('testConnectionLoading').classList.add('d-none');
+            document.getElementById('testConnectionResult').classList.remove('d-none');
+            
+            if (result.success) {
+                document.getElementById('testSuccess').classList.remove('d-none');
+                document.getElementById('resultDeviceName').textContent = result.device_name || '-';
+                document.getElementById('resultSerial').textContent = result.serial_number || '-';
+                document.getElementById('resultVersion').textContent = result.version || '-';
+            } else {
+                document.getElementById('testFailed').classList.remove('d-none');
+                document.getElementById('testErrorMessage').textContent = result.message || 'Unknown error';
+            }
+        } catch (error) {
+            document.getElementById('testConnectionLoading').classList.add('d-none');
+            document.getElementById('testConnectionResult').classList.remove('d-none');
+            document.getElementById('testFailed').classList.remove('d-none');
+            document.getElementById('testErrorMessage').textContent = 'Network error: ' + error.message;
+        }
+    });
+});
+</script>
 
 <?php elseif ($subpage === 'late_rules'): ?>
 

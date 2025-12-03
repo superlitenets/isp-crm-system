@@ -1225,6 +1225,31 @@ if ($page === 'settings' && $action === 'delete_device' && isset($_GET['id'])) {
     }
 }
 
+if ($page === 'api' && $action === 'test_biometric_device') {
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+    
+    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'message' => 'Device ID required']);
+        exit;
+    }
+    
+    try {
+        $biometricService = new \App\BiometricSyncService($db);
+        $result = $biometricService->testDevice($deviceId);
+        echo json_encode($result);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'settings' && $action === 'delete_mapping' && isset($_GET['device_id']) && isset($_GET['device_user_id'])) {
     if (!\App\Auth::isAdmin()) {
         $message = 'Only administrators can delete mappings.';
