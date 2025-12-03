@@ -1768,11 +1768,6 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $page === 'sales' ? 'active' : '' ?>" href="?page=sales">
-                    <i class="bi bi-graph-up-arrow"></i> Sales
-                </a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -1819,9 +1814,6 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'orders':
                 include __DIR__ . '/../templates/orders.php';
-                break;
-            case 'sales':
-                include __DIR__ . '/../templates/sales.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();
