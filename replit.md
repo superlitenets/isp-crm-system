@@ -68,6 +68,11 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Fault reporting and repair tracking
   - Equipment condition and status monitoring
   - Full equipment history and audit trail
+  - **Bulk Import/Export**: Excel and CSV file support
+    - Download import template with instructions
+    - Smart column header detection (multiple aliases)
+    - Bulk add form for quick manual entry
+    - Export equipment with status/category filters
 - **Settings Module**: Comprehensive configuration including:
   - Company settings (name, contact info, branding)
   - SMS gateway configuration (supports any POST/GET API)
