@@ -18,7 +18,12 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 │   ├── SMSGateway.php    # Custom SMS gateway integration
 │   ├── Settings.php      # Company settings and ticket templates
 │   ├── WhatsApp.php      # WhatsApp Web messaging integration
-│   └── TemplateEngine.php # Template placeholder engine
+│   ├── TemplateEngine.php # Template placeholder engine
+│   ├── BiometricDevice.php # Abstract biometric device class
+│   ├── ZKTecoDevice.php  # ZKTeco biometric device implementation
+│   ├── HikvisionDevice.php # Hikvision biometric device implementation
+│   ├── BiometricSyncService.php # Biometric sync and attendance import
+│   └── LateDeductionCalculator.php # Late arrival deduction calculations
 ├── templates/
 │   ├── login.php         # Login page
 │   ├── dashboard.php     # Dashboard view
@@ -41,6 +46,18 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
   - Attendance tracking (clock in/out, overtime, work-from-home)
   - Payroll management (salary, bonuses, deductions, tax calculations)
   - Performance reviews (ratings, goals, strengths, improvement areas)
+  - Late arrivals reporting with monthly statistics
+  - Automatic late deduction integration with payroll
+- **Biometric Integration**: Support for attendance devices:
+  - ZKTeco biometric devices (Push Protocol)
+  - Hikvision biometric devices (ISAPI)
+  - Automatic attendance import from devices
+  - Device user mapping to employees
+- **Late Deduction System**: Automated late arrival penalties:
+  - Configurable grace periods and work start times
+  - Tiered deduction rules (e.g., 1-15 min = $5, 16-30 min = $10)
+  - Department-specific or company-wide rules
+  - Automatic payroll integration
 - **Settings Module**: Comprehensive configuration including:
   - Company settings (name, contact info, branding)
   - SMS gateway configuration (supports any POST/GET API)
@@ -61,10 +78,15 @@ A PHP-based Customer Relationship Management (CRM) and ticketing system designed
 - **employees**: Employee records with HR data
 - **attendance**: Daily attendance records with clock in/out times
 - **payroll**: Payroll records with salary, bonuses, deductions
+- **payroll_deductions**: Breakdown of payroll deductions (late arrivals, etc.)
 - **performance_reviews**: Employee performance evaluations
 - **company_settings**: System configuration key-value pairs
 - **ticket_templates**: Reusable ticket response templates
 - **whatsapp_logs**: Log of WhatsApp messages sent
+- **biometric_devices**: Registered biometric attendance devices
+- **biometric_attendance_logs**: Raw attendance logs from devices
+- **device_user_mapping**: Maps device user IDs to employees
+- **late_rules**: Late arrival deduction rules configuration
 
 ## Authentication
 The system includes built-in authentication:
@@ -169,6 +191,11 @@ Available placeholders for ticket templates:
 - Role-based access control (admin/technician)
 
 ## Recent Changes
+- December 2024: Added biometric device integration (ZKTeco, Hikvision) for attendance import
+- December 2024: Added late arrival deduction system with configurable rules
+- December 2024: Integrated late deductions with payroll system (automatic application)
+- December 2024: Added Late Arrivals reporting tab in HR module
+- December 2024: Added Settings UI for managing biometric devices and late rules
 - December 2024: Added WhatsApp Web integration for messaging customers and technicians
 - December 2024: Added rich template placeholders including {customer_phone}, {technician_phone}
 - December 2024: Added TemplateEngine class for placeholder replacement
