@@ -7,12 +7,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-isp_crm}
-      POSTGRES_USER: ${POSTGRES_USER:-crm_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Mgathoni.2016}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm_user} -d ${POSTGRES_DB:-isp_crm}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-isp_crm}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,17 +27,15 @@ services:
       - PGHOST=db
       - PGPORT=5432
       - PGDATABASE=${POSTGRES_DB:-isp_crm}
-      - PGUSER=${POSTGRES_USER:-crm_user}
-      - PGPASSWORD=${POSTGRES_PASSWORD:-changeme}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-isp_crm}
+      - PGUSER=${POSTGRES_USER:-crm}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-Mgathoni.2016}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-Mgathoni.2016}@db:5432/${POSTGRES_DB:-isp_crm}
       - SESSION_SECRET=${SESSION_SECRET:-change_this_to_random_string}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - ADVANTA_API_KEY=${ADVANTA_API_KEY:-}
       - ADVANTA_PARTNER_ID=${ADVANTA_PARTNER_ID:-}
       - ADVANTA_SHORTCODE=${ADVANTA_SHORTCODE:-}
       - ADVANTA_URL=${ADVANTA_URL:-}
-    volumes:
-      - ./:/var/www/html:cached
 
   nginx:
     image: nginx:stable-alpine
