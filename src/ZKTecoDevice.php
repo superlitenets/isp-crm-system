@@ -31,19 +31,24 @@ class ZKTecoDevice extends BiometricDevice {
     }
     
     public function connect(): bool {
-        $this->socket = @socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-        if (!$this->socket) {
-            $this->setError('Failed to create socket: ' . socket_strerror(socket_last_error()));
+        if (!function_exists('socket_create')) {
+            $this->setError('PHP sockets extension is not enabled');
             return false;
         }
         
-        socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 10, 'usec' => 0]);
-        socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, ['sec' => 10, 'usec' => 0]);
+        $this->socket = @\socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        if (!$this->socket) {
+            $this->setError('Failed to create socket: ' . \socket_strerror(\socket_last_error()));
+            return false;
+        }
+        
+        \socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 10, 'usec' => 0]);
+        \socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, ['sec' => 10, 'usec' => 0]);
         
         $command = $this->createHeader(self::CMD_CONNECT, '', 0, 0);
         
-        if (!@socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
-            $this->setError('Failed to send connect command: ' . socket_strerror(socket_last_error()));
+        if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+            $this->setError('Failed to send connect command: ' . \socket_strerror(\socket_last_error()));
             return false;
         }
         
@@ -68,11 +73,11 @@ class ZKTecoDevice extends BiometricDevice {
     public function disconnect(): void {
         if ($this->socket && $this->sessionId) {
             $command = $this->createHeader(self::CMD_EXIT, '', $this->sessionId, $this->replyId);
-            @socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+            @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
         }
         
         if ($this->socket) {
-            socket_close($this->socket);
+            \socket_close($this->socket);
             $this->socket = null;
         }
         
@@ -122,7 +127,7 @@ class ZKTecoDevice extends BiometricDevice {
         try {
             $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(13), $this->sessionId, $this->replyId);
             
-            if (!@socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
                 throw new \Exception('Failed to request attendance data');
             }
             
@@ -143,7 +148,7 @@ class ZKTecoDevice extends BiometricDevice {
             }
             
             $freeCommand = $this->createHeader(self::CMD_FREE_DATA, '', $this->sessionId, $this->replyId);
-            @socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
+            @\socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
             
         } catch (\Exception $e) {
             $this->setError($e->getMessage());
@@ -167,7 +172,7 @@ class ZKTecoDevice extends BiometricDevice {
         try {
             $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
             
-            if (!@socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
                 throw new \Exception('Failed to request user data');
             }
             
@@ -188,7 +193,7 @@ class ZKTecoDevice extends BiometricDevice {
             }
             
             $freeCommand = $this->createHeader(self::CMD_FREE_DATA, '', $this->sessionId, $this->replyId);
-            @socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
+            @\socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
             
         } catch (\Exception $e) {
             $this->setError($e->getMessage());
@@ -212,14 +217,14 @@ class ZKTecoDevice extends BiometricDevice {
     
     private function enableDevice(): bool {
         $command = $this->createHeader(self::CMD_ENABLEDEVICE, '', $this->sessionId, $this->replyId);
-        @socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+        @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
         $this->receiveData();
         return true;
     }
     
     private function disableDevice(): bool {
         $command = $this->createHeader(self::CMD_DISABLEDEVICE, '', $this->sessionId, $this->replyId);
-        @socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+        @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
         $this->receiveData();
         return true;
     }
@@ -227,7 +232,7 @@ class ZKTecoDevice extends BiometricDevice {
     private function executeCommand(int $commandId): ?string {
         $command = $this->createHeader($commandId, '', $this->sessionId, $this->replyId);
         
-        if (!@socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+        if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
             return null;
         }
         
@@ -284,7 +289,7 @@ class ZKTecoDevice extends BiometricDevice {
         $from = '';
         $port = 0;
         
-        $result = @socket_recvfrom($this->socket, $data, 1024, 0, $from, $port);
+        $result = @\socket_recvfrom($this->socket, $data, 1024, 0, $from, $port);
         
         if ($result === false || $result === 0) {
             return false;
@@ -304,7 +309,7 @@ class ZKTecoDevice extends BiometricDevice {
             $from = '';
             $port = 0;
             
-            $result = @socket_recvfrom($this->socket, $chunk, min($remaining + 16, 65536), 0, $from, $port);
+            $result = @\socket_recvfrom($this->socket, $chunk, min($remaining + 16, 65536), 0, $from, $port);
             
             if ($result === false || $result === 0) {
                 break;

@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     git \
-    && docker-php-ext-install pdo pdo_pgsql intl curl zip opcache \
+    && docker-php-ext-install pdo pdo_pgsql intl curl zip opcache sockets \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
