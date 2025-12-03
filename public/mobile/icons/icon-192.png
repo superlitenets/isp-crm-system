@@ -1,0 +1,1 @@
+$(convert -size 192x192 xc:#0d6efd -fill white -gravity center -pointsize 80 -font DejaVu-Sans-Bold -annotate +0+0 "ISP" PNG:- 2>/dev/null || echo "Icon placeholder")

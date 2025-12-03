@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ISP CRM">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.svg">
+    <title>ISP CRM Mobile</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+    <div id="app">
+        <div id="login-screen" class="screen active">
+            <div class="login-container">
+                <div class="login-header">
+                    <i class="bi bi-wifi logo-icon"></i>
+                    <h1>ISP CRM</h1>
+                    <p>Mobile Portal</p>
+                </div>
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control form-control-lg" id="login-email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control form-control-lg" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </button>
+                </form>
+                <div id="login-error" class="alert alert-danger mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <div id="salesperson-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <span class="navbar-brand">
+                        <i class="bi bi-person-badge"></i> Sales Portal
+                    </span>
+                    <div class="d-flex align-items-center">
+                        <span id="sp-user-name" class="text-white me-2 small"></span>
+                        <button class="btn btn-outline-light btn-sm" onclick="app.logout()">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="sp-stats" class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="sp-total-orders">0</div>
+                        <div class="stat-label">Orders</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-value" id="sp-total-sales">0</div>
+                        <div class="stat-label">Sales (KES)</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-value" id="sp-pending">0</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-value" id="sp-commission">0</div>
+                        <div class="stat-label">Commission</div>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <h5><i class="bi bi-list-check"></i> My Orders</h5>
+                    <button class="btn btn-primary btn-sm" onclick="app.showNewOrder()">
+                        <i class="bi bi-plus"></i> New
+                    </button>
+                </div>
+
+                <div id="sp-orders-list" class="list-container"></div>
+            </div>
+
+            <nav class="bottom-nav">
+                <a href="#" class="nav-item active" onclick="app.loadSalespersonDashboard()">
+                    <i class="bi bi-house"></i>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showNewOrder()">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>New Order</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.loadSalespersonOrders('completed')">
+                    <i class="bi bi-check-circle"></i>
+                    <span>Completed</span>
+                </a>
+            </nav>
+        </div>
+
+        <div id="technician-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <span class="navbar-brand">
+                        <i class="bi bi-tools"></i> Tech Portal
+                    </span>
+                    <div class="d-flex align-items-center">
+                        <span id="tech-user-name" class="text-white me-2 small"></span>
+                        <button class="btn btn-outline-light btn-sm" onclick="app.logout()">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="attendance-card" class="attendance-section">
+                    <div class="attendance-time" id="current-time"></div>
+                    <div class="attendance-date" id="current-date"></div>
+                    <div class="attendance-buttons">
+                        <button class="btn btn-success btn-lg" id="btn-clock-in" onclick="app.clockIn()">
+                            <i class="bi bi-box-arrow-in-right"></i> Clock In
+                        </button>
+                        <button class="btn btn-danger btn-lg" id="btn-clock-out" onclick="app.clockOut()" disabled>
+                            <i class="bi bi-box-arrow-right"></i> Clock Out
+                        </button>
+                    </div>
+                    <div id="attendance-status" class="attendance-status"></div>
+                </div>
+
+                <div id="tech-stats" class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="tech-total">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-value" id="tech-open">0</div>
+                        <div class="stat-label">Open</div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="stat-value" id="tech-progress">0</div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-value" id="tech-resolved">0</div>
+                        <div class="stat-label">Resolved</div>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <h5><i class="bi bi-ticket"></i> My Tickets</h5>
+                    <select class="form-select form-select-sm" style="width: auto;" onchange="app.filterTickets(this.value)">
+                        <option value="">All</option>
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+
+                <div id="tech-tickets-list" class="list-container"></div>
+            </div>
+
+            <nav class="bottom-nav bg-success">
+                <a href="#" class="nav-item active" onclick="app.loadTechnicianDashboard()">
+                    <i class="bi bi-house"></i>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showEquipment()">
+                    <i class="bi bi-box"></i>
+                    <span>Equipment</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showAttendanceHistory()">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Attendance</span>
+                </a>
+            </nav>
+        </div>
+
+        <div id="new-order-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">New Order</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content form-content">
+                <form id="new-order-form">
+                    <div class="mb-3">
+                        <label class="form-label">Customer Name *</label>
+                        <input type="text" class="form-control" id="order-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="tel" class="form-control" id="order-phone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" id="order-email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" id="order-address" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Service Package</label>
+                        <select class="form-select" id="order-package">
+                            <option value="">Select package...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES)</label>
+                        <input type="number" class="form-control" id="order-amount" step="0.01">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="order-notes" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-check-lg"></i> Create Order
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div id="ticket-detail-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Ticket Details</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="ticket-detail-content"></div>
+            </div>
+        </div>
+
+        <div id="equipment-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Equipment</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="equipment-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="attendance-history-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Attendance History</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="attendance-list" class="list-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="app-toast" class="toast" role="alert">
+            <div class="toast-body" id="toast-message"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

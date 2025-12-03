@@ -603,6 +603,14 @@ function runMigrations(PDO $db): void {
                 repair_cost DECIMAL(12, 2),
                 repair_notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'mobile_tokens' => "
+            CREATE TABLE IF NOT EXISTS mobile_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                token VARCHAR(64) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
