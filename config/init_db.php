@@ -200,6 +200,76 @@ function initializeDatabase(): void {
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS biometric_devices (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        device_type VARCHAR(20) NOT NULL CHECK (device_type IN ('zkteco', 'hikvision')),
+        ip_address VARCHAR(45) NOT NULL,
+        port INTEGER DEFAULT 4370,
+        username VARCHAR(100),
+        password_encrypted TEXT,
+        sync_interval_minutes INTEGER DEFAULT 15,
+        is_active BOOLEAN DEFAULT TRUE,
+        last_sync_at TIMESTAMP,
+        last_sync_status VARCHAR(50),
+        last_sync_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS biometric_attendance_logs (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES biometric_devices(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        device_user_id VARCHAR(50) NOT NULL,
+        log_time TIMESTAMP NOT NULL,
+        direction VARCHAR(10) CHECK (direction IN ('in', 'out', 'unknown')),
+        verification_type VARCHAR(20),
+        raw_data JSONB,
+        synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        processed BOOLEAN DEFAULT FALSE,
+        UNIQUE(device_id, device_user_id, log_time)
+    );
+
+    CREATE TABLE IF NOT EXISTS device_user_mapping (
+        id SERIAL PRIMARY KEY,
+        device_id INTEGER REFERENCES biometric_devices(id) ON DELETE CASCADE,
+        device_user_id VARCHAR(50) NOT NULL,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        device_user_name VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(device_id, device_user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS late_rules (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        work_start_time TIME NOT NULL DEFAULT '09:00',
+        grace_minutes INTEGER DEFAULT 15,
+        deduction_tiers JSONB NOT NULL DEFAULT '[]',
+        currency VARCHAR(10) DEFAULT 'KES',
+        apply_to_department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS payroll_deductions (
+        id SERIAL PRIMARY KEY,
+        payroll_id INTEGER REFERENCES payroll(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        deduction_type VARCHAR(50) NOT NULL,
+        description TEXT,
+        amount DECIMAL(12, 2) NOT NULL,
+        details JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_minutes INTEGER DEFAULT 0;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'manual';
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS biometric_log_id INTEGER;
+
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
@@ -223,6 +293,17 @@ function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_company_settings_key ON company_settings(setting_key);
     CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_ticket ON whatsapp_logs(ticket_id);
     CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_sent ON whatsapp_logs(sent_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_biometric_devices_active ON biometric_devices(is_active);
+    CREATE INDEX IF NOT EXISTS idx_biometric_logs_device ON biometric_attendance_logs(device_id);
+    CREATE INDEX IF NOT EXISTS idx_biometric_logs_employee ON biometric_attendance_logs(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_biometric_logs_time ON biometric_attendance_logs(log_time);
+    CREATE INDEX IF NOT EXISTS idx_biometric_logs_processed ON biometric_attendance_logs(processed);
+    CREATE INDEX IF NOT EXISTS idx_device_mapping_device ON device_user_mapping(device_id);
+    CREATE INDEX IF NOT EXISTS idx_device_mapping_employee ON device_user_mapping(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_late_rules_active ON late_rules(is_active);
+    CREATE INDEX IF NOT EXISTS idx_payroll_deductions_payroll ON payroll_deductions(payroll_id);
+    CREATE INDEX IF NOT EXISTS idx_payroll_deductions_employee ON payroll_deductions(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_payroll_deductions_type ON payroll_deductions(deduction_type);
     ";
 
     try {
