@@ -1,5 +1,14 @@
 # ISP CRM & Ticketing System
 
+## Recent Changes
+- **December 2024**: Added Mobile PWA for salespersons and technicians
+  - Accessible at `/mobile/` - installable on Android devices
+  - Salesperson features: orders, commissions, leads tracking
+  - Technician features: tickets, attendance clock in/out, equipment
+  - Offline support via service worker
+- Added inventory database tables to auto-migration
+- Fixed PHP 8.3 compatibility in Docker setup
+
 ## Overview
 This project is a PHP-based Customer Relationship Management (CRM) and ticketing system specifically designed for Internet Service Providers (ISPs). Its core purpose is to streamline customer interactions, manage support tickets efficiently, and automate various operational tasks. The system aims to provide a comprehensive solution for ISPs to manage their customer base, track equipment, process orders, handle HR functions including employee attendance and payroll, and facilitate communication through integrated SMS and WhatsApp messaging.
 
