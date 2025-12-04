@@ -1,0 +1,43 @@
+
+isp_crm_php | [04-Dec-2025 13:52:02] NOTICE: fpm is running, pid 1
+isp_crm_php | [04-Dec-2025 13:52:02] NOTICE: ready to handle connections
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:14 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:19 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:28 +0000 "POST /index.php" 302
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:28 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:34 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:43 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:47 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:51 +0000 "GET /index.php" 200
+isp_crm_php | [04-Dec-2025 13:53:27] WARNING: [pool www] server reached pm.max_c              hildren setting (5), consider raising it
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:52:57 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:53:06 +0000 "GET /index.php" 200
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:53:08 +0000 "GET /index.php" 200
+Exception in thread Thread-4 (watch_events):
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3/dist-packages/compose/cli/log_printer.py", line 202, in               watch_events
+    for event in event_stream:
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 626, in yield_l              oop
+    yield build_container_event(event)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 594, in build_c              ontainer_event
+    container = Container.from_id(self.client, event['id'])
+                                               ~~~~~^^^^^^
+KeyError: 'id'
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:53:23 +0000 "GET /index.php" 200
+isp_crm_nginx | 105.160.98.215 - - [04/Dec/2025:13:54:17 +0000] "GET /?page=settings&subpage=sms&action=send_test&phone=0701031531 HTTP/1.1" 200 17695 "http://app.superlite.co.ke/?page=settings&subpage=sms&action=test" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" "-"
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:53:27 +0000 "GET /index.php" 200
+isp_crm_nginx | 105.160.98.215 - - [04/Dec/2025:13:54:17 +0000] "GET /?page=settings&subpage=sms&action=test HTTP/1.1" 200 17671 "http://app.superlite.co.ke/?page=settings&subpage=sms" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" "-"
+isp_crm_nginx | 167.99.216.254 - - [04/Dec/2025:13:55:04 +0000] "GET /.env HTTP/1.1" 403 153 "-" "Mozilla/5.0; Keydrop.io/1.0(onlyscans.com/about);" "-"
+isp_crm_nginx | 2025/12/04 13:55:04 [error] 29#29: *25 access forbidden by rule, client: 167.99.216.254, server: localhost, request: "GET /.env HTTP/1.1", host: "102.205.236.243"
+isp_crm_nginx | 167.99.216.254 - - [04/Dec/2025:13:55:04 +0000] "GET /.git/config HTTP/1.1" 403 153 "-" "Mozilla/5.0; Keydrop.io/1.0(onlyscans.com/about);" "-"
+isp_crm_nginx | 2025/12/04 13:55:04 [error] 29#29: *26 access forbidden by rule, client: 167.99.216.254, server: localhost, request: "GET /.git/config HTTP/1.1", host: "102.205.236.243"
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:54:42 +0000 "GET /index.php" 200
+isp_crm_nginx | 105.160.98.215 - - [04/Dec/2025:13:55:12 +0000] "GET /?page=settings&subpage=sms&action=send_test&phone=0701031531 HTTP/1.1" 200 17695 "http://app.superlite.co.ke/?page=settings&subpage=sms&action=test" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" "-"
+isp_crm_php | 172.18.0.4 -  04/Dec/2025:13:55:19 +0000 "GET /index.php" 302
+isp_crm_nginx | 20.163.16.228 - - [04/Dec/2025:13:55:19 +0000] "GET /druid/index.html HTTP/1.1" 302 5 "-" "Mozilla/5.0 zgrab/0.x" "-"
+
