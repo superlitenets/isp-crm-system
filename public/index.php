@@ -26,6 +26,7 @@ require_once __DIR__ . '/../src/HikvisionDevice.php';
 require_once __DIR__ . '/../src/BiometricSyncService.php';
 require_once __DIR__ . '/../src/LateDeductionCalculator.php';
 require_once __DIR__ . '/../src/Salesperson.php';
+require_once __DIR__ . '/../src/Role.php';
 
 initializeDatabase();
 
@@ -1279,12 +1280,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'create_role':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can create roles.';
+                if (!\App\Auth::can('roles.manage')) {
+                    $message = 'You do not have permission to create roles.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         $roleId = $roleManager->createRole($_POST);
                         if (!empty($_POST['permissions'])) {
@@ -1301,12 +1301,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'update_role':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can update roles.';
+                if (!\App\Auth::can('roles.manage')) {
+                    $message = 'You do not have permission to update roles.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         $roleId = (int)($_POST['role_id'] ?? 0);
                         $roleManager->updateRole($roleId, $_POST);
@@ -1322,12 +1321,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'delete_role':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can delete roles.';
+                if (!\App\Auth::can('roles.manage')) {
+                    $message = 'You do not have permission to delete roles.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         $roleId = (int)($_POST['role_id'] ?? 0);
                         $role = $roleManager->getRole($roleId);
@@ -1348,12 +1346,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'create_user':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can create users.';
+                if (!\App\Auth::can('users.manage')) {
+                    $message = 'You do not have permission to create users.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         if (strlen($_POST['password'] ?? '') < 6) {
                             throw new Exception('Password must be at least 6 characters.');
@@ -1370,12 +1367,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'update_user':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can update users.';
+                if (!\App\Auth::can('users.manage')) {
+                    $message = 'You do not have permission to update users.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         $userId = (int)($_POST['user_id'] ?? 0);
                         if (!empty($_POST['password']) && strlen($_POST['password']) < 6) {
@@ -1393,12 +1389,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'delete_user':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can delete users.';
+                if (!\App\Auth::can('users.manage')) {
+                    $message = 'You do not have permission to delete users.';
                     $messageType = 'danger';
                 } else {
                     try {
-                        require_once __DIR__ . '/../src/Role.php';
                         $roleManager = new \App\Role($db);
                         $userId = (int)($_POST['user_id'] ?? 0);
                         if ($userId === \App\Auth::userId()) {
