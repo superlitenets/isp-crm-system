@@ -127,6 +127,21 @@ class Employee {
         $fields = [];
         $values = [];
         
+        if (isset($data['user_id']) && $data['user_id'] === 'create_new') {
+            if (!empty($data['new_user_email']) && !empty($data['new_user_password'])) {
+                $userId = $this->createUserAccount([
+                    'name' => $data['name'],
+                    'email' => $data['new_user_email'],
+                    'phone' => $data['phone'],
+                    'password' => $data['new_user_password'],
+                    'role_id' => $data['new_user_role_id'] ?? null
+                ]);
+                $data['user_id'] = $userId;
+            }
+        } elseif (!empty($data['user_id']) && !empty($data['new_user_role_id'])) {
+            $this->updateUserRole((int)$data['user_id'], (int)$data['new_user_role_id']);
+        }
+        
         $allowedFields = ['name', 'email', 'phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id'];
         
         foreach ($allowedFields as $field) {
