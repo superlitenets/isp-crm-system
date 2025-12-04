@@ -612,6 +612,33 @@ function runMigrations(PDO $db): void {
                 token VARCHAR(64) NOT NULL,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'roles' => "
+            CREATE TABLE IF NOT EXISTS roles (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) UNIQUE NOT NULL,
+                display_name VARCHAR(100) NOT NULL,
+                description TEXT,
+                is_system BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'permissions' => "
+            CREATE TABLE IF NOT EXISTS permissions (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                display_name VARCHAR(150) NOT NULL,
+                category VARCHAR(50) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'role_permissions' => "
+            CREATE TABLE IF NOT EXISTS role_permissions (
+                id SERIAL PRIMARY KEY,
+                role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+                permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(role_id, permission_id)
             )"
     ];
     
@@ -628,7 +655,8 @@ function runMigrations(PDO $db): void {
     
     $columnMigrations = [
         ['orders', 'salesperson_id', 'ALTER TABLE orders ADD COLUMN salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE SET NULL'],
-        ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE']
+        ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE'],
+        ['users', 'role_id', 'ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -641,6 +669,153 @@ function runMigrations(PDO $db): void {
         } catch (PDOException $e) {
             error_log("Column migration error for $table.$column: " . $e->getMessage());
         }
+    }
+    
+    seedRolesAndPermissions($db);
+}
+
+function seedRolesAndPermissions(PDO $db): void {
+    $checkRoles = $db->query("SELECT COUNT(*) FROM roles")->fetchColumn();
+    if ($checkRoles > 0) {
+        return;
+    }
+    
+    $roles = [
+        ['admin', 'Administrator', 'Full system access with all permissions', true],
+        ['manager', 'Manager', 'Can manage most resources but limited system settings', true],
+        ['technician', 'Technician', 'Can manage tickets, customers, and basic operations', true],
+        ['salesperson', 'Salesperson', 'Can manage orders, leads, and view commissions', true],
+        ['viewer', 'Viewer', 'Read-only access to most resources', true]
+    ];
+    
+    $stmt = $db->prepare("INSERT INTO roles (name, display_name, description, is_system) VALUES (?, ?, ?, ?)");
+    foreach ($roles as $role) {
+        try {
+            $stmt->execute($role);
+        } catch (PDOException $e) {
+            error_log("Error seeding role {$role[0]}: " . $e->getMessage());
+        }
+    }
+    
+    $permissions = [
+        ['dashboard.view', 'View Dashboard', 'dashboard', 'Can view the main dashboard'],
+        
+        ['customers.view', 'View Customers', 'customers', 'Can view customer list and details'],
+        ['customers.create', 'Create Customers', 'customers', 'Can create new customers'],
+        ['customers.edit', 'Edit Customers', 'customers', 'Can edit existing customers'],
+        ['customers.delete', 'Delete Customers', 'customers', 'Can delete customers'],
+        
+        ['tickets.view', 'View Tickets', 'tickets', 'Can view ticket list and details'],
+        ['tickets.create', 'Create Tickets', 'tickets', 'Can create new tickets'],
+        ['tickets.edit', 'Edit Tickets', 'tickets', 'Can edit and update tickets'],
+        ['tickets.delete', 'Delete Tickets', 'tickets', 'Can delete tickets'],
+        ['tickets.assign', 'Assign Tickets', 'tickets', 'Can assign tickets to technicians'],
+        
+        ['hr.view', 'View HR', 'hr', 'Can view employee records and HR data'],
+        ['hr.manage', 'Manage HR', 'hr', 'Can create, edit, and manage employees'],
+        ['hr.payroll', 'Manage Payroll', 'hr', 'Can process payroll and deductions'],
+        ['hr.attendance', 'Manage Attendance', 'hr', 'Can view and edit attendance records'],
+        
+        ['inventory.view', 'View Inventory', 'inventory', 'Can view equipment and inventory'],
+        ['inventory.manage', 'Manage Inventory', 'inventory', 'Can add, edit, and assign equipment'],
+        
+        ['orders.view', 'View Orders', 'orders', 'Can view orders list'],
+        ['orders.create', 'Create Orders', 'orders', 'Can create new orders'],
+        ['orders.manage', 'Manage Orders', 'orders', 'Can edit and process orders'],
+        
+        ['payments.view', 'View Payments', 'payments', 'Can view payment records'],
+        ['payments.manage', 'Manage Payments', 'payments', 'Can process and manage payments'],
+        
+        ['settings.view', 'View Settings', 'settings', 'Can view system settings'],
+        ['settings.manage', 'Manage Settings', 'settings', 'Can modify system settings'],
+        ['settings.sms', 'Manage SMS Settings', 'settings', 'Can configure SMS gateway'],
+        ['settings.biometric', 'Manage Biometric', 'settings', 'Can configure biometric devices'],
+        
+        ['users.view', 'View Users', 'users', 'Can view user accounts'],
+        ['users.manage', 'Manage Users', 'users', 'Can create, edit, and delete users'],
+        ['roles.manage', 'Manage Roles', 'users', 'Can manage roles and permissions'],
+        
+        ['reports.view', 'View Reports', 'reports', 'Can view reports and analytics'],
+        ['reports.export', 'Export Reports', 'reports', 'Can export data and reports']
+    ];
+    
+    $stmt = $db->prepare("INSERT INTO permissions (name, display_name, category, description) VALUES (?, ?, ?, ?)");
+    foreach ($permissions as $permission) {
+        try {
+            $stmt->execute($permission);
+        } catch (PDOException $e) {
+            error_log("Error seeding permission {$permission[0]}: " . $e->getMessage());
+        }
+    }
+    
+    $rolePermissions = [
+        'admin' => ['*'],
+        'manager' => [
+            'dashboard.view', 'customers.*', 'tickets.*', 'hr.view', 'hr.manage', 'hr.attendance',
+            'inventory.*', 'orders.*', 'payments.view', 'settings.view', 'users.view', 'reports.*'
+        ],
+        'technician' => [
+            'dashboard.view', 'customers.view', 'customers.edit', 'tickets.view', 'tickets.create', 
+            'tickets.edit', 'inventory.view', 'orders.view'
+        ],
+        'salesperson' => [
+            'dashboard.view', 'customers.view', 'customers.create', 'orders.view', 'orders.create',
+            'orders.manage', 'payments.view'
+        ],
+        'viewer' => [
+            'dashboard.view', 'customers.view', 'tickets.view', 'inventory.view', 'orders.view',
+            'payments.view', 'reports.view'
+        ]
+    ];
+    
+    $roleStmt = $db->prepare("SELECT id FROM roles WHERE name = ?");
+    $permStmt = $db->prepare("SELECT id FROM permissions WHERE name = ? OR name LIKE ?");
+    $insertStmt = $db->prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?) ON CONFLICT DO NOTHING");
+    
+    foreach ($rolePermissions as $roleName => $perms) {
+        $roleStmt->execute([$roleName]);
+        $roleId = $roleStmt->fetchColumn();
+        if (!$roleId) continue;
+        
+        if (in_array('*', $perms)) {
+            $allPerms = $db->query("SELECT id FROM permissions")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($allPerms as $permId) {
+                try {
+                    $insertStmt->execute([$roleId, $permId]);
+                } catch (PDOException $e) {}
+            }
+        } else {
+            foreach ($perms as $perm) {
+                if (str_ends_with($perm, '.*')) {
+                    $category = str_replace('.*', '', $perm);
+                    $catPerms = $db->prepare("SELECT id FROM permissions WHERE category = ?");
+                    $catPerms->execute([$category]);
+                    foreach ($catPerms->fetchAll(PDO::FETCH_COLUMN) as $permId) {
+                        try {
+                            $insertStmt->execute([$roleId, $permId]);
+                        } catch (PDOException $e) {}
+                    }
+                } else {
+                    $permStmt->execute([$perm, '']);
+                    $permId = $permStmt->fetchColumn();
+                    if ($permId) {
+                        try {
+                            $insertStmt->execute([$roleId, $permId]);
+                        } catch (PDOException $e) {}
+                    }
+                }
+            }
+        }
+    }
+    
+    $adminRole = $db->query("SELECT id FROM roles WHERE name = 'admin'")->fetchColumn();
+    $techRole = $db->query("SELECT id FROM roles WHERE name = 'technician'")->fetchColumn();
+    
+    if ($adminRole) {
+        $db->exec("UPDATE users SET role_id = $adminRole WHERE role = 'admin' AND role_id IS NULL");
+    }
+    if ($techRole) {
+        $db->exec("UPDATE users SET role_id = $techRole WHERE role = 'technician' AND role_id IS NULL");
     }
 }
 
