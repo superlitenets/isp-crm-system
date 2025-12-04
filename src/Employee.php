@@ -31,18 +31,51 @@ class Employee {
     }
 
     public function createUserAccount(array $data): int {
+        $roleId = $data['role_id'] ?? null;
+        $roleName = $data['role'] ?? 'technician';
+        
+        if ($roleId) {
+            $roleStmt = $this->db->prepare("SELECT name FROM roles WHERE id = ?");
+            $roleStmt->execute([$roleId]);
+            $roleName = $roleStmt->fetchColumn() ?: 'technician';
+        }
+        
         $stmt = $this->db->prepare("
-            INSERT INTO users (name, email, phone, password_hash, role)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users (name, email, phone, password_hash, role, role_id)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
             $data['email'],
             $data['phone'],
             password_hash($data['password'], PASSWORD_DEFAULT),
-            $data['role'] ?? 'technician'
+            $roleName,
+            $roleId
         ]);
         return (int) $this->db->lastInsertId();
+    }
+    
+    public function updateUserRole(int $userId, int $roleId): bool {
+        $roleStmt = $this->db->prepare("SELECT name FROM roles WHERE id = ?");
+        $roleStmt->execute([$roleId]);
+        $roleName = $roleStmt->fetchColumn();
+        
+        if (!$roleName) return false;
+        
+        $stmt = $this->db->prepare("UPDATE users SET role = ?, role_id = ? WHERE id = ?");
+        return $stmt->execute([$roleName, $roleId, $userId]);
+    }
+    
+    public function getUserByEmployeeId(int $employeeId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT u.*, r.display_name as role_display_name 
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id
+            JOIN employees e ON e.user_id = u.id 
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$employeeId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
 
     public function create(array $data): int {
@@ -55,11 +88,14 @@ class Employee {
                     'email' => $data['new_user_email'],
                     'phone' => $data['phone'],
                     'password' => $data['new_user_password'],
-                    'role' => $data['new_user_role'] ?? 'technician'
+                    'role_id' => $data['new_user_role_id'] ?? null
                 ]);
             }
         } elseif (!empty($data['user_id'])) {
             $userId = (int)$data['user_id'];
+            if (!empty($data['new_user_role_id'])) {
+                $this->updateUserRole($userId, (int)$data['new_user_role_id']);
+            }
         }
         
         $stmt = $this->db->prepare("
