@@ -101,6 +101,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-speedometer2"></i> SLA Policies
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'hr_templates' ? 'active' : '' ?>" href="?page=settings&subpage=hr_templates">
+            <i class="bi bi-bell"></i> HR Notifications
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -3429,5 +3434,388 @@ function editPolicy(policy) {
     new bootstrap.Modal(document.getElementById('slaPolicyModal')).show();
 }
 </script>
+
+<?php elseif ($subpage === 'hr_templates'): ?>
+
+<?php
+$rtProcessor = new \App\RealTimeAttendanceProcessor($dbConn);
+$hrTemplates = $rtProcessor->getHRTemplates();
+$eventTypes = $rtProcessor->getEventTypes();
+$hrPlaceholders = $templateEngine->getHRPlaceholders();
+$editHRTemplate = null;
+if ($action === 'edit_hr_template' && $id) {
+    $editHRTemplate = $rtProcessor->getHRTemplate($id);
+}
+?>
+
+<?php if ($action === 'create_hr_template' || $action === 'edit_hr_template'): ?>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-<?= $editHRTemplate ? 'pencil' : 'plus-circle' ?>"></i> <?= $editHRTemplate ? 'Edit' : 'Create' ?> HR Notification Template</h4>
+    <a href="?page=settings&subpage=hr_templates" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Templates
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="action" value="<?= $editHRTemplate ? 'update_hr_template' : 'create_hr_template' ?>">
+                    <?php if ($editHRTemplate): ?>
+                    <input type="hidden" name="template_id" value="<?= $editHRTemplate['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Template Name *</label>
+                        <input type="text" name="name" class="form-control" required
+                               value="<?= htmlspecialchars($editHRTemplate['name'] ?? '') ?>">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-select">
+                                <option value="attendance" <?= ($editHRTemplate['category'] ?? '') === 'attendance' ? 'selected' : '' ?>>Attendance</option>
+                                <option value="payroll" <?= ($editHRTemplate['category'] ?? '') === 'payroll' ? 'selected' : '' ?>>Payroll</option>
+                                <option value="hr" <?= ($editHRTemplate['category'] ?? '') === 'hr' ? 'selected' : '' ?>>HR General</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Event Type *</label>
+                            <select name="event_type" class="form-select" required>
+                                <?php foreach ($eventTypes as $value => $label): ?>
+                                <option value="<?= $value ?>" <?= ($editHRTemplate['event_type'] ?? '') === $value ? 'selected' : '' ?>><?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Subject (for emails/notifications)</label>
+                        <input type="text" name="subject" class="form-control"
+                               value="<?= htmlspecialchars($editHRTemplate['subject'] ?? '') ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">SMS Template *</label>
+                        <textarea name="sms_template" class="form-control" rows="4" required
+                                  placeholder="Dear {employee_name}, You checked in at {clock_in_time}..."><?= htmlspecialchars($editHRTemplate['sms_template'] ?? '') ?></textarea>
+                        <small class="text-muted">Use placeholders from the list on the right</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Email Template (optional)</label>
+                        <textarea name="email_template" class="form-control" rows="6"
+                                  placeholder="Optional email content..."><?= htmlspecialchars($editHRTemplate['email_template'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_active" class="form-check-input" id="hrTemplateActive" value="1"
+                                       <?= !isset($editHRTemplate['is_active']) || $editHRTemplate['is_active'] ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="hrTemplateActive">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="send_sms" class="form-check-input" id="hrTemplateSMS" value="1"
+                                       <?= !isset($editHRTemplate['send_sms']) || $editHRTemplate['send_sms'] ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="hrTemplateSMS">Send SMS</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="send_email" class="form-check-input" id="hrTemplateEmail" value="1"
+                                       <?= ($editHRTemplate['send_email'] ?? false) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="hrTemplateEmail">Send Email</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editHRTemplate ? 'Update Template' : 'Create Template' ?>
+                        </button>
+                        <a href="?page=settings&subpage=hr_templates" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-braces"></i> Available Placeholders
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                <small class="text-muted">Click to copy</small>
+                <table class="table table-sm mt-2">
+                    <?php foreach ($hrPlaceholders as $placeholder => $description): ?>
+                    <tr>
+                        <td>
+                            <code class="user-select-all" style="cursor: pointer;" onclick="navigator.clipboard.writeText('<?= $placeholder ?>')"><?= $placeholder ?></code>
+                        </td>
+                        <td><small class="text-muted"><?= $description ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="bi bi-eye"></i> Preview
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Sample preview with test data:</p>
+                <div id="hrTemplatePreview" class="p-3 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">
+                    Enter text in SMS Template to see preview
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelector('textarea[name="sms_template"]').addEventListener('input', function() {
+    const template = this.value;
+    const sampleData = {
+        '{employee_name}': 'John Kamau',
+        '{employee_id}': 'EMP-2024-0012',
+        '{employee_phone}': '+254712345678',
+        '{employee_email}': 'john.kamau@company.com',
+        '{department_name}': 'Technical Support',
+        '{position}': 'Senior Technician',
+        '{clock_in_time}': '09:25 AM',
+        '{clock_out_time}': '05:30 PM',
+        '{work_start_time}': '09:00 AM',
+        '{late_minutes}': '25',
+        '{deduction_amount}': '150.00',
+        '{currency}': 'KES',
+        '{attendance_date}': new Date().toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}),
+        '{hours_worked}': '8.0',
+        '{company_name}': 'ISP Company',
+        '{company_phone}': '+254700000000',
+        '{current_date}': new Date().toISOString().split('T')[0],
+        '{current_time}': new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})
+    };
+    
+    let preview = template;
+    for (const [key, value] of Object.entries(sampleData)) {
+        preview = preview.split(key).join(value);
+    }
+    
+    document.getElementById('hrTemplatePreview').textContent = preview || 'Enter text in SMS Template to see preview';
+});
+
+document.querySelector('textarea[name="sms_template"]').dispatchEvent(new Event('input'));
+</script>
+
+<?php else: ?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-bell"></i> HR Notification Templates</h4>
+        <p class="text-muted mb-0">Configure automatic notifications for attendance events like late arrivals</p>
+    </div>
+    <a href="?page=settings&subpage=hr_templates&action=create_hr_template" class="btn btn-success">
+        <i class="bi bi-plus-lg"></i> New Template
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= count($hrTemplates) ?></h3>
+                <small>Total Templates</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= count(array_filter($hrTemplates, fn($t) => $t['is_active'])) ?></h3>
+                <small>Active</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= count(array_filter($hrTemplates, fn($t) => $t['send_sms'])) ?></h3>
+                <small>SMS Enabled</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <?php
+                $notifLogs = $rtProcessor->getNotificationLogs(null, date('Y-m-d'), date('Y-m-d'), 1000);
+                $sentCount = count(array_filter($notifLogs, fn($l) => $l['status'] === 'sent'));
+                ?>
+                <h3 class="mb-0"><?= $sentCount ?></h3>
+                <small>Sent Today</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list"></i> Notification Templates
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Event Type</th>
+                    <th>SMS</th>
+                    <th>Status</th>
+                    <th width="120">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($hrTemplates as $tpl): ?>
+                <tr>
+                    <td>
+                        <strong><?= htmlspecialchars($tpl['name']) ?></strong>
+                        <?php if (!empty($tpl['subject'])): ?>
+                        <br><small class="text-muted"><?= htmlspecialchars($tpl['subject']) ?></small>
+                        <?php endif; ?>
+                    </td>
+                    <td><span class="badge bg-secondary"><?= ucfirst($tpl['category']) ?></span></td>
+                    <td><?= $eventTypes[$tpl['event_type']] ?? $tpl['event_type'] ?></td>
+                    <td>
+                        <?php if ($tpl['send_sms']): ?>
+                        <span class="badge bg-success"><i class="bi bi-check"></i> SMS</span>
+                        <?php endif; ?>
+                        <?php if ($tpl['send_email']): ?>
+                        <span class="badge bg-info"><i class="bi bi-envelope"></i> Email</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($tpl['is_active']): ?>
+                        <span class="badge bg-success">Active</span>
+                        <?php else: ?>
+                        <span class="badge bg-secondary">Inactive</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <a href="?page=settings&subpage=hr_templates&action=edit_hr_template&id=<?= $tpl['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" class="d-inline" onsubmit="return confirm('Delete this template?');">
+                            <input type="hidden" name="action" value="delete_hr_template">
+                            <input type="hidden" name="template_id" value="<?= $tpl['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($hrTemplates)): ?>
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No notification templates yet. <a href="?page=settings&subpage=hr_templates&action=create_hr_template">Create your first template</a>
+                    </td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history"></i> Recent Notification Logs</span>
+        <small class="text-muted">Last 20 notifications</small>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Date/Time</th>
+                    <th>Employee</th>
+                    <th>Event</th>
+                    <th>Late</th>
+                    <th>Deduction</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $recentLogs = $rtProcessor->getNotificationLogs(null, null, null, 20);
+                foreach ($recentLogs as $log): 
+                ?>
+                <tr>
+                    <td>
+                        <small><?= date('M j, Y', strtotime($log['attendance_date'])) ?></small><br>
+                        <small class="text-muted"><?= $log['clock_in_time'] ? date('h:i A', strtotime($log['clock_in_time'])) : '-' ?></small>
+                    </td>
+                    <td>
+                        <?= htmlspecialchars($log['employee_name'] ?? 'Unknown') ?>
+                        <?php if ($log['employee_code']): ?>
+                        <br><small class="text-muted"><?= $log['employee_code'] ?></small>
+                        <?php endif; ?>
+                    </td>
+                    <td><span class="badge bg-secondary"><?= $log['template_name'] ?? 'Unknown' ?></span></td>
+                    <td><?= $log['late_minutes'] ?> min</td>
+                    <td><?= number_format($log['deduction_amount'], 2) ?></td>
+                    <td>
+                        <?php if ($log['status'] === 'sent'): ?>
+                        <span class="badge bg-success">Sent</span>
+                        <?php elseif ($log['status'] === 'failed'): ?>
+                        <span class="badge bg-danger">Failed</span>
+                        <?php else: ?>
+                        <span class="badge bg-warning">Pending</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($recentLogs)): ?>
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-3">
+                        No notification logs yet
+                    </td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mt-4 border-info">
+    <div class="card-header bg-info text-white">
+        <i class="bi bi-info-circle"></i> Biometric API Endpoint
+    </div>
+    <div class="card-body">
+        <p>Configure your biometric devices to push attendance data to this endpoint for real-time processing:</p>
+        <div class="bg-light p-3 rounded mb-3">
+            <code><?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'yourdomain.com') ?>/biometric-api.php?action=push</code>
+        </div>
+        <p class="mb-2"><strong>Supported Actions:</strong></p>
+        <ul class="mb-0">
+            <li><code>push</code> or <code>attendance</code> - Process single attendance event</li>
+            <li><code>bulk-push</code> - Process multiple attendance records</li>
+            <li><code>clock-in</code> - Manual clock in by employee ID</li>
+            <li><code>clock-out</code> - Manual clock out by employee ID</li>
+            <li><code>zkteco-push</code> - ZKTeco device push protocol</li>
+            <li><code>hikvision-push</code> - Hikvision device push protocol</li>
+            <li><code>stats</code> - Get real-time attendance statistics</li>
+            <li><code>late-arrivals</code> - Get today's late arrivals</li>
+        </ul>
+    </div>
+</div>
+
+<?php endif; ?>
 
 <?php endif; ?>

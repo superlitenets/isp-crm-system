@@ -937,6 +937,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_hr_template':
+                try {
+                    require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
+                    $rtProcessor = new \App\RealTimeAttendanceProcessor(\Database::getConnection());
+                    $rtProcessor->createHRTemplate($_POST);
+                    $message = 'HR notification template created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=hr_templates');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error creating HR template: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_hr_template':
+                try {
+                    require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
+                    $rtProcessor = new \App\RealTimeAttendanceProcessor(\Database::getConnection());
+                    $rtProcessor->updateHRTemplate((int)$_POST['template_id'], $_POST);
+                    $message = 'HR notification template updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=hr_templates');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error updating HR template: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_hr_template':
+                try {
+                    require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
+                    $rtProcessor = new \App\RealTimeAttendanceProcessor(\Database::getConnection());
+                    $rtProcessor->deleteHRTemplate((int)$_POST['template_id']);
+                    $message = 'HR notification template deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting HR template: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_mpesa_settings':
                 try {
                     $mpesa = new \App\Mpesa();

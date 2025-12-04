@@ -1,6 +1,18 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added Real-Time Biometric Attendance with Late Notifications
+  - Database tables: `hr_notification_templates`, `attendance_notification_logs`
+  - Attendance table extended with: `late_minutes`, `source`
+  - Real-time processing of biometric events via webhook API (`/biometric-api.php`)
+  - Automatic late detection when employees clock in after work start time (considers grace period)
+  - SMS notifications sent automatically to late employees using customizable templates
+  - Templates support placeholders: {employee_name}, {clock_in_time}, {work_start_time}, {late_minutes}, {deduction_amount}, etc.
+  - RealTimeAttendanceProcessor class handles clock-in/out processing and notifications
+  - API endpoints for ZKTeco and Hikvision push protocols
+  - Settings > HR Notifications tab for managing notification templates
+  - Notification logs with sent/failed status tracking
+  - API requires authentication (X-API-Key header or api_key parameter)
 - **December 2024**: Added SLA (Service Level Agreement) Management
   - Database tables: `sla_policies`, `sla_business_hours`, `sla_holidays`, `ticket_sla_logs`
   - Ticket table extended with: `sla_policy_id`, `first_response_at`, `sla_response_due`, `sla_resolution_due`, `sla_response_breached`, `sla_resolution_breached`
