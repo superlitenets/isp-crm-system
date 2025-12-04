@@ -224,7 +224,12 @@ class SMSGateway {
                 return [
                     'success' => false,
                     'error' => $responseData['message'] ?? $responseData['error'] ?? "HTTP $httpCode",
-                    'http_code' => $httpCode
+                    'http_code' => $httpCode,
+                    'debug' => [
+                        'url' => $url,
+                        'provider' => $this->provider,
+                        'raw_response' => substr($response, 0, 300)
+                    ]
                 ];
             }
         } catch (\Exception $e) {

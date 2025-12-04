@@ -328,8 +328,10 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                     <?php if (!empty($sendTestResult['http_code'])): ?>
                     <br><small>HTTP Code: <?= $sendTestResult['http_code'] ?></small>
                     <?php endif; ?>
-                    <?php if (!empty($sendTestResult['raw_response'])): ?>
-                    <br><small class="text-muted">Response: <?= htmlspecialchars($sendTestResult['raw_response']) ?></small>
+                    <?php if (!empty($sendTestResult['debug'])): ?>
+                    <br><small class="text-muted">URL: <?= htmlspecialchars($sendTestResult['debug']['url'] ?? 'N/A') ?></small>
+                    <br><small class="text-muted">Provider: <?= htmlspecialchars($sendTestResult['debug']['provider'] ?? 'N/A') ?></small>
+                    <br><small class="text-muted">Response: <?= htmlspecialchars($sendTestResult['debug']['raw_response'] ?? 'N/A') ?></small>
                     <?php endif; ?>
                     <?php endif; ?>
                 </div>
