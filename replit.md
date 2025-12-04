@@ -4,7 +4,7 @@
 - **December 2024**: Added Team-Based Ticket Assignment
   - Created `teams` and `team_members` database tables
   - Tickets can now be assigned to teams AND/OR individuals
-  - Settings > Teams tab for managing teams and team members
+  - HR > Teams tab for managing teams and team members (moved from Settings for better organization)
   - Team notifications: all team members receive SMS when ticket is assigned to team
   - Ticket list and view pages show team assignment
 - **December 2024**: Integrated Users with Employees
