@@ -18,6 +18,9 @@ class Ticket {
     public function create(array $data): int {
         $ticketNumber = $this->generateTicketNumber();
         
+        $assignedTo = !empty($data['assigned_to']) ? (int)$data['assigned_to'] : null;
+        $teamId = !empty($data['team_id']) ? (int)$data['team_id'] : null;
+        
         $stmt = $this->db->prepare("
             INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -26,8 +29,8 @@ class Ticket {
         $stmt->execute([
             $ticketNumber,
             $data['customer_id'],
-            $data['assigned_to'] ?? null,
-            $data['team_id'] ?? null,
+            $assignedTo,
+            $teamId,
             $data['subject'],
             $data['description'],
             $data['category'],
@@ -48,12 +51,12 @@ class Ticket {
             $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Ticket created notification', $result['success'] ? 'sent' : 'failed');
         }
 
-        if (!empty($data['assigned_to'])) {
-            $this->notifyAssignedTechnician($ticketId, $data['assigned_to']);
+        if ($assignedTo) {
+            $this->notifyAssignedTechnician($ticketId, $assignedTo);
         }
 
-        if (!empty($data['team_id'])) {
-            $this->notifyTeamMembers($ticketId, (int)$data['team_id']);
+        if ($teamId) {
+            $this->notifyTeamMembers($ticketId, $teamId);
         }
 
         return $ticketId;
