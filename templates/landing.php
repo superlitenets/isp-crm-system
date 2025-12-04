@@ -383,6 +383,204 @@
             text-align: center;
         }
         
+        .hero-image-container {
+            position: relative;
+        }
+        
+        .hero-main-image {
+            width: 100%;
+            height: auto;
+            border-radius: 30px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+        }
+        
+        .hero-float-card {
+            position: absolute;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            animation: float-bounce 3s ease-in-out infinite;
+        }
+        
+        .hero-float-card i {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+        
+        .hero-float-card strong {
+            display: block;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+        
+        .hero-float-card span {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+        }
+        
+        .hero-float-1 {
+            top: 20px;
+            right: -20px;
+            animation-delay: 0s;
+        }
+        
+        .hero-float-2 {
+            bottom: 100px;
+            left: -40px;
+            animation-delay: 1s;
+        }
+        
+        .hero-float-3 {
+            bottom: 20px;
+            right: 40px;
+            animation-delay: 2s;
+        }
+        
+        @keyframes float-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .service-card-img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .testimonials-section {
+            background: linear-gradient(180deg, var(--gray-100) 0%, white 100%);
+        }
+        
+        .testimonial-card {
+            background: white;
+            border-radius: 24px;
+            padding: 2.5rem;
+            height: 100%;
+            border: 1px solid var(--gray-200);
+            transition: all 0.4s ease;
+            position: relative;
+        }
+        
+        .testimonial-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.1);
+        }
+        
+        .testimonial-quote {
+            font-size: 3rem;
+            color: var(--primary);
+            opacity: 0.3;
+            position: absolute;
+            top: 20px;
+            right: 30px;
+        }
+        
+        .testimonial-text {
+            color: var(--gray-700);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+            font-style: italic;
+        }
+        
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .testimonial-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--primary-light);
+        }
+        
+        .testimonial-info h5 {
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+        
+        .testimonial-info span {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+        }
+        
+        .testimonial-rating {
+            color: #FFB800;
+            margin-top: 0.25rem;
+        }
+        
+        .why-choose-section {
+            background: white;
+            overflow: hidden;
+        }
+        
+        .why-choose-image {
+            position: relative;
+        }
+        
+        .why-choose-image img {
+            width: 100%;
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+        }
+        
+        .why-choose-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .why-choose-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            background: var(--gray-100);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .why-choose-list li:hover {
+            background: var(--primary-light);
+        }
+        
+        .why-choose-list .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: var(--gradient-primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        
+        .why-choose-list h5 {
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+        
+        .why-choose-list p {
+            color: var(--gray-600);
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        
         .speed-stat-value {
             font-size: 1.5rem;
             font-weight: 700;
@@ -1208,25 +1406,27 @@
                 </div>
                 <div class="col-lg-6 d-none d-lg-block">
                     <div class="hero-image-wrapper animate__animated animate__fadeInRight animate__delay-1s">
-                        <div class="speed-meter">
-                            <div class="speed-circle">
-                                <div class="speed-value">
+                        <div class="hero-image-container">
+                            <img src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=500&fit=crop" alt="High Speed Internet" class="hero-main-image">
+                            <div class="hero-float-card hero-float-1">
+                                <i class="bi bi-lightning-charge-fill"></i>
+                                <div>
                                     <strong>1 Gbps</strong>
                                     <span>Download Speed</span>
                                 </div>
                             </div>
-                            <div class="speed-stats">
-                                <div class="speed-stat">
-                                    <div class="speed-stat-value">99.9%</div>
-                                    <div class="speed-stat-label">Uptime</div>
+                            <div class="hero-float-card hero-float-2">
+                                <i class="bi bi-shield-check"></i>
+                                <div>
+                                    <strong>99.9%</strong>
+                                    <span>Uptime</span>
                                 </div>
-                                <div class="speed-stat">
-                                    <div class="speed-stat-value">&lt;5ms</div>
-                                    <div class="speed-stat-label">Latency</div>
-                                </div>
-                                <div class="speed-stat">
-                                    <div class="speed-stat-value">24/7</div>
-                                    <div class="speed-stat-label">Support</div>
+                            </div>
+                            <div class="hero-float-card hero-float-3">
+                                <i class="bi bi-headset"></i>
+                                <div>
+                                    <strong>24/7</strong>
+                                    <span>Support</span>
                                 </div>
                             </div>
                         </div>
@@ -1292,6 +1492,7 @@
             <div class="row g-4">
                 <div class="col-lg-3 col-md-6">
                     <div class="service-card animate-on-scroll">
+                        <img src="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=400&h=250&fit=crop" alt="Fiber Internet" class="service-card-img">
                         <div class="service-icon blue"><i class="bi bi-router"></i></div>
                         <h4 class="service-title">Fiber Internet</h4>
                         <p class="service-desc">Experience blazing fast fiber optic internet with speeds up to 1Gbps for seamless streaming and gaming.</p>
@@ -1299,6 +1500,7 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <div class="service-card animate-on-scroll">
+                        <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=250&fit=crop" alt="Business Solutions" class="service-card-img">
                         <div class="service-icon green"><i class="bi bi-building"></i></div>
                         <h4 class="service-title">Business Solutions</h4>
                         <p class="service-desc">Dedicated business internet with guaranteed uptime, static IPs, and priority support for your company.</p>
@@ -1306,6 +1508,7 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <div class="service-card animate-on-scroll">
+                        <img src="https://images.unsplash.com/photo-1516044734145-07ca8eef8731?w=400&h=250&fit=crop" alt="Wireless Networks" class="service-card-img">
                         <div class="service-icon orange"><i class="bi bi-wifi"></i></div>
                         <h4 class="service-title">Wireless Networks</h4>
                         <p class="service-desc">High-speed wireless solutions for areas where fiber isn't available, with reliable coverage.</p>
@@ -1313,9 +1516,58 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <div class="service-card animate-on-scroll">
+                        <img src="https://images.unsplash.com/photo-1553775927-a071d5a6a39a?w=400&h=250&fit=crop" alt="24/7 Support" class="service-card-img">
                         <div class="service-icon purple"><i class="bi bi-headset"></i></div>
                         <h4 class="service-title">24/7 Support</h4>
                         <p class="service-desc">Round-the-clock customer support via phone, email, and WhatsApp to resolve any issues quickly.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="section why-choose-section">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6">
+                    <div class="why-choose-image animate-on-scroll">
+                        <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=600&h=500&fit=crop" alt="Why Choose Us">
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="animate-on-scroll">
+                        <div class="section-tag">Why Choose Us</div>
+                        <h2 class="section-title mb-4">The Best ISP in Your Area</h2>
+                        <ul class="why-choose-list">
+                            <li>
+                                <div class="icon"><i class="bi bi-lightning-charge"></i></div>
+                                <div>
+                                    <h5>Fastest Speeds</h5>
+                                    <p>Get speeds up to 1Gbps with our cutting-edge fiber network infrastructure.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="icon"><i class="bi bi-graph-up-arrow"></i></div>
+                                <div>
+                                    <h5>99.9% Uptime</h5>
+                                    <p>Our reliable network ensures you stay connected when it matters most.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="icon"><i class="bi bi-currency-dollar"></i></div>
+                                <div>
+                                    <h5>Affordable Plans</h5>
+                                    <p>Competitive pricing with no hidden fees or surprise charges.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <div class="icon"><i class="bi bi-tools"></i></div>
+                                <div>
+                                    <h5>Free Installation</h5>
+                                    <p>Professional installation at no extra cost with a free WiFi router included.</p>
+                                </div>
+                            </li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -1439,6 +1691,78 @@
                     </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="section testimonials-section">
+        <div class="container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-tag">Testimonials</div>
+                <h2 class="section-title">What Our Customers Say</h2>
+                <p class="section-subtitle">Don't just take our word for it. Here's what our satisfied customers have to say about our services.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card animate-on-scroll">
+                        <i class="bi bi-quote testimonial-quote"></i>
+                        <p class="testimonial-text">"The internet speed is incredible! I can now work from home, stream movies, and my kids can game online - all at the same time without any lag."</p>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" alt="Customer" class="testimonial-avatar">
+                            <div class="testimonial-info">
+                                <h5>James Mwangi</h5>
+                                <span>Home User, Nairobi</span>
+                                <div class="testimonial-rating">
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card animate-on-scroll">
+                        <i class="bi bi-quote testimonial-quote"></i>
+                        <p class="testimonial-text">"As a business owner, reliable internet is crucial. Their 99.9% uptime guarantee has been true - we haven't experienced any significant downtime in over a year."</p>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=face" alt="Customer" class="testimonial-avatar">
+                            <div class="testimonial-info">
+                                <h5>Sarah Wanjiku</h5>
+                                <span>Business Owner, Karen</span>
+                                <div class="testimonial-rating">
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="testimonial-card animate-on-scroll">
+                        <i class="bi bi-quote testimonial-quote"></i>
+                        <p class="testimonial-text">"Excellent customer support! When I had an issue, their team responded within minutes via WhatsApp and resolved it the same day. Highly recommend!"</p>
+                        <div class="testimonial-author">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Customer" class="testimonial-avatar">
+                            <div class="testimonial-info">
+                                <h5>David Ochieng</h5>
+                                <span>Software Developer, Westlands</span>
+                                <div class="testimonial-rating">
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-half"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -1577,13 +1901,20 @@
         <div class="container position-relative">
             <h2 class="cta-title animate-on-scroll">Ready to Get Connected?</h2>
             <p class="cta-subtitle animate-on-scroll">Join thousands of satisfied customers enjoying high-speed internet. Get started today!</p>
+            <?php $whatsappNum = preg_replace('/[^0-9]/', '', $contactSettings['contact_whatsapp'] ?? $contactSettings['contact_phone'] ?? ''); ?>
             <div class="cta-buttons animate-on-scroll">
                 <a href="?page=order" class="btn btn-light btn-lg">
                     <i class="bi bi-rocket-takeoff me-2"></i>Get Started Today
                 </a>
+                <?php if (!empty($whatsappNum)): ?>
+                <a href="https://wa.me/<?= $whatsappNum ?>?text=Hi,%20I'm%20interested%20in%20your%20internet%20services" class="btn btn-outline-light btn-lg" target="_blank">
+                    <i class="bi bi-whatsapp me-2"></i>Contact Sales
+                </a>
+                <?php else: ?>
                 <a href="#contact" class="btn btn-outline-light btn-lg">
                     <i class="bi bi-telephone me-2"></i>Contact Sales
                 </a>
+                <?php endif; ?>
             </div>
             
             <?php 
