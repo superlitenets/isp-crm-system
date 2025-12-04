@@ -19,14 +19,15 @@ class Ticket {
         $ticketNumber = $this->generateTicketNumber();
         
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, assigned_to, subject, description, category, priority, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $ticketNumber,
             $data['customer_id'],
             $data['assigned_to'] ?? null,
+            $data['team_id'] ?? null,
             $data['subject'],
             $data['description'],
             $data['category'],
@@ -51,6 +52,10 @@ class Ticket {
             $this->notifyAssignedTechnician($ticketId, $data['assigned_to']);
         }
 
+        if (!empty($data['team_id'])) {
+            $this->notifyTeamMembers($ticketId, (int)$data['team_id']);
+        }
+
         return $ticketId;
     }
 
@@ -63,10 +68,10 @@ class Ticket {
         $fields = [];
         $values = [];
         
-        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to'] as $field) {
+        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to', 'team_id'] as $field) {
             if (isset($data[$field])) {
                 $fields[] = "$field = ?";
-                $values[] = $data[$field];
+                $values[] = $data[$field] === '' ? null : $data[$field];
             }
         }
         
@@ -100,6 +105,10 @@ class Ticket {
 
         if ($result && isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
             $this->notifyAssignedTechnician($id, $data['assigned_to']);
+        }
+
+        if ($result && isset($data['team_id']) && $data['team_id'] != $ticket['team_id'] && !empty($data['team_id'])) {
+            $this->notifyTeamMembers($id, (int)$data['team_id']);
         }
 
         return $result;
@@ -139,10 +148,12 @@ class Ticket {
     public function find(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.account_number,
-                   u.name as assigned_name, u.phone as assigned_phone
+                   u.name as assigned_name, u.phone as assigned_phone,
+                   tm.name as team_name
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN teams tm ON t.team_id = tm.id
             WHERE t.id = ?
         ");
         $stmt->execute([$id]);
@@ -153,10 +164,11 @@ class Ticket {
     public function getAll(array $filters = [], int $limit = 50, int $offset = 0): array {
         $sql = "
             SELECT t.*, c.name as customer_name, c.account_number,
-                   u.name as assigned_name
+                   u.name as assigned_name, tm.name as team_name
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN teams tm ON t.team_id = tm.id
             WHERE 1=1
         ";
         $params = [];
@@ -174,6 +186,11 @@ class Ticket {
         if (!empty($filters['assigned_to'])) {
             $sql .= " AND t.assigned_to = ?";
             $params[] = $filters['assigned_to'];
+        }
+        
+        if (!empty($filters['team_id'])) {
+            $sql .= " AND t.team_id = ?";
+            $params[] = $filters['team_id'];
         }
         
         if (!empty($filters['search'])) {
@@ -218,6 +235,11 @@ class Ticket {
         if (!empty($filters['assigned_to'])) {
             $sql .= " AND t.assigned_to = ?";
             $params[] = $filters['assigned_to'];
+        }
+        
+        if (!empty($filters['team_id'])) {
+            $sql .= " AND t.team_id = ?";
+            $params[] = $filters['team_id'];
         }
         
         if (!empty($filters['search'])) {
@@ -311,5 +333,102 @@ class Ticket {
             'resolved' => 'Resolved',
             'closed' => 'Closed'
         ];
+    }
+
+    public function getAllTeams(): array {
+        $stmt = $this->db->query("SELECT * FROM teams WHERE is_active = true ORDER BY name");
+        return $stmt->fetchAll();
+    }
+
+    public function getTeam(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM teams WHERE id = ?");
+        $stmt->execute([$id]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    public function createTeam(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO teams (name, description, leader_id)
+            VALUES (?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['name'],
+            $data['description'] ?? null,
+            $data['leader_id'] ?? null
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function updateTeam(int $id, array $data): bool {
+        $fields = [];
+        $values = [];
+        
+        foreach (['name', 'description', 'leader_id', 'is_active'] as $field) {
+            if (isset($data[$field])) {
+                $fields[] = "$field = ?";
+                $values[] = $data[$field] === '' ? null : $data[$field];
+            }
+        }
+        
+        if (empty($fields)) {
+            return false;
+        }
+        
+        $fields[] = "updated_at = CURRENT_TIMESTAMP";
+        $values[] = $id;
+        
+        $stmt = $this->db->prepare("UPDATE teams SET " . implode(', ', $fields) . " WHERE id = ?");
+        return $stmt->execute($values);
+    }
+
+    public function deleteTeam(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM teams WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function getTeamMembers(int $teamId): array {
+        $stmt = $this->db->prepare("
+            SELECT e.*, tm.joined_at, u.name as user_name
+            FROM team_members tm
+            JOIN employees e ON tm.employee_id = e.id
+            LEFT JOIN users u ON e.user_id = u.id
+            WHERE tm.team_id = ?
+            ORDER BY e.name
+        ");
+        $stmt->execute([$teamId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addTeamMember(int $teamId, int $employeeId): bool {
+        $stmt = $this->db->prepare("
+            INSERT INTO team_members (team_id, employee_id)
+            VALUES (?, ?)
+            ON CONFLICT (team_id, employee_id) DO NOTHING
+        ");
+        return $stmt->execute([$teamId, $employeeId]);
+    }
+
+    public function removeTeamMember(int $teamId, int $employeeId): bool {
+        $stmt = $this->db->prepare("DELETE FROM team_members WHERE team_id = ? AND employee_id = ?");
+        return $stmt->execute([$teamId, $employeeId]);
+    }
+
+    public function notifyTeamMembers(int $ticketId, int $teamId): void {
+        $ticket = $this->find($ticketId);
+        $members = $this->getTeamMembers($teamId);
+        $customer = (new Customer())->find($ticket['customer_id']);
+
+        foreach ($members as $member) {
+            if ($member['phone'] && $customer) {
+                $result = $this->sms->notifyTechnician(
+                    $member['phone'],
+                    $ticket['ticket_number'],
+                    $customer['name'],
+                    $ticket['subject']
+                );
+                $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
+            }
+        }
     }
 }

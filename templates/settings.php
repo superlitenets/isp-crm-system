@@ -91,6 +91,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-shield-lock"></i> Roles & Permissions
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'teams' ? 'active' : '' ?>" href="?page=settings&subpage=teams">
+            <i class="bi bi-people"></i> Teams
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -2807,6 +2812,272 @@ function editUser(user) {
     document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit User';
     
     new bootstrap.Modal(document.getElementById('userModal')).show();
+}
+</script>
+
+<?php elseif ($subpage === 'teams'): ?>
+
+<?php
+$ticketManager = new \App\Ticket();
+$allTeams = $ticketManager->getAllTeams();
+$allEmployees = (new \App\Employee($dbConn))->getAll();
+
+$editTeam = null;
+$teamMembers = [];
+if ($action === 'edit_team' && $id) {
+    $editTeam = $ticketManager->getTeam($id);
+    $teamMembers = $ticketManager->getTeamMembers($id);
+}
+?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Teams</h5>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#teamModal" onclick="resetTeamForm()">
+                    <i class="bi bi-plus-circle"></i> Add Team
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Team Name</th>
+                                <th>Description</th>
+                                <th>Members</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $db = \Database::getConnection();
+                            $teamsStmt = $db->query("SELECT t.*, 
+                                (SELECT COUNT(*) FROM team_members tm WHERE tm.team_id = t.id) as member_count,
+                                e.name as leader_name
+                                FROM teams t 
+                                LEFT JOIN employees e ON t.leader_id = e.id
+                                ORDER BY t.name");
+                            $allTeamsData = $teamsStmt->fetchAll();
+                            foreach ($allTeamsData as $t): 
+                            ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($t['name']) ?></strong>
+                                    <?php if ($t['leader_name']): ?>
+                                    <br><small class="text-muted">Leader: <?= htmlspecialchars($t['leader_name']) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($t['description'] ?? '-') ?></td>
+                                <td><span class="badge bg-primary"><?= $t['member_count'] ?> members</span></td>
+                                <td>
+                                    <span class="badge bg-<?= $t['is_active'] ? 'success' : 'secondary' ?>">
+                                        <?= $t['is_active'] ? 'Active' : 'Inactive' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=teams&action=edit_team&id=<?= $t['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit & Manage Members">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this team?');">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_team">
+                                        <input type="hidden" name="team_id" value="<?= $t['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($allTeamsData)): ?>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    No teams created yet. Click "Add Team" to create your first team.
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Teams</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Teams allow you to group employees together for ticket assignment.</p>
+                <ul class="mb-0">
+                    <li>Assign tickets to entire teams</li>
+                    <li>All team members receive notifications</li>
+                    <li>Track workload by team</li>
+                    <li>Set team leaders for accountability</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if ($action === 'edit_team' && $editTeam): ?>
+<div class="row g-4 mt-2">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-pencil"></i> Edit Team: <?= htmlspecialchars($editTeam['name']) ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="update_team">
+                    <input type="hidden" name="team_id" value="<?= $editTeam['id'] ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Team Name *</label>
+                        <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($editTeam['name']) ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"><?= htmlspecialchars($editTeam['description'] ?? '') ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Team Leader</label>
+                        <select class="form-select" name="leader_id">
+                            <option value="">No Leader</option>
+                            <?php foreach ($allEmployees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>" <?= $editTeam['leader_id'] == $emp['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="teamActive" <?= $editTeam['is_active'] ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="teamActive">Active</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save Changes
+                    </button>
+                    <a href="?page=settings&subpage=teams" class="btn btn-outline-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people-fill"></i> Team Members</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="mb-3">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="add_team_member">
+                    <input type="hidden" name="team_id" value="<?= $editTeam['id'] ?>">
+                    <div class="input-group">
+                        <select class="form-select" name="employee_id" required>
+                            <option value="">Select Employee to Add</option>
+                            <?php 
+                            $memberIds = array_column($teamMembers, 'id');
+                            foreach ($allEmployees as $emp): 
+                                if (!in_array($emp['id'], $memberIds)):
+                            ?>
+                            <option value="<?= $emp['id'] ?>">
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position']) ?>)
+                            </option>
+                            <?php 
+                                endif;
+                            endforeach; 
+                            ?>
+                        </select>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus"></i> Add
+                        </button>
+                    </div>
+                </form>
+                
+                <?php if (empty($teamMembers)): ?>
+                <p class="text-muted text-center">No members in this team yet.</p>
+                <?php else: ?>
+                <ul class="list-group">
+                    <?php foreach ($teamMembers as $member): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><?= htmlspecialchars($member['name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($member['position']) ?></small>
+                        </div>
+                        <form method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="remove_team_member">
+                            <input type="hidden" name="team_id" value="<?= $editTeam['id'] ?>">
+                            <input type="hidden" name="employee_id" value="<?= $member['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </form>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="modal fade" id="teamModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="teamModalTitle"><i class="bi bi-plus-circle"></i> Add Team</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="create_team">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Team Name *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Team Leader</label>
+                        <select class="form-select" name="leader_id">
+                            <option value="">No Leader</option>
+                            <?php foreach ($allEmployees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>">
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Create Team
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetTeamForm() {
+    document.querySelector('#teamModal form').reset();
 }
 </script>
 

@@ -1410,6 +1410,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+
+            case 'create_team':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can create teams.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $ticketManager = new \App\Ticket();
+                        $ticketManager->createTeam($_POST);
+                        $message = 'Team created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating team: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_team':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update teams.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $ticketManager = new \App\Ticket();
+                        $teamId = (int)($_POST['team_id'] ?? 0);
+                        $ticketManager->updateTeam($teamId, [
+                            'name' => $_POST['name'] ?? '',
+                            'description' => $_POST['description'] ?? null,
+                            'leader_id' => $_POST['leader_id'] ?: null,
+                            'is_active' => isset($_POST['is_active'])
+                        ]);
+                        $message = 'Team updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating team: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_team':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete teams.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $ticketManager = new \App\Ticket();
+                        $teamId = (int)($_POST['team_id'] ?? 0);
+                        $ticketManager->deleteTeam($teamId);
+                        $message = 'Team deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting team: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'add_team_member':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can add team members.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $ticketManager = new \App\Ticket();
+                        $teamId = (int)($_POST['team_id'] ?? 0);
+                        $employeeId = (int)($_POST['employee_id'] ?? 0);
+                        $ticketManager->addTeamMember($teamId, $employeeId);
+                        $message = 'Team member added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error adding team member: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'remove_team_member':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can remove team members.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $ticketManager = new \App\Ticket();
+                        $teamId = (int)($_POST['team_id'] ?? 0);
+                        $employeeId = (int)($_POST['employee_id'] ?? 0);
+                        $ticketManager->removeTeamMember($teamId, $employeeId);
+                        $message = 'Team member removed successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error removing team member: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
         }
     }
 }

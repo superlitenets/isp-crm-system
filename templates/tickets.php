@@ -48,7 +48,21 @@ if (isset($_GET['customer_id'])) {
                 <?php endif; ?>
                 
                 <div class="col-md-6">
-                    <label class="form-label">Assign To</label>
+                    <label class="form-label">Assign To Team</label>
+                    <?php $teams = $ticket->getAllTeams(); ?>
+                    <select class="form-select" name="team_id">
+                        <option value="">No Team</option>
+                        <?php foreach ($teams as $t): ?>
+                        <option value="<?= $t['id'] ?>" <?= ($ticketData['team_id'] ?? '') == $t['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($t['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small class="text-muted">All team members will be notified</small>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label">Assign To Individual</label>
                     <select class="form-select" name="assigned_to">
                         <option value="">Unassigned</option>
                         <?php foreach ($users as $u): ?>
@@ -57,7 +71,7 @@ if (isset($_GET['customer_id'])) {
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <small class="text-muted">Assigned technician will receive SMS notification</small>
+                    <small class="text-muted">Individual will receive SMS notification</small>
                 </div>
                 
                 <div class="col-12">
@@ -205,6 +219,10 @@ if (isset($_GET['customer_id'])) {
                     <tr>
                         <th>Category</th>
                         <td><?= htmlspecialchars($categories[$ticketData['category']] ?? $ticketData['category']) ?></td>
+                    </tr>
+                    <tr>
+                        <th>Assigned Team</th>
+                        <td><?= htmlspecialchars($ticketData['team_name'] ?? 'No Team') ?></td>
                     </tr>
                     <tr>
                         <th>Assigned To</th>
@@ -365,6 +383,7 @@ if (isset($_GET['customer_id'])) {
                         <th>Customer</th>
                         <th>Subject</th>
                         <th>Category</th>
+                        <th>Team</th>
                         <th>Assigned To</th>
                         <th>Priority</th>
                         <th>Status</th>
@@ -386,6 +405,7 @@ if (isset($_GET['customer_id'])) {
                         <td><?= htmlspecialchars($t['customer_name'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars(substr($t['subject'], 0, 30)) ?><?= strlen($t['subject']) > 30 ? '...' : '' ?></td>
                         <td><?= htmlspecialchars($categories[$t['category']] ?? $t['category']) ?></td>
+                        <td><span class="badge bg-info text-dark"><?= htmlspecialchars($t['team_name'] ?? '-') ?></span></td>
                         <td><?= htmlspecialchars($t['assigned_name'] ?? '-') ?></td>
                         <td><span class="badge badge-priority-<?= $t['priority'] ?>"><?= ucfirst($t['priority']) ?></span></td>
                         <td><span class="badge badge-status-<?= $t['status'] ?>"><?= ucfirst(str_replace('_', ' ', $t['status'])) ?></span></td>
@@ -402,7 +422,7 @@ if (isset($_GET['customer_id'])) {
                     <?php endforeach; ?>
                     <?php if (empty($tickets)): ?>
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="10" class="text-center text-muted py-4">
                             No tickets found. <a href="?page=tickets&action=create">Create your first ticket</a>
                         </td>
                     </tr>
