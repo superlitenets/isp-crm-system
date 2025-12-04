@@ -1348,9 +1348,15 @@
                     <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
                     <li class="nav-item"><a class="nav-link" href="#services">Services</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
                     <li class="nav-item"><a class="nav-link" href="#packages">Packages</a></li>
                     <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
-                    <li class="nav-item ms-lg-3">
+                    <li class="nav-item ms-lg-2">
+                        <a class="btn btn-outline-light btn-sm" href="?page=login">
+                            <i class="bi bi-person-circle me-1"></i>Customer Portal
+                        </a>
+                    </li>
+                    <li class="nav-item ms-lg-2">
                         <a class="btn btn-primary" href="?page=order">Get Started</a>
                     </li>
                 </ul>
@@ -1526,7 +1532,7 @@
         </div>
     </section>
     
-    <section class="section why-choose-section">
+    <section id="features" class="section why-choose-section">
         <div class="container">
             <div class="row align-items-center g-5">
                 <div class="col-lg-6">
@@ -1536,7 +1542,7 @@
                 </div>
                 <div class="col-lg-6">
                     <div class="animate-on-scroll">
-                        <div class="section-tag">Why Choose Us</div>
+                        <div class="section-tag">Our Features</div>
                         <h2 class="section-title mb-4">The Best ISP in Your Area</h2>
                         <ul class="why-choose-list">
                             <li>
