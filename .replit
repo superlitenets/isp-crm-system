@@ -50,6 +50,10 @@ externalPort = 5000
 localPort = 43165
 externalPort = 3000
 
+[[ports]]
+localPort = 45855
+externalPort = 3003
+
 [nix]
 channel = "stable-25_05"
 packages = ["zip"]
