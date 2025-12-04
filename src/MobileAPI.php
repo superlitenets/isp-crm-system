@@ -342,4 +342,226 @@ class MobileAPI {
             'employee' => $employee
         ];
     }
+    
+    public function getSalespersonPerformance(int $salespersonId): array {
+        $thisMonth = date('Y-m-01');
+        $lastMonth = date('Y-m-01', strtotime('-1 month'));
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_orders,
+                COUNT(CASE WHEN order_status = 'completed' THEN 1 END) as completed_orders,
+                COUNT(CASE WHEN order_status = 'cancelled' THEN 1 END) as cancelled_orders,
+                COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) as total_sales
+            FROM orders 
+            WHERE salesperson_id = ? AND created_at >= ?
+        ");
+        $stmt->execute([$salespersonId, $thisMonth]);
+        $thisMonthStats = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $stmt->execute([$salespersonId, $lastMonth]);
+        $lastMonthStats = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $conversionRate = $thisMonthStats['total_orders'] > 0 
+            ? round(($thisMonthStats['completed_orders'] / $thisMonthStats['total_orders']) * 100, 1) 
+            : 0;
+        
+        $stmt = $this->db->prepare("
+            SELECT s.id, s.name, 
+                   COALESCE(SUM(CASE WHEN o.payment_status = 'paid' THEN o.amount ELSE 0 END), 0) as sales
+            FROM salespersons s
+            LEFT JOIN orders o ON s.id = o.salesperson_id AND o.created_at >= ?
+            WHERE s.is_active = TRUE
+            GROUP BY s.id, s.name
+            ORDER BY sales DESC
+        ");
+        $stmt->execute([$thisMonth]);
+        $allSalespersons = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $rank = 1;
+        $totalSalespersons = count($allSalespersons);
+        foreach ($allSalespersons as $index => $sp) {
+            if ($sp['id'] == $salespersonId) {
+                $rank = $index + 1;
+                break;
+            }
+        }
+        
+        $achievements = [];
+        if ($thisMonthStats['total_sales'] >= 100000) {
+            $achievements[] = ['icon' => 'trophy', 'title' => 'Top Performer', 'color' => 'gold'];
+        }
+        if ($thisMonthStats['completed_orders'] >= 10) {
+            $achievements[] = ['icon' => 'award', 'title' => '10+ Orders', 'color' => 'silver'];
+        }
+        if ($conversionRate >= 80) {
+            $achievements[] = ['icon' => 'star', 'title' => 'High Converter', 'color' => 'bronze'];
+        }
+        if ($rank == 1) {
+            $achievements[] = ['icon' => 'crown', 'title' => '#1 Salesperson', 'color' => 'gold'];
+        }
+        
+        $salesGrowth = 0;
+        if ($lastMonthStats['total_sales'] > 0) {
+            $salesGrowth = round((($thisMonthStats['total_sales'] - $lastMonthStats['total_sales']) / $lastMonthStats['total_sales']) * 100, 1);
+        }
+        
+        return [
+            'this_month' => $thisMonthStats,
+            'conversion_rate' => $conversionRate,
+            'rank' => $rank,
+            'total_salespersons' => $totalSalespersons,
+            'sales_growth' => $salesGrowth,
+            'achievements' => $achievements
+        ];
+    }
+    
+    public function getTechnicianPerformance(int $userId): array {
+        $thisMonth = date('Y-m-01');
+        $employee = $this->getEmployeeByUserId($userId);
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets,
+                COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_tickets,
+                COUNT(CASE WHEN sla_resolution_breached = TRUE THEN 1 END) as sla_breached,
+                AVG(CASE WHEN resolved_at IS NOT NULL THEN 
+                    EXTRACT(EPOCH FROM (resolved_at - created_at))/3600 
+                END) as avg_resolution_hours
+            FROM tickets 
+            WHERE assigned_to = ? AND created_at >= ?
+        ");
+        $stmt->execute([$userId, $thisMonth]);
+        $thisMonthStats = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $resolutionRate = $thisMonthStats['total_tickets'] > 0 
+            ? round((($thisMonthStats['resolved_tickets'] + $thisMonthStats['closed_tickets']) / $thisMonthStats['total_tickets']) * 100, 1) 
+            : 0;
+        
+        $slaCompliance = $thisMonthStats['total_tickets'] > 0 
+            ? round(100 - (($thisMonthStats['sla_breached'] / $thisMonthStats['total_tickets']) * 100), 1) 
+            : 100;
+        
+        $avgResolutionTime = $thisMonthStats['avg_resolution_hours'] 
+            ? round($thisMonthStats['avg_resolution_hours'], 1) 
+            : null;
+        
+        $stmt = $this->db->prepare("
+            SELECT u.id, u.name, 
+                   COUNT(CASE WHEN t.status IN ('resolved', 'closed') THEN 1 END) as resolved
+            FROM users u
+            LEFT JOIN tickets t ON u.id = t.assigned_to AND t.created_at >= ?
+            WHERE u.role IN ('technician', 'admin')
+            GROUP BY u.id, u.name
+            ORDER BY resolved DESC
+        ");
+        $stmt->execute([$thisMonth]);
+        $allTechnicians = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $rank = 1;
+        $totalTechnicians = count($allTechnicians);
+        foreach ($allTechnicians as $index => $tech) {
+            if ($tech['id'] == $userId) {
+                $rank = $index + 1;
+                break;
+            }
+        }
+        
+        $attendanceRate = 0;
+        if ($employee) {
+            $workingDays = cal_days_in_month(CAL_GREGORIAN, (int)date('m'), (int)date('Y')) - 8;
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) as present_days
+                FROM attendance 
+                WHERE employee_id = ? AND date >= ? AND status = 'present'
+            ");
+            $stmt->execute([$employee['id'], $thisMonth]);
+            $presentDays = $stmt->fetch(\PDO::FETCH_ASSOC)['present_days'];
+            $attendanceRate = $workingDays > 0 ? round(($presentDays / $workingDays) * 100, 1) : 0;
+            $attendanceRate = min(100, $attendanceRate);
+        }
+        
+        $achievements = [];
+        if ($resolutionRate >= 90) {
+            $achievements[] = ['icon' => 'trophy', 'title' => 'Problem Solver', 'color' => 'gold'];
+        }
+        if ($slaCompliance >= 95) {
+            $achievements[] = ['icon' => 'clock', 'title' => 'SLA Champion', 'color' => 'silver'];
+        }
+        if ($thisMonthStats['resolved_tickets'] >= 20) {
+            $achievements[] = ['icon' => 'star', 'title' => '20+ Resolved', 'color' => 'bronze'];
+        }
+        if ($rank == 1) {
+            $achievements[] = ['icon' => 'award', 'title' => '#1 Technician', 'color' => 'gold'];
+        }
+        
+        return [
+            'this_month' => $thisMonthStats,
+            'resolution_rate' => $resolutionRate,
+            'sla_compliance' => $slaCompliance,
+            'avg_resolution_hours' => $avgResolutionTime,
+            'rank' => $rank,
+            'total_technicians' => $totalTechnicians,
+            'attendance_rate' => $attendanceRate,
+            'achievements' => $achievements
+        ];
+    }
+    
+    public function createTicket(int $userId, array $data): ?int {
+        $ticketNumber = 'TKT-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        
+        $customerId = null;
+        if (!empty($data['customer_id'])) {
+            $customerId = (int)$data['customer_id'];
+        } elseif (!empty($data['customer_phone'])) {
+            $stmt = $this->db->prepare("SELECT id FROM customers WHERE phone = ?");
+            $stmt->execute([$data['customer_phone']]);
+            $customer = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($customer) {
+                $customerId = $customer['id'];
+            }
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO tickets (ticket_number, subject, description, category, priority, 
+                                customer_id, created_by, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'open')
+        ");
+        
+        $stmt->execute([
+            $ticketNumber,
+            $data['subject'],
+            $data['description'] ?? '',
+            $data['category'] ?? 'general',
+            $data['priority'] ?? 'medium',
+            $customerId,
+            $userId
+        ]);
+        
+        return (int) $this->db->lastInsertId();
+    }
+    
+    public function getTicketCategories(): array {
+        return [
+            ['value' => 'installation', 'label' => 'New Installation'],
+            ['value' => 'fault', 'label' => 'Fault/Repair'],
+            ['value' => 'relocation', 'label' => 'Relocation'],
+            ['value' => 'upgrade', 'label' => 'Package Upgrade'],
+            ['value' => 'billing', 'label' => 'Billing Issue'],
+            ['value' => 'general', 'label' => 'General Inquiry']
+        ];
+    }
+    
+    public function searchCustomers(string $query, int $limit = 10): array {
+        $stmt = $this->db->prepare("
+            SELECT id, name, phone, address, email
+            FROM customers 
+            WHERE name ILIKE ? OR phone ILIKE ?
+            ORDER BY name
+            LIMIT ?
+        ");
+        $stmt->execute(['%' . $query . '%', '%' . $query . '%', $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
 }

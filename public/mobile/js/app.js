@@ -569,7 +569,238 @@ const app = {
             'on_hold': 'bg-secondary'
         };
         return badges[status] || 'bg-secondary';
+    },
+    
+    async showPerformance() {
+        this.showScreen('performance-screen');
+        const container = document.getElementById('performance-content');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>';
+        
+        const result = await this.api('salesperson-performance');
+        if (result.success) {
+            const p = result.data;
+            container.innerHTML = `
+                <div class="performance-header">
+                    <div class="rank-badge">
+                        <span class="rank-number">#${p.rank}</span>
+                        <span class="rank-label">of ${p.total_salespersons}</span>
+                    </div>
+                    <h5>This Month's Performance</h5>
+                </div>
+                
+                ${p.achievements.length > 0 ? `
+                <div class="achievements-section">
+                    <h6><i class="bi bi-trophy"></i> Achievements</h6>
+                    <div class="achievements-grid">
+                        ${p.achievements.map(a => `
+                            <div class="achievement-badge ${a.color}">
+                                <i class="bi bi-${a.icon}"></i>
+                                <span>${a.title}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="performance-stats">
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                        <div class="perf-stat-value">${p.conversion_rate}%</div>
+                        <div class="perf-stat-label">Conversion Rate</div>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-cart-check"></i></div>
+                        <div class="perf-stat-value">${p.this_month.completed_orders}</div>
+                        <div class="perf-stat-label">Completed Orders</div>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-cash-stack"></i></div>
+                        <div class="perf-stat-value">KES ${this.formatNumber(p.this_month.total_sales)}</div>
+                        <div class="perf-stat-label">Total Sales</div>
+                    </div>
+                    <div class="perf-stat-card ${p.sales_growth >= 0 ? 'positive' : 'negative'}">
+                        <div class="perf-stat-icon"><i class="bi bi-${p.sales_growth >= 0 ? 'arrow-up' : 'arrow-down'}"></i></div>
+                        <div class="perf-stat-value">${p.sales_growth >= 0 ? '+' : ''}${p.sales_growth}%</div>
+                        <div class="perf-stat-label">vs Last Month</div>
+                    </div>
+                </div>
+                
+                <div class="performance-summary">
+                    <div class="summary-row">
+                        <span>Total Orders</span>
+                        <span>${p.this_month.total_orders}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Completed</span>
+                        <span class="text-success">${p.this_month.completed_orders}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Cancelled</span>
+                        <span class="text-danger">${p.this_month.cancelled_orders}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Could not load performance data</p></div>';
+        }
+    },
+    
+    async showTechPerformance() {
+        this.showScreen('tech-performance-screen');
+        const container = document.getElementById('tech-performance-content');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('technician-performance');
+        if (result.success) {
+            const p = result.data;
+            container.innerHTML = `
+                <div class="performance-header tech">
+                    <div class="rank-badge">
+                        <span class="rank-number">#${p.rank}</span>
+                        <span class="rank-label">of ${p.total_technicians}</span>
+                    </div>
+                    <h5>This Month's Performance</h5>
+                </div>
+                
+                ${p.achievements.length > 0 ? `
+                <div class="achievements-section">
+                    <h6><i class="bi bi-trophy"></i> Achievements</h6>
+                    <div class="achievements-grid">
+                        ${p.achievements.map(a => `
+                            <div class="achievement-badge ${a.color}">
+                                <i class="bi bi-${a.icon}"></i>
+                                <span>${a.title}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="performance-stats">
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-check-circle"></i></div>
+                        <div class="perf-stat-value">${p.resolution_rate}%</div>
+                        <div class="perf-stat-label">Resolution Rate</div>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-clock-history"></i></div>
+                        <div class="perf-stat-value">${p.sla_compliance}%</div>
+                        <div class="perf-stat-label">SLA Compliance</div>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-hourglass-split"></i></div>
+                        <div class="perf-stat-value">${p.avg_resolution_hours ? p.avg_resolution_hours + 'h' : 'N/A'}</div>
+                        <div class="perf-stat-label">Avg Resolution</div>
+                    </div>
+                    <div class="perf-stat-card">
+                        <div class="perf-stat-icon"><i class="bi bi-calendar-check"></i></div>
+                        <div class="perf-stat-value">${p.attendance_rate}%</div>
+                        <div class="perf-stat-label">Attendance</div>
+                    </div>
+                </div>
+                
+                <div class="performance-summary">
+                    <div class="summary-row">
+                        <span>Total Tickets</span>
+                        <span>${p.this_month.total_tickets}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Resolved</span>
+                        <span class="text-success">${p.this_month.resolved_tickets}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>SLA Breached</span>
+                        <span class="text-danger">${p.this_month.sla_breached || 0}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Could not load performance data</p></div>';
+        }
+    },
+    
+    showNewTicket() {
+        this.showScreen('new-ticket-screen');
+        document.getElementById('new-ticket-form').reset();
+        document.getElementById('ticket-customer-id').value = '';
+        document.getElementById('customer-search-results').innerHTML = '';
+    },
+    
+    async searchCustomers(query) {
+        if (query.length < 2) {
+            document.getElementById('customer-search-results').innerHTML = '';
+            return;
+        }
+        
+        const result = await this.api('search-customers&q=' + encodeURIComponent(query));
+        const container = document.getElementById('customer-search-results');
+        
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(c => `
+                <div class="search-result-item" onclick="app.selectCustomer(${c.id}, '${c.name.replace(/'/g, "\\'")}', '${c.phone}')">
+                    <strong>${c.name}</strong>
+                    <span class="text-muted">${c.phone}</span>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="search-result-item text-muted">No customers found</div>';
+        }
+    },
+    
+    selectCustomer(id, name, phone) {
+        document.getElementById('ticket-customer-id').value = id;
+        document.getElementById('ticket-customer-search').value = `${name} (${phone})`;
+        document.getElementById('customer-search-results').innerHTML = '';
+    },
+    
+    async createTicket() {
+        const data = {
+            customer_id: document.getElementById('ticket-customer-id').value || null,
+            subject: document.getElementById('ticket-subject').value,
+            category: document.getElementById('ticket-category').value,
+            priority: document.getElementById('ticket-priority').value,
+            description: document.getElementById('ticket-description').value
+        };
+        
+        if (!data.subject) {
+            this.showToast('Subject is required', 'danger');
+            return;
+        }
+        
+        const result = await this.api('create-ticket', 'POST', data);
+        
+        if (result.success) {
+            this.showToast('Ticket created successfully!', 'success');
+            document.getElementById('new-ticket-form').reset();
+            document.getElementById('ticket-customer-id').value = '';
+            this.goBack();
+            this.loadTechnicianDashboard();
+        } else {
+            this.showToast(result.error || 'Failed to create ticket', 'danger');
+        }
+    },
+    
+    initTicketForm() {
+        const searchInput = document.getElementById('ticket-customer-search');
+        if (searchInput) {
+            let timeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => this.searchCustomers(e.target.value), 300);
+            });
+        }
+        
+        const ticketForm = document.getElementById('new-ticket-form');
+        if (ticketForm) {
+            ticketForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.createTicket();
+            });
+        }
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => app.init());
+document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+    app.initTicketForm();
+});

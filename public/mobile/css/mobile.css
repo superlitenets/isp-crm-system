@@ -399,3 +399,180 @@ body {
     color: white;
     opacity: 0.7;
 }
+
+.performance-header {
+    text-align: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    border-radius: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.performance-header.tech {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.rank-badge {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.rank-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.rank-label {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+.achievements-section {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.achievements-section h6 {
+    margin: 0 0 0.75rem;
+    color: #333;
+}
+
+.achievements-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.achievement-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8f9fa;
+    padding: 0.5rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.85rem;
+}
+
+.achievement-badge i {
+    font-size: 1rem;
+}
+
+.achievement-badge.gold {
+    background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
+    color: #333;
+}
+
+.achievement-badge.silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+    color: #333;
+}
+
+.achievement-badge.bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+    color: white;
+}
+
+.performance-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.perf-stat-card {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.perf-stat-card.positive {
+    border-left: 4px solid #198754;
+}
+
+.perf-stat-card.negative {
+    border-left: 4px solid #dc3545;
+}
+
+.perf-stat-icon {
+    font-size: 1.5rem;
+    color: #0d6efd;
+    margin-bottom: 0.5rem;
+}
+
+.perf-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #333;
+}
+
+.perf-stat-label {
+    font-size: 0.7rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.performance-summary {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.search-results {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.search-result-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-result-item:hover {
+    background: #f8f9fa;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.mb-3 {
+    position: relative;
+}

@@ -42,10 +42,20 @@
   - Granular permissions by category: customers, tickets, hr, inventory, orders, payments, settings, users, reports
   - Auth class methods: `can()`, `canAny()`, `canAll()`, `requirePermission()`
   - Roles & Permissions management UI in Settings
-- **December 2024**: Added Mobile PWA for salespersons and technicians
+- **December 2024**: Enhanced Mobile PWA with Performance Tracking and Ticket Creation
   - Accessible at `/mobile/` - installable on Android devices
-  - Salesperson features: orders, commissions, leads tracking
-  - Technician features: tickets, attendance clock in/out, equipment
+  - **Salesperson features:**
+    - Create new orders directly from mobile
+    - View performance dashboard: ranking, conversion rate, sales growth
+    - Achievement badges: Top Performer, 10+ Orders, High Converter, #1 Salesperson
+    - Monthly statistics and comparison with previous month
+  - **Technician features:**
+    - Create new tickets from mobile with customer search
+    - View performance dashboard: resolution rate, SLA compliance, attendance rate
+    - Achievement badges: Problem Solver, SLA Champion, 20+ Resolved, #1 Technician
+    - Ticket management with status updates and comments
+    - Attendance clock in/out with history
+  - Role-based access control for ticket creation
   - Offline support via service worker
 - Added inventory database tables to auto-migration
 - Fixed PHP 8.3 compatibility in Docker setup

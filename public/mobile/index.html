@@ -97,9 +97,9 @@
                     <i class="bi bi-plus-circle"></i>
                     <span>New Order</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.loadSalespersonOrders('completed')">
-                    <i class="bi bi-check-circle"></i>
-                    <span>Completed</span>
+                <a href="#" class="nav-item" onclick="app.showPerformance()">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Performance</span>
                 </a>
             </nav>
         </div>
@@ -171,13 +171,13 @@
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showEquipment()">
-                    <i class="bi bi-box"></i>
-                    <span>Equipment</span>
+                <a href="#" class="nav-item" onclick="app.showNewTicket()">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>New Ticket</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showAttendanceHistory()">
-                    <i class="bi bi-calendar-check"></i>
-                    <span>Attendance</span>
+                <a href="#" class="nav-item" onclick="app.showTechPerformance()">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Performance</span>
                 </a>
             </nav>
         </div>
@@ -277,6 +277,92 @@
 
             <div class="main-content">
                 <div id="attendance-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="performance-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">My Performance</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="performance-content"></div>
+            </div>
+        </div>
+
+        <div id="tech-performance-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">My Performance</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content">
+                <div id="tech-performance-content"></div>
+            </div>
+        </div>
+
+        <div id="new-ticket-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Raise New Ticket</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content form-content">
+                <form id="new-ticket-form">
+                    <div class="mb-3">
+                        <label class="form-label">Customer (Optional)</label>
+                        <input type="text" class="form-control" id="ticket-customer-search" placeholder="Search by name or phone...">
+                        <input type="hidden" id="ticket-customer-id">
+                        <div id="customer-search-results" class="search-results"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subject *</label>
+                        <input type="text" class="form-control" id="ticket-subject" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" id="ticket-category">
+                            <option value="general">General Inquiry</option>
+                            <option value="installation">New Installation</option>
+                            <option value="fault">Fault/Repair</option>
+                            <option value="relocation">Relocation</option>
+                            <option value="upgrade">Package Upgrade</option>
+                            <option value="billing">Billing Issue</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" id="ticket-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="ticket-description" rows="4" placeholder="Describe the issue or request..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg w-100">
+                        <i class="bi bi-ticket"></i> Create Ticket
+                    </button>
+                </form>
             </div>
         </div>
     </div>

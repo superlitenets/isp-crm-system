@@ -270,6 +270,75 @@ try {
             echo json_encode(['success' => true, 'data' => $history]);
             break;
             
+        case 'salesperson-performance':
+            requireAuth();
+            $salesperson = $api->getSalespersonByUserId($user['id']);
+            if (!$salesperson) {
+                echo json_encode(['success' => false, 'error' => 'Not a salesperson']);
+                break;
+            }
+            
+            $performance = $api->getSalespersonPerformance($salesperson['id']);
+            echo json_encode(['success' => true, 'data' => $performance]);
+            break;
+            
+        case 'technician-performance':
+            requireAuth();
+            $performance = $api->getTechnicianPerformance($user['id']);
+            echo json_encode(['success' => true, 'data' => $performance]);
+            break;
+            
+        case 'create-ticket':
+            requireAuth();
+            
+            $employee = $api->getEmployeeByUserId($user['id']);
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            if (!in_array($user['role'] ?? '', $allowedRoles) && !$employee) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to create tickets']);
+                break;
+            }
+            
+            if (empty($input['subject']) || strlen(trim($input['subject'])) < 3) {
+                echo json_encode(['success' => false, 'error' => 'Subject is required (minimum 3 characters)']);
+                break;
+            }
+            
+            $validCategories = ['installation', 'fault', 'relocation', 'upgrade', 'billing', 'general'];
+            if (!empty($input['category']) && !in_array($input['category'], $validCategories)) {
+                $input['category'] = 'general';
+            }
+            
+            $validPriorities = ['low', 'medium', 'high', 'critical'];
+            if (!empty($input['priority']) && !in_array($input['priority'], $validPriorities)) {
+                $input['priority'] = 'medium';
+            }
+            
+            $ticketId = $api->createTicket($user['id'], $input);
+            if ($ticketId) {
+                echo json_encode(['success' => true, 'ticket_id' => $ticketId]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to create ticket']);
+            }
+            break;
+            
+        case 'ticket-categories':
+            requireAuth();
+            $categories = $api->getTicketCategories();
+            echo json_encode(['success' => true, 'data' => $categories]);
+            break;
+            
+        case 'search-customers':
+            requireAuth();
+            $query = $_GET['q'] ?? '';
+            if (strlen($query) < 2) {
+                echo json_encode(['success' => true, 'data' => []]);
+                break;
+            }
+            
+            $customers = $api->searchCustomers($query);
+            echo json_encode(['success' => true, 'data' => $customers]);
+            break;
+            
         default:
             echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }
