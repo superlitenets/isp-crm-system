@@ -1,15 +1,22 @@
 <?php
 $employeeData = null;
 $departmentData = null;
+$linkedUserData = null;
 $subpage = $_GET['subpage'] ?? 'employees';
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 $selectedMonth = $_GET['month'] ?? date('Y-m');
 
 if ($action === 'edit_employee' && $id) {
     $employeeData = $employee->find($id);
+    if ($employeeData && $employeeData['user_id']) {
+        $linkedUserData = $employee->getUserByEmployeeId($id);
+    }
 }
 if ($action === 'view_employee' && $id) {
     $employeeData = $employee->find($id);
+    if ($employeeData && $employeeData['user_id']) {
+        $linkedUserData = $employee->getUserByEmployeeId($id);
+    }
 }
 if ($action === 'edit_department' && $id) {
     $departmentData = $employee->getDepartment($id);
@@ -23,6 +30,8 @@ $attendanceStatuses = $employee->getAttendanceStatuses();
 $payrollStatuses = $employee->getPayrollStatuses();
 $paymentMethods = $employee->getPaymentMethods();
 $performanceStatuses = $employee->getPerformanceStatuses();
+$roleManager = new \App\Role();
+$allRoles = $roleManager->getAllRoles();
 ?>
 
 <?php if ($action === 'create_employee' || $action === 'edit_employee'): ?>
@@ -92,7 +101,7 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                     <label class="form-label">System Access</label>
                     <select class="form-select" name="user_id" id="userAccountSelect">
                         <option value="">No System Access</option>
-                        <option value="create_new" <?= ($action === 'create_employee') ? '' : 'style="display:none"' ?>>+ Create New Login Account</option>
+                        <option value="create_new">+ Create New Login Account</option>
                         <?php foreach ($users as $u): ?>
                         <option value="<?= $u['id'] ?>" <?= ($employeeData['user_id'] ?? '') == $u['id'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars($u['name']) ?> (<?= htmlspecialchars($u['email']) ?>)
@@ -102,26 +111,37 @@ $performanceStatuses = $employee->getPerformanceStatuses();
                     <small class="text-muted">Required for ticket assignment</small>
                 </div>
                 
-                <div class="col-12" id="newAccountFields" style="display: none;">
+                <div class="col-12" id="roleAndAccessFields" style="display: <?= ($employeeData['user_id'] ?? '') ? 'block' : 'none' ?>;">
                     <div class="card bg-light">
                         <div class="card-body">
-                            <h6 class="card-title"><i class="bi bi-person-plus"></i> New Login Account</h6>
+                            <h6 class="card-title"><i class="bi bi-shield-lock"></i> Role & Permissions</h6>
                             <div class="row g-3">
-                                <div class="col-md-4">
+                                <div class="col-md-4" id="newAccountEmailField" style="display: none;">
                                     <label class="form-label">Login Email *</label>
                                     <input type="email" class="form-control" name="new_user_email" placeholder="user@company.com">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4" id="newAccountPasswordField" style="display: none;">
                                     <label class="form-label">Password *</label>
                                     <input type="password" class="form-control" name="new_user_password" placeholder="Min 6 characters">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Role</label>
-                                    <select class="form-select" name="new_user_role">
-                                        <option value="technician">Technician</option>
-                                        <option value="admin">Admin</option>
+                                    <label class="form-label">System Role *</label>
+                                    <select class="form-select" name="new_user_role_id" id="roleSelect" required>
+                                        <option value="">Select Role</option>
+                                        <?php foreach ($allRoles as $role): ?>
+                                        <option value="<?= $role['id'] ?>" <?= ($linkedUserData['role_id'] ?? '') == $role['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($role['display_name']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
                                     </select>
+                                    <small class="text-muted">Determines what the employee can access in the system</small>
                                 </div>
+                                <?php if ($linkedUserData): ?>
+                                <div class="col-md-4">
+                                    <label class="form-label">Current Login</label>
+                                    <input type="text" class="form-control" value="<?= htmlspecialchars($linkedUserData['email']) ?>" readonly>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -1633,16 +1653,35 @@ $defaultCommission = $salespersonModel->getDefaultCommission();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const userSelect = document.getElementById('userAccountSelect');
-    const newAccountFields = document.getElementById('newAccountFields');
+    const roleAndAccessFields = document.getElementById('roleAndAccessFields');
+    const newAccountEmailField = document.getElementById('newAccountEmailField');
+    const newAccountPasswordField = document.getElementById('newAccountPasswordField');
+    const roleSelect = document.getElementById('roleSelect');
     
-    if (userSelect && newAccountFields) {
-        userSelect.addEventListener('change', function() {
-            if (this.value === 'create_new') {
-                newAccountFields.style.display = 'block';
-            } else {
-                newAccountFields.style.display = 'none';
-            }
-        });
+    function updateAccessFields() {
+        if (!userSelect || !roleAndAccessFields) return;
+        
+        const value = userSelect.value;
+        
+        if (value === '') {
+            roleAndAccessFields.style.display = 'none';
+            if (roleSelect) roleSelect.required = false;
+        } else if (value === 'create_new') {
+            roleAndAccessFields.style.display = 'block';
+            if (newAccountEmailField) newAccountEmailField.style.display = 'block';
+            if (newAccountPasswordField) newAccountPasswordField.style.display = 'block';
+            if (roleSelect) roleSelect.required = true;
+        } else {
+            roleAndAccessFields.style.display = 'block';
+            if (newAccountEmailField) newAccountEmailField.style.display = 'none';
+            if (newAccountPasswordField) newAccountPasswordField.style.display = 'none';
+            if (roleSelect) roleSelect.required = true;
+        }
+    }
+    
+    if (userSelect) {
+        userSelect.addEventListener('change', updateAccessFields);
+        updateAccessFields();
     }
     
     const payrollModal = document.getElementById('payrollModal');
