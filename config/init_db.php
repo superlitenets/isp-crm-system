@@ -726,7 +726,13 @@ function runMigrations(PDO $db): void {
         ['tickets', 'sla_response_breached', 'ALTER TABLE tickets ADD COLUMN sla_response_breached BOOLEAN DEFAULT FALSE'],
         ['tickets', 'sla_resolution_breached', 'ALTER TABLE tickets ADD COLUMN sla_resolution_breached BOOLEAN DEFAULT FALSE'],
         ['tickets', 'sla_paused_at', 'ALTER TABLE tickets ADD COLUMN sla_paused_at TIMESTAMP'],
-        ['tickets', 'sla_paused_duration', 'ALTER TABLE tickets ADD COLUMN sla_paused_duration INTEGER DEFAULT 0']
+        ['tickets', 'sla_paused_duration', 'ALTER TABLE tickets ADD COLUMN sla_paused_duration INTEGER DEFAULT 0'],
+        ['equipment_assignments', 'employee_id', 'ALTER TABLE equipment_assignments ADD COLUMN employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL'],
+        ['equipment_assignments', 'customer_id', 'ALTER TABLE equipment_assignments ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL'],
+        ['equipment_assignments', 'assigned_by', 'ALTER TABLE equipment_assignments ADD COLUMN assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['equipment_assignments', 'return_date', 'ALTER TABLE equipment_assignments ADD COLUMN return_date DATE'],
+        ['equipment_assignments', 'status', 'ALTER TABLE equipment_assignments ADD COLUMN status VARCHAR(20) DEFAULT \'assigned\''],
+        ['equipment_assignments', 'notes', 'ALTER TABLE equipment_assignments ADD COLUMN notes TEXT']
     ];
     
     foreach ($columnMigrations as $migration) {
