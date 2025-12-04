@@ -150,12 +150,10 @@ class SMSGateway {
             if ($this->provider === 'advanta') {
                 $data = [
                     'apikey' => $this->apiKey,
-                    'partnerID' => $this->partnerId,
+                    'partnerID' => (int)$this->partnerId,
                     'shortcode' => $this->senderId,
                     'mobile' => $to,
-                    'message' => $message,
-                    'pass_type' => 'plain',
-                    'clientsmsid' => time() . rand(1000, 9999)
+                    'message' => $message
                 ];
                 $headers[] = 'Content-Type: application/json';
                 $headers[] = 'Accept: application/json';
