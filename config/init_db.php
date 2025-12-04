@@ -657,6 +657,49 @@ function runMigrations(PDO $db): void {
                 employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(team_id, employee_id)
+            )",
+        'sla_policies' => "
+            CREATE TABLE IF NOT EXISTS sla_policies (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                priority VARCHAR(20) NOT NULL,
+                response_time_hours INTEGER NOT NULL DEFAULT 4,
+                resolution_time_hours INTEGER NOT NULL DEFAULT 24,
+                escalation_time_hours INTEGER,
+                escalation_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                notify_on_breach BOOLEAN DEFAULT TRUE,
+                is_active BOOLEAN DEFAULT TRUE,
+                is_default BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'sla_business_hours' => "
+            CREATE TABLE IF NOT EXISTS sla_business_hours (
+                id SERIAL PRIMARY KEY,
+                day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
+                start_time TIME NOT NULL DEFAULT '08:00',
+                end_time TIME NOT NULL DEFAULT '17:00',
+                is_working_day BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(day_of_week)
+            )",
+        'sla_holidays' => "
+            CREATE TABLE IF NOT EXISTS sla_holidays (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                holiday_date DATE NOT NULL,
+                is_recurring BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(holiday_date)
+            )",
+        'ticket_sla_logs' => "
+            CREATE TABLE IF NOT EXISTS ticket_sla_logs (
+                id SERIAL PRIMARY KEY,
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+                event_type VARCHAR(50) NOT NULL,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
@@ -675,7 +718,15 @@ function runMigrations(PDO $db): void {
         ['orders', 'salesperson_id', 'ALTER TABLE orders ADD COLUMN salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE SET NULL'],
         ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE'],
         ['users', 'role_id', 'ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL'],
-        ['tickets', 'team_id', 'ALTER TABLE tickets ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL']
+        ['tickets', 'team_id', 'ALTER TABLE tickets ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL'],
+        ['tickets', 'sla_policy_id', 'ALTER TABLE tickets ADD COLUMN sla_policy_id INTEGER REFERENCES sla_policies(id) ON DELETE SET NULL'],
+        ['tickets', 'first_response_at', 'ALTER TABLE tickets ADD COLUMN first_response_at TIMESTAMP'],
+        ['tickets', 'sla_response_due', 'ALTER TABLE tickets ADD COLUMN sla_response_due TIMESTAMP'],
+        ['tickets', 'sla_resolution_due', 'ALTER TABLE tickets ADD COLUMN sla_resolution_due TIMESTAMP'],
+        ['tickets', 'sla_response_breached', 'ALTER TABLE tickets ADD COLUMN sla_response_breached BOOLEAN DEFAULT FALSE'],
+        ['tickets', 'sla_resolution_breached', 'ALTER TABLE tickets ADD COLUMN sla_resolution_breached BOOLEAN DEFAULT FALSE'],
+        ['tickets', 'sla_paused_at', 'ALTER TABLE tickets ADD COLUMN sla_paused_at TIMESTAMP'],
+        ['tickets', 'sla_paused_duration', 'ALTER TABLE tickets ADD COLUMN sla_paused_duration INTEGER DEFAULT 0']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -691,6 +742,7 @@ function runMigrations(PDO $db): void {
     }
     
     seedRolesAndPermissions($db);
+    seedSLADefaults($db);
 }
 
 function seedRolesAndPermissions(PDO $db): void {
@@ -835,6 +887,61 @@ function seedRolesAndPermissions(PDO $db): void {
     }
     if ($techRole) {
         $db->exec("UPDATE users SET role_id = $techRole WHERE role = 'technician' AND role_id IS NULL");
+    }
+}
+
+function seedSLADefaults(PDO $db): void {
+    $checkSLA = $db->query("SELECT COUNT(*) FROM sla_policies")->fetchColumn();
+    if ($checkSLA > 0) {
+        return;
+    }
+    
+    $policies = [
+        ['Critical Priority SLA', 'For critical/emergency issues requiring immediate attention', 'critical', 1, 4, 2, true, true],
+        ['High Priority SLA', 'For high priority issues requiring quick response', 'high', 2, 8, 4, true, false],
+        ['Medium Priority SLA', 'Standard SLA for regular issues', 'medium', 4, 24, 12, true, true],
+        ['Low Priority SLA', 'For low priority issues that can wait', 'low', 8, 48, 24, true, false]
+    ];
+    
+    $stmt = $db->prepare("
+        INSERT INTO sla_policies (name, description, priority, response_time_hours, resolution_time_hours, escalation_time_hours, notify_on_breach, is_default)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    
+    foreach ($policies as $policy) {
+        try {
+            $stmt->execute($policy);
+        } catch (PDOException $e) {
+            error_log("Error seeding SLA policy: " . $e->getMessage());
+        }
+    }
+    
+    $checkHours = $db->query("SELECT COUNT(*) FROM sla_business_hours")->fetchColumn();
+    if ($checkHours > 0) {
+        return;
+    }
+    
+    $businessHours = [
+        [0, '00:00', '00:00', false],
+        [1, '08:00', '17:00', true],
+        [2, '08:00', '17:00', true],
+        [3, '08:00', '17:00', true],
+        [4, '08:00', '17:00', true],
+        [5, '08:00', '17:00', true],
+        [6, '09:00', '13:00', true]
+    ];
+    
+    $stmt = $db->prepare("
+        INSERT INTO sla_business_hours (day_of_week, start_time, end_time, is_working_day)
+        VALUES (?, ?, ?, ?)
+    ");
+    
+    foreach ($businessHours as $hours) {
+        try {
+            $stmt->execute($hours);
+        } catch (PDOException $e) {
+            error_log("Error seeding business hours: " . $e->getMessage());
+        }
     }
 }
 

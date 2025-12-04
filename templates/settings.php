@@ -96,6 +96,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-shield-lock"></i> Roles & Permissions
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'sla' ? 'active' : '' ?>" href="?page=settings&subpage=sla">
+            <i class="bi bi-speedometer2"></i> SLA Policies
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -3044,6 +3049,384 @@ function editUser(user) {
     document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit User';
     
     new bootstrap.Modal(document.getElementById('userModal')).show();
+}
+</script>
+
+<?php elseif ($subpage === 'sla'): 
+$sla = new \App\SLA();
+$slaPolicies = $sla->getAllPolicies();
+$businessHours = $sla->getBusinessHours();
+$holidays = $sla->getHolidays();
+$users = $settings->getAllUsers();
+$dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-speedometer2"></i> SLA Policies</h5>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#slaPolicyModal" onclick="resetPolicyForm()">
+                    <i class="bi bi-plus-lg"></i> Add Policy
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Priority</th>
+                                <th>Response Time</th>
+                                <th>Resolution Time</th>
+                                <th>Escalation</th>
+                                <th>Status</th>
+                                <th width="100">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($slaPolicies)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <i class="bi bi-speedometer2 fs-1"></i>
+                                    <p class="mt-2">No SLA policies defined yet</p>
+                                </td>
+                            </tr>
+                            <?php else: ?>
+                            <?php foreach ($slaPolicies as $policy): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($policy['name']) ?></strong>
+                                    <?php if ($policy['is_default']): ?>
+                                    <span class="badge bg-info">Default</span>
+                                    <?php endif; ?>
+                                    <?php if ($policy['description']): ?>
+                                    <br><small class="text-muted"><?= htmlspecialchars($policy['description']) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $priorityColors = ['critical' => 'danger', 'high' => 'warning', 'medium' => 'primary', 'low' => 'secondary'];
+                                    $color = $priorityColors[$policy['priority']] ?? 'secondary';
+                                    ?>
+                                    <span class="badge bg-<?= $color ?>"><?= ucfirst($policy['priority']) ?></span>
+                                </td>
+                                <td>
+                                    <i class="bi bi-reply text-success"></i> <?= $policy['response_time_hours'] ?> hours
+                                </td>
+                                <td>
+                                    <i class="bi bi-check-circle text-primary"></i> <?= $policy['resolution_time_hours'] ?> hours
+                                </td>
+                                <td>
+                                    <?php if ($policy['escalation_time_hours']): ?>
+                                    <i class="bi bi-arrow-up-circle text-warning"></i> <?= $policy['escalation_time_hours'] ?>h
+                                    <?php if ($policy['escalation_name']): ?>
+                                    <br><small class="text-muted">to <?= htmlspecialchars($policy['escalation_name']) ?></small>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($policy['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick='editPolicy(<?= json_encode($policy) ?>)'>
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this SLA policy?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_sla_policy">
+                                        <input type="hidden" name="policy_id" value="<?= $policy['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock"></i> Business Hours</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">SLA timers only count during business hours. Configure when your support team is available.</p>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_business_hours">
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Working Day</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($businessHours as $hours): ?>
+                                <tr>
+                                    <td class="fw-bold"><?= $dayNames[$hours['day_of_week']] ?></td>
+                                    <td>
+                                        <input type="hidden" name="hours[<?= $hours['day_of_week'] ?>][day_of_week]" value="<?= $hours['day_of_week'] ?>">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="hours[<?= $hours['day_of_week'] ?>][is_working_day]" value="1" 
+                                                <?= $hours['is_working_day'] ? 'checked' : '' ?>>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="time" class="form-control form-control-sm" name="hours[<?= $hours['day_of_week'] ?>][start_time]" 
+                                            value="<?= $hours['start_time'] ?>" style="width: 120px;">
+                                    </td>
+                                    <td>
+                                        <input type="time" class="form-control form-control-sm" name="hours[<?= $hours['day_of_week'] ?>][end_time]" 
+                                            value="<?= $hours['end_time'] ?>" style="width: 120px;">
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save Business Hours
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Holidays</h5>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#holidayModal">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <?php if (empty($holidays)): ?>
+                    <li class="list-group-item text-center text-muted py-4">
+                        <i class="bi bi-calendar-x"></i> No holidays defined
+                    </li>
+                    <?php else: ?>
+                    <?php foreach ($holidays as $holiday): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><?= htmlspecialchars($holiday['name']) ?></strong><br>
+                            <small class="text-muted">
+                                <?= date('M d, Y', strtotime($holiday['holiday_date'])) ?>
+                                <?= $holiday['is_recurring'] ? '<span class="badge bg-info">Recurring</span>' : '' ?>
+                            </small>
+                        </div>
+                        <form method="POST" class="d-inline" onsubmit="return confirm('Remove this holiday?')">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="delete_holiday">
+                            <input type="hidden" name="holiday_id" value="<?= $holiday['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </li>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> How SLA Works</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6 class="text-primary"><i class="bi bi-reply"></i> Response Time</h6>
+                    <p class="small text-muted mb-0">Time until first response/comment on a ticket from staff.</p>
+                </div>
+                <div class="mb-3">
+                    <h6 class="text-success"><i class="bi bi-check-circle"></i> Resolution Time</h6>
+                    <p class="small text-muted mb-0">Time until ticket is marked as resolved.</p>
+                </div>
+                <div class="mb-3">
+                    <h6 class="text-warning"><i class="bi bi-arrow-up-circle"></i> Escalation</h6>
+                    <p class="small text-muted mb-0">Auto-escalate and notify manager if SLA is about to breach.</p>
+                </div>
+                <hr>
+                <p class="small text-muted mb-0">
+                    <i class="bi bi-lightbulb"></i> SLA timers pause outside business hours and on holidays.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="slaPolicyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="slaPolicyForm">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" id="policyAction" value="create_sla_policy">
+                <input type="hidden" name="policy_id" id="editPolicyId" value="">
+                
+                <div class="modal-header">
+                    <h5 class="modal-title" id="policyModalTitle"><i class="bi bi-speedometer2"></i> Add SLA Policy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Policy Name *</label>
+                            <input type="text" class="form-control" name="name" id="policyName" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Priority *</label>
+                            <select class="form-select" name="priority" id="policyPriority" required>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" id="policyDescription" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Response Time (hours) *</label>
+                            <input type="number" class="form-control" name="response_time_hours" id="policyResponseTime" min="1" value="4" required>
+                            <small class="text-muted">Time to first staff response</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Resolution Time (hours) *</label>
+                            <input type="number" class="form-control" name="resolution_time_hours" id="policyResolutionTime" min="1" value="24" required>
+                            <small class="text-muted">Time to resolve ticket</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Escalation Time (hours)</label>
+                            <input type="number" class="form-control" name="escalation_time_hours" id="policyEscalationTime" min="1">
+                            <small class="text-muted">When to escalate (optional)</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Escalate To</label>
+                            <select class="form-select" name="escalation_to" id="policyEscalationTo">
+                                <option value="">-- No Escalation --</option>
+                                <?php foreach ($users as $user): ?>
+                                <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="notify_on_breach" id="policyNotify" value="1" checked>
+                                <label class="form-check-label" for="policyNotify">Notify on SLA Breach</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="is_default" id="policyDefault" value="1">
+                                <label class="form-check-label" for="policyDefault">Default for Priority</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="policyActive" value="1" checked>
+                                <label class="form-check-label" for="policyActive">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Policy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="holidayModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="add_holiday">
+                
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> Add Holiday</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Holiday Name *</label>
+                        <input type="text" class="form-control" name="name" required placeholder="e.g., Christmas Day">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-control" name="holiday_date" required>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_recurring" value="1" id="recurringHoliday">
+                        <label class="form-check-label" for="recurringHoliday">
+                            Recurring every year
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add Holiday</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetPolicyForm() {
+    document.getElementById('policyAction').value = 'create_sla_policy';
+    document.getElementById('editPolicyId').value = '';
+    document.getElementById('policyName').value = '';
+    document.getElementById('policyDescription').value = '';
+    document.getElementById('policyPriority').value = 'medium';
+    document.getElementById('policyResponseTime').value = '4';
+    document.getElementById('policyResolutionTime').value = '24';
+    document.getElementById('policyEscalationTime').value = '';
+    document.getElementById('policyEscalationTo').value = '';
+    document.getElementById('policyNotify').checked = true;
+    document.getElementById('policyDefault').checked = false;
+    document.getElementById('policyActive').checked = true;
+    document.getElementById('policyModalTitle').innerHTML = '<i class="bi bi-speedometer2"></i> Add SLA Policy';
+}
+
+function editPolicy(policy) {
+    document.getElementById('policyAction').value = 'update_sla_policy';
+    document.getElementById('editPolicyId').value = policy.id;
+    document.getElementById('policyName').value = policy.name;
+    document.getElementById('policyDescription').value = policy.description || '';
+    document.getElementById('policyPriority').value = policy.priority;
+    document.getElementById('policyResponseTime').value = policy.response_time_hours;
+    document.getElementById('policyResolutionTime').value = policy.resolution_time_hours;
+    document.getElementById('policyEscalationTime').value = policy.escalation_time_hours || '';
+    document.getElementById('policyEscalationTo').value = policy.escalation_to || '';
+    document.getElementById('policyNotify').checked = policy.notify_on_breach;
+    document.getElementById('policyDefault').checked = policy.is_default;
+    document.getElementById('policyActive').checked = policy.is_active;
+    document.getElementById('policyModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit SLA Policy';
+    
+    new bootstrap.Modal(document.getElementById('slaPolicyModal')).show();
 }
 </script>
 
