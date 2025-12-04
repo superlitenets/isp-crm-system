@@ -149,8 +149,9 @@ class SMSGateway {
 
             if ($this->provider === 'advanta') {
                 $data = [
+                    'partnerID' => $this->partnerId,
                     'apikey' => $this->apiKey,
-                    'partnerID' => (int)$this->partnerId,
+                    'pass_type' => 'plain',
                     'shortcode' => $this->senderId,
                     'mobile' => $to,
                     'message' => $message
