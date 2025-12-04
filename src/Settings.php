@@ -513,6 +513,46 @@ class Settings {
         return true;
     }
 
+    public function getContactSettings(): array {
+        return [
+            'contact_phone' => $this->get('contact_phone', ''),
+            'contact_phone_2' => $this->get('contact_phone_2', ''),
+            'contact_email' => $this->get('contact_email', ''),
+            'contact_email_support' => $this->get('contact_email_support', ''),
+            'contact_address' => $this->get('contact_address', ''),
+            'contact_city' => $this->get('contact_city', ''),
+            'contact_country' => $this->get('contact_country', 'Kenya'),
+            'contact_whatsapp' => $this->get('contact_whatsapp', ''),
+            'social_facebook' => $this->get('social_facebook', ''),
+            'social_twitter' => $this->get('social_twitter', ''),
+            'social_instagram' => $this->get('social_instagram', ''),
+            'social_linkedin' => $this->get('social_linkedin', ''),
+            'social_youtube' => $this->get('social_youtube', ''),
+            'social_tiktok' => $this->get('social_tiktok', ''),
+            'map_embed_url' => $this->get('map_embed_url', ''),
+            'working_days' => $this->get('working_days', 'Monday - Friday'),
+            'working_hours' => $this->get('working_hours', '8:00 AM - 5:00 PM'),
+            'support_hours' => $this->get('support_hours', '24/7'),
+        ];
+    }
+
+    public function saveContactSettings(array $data): bool {
+        $fields = [
+            'contact_phone', 'contact_phone_2', 'contact_email', 'contact_email_support',
+            'contact_address', 'contact_city', 'contact_country', 'contact_whatsapp',
+            'social_facebook', 'social_twitter', 'social_instagram', 'social_linkedin',
+            'social_youtube', 'social_tiktok', 'map_embed_url',
+            'working_days', 'working_hours', 'support_hours'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $this->set($field, $data[$field]);
+            }
+        }
+        return true;
+    }
+
     public function getBillingCycles(): array {
         return [
             'monthly' => 'Monthly',
