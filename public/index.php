@@ -27,6 +27,7 @@ require_once __DIR__ . '/../src/BiometricSyncService.php';
 require_once __DIR__ . '/../src/LateDeductionCalculator.php';
 require_once __DIR__ . '/../src/Salesperson.php';
 require_once __DIR__ . '/../src/Role.php';
+require_once __DIR__ . '/../src/SLA.php';
 
 initializeDatabase();
 
@@ -843,6 +844,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving contact settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_sla_policy':
+                try {
+                    $sla = new \App\SLA();
+                    $sla->createPolicy($_POST);
+                    $message = 'SLA policy created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating SLA policy: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_sla_policy':
+                try {
+                    $sla = new \App\SLA();
+                    $sla->updatePolicy((int)$_POST['policy_id'], $_POST);
+                    $message = 'SLA policy updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating SLA policy: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_sla_policy':
+                try {
+                    $sla = new \App\SLA();
+                    $sla->deletePolicy((int)$_POST['policy_id']);
+                    $message = 'SLA policy deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting SLA policy: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_business_hours':
+                try {
+                    $sla = new \App\SLA();
+                    $hours = [];
+                    foreach ($_POST['hours'] as $dayHours) {
+                        $hours[] = [
+                            'day_of_week' => (int)$dayHours['day_of_week'],
+                            'start_time' => $dayHours['start_time'],
+                            'end_time' => $dayHours['end_time'],
+                            'is_working_day' => isset($dayHours['is_working_day'])
+                        ];
+                    }
+                    $sla->updateBusinessHours($hours);
+                    $message = 'Business hours saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving business hours: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_holiday':
+                try {
+                    $sla = new \App\SLA();
+                    $sla->addHoliday($_POST);
+                    $message = 'Holiday added successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error adding holiday: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_holiday':
+                try {
+                    $sla = new \App\SLA();
+                    $sla->deleteHoliday((int)$_POST['holiday_id']);
+                    $message = 'Holiday removed successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error removing holiday: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

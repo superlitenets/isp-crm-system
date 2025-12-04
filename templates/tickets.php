@@ -242,6 +242,88 @@ if (isset($_GET['customer_id'])) {
             </div>
         </div>
         
+        <?php if ($ticketData['sla_policy_id']): 
+            $slaStatus = $ticket->getSLAStatus($ticketData['id']);
+            $sla = new \App\SLA();
+        ?>
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-speedometer2"></i> SLA Status</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Policy: <?= htmlspecialchars($ticketData['sla_policy_name'] ?? 'Standard') ?></p>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold"><i class="bi bi-reply"></i> Response</span>
+                        <?php
+                        $respStatus = $slaStatus['response']['status'];
+                        $respClass = match($respStatus) {
+                            'met' => 'success',
+                            'on_track' => 'success',
+                            'at_risk' => 'warning',
+                            'breached' => 'danger',
+                            default => 'secondary'
+                        };
+                        $respIcon = match($respStatus) {
+                            'met' => 'check-circle-fill',
+                            'on_track' => 'check-circle',
+                            'at_risk' => 'exclamation-triangle',
+                            'breached' => 'x-circle-fill',
+                            default => 'dash-circle'
+                        };
+                        ?>
+                        <span class="badge bg-<?= $respClass ?>">
+                            <i class="bi bi-<?= $respIcon ?>"></i> <?= ucfirst(str_replace('_', ' ', $respStatus)) ?>
+                        </span>
+                    </div>
+                    <?php if ($ticketData['first_response_at']): ?>
+                    <small class="text-muted">Responded: <?= date('M j, g:i A', strtotime($ticketData['first_response_at'])) ?></small>
+                    <?php elseif ($ticketData['sla_response_due'] && $respStatus !== 'breached'): ?>
+                    <small class="text-muted">Due: <?= date('M j, g:i A', strtotime($ticketData['sla_response_due'])) ?></small>
+                    <?php if (isset($slaStatus['response']['time_left'])): ?>
+                    <br><small class="text-<?= $respClass ?>"><?= $sla->formatTimeLeft($slaStatus['response']['time_left']) ?> remaining</small>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+                
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold"><i class="bi bi-check-circle"></i> Resolution</span>
+                        <?php
+                        $resStatus = $slaStatus['resolution']['status'];
+                        $resClass = match($resStatus) {
+                            'met' => 'success',
+                            'on_track' => 'success',
+                            'at_risk' => 'warning',
+                            'breached' => 'danger',
+                            default => 'secondary'
+                        };
+                        $resIcon = match($resStatus) {
+                            'met' => 'check-circle-fill',
+                            'on_track' => 'check-circle',
+                            'at_risk' => 'exclamation-triangle',
+                            'breached' => 'x-circle-fill',
+                            default => 'dash-circle'
+                        };
+                        ?>
+                        <span class="badge bg-<?= $resClass ?>">
+                            <i class="bi bi-<?= $resIcon ?>"></i> <?= ucfirst(str_replace('_', ' ', $resStatus)) ?>
+                        </span>
+                    </div>
+                    <?php if (in_array($ticketData['status'], ['resolved', 'closed']) && $ticketData['resolved_at']): ?>
+                    <small class="text-muted">Resolved: <?= date('M j, g:i A', strtotime($ticketData['resolved_at'])) ?></small>
+                    <?php elseif ($ticketData['sla_resolution_due'] && $resStatus !== 'breached'): ?>
+                    <small class="text-muted">Due: <?= date('M j, g:i A', strtotime($ticketData['sla_resolution_due'])) ?></small>
+                    <?php if (isset($slaStatus['resolution']['time_left'])): ?>
+                    <br><small class="text-<?= $resClass ?>"><?= $sla->formatTimeLeft($slaStatus['resolution']['time_left']) ?> remaining</small>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <div class="card mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Customer</h5>
@@ -382,10 +464,9 @@ if (isset($_GET['customer_id'])) {
                         <th>Ticket #</th>
                         <th>Customer</th>
                         <th>Subject</th>
-                        <th>Category</th>
-                        <th>Team</th>
-                        <th>Assigned To</th>
                         <th>Priority</th>
+                        <th>SLA</th>
+                        <th>Assigned</th>
                         <th>Status</th>
                         <th>Created</th>
                         <th>Actions</th>
@@ -398,16 +479,38 @@ if (isset($_GET['customer_id'])) {
                     if ($priorityFilter) $filters['priority'] = $priorityFilter;
                     if ($search) $filters['search'] = $search;
                     $tickets = $ticket->getAll($filters);
+                    $slaHelper = new \App\SLA();
                     foreach ($tickets as $t):
+                        $slaStatus = $slaHelper->getSLAStatus($t);
+                        $hasBreached = $t['sla_response_breached'] || $t['sla_resolution_breached'];
+                        $isAtRisk = ($slaStatus['response']['status'] === 'at_risk' || $slaStatus['resolution']['status'] === 'at_risk');
                     ?>
-                    <tr>
+                    <tr class="<?= $hasBreached ? 'table-danger' : ($isAtRisk ? 'table-warning' : '') ?>">
                         <td><a href="?page=tickets&action=view&id=<?= $t['id'] ?>"><?= htmlspecialchars($t['ticket_number']) ?></a></td>
                         <td><?= htmlspecialchars($t['customer_name'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars(substr($t['subject'], 0, 30)) ?><?= strlen($t['subject']) > 30 ? '...' : '' ?></td>
-                        <td><?= htmlspecialchars($categories[$t['category']] ?? $t['category']) ?></td>
-                        <td><span class="badge bg-info text-dark"><?= htmlspecialchars($t['team_name'] ?? '-') ?></span></td>
-                        <td><?= htmlspecialchars($t['assigned_name'] ?? '-') ?></td>
                         <td><span class="badge badge-priority-<?= $t['priority'] ?>"><?= ucfirst($t['priority']) ?></span></td>
+                        <td>
+                            <?php if ($t['sla_policy_id']): ?>
+                                <?php if ($hasBreached): ?>
+                                <span class="badge bg-danger" title="SLA Breached"><i class="bi bi-x-circle-fill"></i> Breached</span>
+                                <?php elseif ($isAtRisk): ?>
+                                <span class="badge bg-warning text-dark" title="SLA At Risk"><i class="bi bi-exclamation-triangle-fill"></i> At Risk</span>
+                                <?php elseif (in_array($t['status'], ['resolved', 'closed'])): ?>
+                                <span class="badge bg-success" title="SLA Met"><i class="bi bi-check-circle-fill"></i> Met</span>
+                                <?php else: ?>
+                                <span class="badge bg-success" title="SLA On Track"><i class="bi bi-check-circle"></i> On Track</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                            <span class="badge bg-secondary">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($t['team_name']): ?>
+                            <small class="text-info"><?= htmlspecialchars($t['team_name']) ?></small><br>
+                            <?php endif; ?>
+                            <?= htmlspecialchars($t['assigned_name'] ?? '-') ?>
+                        </td>
                         <td><span class="badge badge-status-<?= $t['status'] ?>"><?= ucfirst(str_replace('_', ' ', $t['status'])) ?></span></td>
                         <td><?= date('M j', strtotime($t['created_at'])) ?></td>
                         <td>
@@ -422,7 +525,7 @@ if (isset($_GET['customer_id'])) {
                     <?php endforeach; ?>
                     <?php if (empty($tickets)): ?>
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             No tickets found. <a href="?page=tickets&action=create">Create your first ticket</a>
                         </td>
                     </tr>

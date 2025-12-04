@@ -1,6 +1,17 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added SLA (Service Level Agreement) Management
+  - Database tables: `sla_policies`, `sla_business_hours`, `sla_holidays`, `ticket_sla_logs`
+  - Ticket table extended with: `sla_policy_id`, `first_response_at`, `sla_response_due`, `sla_resolution_due`, `sla_response_breached`, `sla_resolution_breached`
+  - SLA policies auto-applied based on ticket priority (Critical: 1h response/4h resolution, High: 2h/8h, Medium: 4h/24h, Low: 8h/48h)
+  - Business hours configuration (SLA timers only count during working hours)
+  - Holiday management (SLA timers pause on holidays)
+  - SLA status indicators on ticket list and view pages (On Track, At Risk, Breached, Met)
+  - Dashboard shows SLA compliance rates and at-risk/breached ticket counts
+  - First response tracking when staff adds a comment
+  - SLA class in `src/SLA.php` handles all SLA calculations
+  - Settings > SLA Policies tab for managing policies, business hours, and holidays
 - **December 2024**: Added Team-Based Ticket Assignment
   - Created `teams` and `team_members` database tables
   - Tickets can now be assigned to teams AND/OR individuals

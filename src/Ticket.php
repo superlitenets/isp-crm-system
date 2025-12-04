@@ -5,10 +5,18 @@ namespace App;
 class Ticket {
     private \PDO $db;
     private SMSGateway $sms;
+    private ?SLA $sla = null;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
+    }
+
+    private function getSLA(): SLA {
+        if ($this->sla === null) {
+            $this->sla = new SLA();
+        }
+        return $this->sla;
     }
 
     public function generateTicketNumber(): string {
@@ -20,10 +28,13 @@ class Ticket {
         
         $assignedTo = !empty($data['assigned_to']) ? (int)$data['assigned_to'] : null;
         $teamId = !empty($data['team_id']) ? (int)$data['team_id'] : null;
+        $priority = $data['priority'] ?? 'medium';
+        
+        $slaData = $this->getSLA()->calculateSLAForTicket($priority);
         
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -34,11 +45,18 @@ class Ticket {
             $data['subject'],
             $data['description'],
             $data['category'],
-            $data['priority'] ?? 'medium',
-            'open'
+            $priority,
+            'open',
+            $slaData['policy_id'],
+            $slaData['response_due'] ? $slaData['response_due']->format('Y-m-d H:i:s') : null,
+            $slaData['resolution_due'] ? $slaData['resolution_due']->format('Y-m-d H:i:s') : null
         ]);
 
         $ticketId = (int) $this->db->lastInsertId();
+        
+        if ($slaData['policy_id']) {
+            $this->getSLA()->logSLAEvent($ticketId, 'sla_assigned', "SLA policy applied based on {$priority} priority");
+        }
 
         $customer = (new Customer())->find($data['customer_id']);
         if ($customer && $customer['phone']) {
@@ -152,26 +170,104 @@ class Ticket {
         $stmt = $this->db->prepare("
             SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.account_number,
                    u.name as assigned_name, u.phone as assigned_phone,
-                   tm.name as team_name
+                   tm.name as team_name, sp.name as sla_policy_name,
+                   sp.response_time_hours, sp.resolution_time_hours
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
             LEFT JOIN teams tm ON t.team_id = tm.id
+            LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
             WHERE t.id = ?
         ");
         $stmt->execute([$id]);
         $result = $stmt->fetch();
         return $result ?: null;
     }
+    
+    public function recordFirstResponse(int $ticketId): bool {
+        $ticket = $this->find($ticketId);
+        if (!$ticket || $ticket['first_response_at']) {
+            return false;
+        }
+        
+        $stmt = $this->db->prepare("
+            UPDATE tickets SET first_response_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND first_response_at IS NULL
+        ");
+        $result = $stmt->execute([$ticketId]);
+        
+        if ($result && $ticket['sla_response_due']) {
+            $now = new \DateTime();
+            $responseDue = new \DateTime($ticket['sla_response_due']);
+            $breached = $now > $responseDue;
+            
+            if ($breached) {
+                $this->db->prepare("UPDATE tickets SET sla_response_breached = TRUE WHERE id = ?")->execute([$ticketId]);
+                $this->getSLA()->logSLAEvent($ticketId, 'response_breached', 'Response SLA was breached');
+            } else {
+                $this->getSLA()->logSLAEvent($ticketId, 'response_met', 'Response SLA was met');
+            }
+        }
+        
+        return $result;
+    }
+    
+    public function checkAndUpdateSLABreaches(): array {
+        $now = date('Y-m-d H:i:s');
+        
+        $responseBreached = $this->db->prepare("
+            UPDATE tickets SET sla_response_breached = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE sla_response_due < ? 
+            AND first_response_at IS NULL 
+            AND sla_response_breached = FALSE
+            AND status NOT IN ('resolved', 'closed')
+            RETURNING id
+        ");
+        $responseBreached->execute([$now]);
+        $responseIds = $responseBreached->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $resolutionBreached = $this->db->prepare("
+            UPDATE tickets SET sla_resolution_breached = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE sla_resolution_due < ? 
+            AND sla_resolution_breached = FALSE
+            AND status NOT IN ('resolved', 'closed')
+            RETURNING id
+        ");
+        $resolutionBreached->execute([$now]);
+        $resolutionIds = $resolutionBreached->fetchAll(\PDO::FETCH_COLUMN);
+        
+        foreach ($responseIds as $ticketId) {
+            $this->getSLA()->logSLAEvent($ticketId, 'response_breached', 'Response SLA breached automatically');
+        }
+        
+        foreach ($resolutionIds as $ticketId) {
+            $this->getSLA()->logSLAEvent($ticketId, 'resolution_breached', 'Resolution SLA breached automatically');
+        }
+        
+        return [
+            'response_breached' => count($responseIds),
+            'resolution_breached' => count($resolutionIds)
+        ];
+    }
+    
+    public function getSLAStatus(int $ticketId): array {
+        $ticket = $this->find($ticketId);
+        if (!$ticket) {
+            return ['response' => ['status' => 'n/a'], 'resolution' => ['status' => 'n/a']];
+        }
+        return $this->getSLA()->getSLAStatus($ticket);
+    }
 
     public function getAll(array $filters = [], int $limit = 50, int $offset = 0): array {
         $sql = "
             SELECT t.*, c.name as customer_name, c.account_number,
-                   u.name as assigned_name, tm.name as team_name
+                   u.name as assigned_name, tm.name as team_name,
+                   sp.name as sla_policy_name
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
             LEFT JOIN teams tm ON t.team_id = tm.id
+            LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
             WHERE 1=1
         ";
         $params = [];
@@ -279,7 +375,13 @@ class Ticket {
             VALUES (?, ?, ?, ?)
         ");
         $stmt->execute([$ticketId, $userId, $comment, $isInternal]);
-        return (int) $this->db->lastInsertId();
+        $commentId = (int) $this->db->lastInsertId();
+        
+        if (!$isInternal) {
+            $this->recordFirstResponse($ticketId);
+        }
+        
+        return $commentId;
     }
 
     public function getComments(int $ticketId): array {

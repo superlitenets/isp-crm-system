@@ -90,6 +90,67 @@
     </div>
 </div>
 
+<?php
+$sla = new \App\SLA();
+$slaStats = $sla->getSLAStatistics('30days');
+$breachedTickets = $sla->getBreachedTickets();
+$atRiskTickets = $sla->getAtRiskTickets();
+?>
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
+                    <i class="bi bi-speedometer2"></i>
+                </div>
+                <div>
+                    <h3 class="mb-0"><?= $slaStats['response_compliance'] ?>%</h3>
+                    <small class="text-muted">Response SLA</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <h3 class="mb-0"><?= $slaStats['resolution_compliance'] ?>%</h3>
+                    <small class="text-muted">Resolution SLA</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card border-danger">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-danger bg-opacity-10 text-danger me-3">
+                    <i class="bi bi-x-circle"></i>
+                </div>
+                <div>
+                    <h3 class="mb-0"><?= count($breachedTickets) ?></h3>
+                    <small class="text-muted">SLA Breached</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card border-warning">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <div>
+                    <h3 class="mb-0"><?= count($atRiskTickets) ?></h3>
+                    <small class="text-muted">At Risk</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-md-8">
         <div class="card">
