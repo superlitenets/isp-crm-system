@@ -105,6 +105,32 @@ class SMSGateway {
         return $this->provider;
     }
 
+    private function normalizePhoneNumber(string $phone): string {
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        
+        if (str_starts_with($phone, '+254')) {
+            return substr($phone, 1);
+        }
+        
+        if (str_starts_with($phone, '254')) {
+            return $phone;
+        }
+        
+        if (str_starts_with($phone, '07') || str_starts_with($phone, '01')) {
+            return '254' . substr($phone, 1);
+        }
+        
+        if (str_starts_with($phone, '7') || str_starts_with($phone, '1')) {
+            return '254' . $phone;
+        }
+        
+        if (str_starts_with($phone, '+')) {
+            return substr($phone, 1);
+        }
+        
+        return $phone;
+    }
+
     public function send(string $to, string $message): array {
         if (!$this->enabled) {
             return [
@@ -113,6 +139,8 @@ class SMSGateway {
                 'simulated' => true
             ];
         }
+
+        $to = $this->normalizePhoneNumber($to);
 
         try {
             $ch = curl_init();
