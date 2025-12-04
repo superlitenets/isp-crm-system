@@ -6,13 +6,13 @@ services:
     container_name: isp_crm_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-isp_crm}
-      POSTGRES_USER: ${POSTGRES_USER:-crm}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Mgathoni.2016}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-isp_crm}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,20 +22,31 @@ services:
     container_name: isp_crm_php
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - PGHOST=db
       - PGPORT=5432
-      - PGDATABASE=${POSTGRES_DB:-isp_crm}
-      - PGUSER=${POSTGRES_USER:-crm}
-      - PGPASSWORD=${POSTGRES_PASSWORD:-Mgathoni.2016}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-Mgathoni.2016}@db:5432/${POSTGRES_DB:-isp_crm}
-      - SESSION_SECRET=${SESSION_SECRET:-change_this_to_random_string}
+      - PGDATABASE=${POSTGRES_DB}
+      - PGUSER=${POSTGRES_USER}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - SESSION_SECRET=${SESSION_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - BIOMETRIC_API_KEY=${BIOMETRIC_API_KEY:-}
       - ADVANTA_API_KEY=${ADVANTA_API_KEY:-}
       - ADVANTA_PARTNER_ID=${ADVANTA_PARTNER_ID:-}
       - ADVANTA_SHORTCODE=${ADVANTA_SHORTCODE:-}
       - ADVANTA_URL=${ADVANTA_URL:-}
+      - MPESA_ENV=${MPESA_ENV:-sandbox}
+      - MPESA_CONSUMER_KEY=${MPESA_CONSUMER_KEY:-}
+      - MPESA_CONSUMER_SECRET=${MPESA_CONSUMER_SECRET:-}
+      - MPESA_SHORTCODE=${MPESA_SHORTCODE:-}
+      - MPESA_PASSKEY=${MPESA_PASSKEY:-}
+      - APP_TIMEZONE=${APP_TIMEZONE:-Africa/Nairobi}
+      - APP_DEBUG=${APP_DEBUG:-false}
+    volumes:
+      - ./logs:/var/www/html/logs
 
   nginx:
     image: nginx:stable-alpine
