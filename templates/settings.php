@@ -331,6 +331,8 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                     <?php if (!empty($sendTestResult['debug'])): ?>
                     <br><small class="text-muted">URL: <?= htmlspecialchars($sendTestResult['debug']['url'] ?? 'N/A') ?></small>
                     <br><small class="text-muted">Provider: <?= htmlspecialchars($sendTestResult['debug']['provider'] ?? 'N/A') ?></small>
+                    <br><small class="text-muted">Partner ID: <?= htmlspecialchars($sendTestResult['debug']['partner_id'] ?? 'N/A') ?></small>
+                    <br><small class="text-muted">Shortcode: <?= htmlspecialchars($sendTestResult['debug']['shortcode'] ?? 'N/A') ?></small>
                     <br><small class="text-muted">Response: <?= htmlspecialchars($sendTestResult['debug']['raw_response'] ?? 'N/A') ?></small>
                     <?php endif; ?>
                     <?php endif; ?>

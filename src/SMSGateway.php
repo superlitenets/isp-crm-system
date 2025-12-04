@@ -228,6 +228,8 @@ class SMSGateway {
                     'debug' => [
                         'url' => $url,
                         'provider' => $this->provider,
+                        'partner_id' => $this->partnerId ?? '(empty)',
+                        'shortcode' => $this->senderId ?? '(empty)',
                         'raw_response' => substr($response, 0, 300)
                     ]
                 ];
