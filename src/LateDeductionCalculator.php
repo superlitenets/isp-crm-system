@@ -49,7 +49,10 @@ class LateDeductionCalculator {
     }
     
     public function addRule(array $data): int {
-        if (!empty($data['is_default'])) {
+        $isDefault = !empty($data['is_default']) && $data['is_default'] !== '' && $data['is_default'] !== '0';
+        $isActive = !isset($data['is_active']) || (!empty($data['is_active']) && $data['is_active'] !== '' && $data['is_active'] !== '0');
+        
+        if ($isDefault) {
             $this->db->exec("UPDATE late_rules SET is_default = FALSE WHERE is_default = TRUE");
         }
         
@@ -59,41 +62,64 @@ class LateDeductionCalculator {
         ");
         
         $tiers = is_array($data['deduction_tiers']) ? json_encode($data['deduction_tiers']) : $data['deduction_tiers'];
+        $deptId = !empty($data['apply_to_department_id']) ? (int)$data['apply_to_department_id'] : null;
         
         $stmt->execute([
             $data['name'],
             $data['work_start_time'] ?? '09:00',
-            $data['grace_minutes'] ?? 15,
+            (int)($data['grace_minutes'] ?? 15),
             $tiers,
             $data['currency'] ?? 'KES',
-            $data['apply_to_department_id'] ?: null,
-            isset($data['is_default']) ? (bool)$data['is_default'] : false,
-            isset($data['is_active']) ? (bool)$data['is_active'] : true
+            $deptId,
+            $isDefault,
+            $isActive
         ]);
         
         return (int)$this->db->lastInsertId();
     }
     
     public function updateRule(int $id, array $data): bool {
-        if (!empty($data['is_default'])) {
+        $isDefault = !empty($data['is_default']) && $data['is_default'] !== '' && $data['is_default'] !== '0';
+        
+        if ($isDefault) {
             $this->db->exec("UPDATE late_rules SET is_default = FALSE WHERE is_default = TRUE AND id != " . intval($id));
         }
         
         $fields = [];
         $params = [];
         
-        $allowed = ['name', 'work_start_time', 'grace_minutes', 'currency', 'apply_to_department_id', 'is_default', 'is_active'];
+        $simpleFields = ['name', 'work_start_time', 'grace_minutes', 'currency'];
         
-        foreach ($allowed as $field) {
-            if (isset($data[$field])) {
+        foreach ($simpleFields as $field) {
+            if (isset($data[$field]) && $data[$field] !== '') {
                 $fields[] = "{$field} = ?";
                 $params[] = $data[$field];
             }
         }
         
+        if (array_key_exists('apply_to_department_id', $data)) {
+            $fields[] = "apply_to_department_id = ?";
+            $params[] = !empty($data['apply_to_department_id']) ? (int)$data['apply_to_department_id'] : null;
+        }
+        
+        if (array_key_exists('is_default', $data)) {
+            $fields[] = "is_default = ?";
+            $params[] = $isDefault;
+        }
+        
+        if (array_key_exists('is_active', $data)) {
+            $isActive = !empty($data['is_active']) && $data['is_active'] !== '' && $data['is_active'] !== '0';
+            $fields[] = "is_active = ?";
+            $params[] = $isActive;
+        }
+        
         if (isset($data['deduction_tiers'])) {
             $fields[] = "deduction_tiers = ?";
             $params[] = is_array($data['deduction_tiers']) ? json_encode($data['deduction_tiers']) : $data['deduction_tiers'];
+        }
+        
+        if (empty($fields)) {
+            return true;
         }
         
         $fields[] = "updated_at = CURRENT_TIMESTAMP";
