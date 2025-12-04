@@ -216,12 +216,13 @@ class SMSGateway {
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
+            $requestInfo = curl_getinfo($ch);
             curl_close($ch);
 
             if ($error) {
                 return [
                     'success' => false,
-                    'error' => $error
+                    'error' => "cURL error: $error"
                 ];
             }
 
@@ -242,10 +243,19 @@ class SMSGateway {
                     'http_code' => $httpCode
                 ];
             } else {
+                $errorMsg = '';
+                if ($responseData) {
+                    $errorMsg = $responseData['message'] ?? $responseData['error'] ?? $responseData['detail'] ?? '';
+                }
+                if (empty($errorMsg)) {
+                    $errorMsg = "HTTP $httpCode - Raw: " . substr($response, 0, 200);
+                }
                 return [
                     'success' => false,
-                    'error' => $responseData['message'] ?? $responseData['error'] ?? "HTTP $httpCode",
-                    'http_code' => $httpCode
+                    'error' => $errorMsg,
+                    'http_code' => $httpCode,
+                    'raw_response' => substr($response, 0, 500),
+                    'request_url' => $requestInfo['url'] ?? $url
                 ];
             }
         } catch (\Exception $e) {

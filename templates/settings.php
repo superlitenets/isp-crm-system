@@ -325,6 +325,12 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                     <strong>Test SMS Sent!</strong> Check your phone.
                     <?php else: ?>
                     <strong>Failed:</strong> <?= htmlspecialchars($sendTestResult['error'] ?? 'Unknown error') ?>
+                    <?php if (!empty($sendTestResult['http_code'])): ?>
+                    <br><small>HTTP Code: <?= $sendTestResult['http_code'] ?></small>
+                    <?php endif; ?>
+                    <?php if (!empty($sendTestResult['raw_response'])): ?>
+                    <br><small class="text-muted">Response: <?= htmlspecialchars($sendTestResult['raw_response']) ?></small>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
