@@ -1415,7 +1415,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::verifyToken($_POST['csrf_token'] ?? '')) {
+if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '')) {
     $action = $_POST['action'] ?? '';
     
     switch ($action) {
