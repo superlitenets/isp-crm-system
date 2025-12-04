@@ -571,7 +571,7 @@ function runMigrations(PDO $db): void {
                 employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
                 customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
                 assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                assigned_date DATE NOT NULL,
+                assignment_date DATE NOT NULL,
                 return_date DATE,
                 status VARCHAR(20) DEFAULT 'assigned',
                 notes TEXT,

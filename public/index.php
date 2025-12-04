@@ -1828,7 +1828,7 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         $data = [
                             'equipment_id' => (int)$_POST['equipment_id'],
                             'employee_id' => (int)$_POST['employee_id'],
-                            'assigned_date' => $_POST['assigned_date'] ?? date('Y-m-d'),
+                            'assignment_date' => $_POST['assignment_date'] ?? date('Y-m-d'),
                             'assigned_by' => $currentUser['id'],
                             'notes' => $_POST['notes'] ?? null
                         ];

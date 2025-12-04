@@ -515,7 +515,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Assignment Date</label>
-                            <input type="date" class="form-control" name="assigned_date" value="<?= date('Y-m-d') ?>">
+                            <input type="date" class="form-control" name="assignment_date" value="<?= date('Y-m-d') ?>">
                         </div>
                     </div>
                     
@@ -571,7 +571,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                                 <td><?= htmlspecialchars($assign['equipment_name']) ?></td>
                                 <td><code><?= htmlspecialchars($assign['serial_number'] ?? '-') ?></code></td>
                                 <td><?= htmlspecialchars($assign['first_name'] . ' ' . $assign['last_name']) ?></td>
-                                <td><?= $assign['assigned_date'] ?></td>
+                                <td><?= $assign['assignment_date'] ?></td>
                                 <td>
                                     <span class="badge bg-<?= $assign['status'] === 'assigned' ? 'success' : 'secondary' ?>">
                                         <?= ucfirst($assign['status']) ?>

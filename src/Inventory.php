@@ -185,7 +185,7 @@ class Inventory {
             $sql .= " AND a.status = 'assigned'";
         }
         
-        $sql .= " ORDER BY a.assigned_date DESC";
+        $sql .= " ORDER BY a.assignment_date DESC";
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -215,13 +215,13 @@ class Inventory {
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("
-                INSERT INTO equipment_assignments (equipment_id, employee_id, assigned_date, assigned_by, notes)
+                INSERT INTO equipment_assignments (equipment_id, employee_id, assignment_date, assigned_by, notes)
                 VALUES (?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['equipment_id'],
                 $data['employee_id'],
-                $data['assigned_date'] ?? date('Y-m-d'),
+                $data['assignment_date'] ?? date('Y-m-d'),
                 $data['assigned_by'] ?? null,
                 $data['notes'] ?? null
             ]);
@@ -515,8 +515,8 @@ class Inventory {
         $history = [];
         
         $stmt = $this->db->prepare("
-            SELECT 'assignment' as type, a.assigned_date as date, 
-                   CONCAT(emp.first_name, ' ', emp.last_name) as to_name,
+            SELECT 'assignment' as type, a.assignment_date as date, 
+                   emp.name as to_name,
                    a.return_date, a.status, a.notes
             FROM equipment_assignments a
             JOIN employees emp ON a.employee_id = emp.id
