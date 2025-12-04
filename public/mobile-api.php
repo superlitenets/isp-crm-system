@@ -2,6 +2,11 @@
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
+header('X-Content-Type-Options: nosniff');
+
+if (extension_loaded('zlib') && !headers_sent()) {
+    ob_start('ob_gzhandler');
+}
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';
@@ -90,6 +95,16 @@ try {
             echo json_encode(['success' => true]);
             break;
             
+        case 'salesperson-dashboard':
+            requireAuth();
+            $data = $api->getSalespersonDashboard($user['id']);
+            if (isset($data['error'])) {
+                echo json_encode(['success' => false, 'error' => $data['error']]);
+            } else {
+                echo json_encode(['success' => true, 'data' => $data]);
+            }
+            break;
+            
         case 'salesperson-stats':
             requireAuth();
             $salesperson = $api->getSalespersonByUserId($user['id']);
@@ -135,6 +150,12 @@ try {
             
             $orderId = $api->createOrder($salesperson['id'], $input);
             echo json_encode(['success' => true, 'order_id' => $orderId]);
+            break;
+            
+        case 'technician-dashboard':
+            requireAuth();
+            $data = $api->getTechnicianDashboard($user['id']);
+            echo json_encode(['success' => true, 'data' => $data]);
             break;
             
         case 'technician-stats':

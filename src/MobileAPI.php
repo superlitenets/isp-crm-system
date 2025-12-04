@@ -62,7 +62,7 @@ class MobileAPI {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
-    public function getSalespersonOrders(int $salespersonId, string $status = ''): array {
+    public function getSalespersonOrders(int $salespersonId, string $status = '', int $limit = 50): array {
         $sql = "SELECT o.*, sp.name as package_name, sp.speed, sp.price as package_price
                 FROM orders o
                 LEFT JOIN service_packages sp ON o.package_id = sp.id
@@ -74,7 +74,7 @@ class MobileAPI {
             $params[] = $status;
         }
         
-        $sql .= " ORDER BY o.created_at DESC LIMIT 50";
+        $sql .= " ORDER BY o.created_at DESC LIMIT " . (int)$limit;
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -133,7 +133,7 @@ class MobileAPI {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function getTechnicianTickets(int $userId, string $status = ''): array {
+    public function getTechnicianTickets(int $userId, string $status = '', int $limit = 50): array {
         $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
                 FROM tickets t
                 LEFT JOIN customers c ON t.customer_id = c.id
@@ -153,7 +153,7 @@ class MobileAPI {
                 ELSE 4 
             END,
             t.created_at DESC
-            LIMIT 50";
+            LIMIT " . (int)$limit;
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -317,5 +317,29 @@ class MobileAPI {
         ");
         $stmt->execute([$employeeId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSalespersonDashboard(int $userId): array {
+        $salesperson = $this->getSalespersonByUserId($userId);
+        if (!$salesperson) {
+            return ['error' => 'Not a salesperson'];
+        }
+        
+        return [
+            'stats' => $this->getSalespersonStats($salesperson['id']),
+            'orders' => $this->getSalespersonOrders($salesperson['id'], '', 20),
+            'salesperson' => $salesperson
+        ];
+    }
+    
+    public function getTechnicianDashboard(int $userId): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        
+        return [
+            'stats' => $this->getTechnicianStats($userId),
+            'tickets' => $this->getTechnicianTickets($userId, '', 20),
+            'attendance' => $employee ? $this->getTodayAttendance($employee['id']) : null,
+            'employee' => $employee
+        ];
     }
 }

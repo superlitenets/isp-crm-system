@@ -110,15 +110,41 @@ const app = {
     },
     
     async loadSalespersonDashboard() {
-        const stats = await this.api('salesperson-stats');
-        if (stats.success) {
-            document.getElementById('sp-total-orders').textContent = stats.data.total_orders || 0;
-            document.getElementById('sp-total-sales').textContent = this.formatNumber(stats.data.total_sales || 0);
-            document.getElementById('sp-pending').textContent = stats.data.pending_orders || 0;
-            document.getElementById('sp-commission').textContent = this.formatNumber(stats.data.total_commission || 0);
+        const result = await this.api('salesperson-dashboard');
+        if (result.success) {
+            const { stats, orders } = result.data;
+            document.getElementById('sp-total-orders').textContent = stats.total_orders || 0;
+            document.getElementById('sp-total-sales').textContent = this.formatNumber(stats.total_sales || 0);
+            document.getElementById('sp-pending').textContent = stats.pending_orders || 0;
+            document.getElementById('sp-commission').textContent = this.formatNumber(stats.total_commission || 0);
+            this.renderOrders(orders);
         }
-        
-        this.loadSalespersonOrders();
+    },
+    
+    renderOrders(orders) {
+        const container = document.getElementById('sp-orders-list');
+        if (orders && orders.length > 0) {
+            container.innerHTML = orders.map(order => `
+                <div class="list-item">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${order.customer_name}</h6>
+                            <p class="list-item-subtitle">${order.order_number}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(order.order_status)} badge-status">
+                            ${order.order_status}
+                        </span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span><i class="bi bi-telephone"></i> ${order.customer_phone}</span>
+                        <span><i class="bi bi-cash"></i> KES ${this.formatNumber(order.amount || 0)}</span>
+                    </div>
+                    ${order.package_name ? `<div class="list-item-meta"><span><i class="bi bi-wifi"></i> ${order.package_name} - ${order.speed}</span></div>` : ''}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>No orders found</p></div>';
+        }
     },
     
     async loadSalespersonOrders(status = '') {
@@ -198,39 +224,73 @@ const app = {
     },
     
     async loadTechnicianDashboard() {
-        const stats = await this.api('technician-stats');
-        if (stats.success) {
-            document.getElementById('tech-total').textContent = stats.data.total_tickets || 0;
-            document.getElementById('tech-open').textContent = stats.data.open_tickets || 0;
-            document.getElementById('tech-progress').textContent = stats.data.in_progress_tickets || 0;
-            document.getElementById('tech-resolved').textContent = stats.data.resolved_tickets || 0;
+        const result = await this.api('technician-dashboard');
+        if (result.success) {
+            const { stats, tickets, attendance } = result.data;
+            document.getElementById('tech-total').textContent = stats.total_tickets || 0;
+            document.getElementById('tech-open').textContent = stats.open_tickets || 0;
+            document.getElementById('tech-progress').textContent = stats.in_progress_tickets || 0;
+            document.getElementById('tech-resolved').textContent = stats.resolved_tickets || 0;
+            this.renderTickets(tickets);
+            this.renderAttendanceStatus(attendance);
         }
-        
-        this.loadAttendanceStatus();
-        this.loadTechnicianTickets();
     },
     
-    async loadAttendanceStatus() {
-        const result = await this.api('today-attendance');
+    renderTickets(tickets) {
+        const container = document.getElementById('tech-tickets-list');
+        if (tickets && tickets.length > 0) {
+            container.innerHTML = tickets.map(ticket => `
+                <div class="list-item" onclick="app.showTicketDetail(${ticket.id})">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${ticket.subject}</h6>
+                            <p class="list-item-subtitle">${ticket.ticket_number} - ${ticket.customer_name || 'Unknown'}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(ticket.status)} badge-status">
+                            ${ticket.status}
+                        </span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
+                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-ticket"></i><p>No tickets assigned</p></div>';
+        }
+    },
+    
+    renderAttendanceStatus(attendance) {
         const statusEl = document.getElementById('attendance-status');
         const clockInBtn = document.getElementById('btn-clock-in');
         const clockOutBtn = document.getElementById('btn-clock-out');
         
-        if (result.success && result.data) {
-            const att = result.data;
-            if (att.clock_in && !att.clock_out) {
-                statusEl.innerHTML = `<span class="clocked-in"><i class="bi bi-check-circle"></i> Clocked in at ${att.clock_in}</span>`;
+        if (attendance) {
+            if (attendance.clock_in && !attendance.clock_out) {
+                statusEl.innerHTML = `<span class="clocked-in"><i class="bi bi-check-circle"></i> Clocked in at ${attendance.clock_in}</span>`;
                 clockInBtn.disabled = true;
                 clockOutBtn.disabled = false;
-            } else if (att.clock_in && att.clock_out) {
-                statusEl.innerHTML = `<span class="clocked-out"><i class="bi bi-check-circle"></i> Worked ${att.hours_worked || 0} hours today</span>`;
+            } else if (attendance.clock_in && attendance.clock_out) {
+                statusEl.innerHTML = `<span class="clocked-out"><i class="bi bi-check-circle"></i> Worked ${attendance.hours_worked || 0} hours today</span>`;
                 clockInBtn.disabled = true;
+                clockOutBtn.disabled = true;
+            } else {
+                statusEl.innerHTML = '<span class="text-muted">Not clocked in today</span>';
+                clockInBtn.disabled = false;
                 clockOutBtn.disabled = true;
             }
         } else {
             statusEl.innerHTML = '<span class="text-muted">Not clocked in today</span>';
             clockInBtn.disabled = false;
             clockOutBtn.disabled = true;
+        }
+    },
+    
+    async loadAttendanceStatus() {
+        const result = await this.api('today-attendance');
+        if (result.success) {
+            this.renderAttendanceStatus(result.data);
         }
     },
     
@@ -256,33 +316,8 @@ const app = {
     
     async loadTechnicianTickets(status = '') {
         const result = await this.api('technician-tickets' + (status ? '&status=' + status : ''));
-        const container = document.getElementById('tech-tickets-list');
-        
-        if (result.success && result.data.length > 0) {
-            container.innerHTML = result.data.map(ticket => `
-                <div class="list-item" onclick="app.showTicketDetail(${ticket.id})">
-                    <div class="list-item-header">
-                        <div>
-                            <h6 class="list-item-title">${ticket.subject}</h6>
-                            <p class="list-item-subtitle">${ticket.ticket_number} - ${ticket.customer_name || 'Unknown'}</p>
-                        </div>
-                        <span class="badge ${this.getStatusBadge(ticket.status)} badge-status">
-                            ${ticket.status}
-                        </span>
-                    </div>
-                    <div class="list-item-meta">
-                        <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
-                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="bi bi-ticket"></i>
-                    <p>No tickets assigned</p>
-                </div>
-            `;
+        if (result.success) {
+            this.renderTickets(result.data);
         }
     },
     
