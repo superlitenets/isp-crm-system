@@ -836,15 +836,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'save_mpesa_settings':
                 try {
                     $mpesa = new \App\Mpesa();
-                    $mpesa->saveConfig('mpesa_environment', $_POST['mpesa_environment'] ?? 'sandbox');
-                    $mpesa->saveConfig('mpesa_shortcode', $_POST['mpesa_shortcode'] ?? '');
-                    $mpesa->saveConfig('mpesa_consumer_key', $_POST['mpesa_consumer_key'] ?? '');
-                    $mpesa->saveConfig('mpesa_consumer_secret', $_POST['mpesa_consumer_secret'] ?? '');
-                    $mpesa->saveConfig('mpesa_passkey', $_POST['mpesa_passkey'] ?? '');
-                    $mpesa->saveConfig('mpesa_callback_url', $_POST['mpesa_callback_url'] ?? '');
-                    $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '');
-                    $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '');
-                    $message = 'M-Pesa settings saved successfully!';
+                    $savedCount = 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_environment', $_POST['mpesa_environment'] ?? 'sandbox') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_shortcode', $_POST['mpesa_shortcode'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_consumer_key', $_POST['mpesa_consumer_key'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_consumer_secret', $_POST['mpesa_consumer_secret'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_passkey', $_POST['mpesa_passkey'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_callback_url', $_POST['mpesa_callback_url'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '') ? 1 : 0;
+                    $savedCount += $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '') ? 1 : 0;
+                    $message = "M-Pesa settings saved successfully! ($savedCount/8 settings saved)";
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
