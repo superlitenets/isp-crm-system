@@ -120,11 +120,19 @@ class SMSGateway {
             $headers = [];
 
             if ($this->provider === 'advanta') {
+                // Format phone for Advanta (Kenya): 0701234567 -> 254701234567
+                $mobile = preg_replace('/[^0-9]/', '', $to);
+                if (substr($mobile, 0, 1) === '0') {
+                    $mobile = '254' . substr($mobile, 1);
+                } elseif (substr($mobile, 0, 3) !== '254') {
+                    $mobile = '254' . $mobile;
+                }
+                
                 $data = [
                     'apikey' => $this->apiKey,
                     'partnerID' => $this->partnerId,
                     'shortcode' => $this->senderId,
-                    'mobile' => $to,
+                    'mobile' => $mobile,
                     'message' => $message
                 ];
                 $headers[] = 'Content-Type: application/json';
