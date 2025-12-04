@@ -149,15 +149,13 @@ class SMSGateway {
 
             if ($this->provider === 'advanta') {
                 $data = [
-                    'partnerID' => $this->partnerId,
                     'apikey' => $this->apiKey,
-                    'pass_type' => 'plain',
+                    'partnerID' => $this->partnerId,
                     'shortcode' => $this->senderId,
                     'mobile' => $to,
                     'message' => $message
                 ];
                 $headers[] = 'Content-Type: application/json';
-                $headers[] = 'Accept: application/json';
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 curl_setopt($ch, CURLOPT_POST, true);
             } elseif (strpos($this->apiUrl, 'twilio.com') !== false) {
