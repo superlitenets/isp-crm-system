@@ -46,26 +46,28 @@
         }
         
         .navbar {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             padding: 1rem 0;
             position: fixed;
             width: 100%;
             top: 0;
             z-index: 1000;
             transition: all 0.4s ease;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
         }
         
         .navbar.scrolled {
-            background: rgba(11, 20, 38, 0.98);
+            background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(20px);
-            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 30px rgba(0,0,0,0.1);
             padding: 0.75rem 0;
         }
         
         .navbar-brand {
             font-weight: 800;
             font-size: 1.75rem;
-            color: white !important;
+            color: var(--gray-900) !important;
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -82,7 +84,7 @@
         
         .nav-link {
             font-weight: 500;
-            color: rgba(255,255,255,0.85) !important;
+            color: var(--gray-700) !important;
             padding: 0.5rem 1.25rem !important;
             transition: all 0.3s ease;
             position: relative;
@@ -101,7 +103,7 @@
         }
         
         .nav-link:hover {
-            color: white !important;
+            color: var(--primary) !important;
         }
         
         .nav-link:hover::after {
@@ -124,17 +126,34 @@
         }
         
         .btn-outline-light {
-            border: 2px solid rgba(255,255,255,0.5);
+            border: 2px solid var(--primary);
+            color: var(--primary);
             padding: 0.875rem 2rem;
             font-weight: 600;
             border-radius: 50px;
-            backdrop-filter: blur(10px);
+            background: transparent;
         }
         
         .btn-outline-light:hover {
-            background: white;
-            border-color: white;
-            color: var(--dark);
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-secondary-outline {
+            border: 2px solid var(--gray-800);
+            color: var(--gray-800);
+            padding: 0.875rem 2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            background: transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary-outline:hover {
+            background: var(--gray-800);
+            border-color: var(--gray-800);
+            color: white;
         }
         
         .hero {
@@ -143,7 +162,7 @@
             align-items: center;
             position: relative;
             overflow: hidden;
-            background: var(--dark);
+            background: linear-gradient(135deg, #f8faff 0%, #e8f4ff 50%, #dbeafe 100%);
         }
         
         .hero-bg {
@@ -153,8 +172,8 @@
             right: 0;
             bottom: 0;
             background: 
-                linear-gradient(135deg, rgba(11, 20, 38, 0.95) 0%, rgba(21, 34, 56, 0.9) 50%, rgba(0, 102, 255, 0.3) 100%),
-                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+                linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(230, 240, 255, 0.8) 50%, rgba(0, 102, 255, 0.1) 100%),
+                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(0,102,255,0.05)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
             background-size: cover, 100px 100px;
         }
         
@@ -170,14 +189,14 @@
         .hero-shape {
             position: absolute;
             border-radius: 50%;
-            opacity: 0.1;
+            opacity: 0.15;
             animation: float 20s ease-in-out infinite;
         }
         
         .hero-shape-1 {
             width: 600px;
             height: 600px;
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), #6366F1);
             top: -200px;
             right: -200px;
             animation-delay: 0s;
@@ -186,7 +205,7 @@
         .hero-shape-2 {
             width: 400px;
             height: 400px;
-            background: var(--secondary);
+            background: linear-gradient(135deg, var(--accent), #00D9A5);
             bottom: -100px;
             left: -100px;
             animation-delay: -5s;
@@ -195,7 +214,7 @@
         .hero-shape-3 {
             width: 300px;
             height: 300px;
-            background: var(--accent);
+            background: linear-gradient(135deg, var(--secondary), #FF8F6B);
             top: 50%;
             left: 50%;
             animation-delay: -10s;
@@ -237,7 +256,7 @@
         .hero-title {
             font-size: 4.5rem;
             font-weight: 800;
-            color: white;
+            color: var(--gray-900);
             line-height: 1.1;
             margin-bottom: 1.5rem;
         }
@@ -258,7 +277,7 @@
         
         .hero-description {
             font-size: 1.25rem;
-            color: var(--gray-400);
+            color: var(--gray-600);
             line-height: 1.8;
             margin-bottom: 2.5rem;
             max-width: 540px;
@@ -281,11 +300,11 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            color: rgba(255,255,255,0.7);
+            color: var(--gray-700);
         }
         
         .hero-feature i {
-            color: var(--accent);
+            color: var(--primary);
             font-size: 1.25rem;
         }
         
@@ -295,14 +314,15 @@
         }
         
         .speed-meter {
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.9);
             backdrop-filter: blur(30px);
             border-radius: 30px;
             padding: 3rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(0,102,255,0.1);
             text-align: center;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,102,255,0.1);
         }
         
         .speed-meter::before {
@@ -312,7 +332,7 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: conic-gradient(from 0deg, transparent, rgba(0, 102, 255, 0.1), transparent);
+            background: conic-gradient(from 0deg, transparent, rgba(0, 102, 255, 0.05), transparent);
             animation: rotate 10s linear infinite;
         }
         
@@ -344,14 +364,14 @@
             position: absolute;
             width: 180px;
             height: 180px;
-            background: var(--dark);
+            background: white;
             border-radius: 50%;
         }
         
         .speed-value {
             position: relative;
             z-index: 1;
-            color: white;
+            color: var(--gray-900);
             animation: spin-reverse 20s linear infinite;
         }
         
@@ -584,12 +604,12 @@
         .speed-stat-value {
             font-size: 1.5rem;
             font-weight: 700;
-            color: white;
+            color: var(--gray-900);
         }
         
         .speed-stat-label {
             font-size: 0.75rem;
-            color: var(--gray-400);
+            color: var(--gray-600);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -1151,15 +1171,15 @@
         }
         
         footer {
-            background: var(--dark);
-            color: white;
+            background: linear-gradient(180deg, var(--gray-100) 0%, #f0f4ff 100%);
+            color: var(--gray-900);
             padding: 5rem 0 2rem;
         }
         
         .footer-brand {
             font-size: 1.75rem;
             font-weight: 800;
-            color: white;
+            color: var(--gray-900);
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -1174,7 +1194,7 @@
         }
         
         .footer-desc {
-            color: var(--gray-400);
+            color: var(--gray-600);
             margin-bottom: 1.5rem;
             max-width: 350px;
             line-height: 1.8;
@@ -1183,7 +1203,7 @@
         .footer-title {
             font-size: 1.125rem;
             font-weight: 700;
-            color: white;
+            color: var(--gray-900);
             margin-bottom: 1.5rem;
             position: relative;
             padding-bottom: 0.75rem;
@@ -1211,7 +1231,7 @@
         }
         
         .footer-links a {
-            color: var(--gray-400);
+            color: var(--gray-600);
             text-decoration: none;
             transition: all 0.3s ease;
             display: inline-flex;
@@ -1220,7 +1240,7 @@
         }
         
         .footer-links a:hover {
-            color: white;
+            color: var(--primary);
             padding-left: 5px;
         }
         
@@ -1228,7 +1248,7 @@
             display: flex;
             gap: 1rem;
             margin-bottom: 1rem;
-            color: var(--gray-400);
+            color: var(--gray-600);
         }
         
         .footer-contact-item i {
@@ -1238,7 +1258,7 @@
         }
         
         .footer-bottom {
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid var(--gray-200);
             margin-top: 4rem;
             padding-top: 2rem;
             display: flex;
@@ -1258,13 +1278,13 @@
         }
         
         .footer-bottom-links a {
-            color: var(--gray-400);
+            color: var(--gray-600);
             text-decoration: none;
             transition: color 0.3s ease;
         }
         
         .footer-bottom-links a:hover {
-            color: white;
+            color: var(--primary);
         }
         
         .whatsapp-float {
@@ -1390,7 +1410,7 @@
                             <a href="#packages" class="btn btn-primary btn-lg">
                                 <i class="bi bi-arrow-right-circle me-2"></i>View Packages
                             </a>
-                            <a href="?page=order" class="btn btn-outline-light btn-lg">
+                            <a href="?page=order" class="btn btn-secondary-outline btn-lg">
                                 <i class="bi bi-telephone me-2"></i>Order Now
                             </a>
                         </div>
