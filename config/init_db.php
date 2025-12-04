@@ -700,6 +700,35 @@ function runMigrations(PDO $db): void {
                 event_type VARCHAR(50) NOT NULL,
                 details TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'hr_notification_templates' => "
+            CREATE TABLE IF NOT EXISTS hr_notification_templates (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                category VARCHAR(50) DEFAULT 'attendance',
+                event_type VARCHAR(50) NOT NULL,
+                subject VARCHAR(200),
+                sms_template TEXT,
+                email_template TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                send_sms BOOLEAN DEFAULT TRUE,
+                send_email BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'attendance_notification_logs' => "
+            CREATE TABLE IF NOT EXISTS attendance_notification_logs (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                notification_template_id INTEGER REFERENCES hr_notification_templates(id) ON DELETE SET NULL,
+                notification_type VARCHAR(50) NOT NULL,
+                recipient_phone VARCHAR(20),
+                recipient_email VARCHAR(100),
+                message_content TEXT,
+                status VARCHAR(20) DEFAULT 'pending',
+                error_message TEXT,
+                sent_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
