@@ -1,12 +1,17 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Integrated Users with Employees
+  - Users and employees are now unified: assign system roles when adding employees
+  - HR employee form now includes role/permissions selection
+  - Settings renamed to "Roles & Permissions" (users managed through HR)
+  - Employee::createUserAccount() and updateUserRole() handle role assignment
 - **December 2024**: Added Flexible Roles & Permissions System
   - Database tables: `roles`, `permissions`, `role_permissions`
   - Default roles: Administrator, Manager, Technician, Salesperson, Viewer
   - Granular permissions by category: customers, tickets, hr, inventory, orders, payments, settings, users, reports
   - Auth class methods: `can()`, `canAny()`, `canAll()`, `requirePermission()`
-  - Users & Roles management UI in Settings
+  - Roles & Permissions management UI in Settings
 - **December 2024**: Added Mobile PWA for salespersons and technicians
   - Accessible at `/mobile/` - installable on Android devices
   - Salesperson features: orders, commissions, leads tracking
