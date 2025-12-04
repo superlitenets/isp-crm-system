@@ -471,10 +471,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try {
                         $employee->create($_POST);
-                        if (!empty($_POST['user_id'])) {
-                            $empId = (int)Database::getConnection()->lastInsertId();
-                            $employee->linkToUser($empId, (int)$_POST['user_id']);
-                        }
                         $message = 'Employee added successfully!';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
@@ -496,9 +492,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try {
                         $employee->update((int)$_POST['id'], $_POST);
-                        if (isset($_POST['user_id'])) {
-                            $employee->linkToUser((int)$_POST['id'], (int)$_POST['user_id'] ?: null);
-                        }
                         $message = 'Employee updated successfully!';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
