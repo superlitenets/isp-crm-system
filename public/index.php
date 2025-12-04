@@ -28,6 +28,8 @@ require_once __DIR__ . '/../src/LateDeductionCalculator.php';
 require_once __DIR__ . '/../src/Salesperson.php';
 require_once __DIR__ . '/../src/Role.php';
 require_once __DIR__ . '/../src/SLA.php';
+require_once __DIR__ . '/../src/Order.php';
+require_once __DIR__ . '/../src/Mpesa.php';
 
 initializeDatabase();
 
