@@ -88,7 +88,7 @@ if ($action === 'edit_template' && $id) {
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'users' ? 'active' : '' ?>" href="?page=settings&subpage=users">
-            <i class="bi bi-people"></i> Users & Roles
+            <i class="bi bi-shield-lock"></i> Roles & Permissions
         </a>
     </li>
 </ul>
@@ -2566,13 +2566,17 @@ if ($action === 'edit_user' && $id) {
     <div class="col-md-6 mb-4">
         <div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-people"></i> Users</h5>
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#userModal" onclick="resetUserForm()">
-                    <i class="bi bi-plus-lg"></i> Add User
-                </button>
+                <h5 class="mb-0"><i class="bi bi-people"></i> System Users</h5>
+                <a href="?page=hr&action=create_employee" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Add Employee
+                </a>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <div class="alert alert-info m-3 mb-2">
+                    <i class="bi bi-info-circle"></i> Users are managed through <a href="?page=hr&subpage=employees" class="alert-link">HR &gt; Employees</a>. 
+                    When adding an employee, you can assign their system role and permissions.
+                </div>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover mb-0">
                         <thead class="table-light sticky-top">
                             <tr>
