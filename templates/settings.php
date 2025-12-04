@@ -86,6 +86,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-phone"></i> Mobile App
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'users' ? 'active' : '' ?>" href="?page=settings&subpage=users">
+            <i class="bi bi-people"></i> Users & Roles
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -2473,5 +2478,332 @@ document.getElementById('commissionType').addEventListener('change', function() 
         </div>
     </div>
 </div>
+
+<?php elseif ($subpage === 'users'): ?>
+
+<?php
+$roleManager = new \App\Role($dbConn);
+$allRoles = $roleManager->getAllRoles();
+$allPermissions = $roleManager->getPermissionsByCategory();
+$allUsers = $roleManager->getAllUsers();
+
+$editRole = null;
+$editRolePermissions = [];
+if ($action === 'edit_role' && $id) {
+    $editRole = $roleManager->getRole((int)$id);
+    $editRolePermissions = $roleManager->getRolePermissionIds((int)$id);
+}
+
+$editUser = null;
+if ($action === 'edit_user' && $id) {
+    $editUser = $roleManager->getUser((int)$id);
+}
+?>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Roles</h5>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#roleModal" onclick="resetRoleForm()">
+                    <i class="bi bi-plus-lg"></i> Add Role
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Role</th>
+                                <th class="text-center">Users</th>
+                                <th class="text-center">Permissions</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allRoles as $role): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($role['display_name']) ?></strong>
+                                    <?php if ($role['is_system']): ?>
+                                    <span class="badge bg-secondary ms-1">System</span>
+                                    <?php endif; ?>
+                                    <?php if ($role['description']): ?>
+                                    <br><small class="text-muted"><?= htmlspecialchars($role['description']) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-info"><?= $role['user_count'] ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary"><?= $role['permission_count'] ?></span>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            onclick="editRole(<?= htmlspecialchars(json_encode($role)) ?>, <?= htmlspecialchars(json_encode($roleManager->getRolePermissionIds($role['id']))) ?>)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <?php if (!$role['is_system']): ?>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this role?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_role">
+                                        <input type="hidden" name="role_id" value="<?= $role['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Users</h5>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#userModal" onclick="resetUserForm()">
+                    <i class="bi bi-plus-lg"></i> Add User
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allUsers as $user): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($user['name']) ?></strong>
+                                    <br><small class="text-muted"><?= htmlspecialchars($user['email']) ?></small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<?= $user['role'] === 'admin' ? 'danger' : ($user['role'] === 'manager' ? 'warning' : 'secondary') ?>">
+                                        <?= htmlspecialchars($user['role_display_name'] ?? ucfirst($user['role'])) ?>
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <?php if ($user['id'] != \App\Auth::userId()): ?>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this user?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_user">
+                                        <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="roleForm">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" id="roleAction" value="create_role">
+                <input type="hidden" name="role_id" id="editRoleId" value="">
+                
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roleModalTitle"><i class="bi bi-shield-plus"></i> Add Role</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Role Name</label>
+                        <input type="text" class="form-control" name="display_name" id="roleDisplayName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="roleDescription" rows="2"></textarea>
+                    </div>
+                    
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-key"></i> Permissions</h6>
+                    
+                    <div class="row">
+                        <?php foreach ($allPermissions as $category => $perms): ?>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header bg-light py-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input category-check" type="checkbox" 
+                                               id="cat_<?= $category ?>" data-category="<?= $category ?>"
+                                               onchange="toggleCategory('<?= $category ?>')">
+                                        <label class="form-check-label fw-bold" for="cat_<?= $category ?>">
+                                            <?= ucfirst($category) ?>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="card-body py-2">
+                                    <?php foreach ($perms as $perm): ?>
+                                    <div class="form-check">
+                                        <input class="form-check-input perm-check perm-<?= $category ?>" 
+                                               type="checkbox" name="permissions[]" 
+                                               value="<?= $perm['id'] ?>" id="perm_<?= $perm['id'] ?>"
+                                               onchange="updateCategoryCheck('<?= $category ?>')">
+                                        <label class="form-check-label small" for="perm_<?= $perm['id'] ?>">
+                                            <?= htmlspecialchars($perm['display_name']) ?>
+                                        </label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Role</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="userForm">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" id="userAction" value="create_user">
+                <input type="hidden" name="user_id" id="editUserId" value="">
+                
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userModalTitle"><i class="bi bi-person-plus"></i> Add User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" id="userName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" id="userEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" name="phone" id="userPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" name="role_id" id="userRoleId" required>
+                            <?php foreach ($allRoles as $role): ?>
+                            <option value="<?= $role['id'] ?>"><?= htmlspecialchars($role['display_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password <span id="passwordHint" class="text-muted small">(required)</span></label>
+                        <input type="password" class="form-control" name="password" id="userPassword">
+                        <small class="text-muted">Minimum 6 characters</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetRoleForm() {
+    document.getElementById('roleAction').value = 'create_role';
+    document.getElementById('editRoleId').value = '';
+    document.getElementById('roleDisplayName').value = '';
+    document.getElementById('roleDescription').value = '';
+    document.getElementById('roleModalTitle').innerHTML = '<i class="bi bi-shield-plus"></i> Add Role';
+    document.querySelectorAll('.perm-check').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.category-check').forEach(cb => cb.checked = false);
+}
+
+function editRole(role, permissionIds) {
+    document.getElementById('roleAction').value = 'update_role';
+    document.getElementById('editRoleId').value = role.id;
+    document.getElementById('roleDisplayName').value = role.display_name;
+    document.getElementById('roleDescription').value = role.description || '';
+    document.getElementById('roleModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Role';
+    
+    document.querySelectorAll('.perm-check').forEach(cb => {
+        cb.checked = permissionIds.includes(parseInt(cb.value));
+    });
+    
+    document.querySelectorAll('.category-check').forEach(cb => {
+        updateCategoryCheck(cb.dataset.category);
+    });
+    
+    new bootstrap.Modal(document.getElementById('roleModal')).show();
+}
+
+function toggleCategory(category) {
+    const catCheck = document.getElementById('cat_' + category);
+    document.querySelectorAll('.perm-' + category).forEach(cb => {
+        cb.checked = catCheck.checked;
+    });
+}
+
+function updateCategoryCheck(category) {
+    const perms = document.querySelectorAll('.perm-' + category);
+    const checked = document.querySelectorAll('.perm-' + category + ':checked');
+    const catCheck = document.getElementById('cat_' + category);
+    catCheck.checked = perms.length === checked.length;
+    catCheck.indeterminate = checked.length > 0 && checked.length < perms.length;
+}
+
+function resetUserForm() {
+    document.getElementById('userAction').value = 'create_user';
+    document.getElementById('editUserId').value = '';
+    document.getElementById('userName').value = '';
+    document.getElementById('userEmail').value = '';
+    document.getElementById('userPhone').value = '';
+    document.getElementById('userRoleId').value = '';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userPassword').required = true;
+    document.getElementById('passwordHint').textContent = '(required)';
+    document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-plus"></i> Add User';
+}
+
+function editUser(user) {
+    document.getElementById('userAction').value = 'update_user';
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('userName').value = user.name;
+    document.getElementById('userEmail').value = user.email;
+    document.getElementById('userPhone').value = user.phone || '';
+    document.getElementById('userRoleId').value = user.role_id || '';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userPassword').required = false;
+    document.getElementById('passwordHint').textContent = '(leave blank to keep current)';
+    document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit User';
+    
+    new bootstrap.Modal(document.getElementById('userModal')).show();
+}
+</script>
 
 <?php endif; ?>

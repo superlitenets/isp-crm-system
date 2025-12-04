@@ -1277,6 +1277,143 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+
+            case 'create_role':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can create roles.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        $roleId = $roleManager->createRole($_POST);
+                        if (!empty($_POST['permissions'])) {
+                            $roleManager->setRolePermissions($roleId, $_POST['permissions']);
+                        }
+                        $message = 'Role created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating role: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_role':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update roles.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        $roleId = (int)($_POST['role_id'] ?? 0);
+                        $roleManager->updateRole($roleId, $_POST);
+                        $roleManager->setRolePermissions($roleId, $_POST['permissions'] ?? []);
+                        $message = 'Role updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating role: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_role':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete roles.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        $roleId = (int)($_POST['role_id'] ?? 0);
+                        $role = $roleManager->getRole($roleId);
+                        if ($role && $role['is_system']) {
+                            $message = 'Cannot delete system roles.';
+                            $messageType = 'danger';
+                        } else {
+                            $roleManager->deleteRole($roleId);
+                            $message = 'Role deleted successfully!';
+                            $messageType = 'success';
+                            \App\Auth::regenerateToken();
+                        }
+                    } catch (Exception $e) {
+                        $message = 'Error deleting role: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'create_user':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can create users.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        if (strlen($_POST['password'] ?? '') < 6) {
+                            throw new Exception('Password must be at least 6 characters.');
+                        }
+                        $roleManager->createUser($_POST);
+                        $message = 'User created successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error creating user: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'update_user':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can update users.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        $userId = (int)($_POST['user_id'] ?? 0);
+                        if (!empty($_POST['password']) && strlen($_POST['password']) < 6) {
+                            throw new Exception('Password must be at least 6 characters.');
+                        }
+                        $roleManager->updateUser($userId, $_POST);
+                        $message = 'User updated successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error updating user: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'delete_user':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can delete users.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        require_once __DIR__ . '/../src/Role.php';
+                        $roleManager = new \App\Role($db);
+                        $userId = (int)($_POST['user_id'] ?? 0);
+                        if ($userId === \App\Auth::userId()) {
+                            throw new Exception('You cannot delete your own account.');
+                        }
+                        $roleManager->deleteUser($userId);
+                        $message = 'User deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting user: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
         }
     }
 }
