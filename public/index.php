@@ -150,6 +150,7 @@ if ($page === 'landing' || $isHomepage) {
     $packages = $settingsObj->getActivePackagesForLanding();
     $company = $settingsObj->getCompanyInfo();
     $landingSettings = $settingsObj->getLandingPageSettings();
+    $contactSettings = $settingsObj->getContactSettings();
     include __DIR__ . '/../templates/landing.php';
     exit;
 }
