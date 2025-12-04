@@ -833,6 +833,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_contact_settings':
+                try {
+                    $settings->saveContactSettings($_POST);
+                    \App\Settings::clearCache();
+                    $message = 'Contact settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving contact settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_mpesa_settings':
                 try {
                     $mpesa = new \App\Mpesa();

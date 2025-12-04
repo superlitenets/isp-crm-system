@@ -72,6 +72,11 @@ if ($action === 'edit_template' && $id) {
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'contact' ? 'active' : '' ?>" href="?page=settings&subpage=contact">
+            <i class="bi bi-telephone"></i> Contact Us
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link <?= $subpage === 'mpesa' ? 'active' : '' ?>" href="?page=settings&subpage=mpesa">
             <i class="bi bi-phone"></i> M-Pesa
         </a>
@@ -1999,6 +2004,238 @@ function copyLandingUrl() {
     alert('URL copied to clipboard!');
 }
 </script>
+
+<?php elseif ($subpage === 'contact'): ?>
+<?php $contactSettings = $settings->getContactSettings(); ?>
+
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+    <input type="hidden" name="action" value="save_contact_settings">
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-telephone"></i> Contact Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Primary Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" class="form-control" name="contact_phone" 
+                                       value="<?= htmlspecialchars($contactSettings['contact_phone']) ?>"
+                                       placeholder="+254 700 000 000">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Secondary Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" class="form-control" name="contact_phone_2" 
+                                       value="<?= htmlspecialchars($contactSettings['contact_phone_2']) ?>"
+                                       placeholder="+254 700 000 001">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">General Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control" name="contact_email" 
+                                       value="<?= htmlspecialchars($contactSettings['contact_email']) ?>"
+                                       placeholder="info@company.com">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Support Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-headset"></i></span>
+                                <input type="email" class="form-control" name="contact_email_support" 
+                                       value="<?= htmlspecialchars($contactSettings['contact_email_support']) ?>"
+                                       placeholder="support@company.com">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">WhatsApp Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-whatsapp"></i></span>
+                                <input type="tel" class="form-control" name="contact_whatsapp" 
+                                       value="<?= htmlspecialchars($contactSettings['contact_whatsapp']) ?>"
+                                       placeholder="+254 700 000 000">
+                            </div>
+                            <div class="form-text">Include country code for WhatsApp link to work</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Street Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                            <input type="text" class="form-control" name="contact_address" 
+                                   value="<?= htmlspecialchars($contactSettings['contact_address']) ?>"
+                                   placeholder="123 Main Street, Building Name">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="contact_city" 
+                                   value="<?= htmlspecialchars($contactSettings['contact_city']) ?>"
+                                   placeholder="Nairobi">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Country</label>
+                            <input type="text" class="form-control" name="contact_country" 
+                                   value="<?= htmlspecialchars($contactSettings['contact_country']) ?>"
+                                   placeholder="Kenya">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-clock"></i> Business Hours</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Working Days</label>
+                            <input type="text" class="form-control" name="working_days" 
+                                   value="<?= htmlspecialchars($contactSettings['working_days']) ?>"
+                                   placeholder="Monday - Friday">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Working Hours</label>
+                            <input type="text" class="form-control" name="working_hours" 
+                                   value="<?= htmlspecialchars($contactSettings['working_hours']) ?>"
+                                   placeholder="8:00 AM - 5:00 PM">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Support Hours</label>
+                            <input type="text" class="form-control" name="support_hours" 
+                                   value="<?= htmlspecialchars($contactSettings['support_hours']) ?>"
+                                   placeholder="24/7">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-share"></i> Social Media Links</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-facebook text-primary"></i> Facebook</label>
+                            <input type="url" class="form-control" name="social_facebook" 
+                                   value="<?= htmlspecialchars($contactSettings['social_facebook']) ?>"
+                                   placeholder="https://facebook.com/yourpage">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-twitter-x"></i> Twitter / X</label>
+                            <input type="url" class="form-control" name="social_twitter" 
+                                   value="<?= htmlspecialchars($contactSettings['social_twitter']) ?>"
+                                   placeholder="https://twitter.com/yourhandle">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-instagram text-danger"></i> Instagram</label>
+                            <input type="url" class="form-control" name="social_instagram" 
+                                   value="<?= htmlspecialchars($contactSettings['social_instagram']) ?>"
+                                   placeholder="https://instagram.com/yourpage">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-linkedin text-primary"></i> LinkedIn</label>
+                            <input type="url" class="form-control" name="social_linkedin" 
+                                   value="<?= htmlspecialchars($contactSettings['social_linkedin']) ?>"
+                                   placeholder="https://linkedin.com/company/yourcompany">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-youtube text-danger"></i> YouTube</label>
+                            <input type="url" class="form-control" name="social_youtube" 
+                                   value="<?= htmlspecialchars($contactSettings['social_youtube']) ?>"
+                                   placeholder="https://youtube.com/yourchannel">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="bi bi-tiktok"></i> TikTok</label>
+                            <input type="url" class="form-control" name="social_tiktok" 
+                                   value="<?= htmlspecialchars($contactSettings['social_tiktok']) ?>"
+                                   placeholder="https://tiktok.com/@yourhandle">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-map"></i> Map Location</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Google Maps Embed URL</label>
+                        <input type="url" class="form-control" name="map_embed_url" 
+                               value="<?= htmlspecialchars($contactSettings['map_embed_url']) ?>"
+                               placeholder="https://www.google.com/maps/embed?pb=...">
+                        <div class="form-text">
+                            Go to Google Maps, find your location, click "Share" > "Embed a map" and paste the URL here.
+                        </div>
+                    </div>
+                    <?php if (!empty($contactSettings['map_embed_url'])): ?>
+                    <div class="ratio ratio-16x9 mt-3">
+                        <iframe src="<?= htmlspecialchars($contactSettings['map_embed_url']) ?>" 
+                                style="border:0; border-radius: 8px;" allowfullscreen="" loading="lazy"></iframe>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-save"></i> Save Contact Settings
+            </button>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Tips</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Include country code for phone numbers</li>
+                        <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Use full URLs for social media links</li>
+                        <li class="mb-2"><i class="bi bi-check-circle text-success"></i> WhatsApp number enables click-to-chat</li>
+                        <li class="mb-2"><i class="bi bi-check-circle text-success"></i> Map embed shows your location on landing page</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-eye"></i> Preview</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-2">These details will appear on your landing page's contact section.</p>
+                    <a href="?page=landing#contact" target="_blank" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-box-arrow-up-right"></i> View Landing Page
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
 
 <?php elseif ($subpage === 'mpesa'): ?>
 <?php
