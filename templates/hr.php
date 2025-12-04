@@ -97,6 +97,40 @@ $allRoles = $roleManager->getAllRoles();
                     <label class="form-label">Hire Date</label>
                     <input type="date" class="form-control" name="hire_date" value="<?= htmlspecialchars($employeeData['hire_date'] ?? '') ?>">
                 </div>
+                <?php if ($action === 'create_employee'): ?>
+                <input type="hidden" name="user_id" value="create_new">
+                
+                <div class="col-12">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-shield-lock"></i> System Login Details</h6>
+                            <p class="text-muted small mb-3">Every employee gets a login account to access the system.</p>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Login Email *</label>
+                                    <input type="email" class="form-control" name="new_user_email" placeholder="user@company.com" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Password *</label>
+                                    <input type="password" class="form-control" name="new_user_password" placeholder="Min 6 characters" required minlength="6">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">System Role *</label>
+                                    <select class="form-select" name="new_user_role_id" required>
+                                        <option value="">Select Role</option>
+                                        <?php foreach ($allRoles as $role): ?>
+                                        <option value="<?= $role['id'] ?>">
+                                            <?= htmlspecialchars($role['display_name']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="text-muted">Determines what the employee can access</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="col-md-4">
                     <label class="form-label">System Access</label>
                     <select class="form-select" name="user_id" id="userAccountSelect">
@@ -126,7 +160,7 @@ $allRoles = $roleManager->getAllRoles();
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">System Role *</label>
-                                    <select class="form-select" name="new_user_role_id" id="roleSelect" required>
+                                    <select class="form-select" name="new_user_role_id" id="roleSelect">
                                         <option value="">Select Role</option>
                                         <?php foreach ($allRoles as $role): ?>
                                         <option value="<?= $role['id'] ?>" <?= ($linkedUserData['role_id'] ?? '') == $role['id'] ? 'selected' : '' ?>>
@@ -146,6 +180,7 @@ $allRoles = $roleManager->getAllRoles();
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 <div class="col-12">
                     <label class="form-label">Address</label>
                     <textarea class="form-control" name="address" rows="2"><?= htmlspecialchars($employeeData['address'] ?? '') ?></textarea>

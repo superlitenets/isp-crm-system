@@ -4,6 +4,7 @@
 - **December 2024**: Integrated Users with Employees
   - Users and employees are now unified: assign system roles when adding employees
   - HR employee form now includes role/permissions selection
+  - When creating an employee, login details (email, password, role) are now required
   - Settings renamed to "Roles & Permissions" (users managed through HR)
   - Employee::createUserAccount() and updateUserRole() handle role assignment
 - **December 2024**: Added Flexible Roles & Permissions System
