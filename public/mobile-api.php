@@ -364,12 +364,23 @@ try {
             
         case 'available-tickets':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            if (!in_array($user['role'] ?? '', $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to view available tickets']);
+                break;
+            }
             $tickets = $api->getAvailableTickets();
             echo json_encode(['success' => true, 'data' => $tickets]);
             break;
             
         case 'claim-ticket':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            if (!in_array($user['role'] ?? '', $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to claim tickets']);
+                break;
+            }
+            
             $ticketId = (int) ($input['ticket_id'] ?? 0);
             if (!$ticketId) {
                 echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
@@ -386,28 +397,47 @@ try {
             
         case 'technician-equipment':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            if (!in_array($user['role'] ?? '', $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to view equipment']);
+                break;
+            }
             $equipment = $api->getTechnicianEquipment($user['id']);
             echo json_encode(['success' => true, 'data' => $equipment]);
             break;
             
         case 'ticket-detail-any':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            $userRole = $user['role'] ?? '';
+            if (!in_array($userRole, $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to view this ticket']);
+                break;
+            }
+            
             $ticketId = (int) ($_GET['id'] ?? 0);
             if (!$ticketId) {
                 echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
                 break;
             }
             
-            $ticket = $api->getTicketDetailsAny($ticketId);
+            $ticket = $api->getTicketDetailsAny($ticketId, $user['id'], $userRole);
             if ($ticket) {
                 echo json_encode(['success' => true, 'data' => $ticket]);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+                echo json_encode(['success' => false, 'error' => 'Ticket not found or not authorized']);
             }
             break;
             
         case 'update-ticket-any':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            $userRole = $user['role'] ?? '';
+            if (!in_array($userRole, $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to update tickets']);
+                break;
+            }
+            
             $ticketId = (int) ($input['ticket_id'] ?? 0);
             $status = $input['status'] ?? '';
             $comment = $input['comment'] ?? null;
@@ -417,12 +447,23 @@ try {
                 break;
             }
             
-            $result = $api->updateTicketStatusAny($ticketId, $user['id'], $status, $comment);
-            echo json_encode(['success' => $result]);
+            $result = $api->updateTicketStatusAny($ticketId, $user['id'], $userRole, $status, $comment);
+            if ($result) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to update this ticket']);
+            }
             break;
             
         case 'add-comment-any':
             requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            $userRole = $user['role'] ?? '';
+            if (!in_array($userRole, $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to add comments']);
+                break;
+            }
+            
             $ticketId = (int) ($input['ticket_id'] ?? 0);
             $comment = $input['comment'] ?? '';
             
@@ -431,8 +472,12 @@ try {
                 break;
             }
             
-            $result = $api->addTicketCommentAny($ticketId, $user['id'], $comment);
-            echo json_encode(['success' => $result]);
+            $result = $api->addTicketCommentAny($ticketId, $user['id'], $userRole, $comment);
+            if ($result) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Not authorized to comment on this ticket']);
+            }
             break;
             
         default:

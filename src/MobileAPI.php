@@ -654,9 +654,10 @@ class MobileAPI {
     public function claimTicket(int $ticketId, int $userId): bool {
         $stmt = $this->db->prepare("
             UPDATE tickets SET assigned_to = ?, updated_at = NOW() 
-            WHERE id = ? AND assigned_to IS NULL
+            WHERE id = ? AND assigned_to IS NULL AND status NOT IN ('resolved', 'closed')
         ");
-        return $stmt->execute([$userId, $ticketId]);
+        $stmt->execute([$userId, $ticketId]);
+        return $stmt->rowCount() > 0;
     }
     
     public function getTicketEquipment(int $ticketId): array {
@@ -689,7 +690,37 @@ class MobileAPI {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function getTicketDetailsAny(int $ticketId): ?array {
+    public function canAccessTicket(int $ticketId, int $userId, string $userRole): bool {
+        if ($userRole === 'admin') {
+            return true;
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT id FROM tickets 
+            WHERE id = ? AND (assigned_to = ? OR assigned_to IS NULL)
+        ");
+        $stmt->execute([$ticketId, $userId]);
+        return $stmt->fetch() !== false;
+    }
+    
+    public function canModifyTicket(int $ticketId, int $userId, string $userRole): bool {
+        if ($userRole === 'admin') {
+            return true;
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT id FROM tickets 
+            WHERE id = ? AND assigned_to = ?
+        ");
+        $stmt->execute([$ticketId, $userId]);
+        return $stmt->fetch() !== false;
+    }
+    
+    public function getTicketDetailsAny(int $ticketId, int $userId, string $userRole): ?array {
+        if (!$this->canAccessTicket($ticketId, $userId, $userRole)) {
+            return null;
+        }
+        
         $stmt = $this->db->prepare("
             SELECT t.*, c.name as customer_name, c.phone as customer_phone, 
                    c.address as customer_address, c.email as customer_email,
@@ -719,7 +750,11 @@ class MobileAPI {
         return $ticket ?: null;
     }
     
-    public function updateTicketStatusAny(int $ticketId, int $userId, string $status, ?string $comment = null): bool {
+    public function updateTicketStatusAny(int $ticketId, int $userId, string $userRole, string $status, ?string $comment = null): bool {
+        if (!$this->canModifyTicket($ticketId, $userId, $userRole)) {
+            return false;
+        }
+        
         $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
         $result = $stmt->execute([$status, $ticketId]);
         
@@ -736,7 +771,11 @@ class MobileAPI {
         return $result;
     }
     
-    public function addTicketCommentAny(int $ticketId, int $userId, string $comment): bool {
+    public function addTicketCommentAny(int $ticketId, int $userId, string $userRole, string $comment): bool {
+        if (!$this->canAccessTicket($ticketId, $userId, $userRole)) {
+            return false;
+        }
+        
         $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
         return $stmt->execute([$ticketId, $userId, $comment]);
     }
