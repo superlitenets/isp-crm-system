@@ -336,8 +336,8 @@ class SLA {
         return $stmt->fetchAll();
     }
     
-    public function getBreachedTickets(): array {
-        $stmt = $this->db->query("
+    public function getBreachedTickets(?int $userId = null): array {
+        $sql = "
             SELECT t.*, c.name as customer_name, u.name as assigned_name,
                    sp.name as sla_policy_name
             FROM tickets t
@@ -346,14 +346,22 @@ class SLA {
             LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
             WHERE (t.sla_response_breached = TRUE OR t.sla_resolution_breached = TRUE)
                 AND t.status NOT IN ('resolved', 'closed')
-            ORDER BY t.created_at DESC
-        ");
+        ";
+        
+        $params = [];
+        if ($userId !== null) {
+            $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params = [$userId, $userId];
+        }
+        
+        $sql .= " ORDER BY t.created_at DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
     
-    public function getAtRiskTickets(): array {
-        $now = date('Y-m-d H:i:s');
-        $stmt = $this->db->prepare("
+    public function getAtRiskTickets(?int $userId = null): array {
+        $sql = "
             SELECT t.*, c.name as customer_name, u.name as assigned_name,
                    sp.name as sla_policy_name, sp.response_time_hours, sp.resolution_time_hours
             FROM tickets t
@@ -367,15 +375,24 @@ class SLA {
                     (t.first_response_at IS NULL AND t.sla_response_due IS NOT NULL AND t.sla_response_due < ?)
                     OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < ?)
                 )
-            ORDER BY COALESCE(t.sla_response_due, t.sla_resolution_due) ASC
-        ");
+        ";
         
         $warningTime = (new \DateTime())->modify('+2 hours')->format('Y-m-d H:i:s');
-        $stmt->execute([$warningTime, $warningTime]);
+        $params = [$warningTime, $warningTime];
+        
+        if ($userId !== null) {
+            $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params[] = $userId;
+            $params[] = $userId;
+        }
+        
+        $sql .= " ORDER BY COALESCE(t.sla_response_due, t.sla_resolution_due) ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
     
-    public function getSLAStatistics(string $period = '30days'): array {
+    public function getSLAStatistics(string $period = '30days', ?int $userId = null): array {
         $startDate = match($period) {
             '7days' => date('Y-m-d', strtotime('-7 days')),
             '30days' => date('Y-m-d', strtotime('-30 days')),
@@ -383,7 +400,7 @@ class SLA {
             default => date('Y-m-d', strtotime('-30 days'))
         };
         
-        $stmt = $this->db->prepare("
+        $sql = "
             SELECT 
                 COUNT(*) as total_tickets,
                 SUM(CASE WHEN sla_policy_id IS NOT NULL THEN 1 ELSE 0 END) as with_sla,
@@ -396,8 +413,17 @@ class SLA {
                          THEN 1 ELSE 0 END) as resolution_met
             FROM tickets
             WHERE created_at >= ?
-        ");
-        $stmt->execute([$startDate]);
+        ";
+        
+        $params = [$startDate];
+        if ($userId !== null) {
+            $sql .= " AND (assigned_to = ? OR created_by = ?)";
+            $params[] = $userId;
+            $params[] = $userId;
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         $stats = $stmt->fetch();
         
         $withSLA = (int)$stats['with_sla'];

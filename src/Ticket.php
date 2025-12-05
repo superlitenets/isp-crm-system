@@ -437,8 +437,8 @@ class Ticket {
         return (int) $stmt->fetchColumn();
     }
 
-    public function getStats(): array {
-        $stmt = $this->db->query("
+    public function getStats(?int $userId = null): array {
+        $sql = "
             SELECT 
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'open') as open,
@@ -448,7 +448,16 @@ class Ticket {
                 COUNT(*) FILTER (WHERE priority = 'critical') as critical,
                 COUNT(*) FILTER (WHERE priority = 'high') as high
             FROM tickets
-        ");
+        ";
+        
+        $params = [];
+        if ($userId !== null) {
+            $sql .= " WHERE (assigned_to = ? OR created_by = ?)";
+            $params = [$userId, $userId];
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch();
     }
 

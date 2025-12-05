@@ -1,6 +1,18 @@
+<?php
+$currentUserId = \App\Auth::user()['id'] ?? null;
+$canViewAllTickets = \App\Auth::can('tickets.view_all') || \App\Auth::isAdmin();
+
+$userFilterId = $canViewAllTickets ? null : $currentUserId;
+$dashboardStats = $ticket->getStats($userFilterId);
+?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-    <span class="text-muted"><?= date('F j, Y') ?></span>
+    <div class="d-flex align-items-center gap-3">
+        <?php if (!$canViewAllTickets): ?>
+            <span class="badge bg-info"><i class="bi bi-person"></i> My Data</span>
+        <?php endif; ?>
+        <span class="text-muted"><?= date('F j, Y') ?></span>
+    </div>
 </div>
 
 <div class="row g-4 mb-4">
@@ -11,7 +23,7 @@
                     <i class="bi bi-ticket"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?= $stats['total'] ?? 0 ?></h3>
+                    <h3 class="mb-0"><?= $dashboardStats['total'] ?? 0 ?></h3>
                     <small class="text-muted">Total Tickets</small>
                 </div>
             </div>
@@ -24,7 +36,7 @@
                     <i class="bi bi-exclamation-circle"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?= $stats['open'] ?? 0 ?></h3>
+                    <h3 class="mb-0"><?= $dashboardStats['open'] ?? 0 ?></h3>
                     <small class="text-muted">Open Tickets</small>
                 </div>
             </div>
@@ -37,7 +49,7 @@
                     <i class="bi bi-arrow-repeat"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?= $stats['in_progress'] ?? 0 ?></h3>
+                    <h3 class="mb-0"><?= $dashboardStats['in_progress'] ?? 0 ?></h3>
                     <small class="text-muted">In Progress</small>
                 </div>
             </div>
@@ -50,7 +62,7 @@
                     <i class="bi bi-check-circle"></i>
                 </div>
                 <div>
-                    <h3 class="mb-0"><?= $stats['resolved'] ?? 0 ?></h3>
+                    <h3 class="mb-0"><?= $dashboardStats['resolved'] ?? 0 ?></h3>
                     <small class="text-muted">Resolved</small>
                 </div>
             </div>
@@ -62,7 +74,7 @@
     <div class="col-md-3">
         <div class="card stat-card border-danger">
             <div class="card-body text-center">
-                <h4 class="text-danger mb-0"><?= $stats['critical'] ?? 0 ?></h4>
+                <h4 class="text-danger mb-0"><?= $dashboardStats['critical'] ?? 0 ?></h4>
                 <small class="text-muted">Critical Priority</small>
             </div>
         </div>
@@ -70,7 +82,7 @@
     <div class="col-md-3">
         <div class="card stat-card border-warning">
             <div class="card-body text-center">
-                <h4 class="text-warning mb-0"><?= $stats['high'] ?? 0 ?></h4>
+                <h4 class="text-warning mb-0"><?= $dashboardStats['high'] ?? 0 ?></h4>
                 <small class="text-muted">High Priority</small>
             </div>
         </div>
@@ -92,9 +104,9 @@
 
 <?php
 $sla = new \App\SLA();
-$slaStats = $sla->getSLAStatistics('30days');
-$breachedTickets = $sla->getBreachedTickets();
-$atRiskTickets = $sla->getAtRiskTickets();
+$slaStats = $sla->getSLAStatistics('30days', $userFilterId);
+$breachedTickets = $sla->getBreachedTickets($userFilterId);
+$atRiskTickets = $sla->getAtRiskTickets($userFilterId);
 ?>
 <div class="row g-4 mb-4">
     <div class="col-md-3">
@@ -172,7 +184,8 @@ $atRiskTickets = $sla->getAtRiskTickets();
                         </thead>
                         <tbody>
                             <?php
-                            $recentTickets = $ticket->getAll([], 5);
+                            $ticketFilters = $canViewAllTickets ? [] : ['user_id' => $currentUserId];
+                            $recentTickets = $ticket->getAll($ticketFilters, 5);
                             foreach ($recentTickets as $t):
                             ?>
                             <tr>
@@ -206,6 +219,7 @@ $atRiskTickets = $sla->getAtRiskTickets();
             </div>
         </div>
     </div>
+    <?php if ($canViewAllTickets): ?>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header bg-white">
@@ -226,4 +240,36 @@ $atRiskTickets = $sla->getAtRiskTickets();
             </div>
         </div>
     </div>
+    <?php else: ?>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">My Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Assigned to me:</span>
+                    <strong><?= $dashboardStats['total'] ?? 0 ?></strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Open:</span>
+                    <span class="badge bg-warning"><?= $dashboardStats['open'] ?? 0 ?></span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>In Progress:</span>
+                    <span class="badge bg-info"><?= $dashboardStats['in_progress'] ?? 0 ?></span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Resolved:</span>
+                    <span class="badge bg-success"><?= $dashboardStats['resolved'] ?? 0 ?></span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span>SLA Breached:</span>
+                    <span class="badge bg-danger"><?= count($breachedTickets) ?></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>

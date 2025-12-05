@@ -1,35 +1,52 @@
 <?php
-$reports = new \App\Reports();
-$activityLog = new \App\ActivityLog();
+try {
+    $reports = new \App\Reports();
+    $activityLog = new \App\ActivityLog();
 
-$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
-$dateTo = $_GET['date_to'] ?? date('Y-m-d');
-$selectedUser = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
-$selectedTab = $_GET['tab'] ?? 'overview';
+    $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+    $dateTo = $_GET['date_to'] ?? date('Y-m-d');
+    $selectedUser = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
+    $selectedTab = $_GET['tab'] ?? 'overview';
 
-$filters = [
-    'date_from' => $dateFrom,
-    'date_to' => $dateTo
-];
+    $filters = [
+        'date_from' => $dateFrom,
+        'date_to' => $dateTo
+    ];
 
-$ticketStats = $reports->getTicketStats($filters);
-$orderStats = $reports->getOrderStats($filters);
-$complaintStats = $reports->getComplaintStats($filters);
-$userSummary = $reports->getUserSummary($filters);
-$ticketsByUser = $reports->getTicketsByUser($filters);
-$ordersBySalesperson = $reports->getOrdersBySalesperson($filters);
-$complaintsByReviewer = $reports->getComplaintsByReviewer($filters);
-$allUsers = $reports->getAllUsers();
+    $ticketStats = $reports->getTicketStats($filters) ?: ['total_tickets' => 0, 'open_tickets' => 0, 'in_progress_tickets' => 0, 'resolved_tickets' => 0, 'sla_breached' => 0, 'avg_resolution_hours' => 0];
+    $orderStats = $reports->getOrderStats($filters) ?: ['total_orders' => 0, 'new_orders' => 0, 'confirmed_orders' => 0, 'completed_orders' => 0, 'paid_orders' => 0, 'total_revenue' => 0];
+    $complaintStats = $reports->getComplaintStats($filters) ?: ['total_complaints' => 0, 'pending_complaints' => 0, 'approved_complaints' => 0, 'rejected_complaints' => 0, 'converted_complaints' => 0];
+    $userSummary = $reports->getUserSummary($filters) ?: [];
+    $ticketsByUser = $reports->getTicketsByUser($filters) ?: [];
+    $ordersBySalesperson = $reports->getOrdersBySalesperson($filters) ?: [];
+    $complaintsByReviewer = $reports->getComplaintsByReviewer($filters) ?: [];
+    $allUsers = $reports->getAllUsers() ?: [];
 
-$activityFilters = [
-    'date_from' => $dateFrom,
-    'date_to' => $dateTo,
-    'limit' => 50
-];
-if ($selectedUser) {
-    $activityFilters['user_id'] = $selectedUser;
+    $activityFilters = [
+        'date_from' => $dateFrom,
+        'date_to' => $dateTo,
+        'limit' => 50
+    ];
+    if ($selectedUser) {
+        $activityFilters['user_id'] = $selectedUser;
+    }
+    $recentActivities = $activityLog->getActivities($activityFilters) ?: [];
+} catch (Exception $e) {
+    error_log("Reports page error: " . $e->getMessage());
+    $ticketStats = ['total_tickets' => 0, 'open_tickets' => 0, 'in_progress_tickets' => 0, 'resolved_tickets' => 0, 'sla_breached' => 0, 'avg_resolution_hours' => 0];
+    $orderStats = ['total_orders' => 0, 'new_orders' => 0, 'confirmed_orders' => 0, 'completed_orders' => 0, 'paid_orders' => 0, 'total_revenue' => 0];
+    $complaintStats = ['total_complaints' => 0, 'pending_complaints' => 0, 'approved_complaints' => 0, 'rejected_complaints' => 0, 'converted_complaints' => 0];
+    $userSummary = [];
+    $ticketsByUser = [];
+    $ordersBySalesperson = [];
+    $complaintsByReviewer = [];
+    $allUsers = [];
+    $recentActivities = [];
+    $dateFrom = date('Y-m-01');
+    $dateTo = date('Y-m-d');
+    $selectedUser = null;
+    $selectedTab = 'overview';
 }
-$recentActivities = $activityLog->getActivities($activityFilters);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
