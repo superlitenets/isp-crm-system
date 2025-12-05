@@ -21,6 +21,10 @@ try {
     $ordersBySalesperson = $reports->getOrdersBySalesperson($filters) ?: [];
     $complaintsByReviewer = $reports->getComplaintsByReviewer($filters) ?: [];
     $allUsers = $reports->getAllUsers() ?: [];
+    
+    $allTickets = $reports->getAllTickets($filters) ?: [];
+    $allOrders = $reports->getAllOrders($filters) ?: [];
+    $allComplaints = $reports->getAllComplaints($filters) ?: [];
 
     $activityFilters = [
         'date_from' => $dateFrom,
@@ -229,14 +233,12 @@ try {
 </div>
 
 <?php elseif ($selectedTab === 'tickets'): ?>
-<div class="card">
+<?php if (!empty($ticketsByUser)): ?>
+<div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-ticket"></i> Tickets by Assigned User</h5>
+        <h5 class="mb-0"><i class="bi bi-people"></i> Tickets by Assigned User</h5>
     </div>
     <div class="card-body">
-        <?php if (empty($ticketsByUser)): ?>
-            <p class="text-muted mb-0">No ticket assignments found for this period.</p>
-        <?php else: ?>
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
@@ -281,19 +283,73 @@ try {
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-ticket"></i> All Tickets (<?= count($allTickets) ?>)</h5>
+    </div>
+    <div class="card-body">
+        <?php if (empty($allTickets)): ?>
+            <p class="text-muted mb-0">No tickets found for this period.</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Ticket #</th>
+                        <th>Subject</th>
+                        <th>Customer</th>
+                        <th>Assigned To</th>
+                        <th class="text-center">Priority</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">SLA</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allTickets as $ticket): ?>
+                    <tr>
+                        <td>
+                            <a href="?page=tickets&action=view&id=<?= $ticket['id'] ?>">
+                                <?= htmlspecialchars($ticket['ticket_number']) ?>
+                            </a>
+                        </td>
+                        <td><?= htmlspecialchars(substr($ticket['subject'], 0, 40)) ?><?= strlen($ticket['subject']) > 40 ? '...' : '' ?></td>
+                        <td><?= htmlspecialchars($ticket['customer_name'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($ticket['assigned_to_name'] ?? '<span class="text-muted">Unassigned</span>') ?></td>
+                        <td class="text-center">
+                            <span class="badge badge-priority-<?= $ticket['priority'] ?>"><?= ucfirst($ticket['priority']) ?></span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge badge-status-<?= $ticket['status'] ?>"><?= ucfirst(str_replace('_', ' ', $ticket['status'])) ?></span>
+                        </td>
+                        <td class="text-center">
+                            <?php if ($ticket['sla_response_breached'] || $ticket['sla_resolution_breached']): ?>
+                                <span class="badge bg-danger">Breached</span>
+                            <?php else: ?>
+                                <span class="badge bg-success">OK</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><small><?= date('M j, Y', strtotime($ticket['created_at'])) ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <?php endif; ?>
     </div>
 </div>
 
 <?php elseif ($selectedTab === 'orders'): ?>
-<div class="card">
+<?php if (!empty($ordersBySalesperson)): ?>
+<div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-cart"></i> Orders by Salesperson</h5>
+        <h5 class="mb-0"><i class="bi bi-people"></i> Orders by Salesperson</h5>
     </div>
     <div class="card-body">
-        <?php if (empty($ordersBySalesperson)): ?>
-            <p class="text-muted mb-0">No salesperson orders found for this period.</p>
-        <?php else: ?>
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
@@ -326,19 +382,86 @@ try {
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cart"></i> All Orders (<?= count($allOrders) ?>)</h5>
+    </div>
+    <div class="card-body">
+        <?php if (empty($allOrders)): ?>
+            <p class="text-muted mb-0">No orders found for this period.</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Package</th>
+                        <th>Salesperson</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Payment</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allOrders as $order): ?>
+                    <tr>
+                        <td>
+                            <a href="?page=orders&action=view&id=<?= $order['id'] ?>">
+                                <?= htmlspecialchars($order['order_number']) ?>
+                            </a>
+                        </td>
+                        <td><?= htmlspecialchars($order['customer_name']) ?></td>
+                        <td><?= htmlspecialchars($order['customer_phone']) ?></td>
+                        <td><?= htmlspecialchars($order['package_name'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($order['salesperson_name'] ?? '-') ?></td>
+                        <td class="text-end">KES <?= number_format($order['amount'] ?? 0) ?></td>
+                        <td class="text-center">
+                            <?php
+                            $statusClass = match($order['order_status']) {
+                                'new' => 'bg-primary',
+                                'confirmed' => 'bg-info',
+                                'completed' => 'bg-success',
+                                'cancelled' => 'bg-danger',
+                                default => 'bg-secondary'
+                            };
+                            ?>
+                            <span class="badge <?= $statusClass ?>"><?= ucfirst($order['order_status']) ?></span>
+                        </td>
+                        <td class="text-center">
+                            <?php
+                            $paymentClass = match($order['payment_status']) {
+                                'paid' => 'bg-success',
+                                'partial' => 'bg-warning',
+                                'pending' => 'bg-secondary',
+                                default => 'bg-secondary'
+                            };
+                            ?>
+                            <span class="badge <?= $paymentClass ?>"><?= ucfirst($order['payment_status']) ?></span>
+                        </td>
+                        <td><small><?= date('M j, Y', strtotime($order['created_at'])) ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <?php endif; ?>
     </div>
 </div>
 
 <?php elseif ($selectedTab === 'complaints'): ?>
-<div class="card">
+<?php if (!empty($complaintsByReviewer)): ?>
+<div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Complaints by Reviewer</h5>
+        <h5 class="mb-0"><i class="bi bi-people"></i> Complaints by Reviewer</h5>
     </div>
     <div class="card-body">
-        <?php if (empty($complaintsByReviewer)): ?>
-            <p class="text-muted mb-0">No complaint reviews found for this period.</p>
-        <?php else: ?>
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
@@ -369,6 +492,61 @@ try {
                             ?>
                             <span class="badge bg-primary"><?= $rate ?>%</span>
                         </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> All Complaints (<?= count($allComplaints) ?>)</h5>
+    </div>
+    <div class="card-body">
+        <?php if (empty($allComplaints)): ?>
+            <p class="text-muted mb-0">No complaints found for this period.</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Complaint #</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Category</th>
+                        <th class="text-center">Status</th>
+                        <th>Reviewed By</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allComplaints as $complaint): ?>
+                    <tr>
+                        <td>
+                            <a href="?page=complaints&action=view&id=<?= $complaint['id'] ?>">
+                                <?= htmlspecialchars($complaint['complaint_number']) ?>
+                            </a>
+                        </td>
+                        <td><?= htmlspecialchars($complaint['customer_name']) ?></td>
+                        <td><?= htmlspecialchars($complaint['customer_phone']) ?></td>
+                        <td><?= htmlspecialchars(ucfirst($complaint['category'] ?? '-')) ?></td>
+                        <td class="text-center">
+                            <?php
+                            $statusClass = match($complaint['status']) {
+                                'pending' => 'bg-warning',
+                                'approved' => 'bg-success',
+                                'rejected' => 'bg-danger',
+                                'converted' => 'bg-info',
+                                default => 'bg-secondary'
+                            };
+                            ?>
+                            <span class="badge <?= $statusClass ?>"><?= ucfirst($complaint['status']) ?></span>
+                        </td>
+                        <td><?= htmlspecialchars($complaint['reviewed_by_name'] ?? '-') ?></td>
+                        <td><small><?= date('M j, Y', strtotime($complaint['created_at'])) ?></small></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

@@ -270,4 +270,109 @@ class Reports {
         $stmt = $this->db->query("SELECT id, name, email FROM users ORDER BY name");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getAllTickets(array $filters = [], int $limit = 50): array {
+        $dateWhere = "";
+        $params = [];
+
+        if (!empty($filters['date_from'])) {
+            $dateWhere .= " AND t.created_at >= ?";
+            $params[] = $filters['date_from'] . ' 00:00:00';
+        }
+        if (!empty($filters['date_to'])) {
+            $dateWhere .= " AND t.created_at <= ?";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params[] = $filters['user_id'];
+            $params[] = $filters['user_id'];
+        }
+
+        $params[] = $limit;
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                t.id, t.ticket_number, t.subject, t.status, t.priority, t.category,
+                t.created_at, t.resolved_at, t.sla_response_breached, t.sla_resolution_breached,
+                c.name as customer_name,
+                u.name as assigned_to_name,
+                cr.name as created_by_name
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN users cr ON t.created_by = cr.id
+            WHERE 1=1 $dateWhere
+            ORDER BY t.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllOrders(array $filters = [], int $limit = 50): array {
+        $dateWhere = "";
+        $params = [];
+
+        if (!empty($filters['date_from'])) {
+            $dateWhere .= " AND o.created_at >= ?";
+            $params[] = $filters['date_from'] . ' 00:00:00';
+        }
+        if (!empty($filters['date_to'])) {
+            $dateWhere .= " AND o.created_at <= ?";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND o.created_by = ?";
+            $params[] = $filters['user_id'];
+        }
+
+        $params[] = $limit;
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                o.id, o.order_number, o.customer_name, o.customer_phone,
+                o.order_status, o.payment_status, o.amount, o.created_at,
+                s.name as salesperson_name,
+                p.name as package_name
+            FROM orders o
+            LEFT JOIN salespersons s ON o.salesperson_id = s.id
+            LEFT JOIN service_packages p ON o.package_id = p.id
+            WHERE 1=1 $dateWhere
+            ORDER BY o.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllComplaints(array $filters = [], int $limit = 50): array {
+        $dateWhere = "";
+        $params = [];
+
+        if (!empty($filters['date_from'])) {
+            $dateWhere .= " AND c.created_at >= ?";
+            $params[] = $filters['date_from'] . ' 00:00:00';
+        }
+        if (!empty($filters['date_to'])) {
+            $dateWhere .= " AND c.created_at <= ?";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+
+        $params[] = $limit;
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                c.id, c.complaint_number, c.customer_name, c.customer_phone,
+                c.category, c.status, c.created_at, c.reviewed_at,
+                u.name as reviewed_by_name
+            FROM complaints c
+            LEFT JOIN users u ON c.reviewed_by = u.id
+            WHERE 1=1 $dateWhere
+            ORDER BY c.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
