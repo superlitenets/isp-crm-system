@@ -2242,6 +2242,8 @@ if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $notes = trim($_POST['review_notes'] ?? '');
                     if (empty($notes)) {
                         $_SESSION['error_message'] = 'Please provide a reason for rejection.';
+                        header('Location: ?page=complaints&action=view&id=' . $complaintId);
+                        exit;
                     } else {
                         $complaintModel->reject($complaintId, $currentUser['id'], $notes);
                         $_SESSION['success_message'] = 'Complaint rejected.';

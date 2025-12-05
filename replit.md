@@ -1,15 +1,27 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added Complaints Module with Approval Workflow
+  - New database table: `complaints` for storing public complaints before ticket conversion
+  - Complaints now go through approval workflow instead of direct ticket creation
+  - Complaint statuses: pending, approved, rejected, converted
+  - Complaints page in admin panel with filtering by status, category, and search
+  - Pending complaints badge in sidebar navigation (yellow warning badge)
+  - Approval workflow: Review → Approve/Reject → Convert to Ticket
+  - Rejection requires mandatory notes explaining the reason
+  - Conversion creates customer (if not exists) and generates ticket with SLA
+  - Can assign ticket to user and/or team during conversion
+  - Priority can be updated before conversion (low, medium, high, critical)
+  - Complaint numbers format: CMP-YYYYMMDD-XXXX
+  - Fixed VPS login issues with environment-aware session cookie settings
 - **December 2024**: Added Mobile Lead Capture and Public Complaint Submission
   - Mobile app: New "New Lead" form for salespeople to capture leads on the go
   - Lead fields: customer name, phone, location, description
   - Leads saved as orders with `lead_source='mobile_lead'` and status 'new'
   - New orders badge in admin sidebar showing count of orders with status='new'
   - Landing page: "Report Issue" button in hero section with complaint form modal
-  - Public complaint submission creates customer (if not exists) and ticket with `source='public'`
+  - Public complaint submission now stores in complaints table for approval
   - Complaint categories: connectivity, speed, billing, equipment, service, other
-  - Auto-generated ticket numbers (CPL-YYYYMMDD-XXXX format)
   - Honeypot spam protection on complaint form
 - **December 2024**: Added Real-Time Biometric Attendance with Late Notifications
   - Database tables: `hr_notification_templates`, `attendance_notification_logs`

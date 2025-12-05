@@ -112,7 +112,11 @@ class Complaint {
         return $stmt->execute([$userId, $notes, $id]);
     }
 
-    public function reject(int $id, int $userId, ?string $notes = null): bool {
+    public function reject(int $id, int $userId, string $notes): bool {
+        if (empty(trim($notes))) {
+            throw new \InvalidArgumentException('Rejection reason is required');
+        }
+        
         $stmt = $this->db->prepare("
             UPDATE complaints 
             SET status = 'rejected', 
