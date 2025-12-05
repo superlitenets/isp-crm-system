@@ -1,5 +1,5 @@
 <?php
-$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+$dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
 $dateTo = $_GET['date_to'] ?? date('Y-m-d');
 $selectedUser = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
 $selectedTab = $_GET['tab'] ?? 'overview';
@@ -12,6 +12,7 @@ $ticketsByUser = [];
 $ordersBySalesperson = [];
 $complaintsByReviewer = [];
 $allUsers = [];
+$allEmployees = [];
 $recentActivities = [];
 $allTickets = [];
 $allOrders = [];
@@ -34,6 +35,7 @@ try {
     $ordersBySalesperson = $reports->getOrdersBySalesperson($filters) ?: [];
     $complaintsByReviewer = $reports->getComplaintsByReviewer($filters) ?: [];
     $allUsers = $reports->getAllUsers() ?: [];
+    $allEmployees = $reports->getAllEmployees() ?: [];
     
     $allTickets = $reports->getAllTickets($filters) ?: [];
     $allOrders = $reports->getAllOrders($filters) ?: [];
@@ -71,14 +73,29 @@ try {
                 <input type="date" class="form-control" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
             </div>
             <div class="col-md-3">
-                <label class="form-label">Filter by User</label>
+                <label class="form-label">Filter by User/Employee</label>
                 <select class="form-select" name="user_id">
-                    <option value="">All Users</option>
-                    <?php foreach ($allUsers as $user): ?>
-                        <option value="<?= $user['id'] ?>" <?= $selectedUser == $user['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($user['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
+                    <option value="">All Users & Employees</option>
+                    <?php if (!empty($allUsers)): ?>
+                    <optgroup label="System Users">
+                        <?php foreach ($allUsers as $user): ?>
+                            <option value="<?= $user['id'] ?>" <?= $selectedUser == $user['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($user['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                    <?php endif; ?>
+                    <?php if (!empty($allEmployees)): ?>
+                    <optgroup label="Employees">
+                        <?php foreach ($allEmployees as $emp): ?>
+                            <?php if ($emp['user_id']): ?>
+                            <option value="<?= $emp['user_id'] ?>" <?= $selectedUser == $emp['user_id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position'] ?? 'Staff') ?>)
+                            </option>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </optgroup>
+                    <?php endif; ?>
                 </select>
             </div>
             <div class="col-md-3">

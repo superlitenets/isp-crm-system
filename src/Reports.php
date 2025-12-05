@@ -272,7 +272,26 @@ class Reports {
     }
 
     public function getAllUsers(): array {
-        $stmt = $this->db->query("SELECT id, name, email FROM users ORDER BY name");
+        $stmt = $this->db->query("
+            SELECT DISTINCT u.id, u.name, u.email, 'user' as source
+            FROM users u
+            UNION
+            SELECT DISTINCT e.user_id as id, e.name, e.email, 'employee' as source
+            FROM employees e
+            WHERE e.user_id IS NOT NULL
+            ORDER BY name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllEmployees(): array {
+        $stmt = $this->db->query("
+            SELECT e.id, e.name, e.email, e.position, e.user_id,
+                   u.name as user_name
+            FROM employees e
+            LEFT JOIN users u ON e.user_id = u.id
+            ORDER BY e.name
+        ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
