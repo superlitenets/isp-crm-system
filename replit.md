@@ -1,6 +1,16 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added Mobile Lead Capture and Public Complaint Submission
+  - Mobile app: New "New Lead" form for salespeople to capture leads on the go
+  - Lead fields: customer name, phone, location, description
+  - Leads saved as orders with `lead_source='mobile_lead'` and status 'new'
+  - New orders badge in admin sidebar showing count of orders with status='new'
+  - Landing page: "Report Issue" button in hero section with complaint form modal
+  - Public complaint submission creates customer (if not exists) and ticket with `source='public'`
+  - Complaint categories: connectivity, speed, billing, equipment, service, other
+  - Auto-generated ticket numbers (CPL-YYYYMMDD-XXXX format)
+  - Honeypot spam protection on complaint form
 - **December 2024**: Added Real-Time Biometric Attendance with Late Notifications
   - Database tables: `hr_notification_templates`, `attendance_notification_logs`
   - Attendance table extended with: `late_minutes`, `source`
