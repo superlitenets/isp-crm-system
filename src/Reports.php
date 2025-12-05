@@ -85,6 +85,11 @@ class Reports {
             $dateWhere .= " AND o.created_at <= ?";
             $params[] = $filters['date_to'] . ' 23:59:59';
         }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND (o.created_by = ? OR o.salesperson_id IN (SELECT id FROM salespersons WHERE user_id = ?))";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
+        }
 
         $stmt = $this->db->prepare("
             SELECT 

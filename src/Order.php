@@ -298,17 +298,27 @@ class Order {
         return $ticketId;
     }
     
-    public function getStats(): array {
-        $stmt = $this->db->query("
+    public function getStats(?int $userId = null): array {
+        $where = "";
+        $params = [];
+        
+        if ($userId !== null) {
+            $where = " WHERE (created_by = ? OR salesperson_id IN (SELECT id FROM salespersons WHERE user_id = ?))";
+            $params = [$userId, $userId];
+        }
+        
+        $stmt = $this->db->prepare("
             SELECT 
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE order_status = 'new') as new_orders,
                 COUNT(*) FILTER (WHERE order_status = 'confirmed') as confirmed,
                 COUNT(*) FILTER (WHERE order_status = 'converted') as converted,
                 COUNT(*) FILTER (WHERE payment_status = 'paid') as paid,
-                SUM(amount) FILTER (WHERE payment_status = 'paid') as total_paid
+                COALESCE(SUM(amount) FILTER (WHERE payment_status = 'paid'), 0) as total_paid
             FROM orders
+            $where
         ");
+        $stmt->execute($params);
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     

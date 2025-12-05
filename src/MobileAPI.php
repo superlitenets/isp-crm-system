@@ -56,10 +56,42 @@ class MobileAPI {
         return $stmt->execute([$token]);
     }
     
-    public function getSalespersonByUserId(int $userId): ?array {
+    public function getSalespersonByUserId(int $userId, bool $autoCreate = false): ?array {
         $stmt = $this->db->prepare("SELECT * FROM salespersons WHERE user_id = ? AND is_active = TRUE");
         $stmt->execute([$userId]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+        $salesperson = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($salesperson) {
+            return $salesperson;
+        }
+        
+        if ($autoCreate) {
+            $stmt = $this->db->prepare("SELECT * FROM salespersons WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $existingInactive = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($existingInactive) {
+                $stmt = $this->db->prepare("UPDATE salespersons SET is_active = TRUE WHERE id = ? RETURNING *");
+                $stmt->execute([$existingInactive['id']]);
+                return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+            }
+            
+            $stmt = $this->db->prepare("SELECT id, name, email, role FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($user && in_array($user['role'], ['salesperson', 'sales', 'admin', 'manager'])) {
+                $stmt = $this->db->prepare("
+                    INSERT INTO salespersons (user_id, name, email, commission_type, commission_value, is_active)
+                    VALUES (?, ?, ?, 'percentage', 5, TRUE)
+                    RETURNING *
+                ");
+                $stmt->execute([$userId, $user['name'], $user['email']]);
+                return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+            }
+        }
+        
+        return null;
     }
     
     public function getSalespersonOrders(int $salespersonId, string $status = '', int $limit = 50): array {

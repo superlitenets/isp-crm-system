@@ -137,9 +137,9 @@ try {
             
         case 'create-order':
             requireAuth();
-            $salesperson = $api->getSalespersonByUserId($user['id']);
+            $salesperson = $api->getSalespersonByUserId($user['id'], true);
             if (!$salesperson) {
-                echo json_encode(['success' => false, 'error' => 'Not a salesperson']);
+                echo json_encode(['success' => false, 'error' => 'Not authorized as a salesperson. Please contact admin.']);
                 break;
             }
             
@@ -154,9 +154,9 @@ try {
             
         case 'create-lead':
             requireAuth();
-            $salesperson = $api->getSalespersonByUserId($user['id']);
+            $salesperson = $api->getSalespersonByUserId($user['id'], true);
             if (!$salesperson) {
-                echo json_encode(['success' => false, 'error' => 'Not a salesperson']);
+                echo json_encode(['success' => false, 'error' => 'Not authorized as a salesperson. Please contact admin.']);
                 break;
             }
             

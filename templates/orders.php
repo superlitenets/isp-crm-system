@@ -5,7 +5,11 @@ $activeSalespersons = $salespersonModel->getActive();
 $action = $_GET['action'] ?? 'list';
 $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $order = $orderId ? $orderModel->getById($orderId) : null;
-$stats = $orderModel->getStats();
+
+$currentUserId = $_SESSION['user_id'] ?? null;
+$canViewAllOrders = \App\Auth::can('orders.view_all') || \App\Auth::isAdmin();
+$orderUserFilter = $canViewAllOrders ? null : $currentUserId;
+$stats = $orderModel->getStats($orderUserFilter);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
