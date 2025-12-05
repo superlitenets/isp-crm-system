@@ -242,6 +242,84 @@ $priorityColors = [
             </div>
         </div>
     </div>
+    
+    <?php 
+    $waComplaint = new \App\WhatsApp();
+    if ($waComplaint->isEnabled() && !empty($viewComplaint['customer_phone'])): 
+        $waSettings = new \App\Settings();
+        $complaintReplacements = [
+            '{customer_name}' => $viewComplaint['customer_name'],
+            '{complaint_number}' => $viewComplaint['complaint_number'],
+            '{category}' => $categoryLabels[$viewComplaint['category']] ?? ucfirst($viewComplaint['category']),
+            '{status}' => ucfirst($viewComplaint['status'])
+        ];
+        
+        $complaintReceivedMsg = str_replace(array_keys($complaintReplacements), array_values($complaintReplacements),
+            $waSettings->get('wa_template_complaint_received', "Hi {customer_name},\n\nWe have received your complaint (Ref: {complaint_number}).\n\nCategory: {category}\n\nOur team will review and respond within 24 hours.\n\nThank you for your feedback."));
+        $complaintReviewMsg = str_replace(array_keys($complaintReplacements), array_values($complaintReplacements),
+            $waSettings->get('wa_template_complaint_review', "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nWe are currently reviewing your issue and will update you soon.\n\nThank you for your patience."));
+        $complaintApprovedMsg = str_replace(array_keys($complaintReplacements), array_values($complaintReplacements),
+            $waSettings->get('wa_template_complaint_approved', "Hi {customer_name},\n\nYour complaint {complaint_number} has been approved and a support ticket will be created.\n\nOur team will contact you shortly to resolve the issue.\n\nThank you!"));
+        $complaintRejectedMsg = str_replace(array_keys($complaintReplacements), array_values($complaintReplacements),
+            $waSettings->get('wa_template_complaint_rejected', "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you."));
+    ?>
+    <div class="card mt-4 border-success">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Notification</h5>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">Send complaint updates via WhatsApp Web:</p>
+            
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintReceivedMsg)) ?>" 
+                   target="_blank" class="btn btn-outline-success btn-sm"
+                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'received')">
+                    <i class="bi bi-envelope-check"></i> Complaint Received
+                </a>
+                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintReviewMsg)) ?>" 
+                   target="_blank" class="btn btn-outline-info btn-sm"
+                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'review')">
+                    <i class="bi bi-hourglass-split"></i> Under Review
+                </a>
+                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintApprovedMsg)) ?>" 
+                   target="_blank" class="btn btn-outline-primary btn-sm"
+                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'approved')">
+                    <i class="bi bi-check-circle"></i> Approved
+                </a>
+                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintRejectedMsg)) ?>" 
+                   target="_blank" class="btn btn-outline-secondary btn-sm"
+                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'rejected')">
+                    <i class="bi bi-x-circle"></i> Rejected
+                </a>
+            </div>
+            
+            <div class="input-group input-group-sm">
+                <textarea class="form-control" id="customComplaintWaMessage" rows="2" placeholder="Type a custom message..."><?= "Hi {$viewComplaint['customer_name']},\n\nRegarding your complaint {$viewComplaint['complaint_number']}:\n\n" ?></textarea>
+                <button type="button" class="btn btn-success" onclick="sendComplaintWhatsApp()">
+                    <i class="bi bi-whatsapp"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function sendComplaintWhatsApp() {
+        var message = document.getElementById('customComplaintWaMessage').value;
+        var phone = '<?= $waComplaint->formatPhone($viewComplaint['customer_phone']) ?>';
+        var url = 'https://web.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(message);
+        window.open(url, '_blank');
+        logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'custom');
+    }
+    
+    function logComplaintWhatsApp(complaintId, messageType) {
+        fetch('?page=api&action=log_whatsapp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({complaint_id: complaintId, message_type: messageType, phone: '<?= $waComplaint->formatPhone($viewComplaint['customer_phone']) ?>'})
+        }).catch(function(e) { console.log('WhatsApp log error:', e); });
+    }
+    </script>
+    <?php endif; ?>
 
     <div class="modal fade" id="approveModal" tabindex="-1">
         <div class="modal-dialog">

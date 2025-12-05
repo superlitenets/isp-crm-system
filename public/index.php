@@ -406,6 +406,40 @@ if ($page === 'api' && $action === 'smartolt_authorize_onu') {
     exit;
 }
 
+if ($page === 'api' && $action === 'log_whatsapp') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $ticketId = $input['ticket_id'] ?? null;
+    $orderId = $input['order_id'] ?? null;
+    $complaintId = $input['complaint_id'] ?? null;
+    $messageType = $input['message_type'] ?? 'custom';
+    $phone = $input['phone'] ?? '';
+    
+    try {
+        $stmt = $db->prepare("
+            INSERT INTO whatsapp_logs (ticket_id, order_id, complaint_id, recipient_phone, recipient_type, message_type, status)
+            VALUES (?, ?, ?, ?, 'customer', ?, 'opened')
+        ");
+        $stmt->execute([$ticketId, $orderId, $complaintId, $phone, $messageType]);
+        echo json_encode(['success' => true]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
@@ -1092,6 +1126,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving WhatsApp settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'save_whatsapp_templates':
+                try {
+                    $templateKeys = [
+                        'wa_template_status_update',
+                        'wa_template_need_info',
+                        'wa_template_resolved',
+                        'wa_template_technician_coming',
+                        'wa_template_scheduled',
+                        'wa_template_order_confirmation',
+                        'wa_template_order_processing',
+                        'wa_template_order_installation',
+                        'wa_template_complaint_received',
+                        'wa_template_complaint_review',
+                        'wa_template_complaint_approved',
+                        'wa_template_complaint_rejected'
+                    ];
+                    foreach ($templateKeys as $key) {
+                        if (isset($_POST[$key])) {
+                            $settings->set($key, $_POST[$key]);
+                        }
+                    }
+                    \App\Settings::clearCache();
+                    $message = 'WhatsApp templates saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving WhatsApp templates: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

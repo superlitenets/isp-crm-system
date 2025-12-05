@@ -245,6 +245,78 @@ $stats = $orderModel->getStats();
                 <?php endif; ?>
             </div>
         </div>
+        
+        <?php 
+        $waOrder = new \App\WhatsApp();
+        if ($waOrder->isEnabled() && !empty($order['customer_phone'])): 
+            $waSettings = new \App\Settings();
+            $orderReplacements = [
+                '{customer_name}' => $order['customer_name'],
+                '{order_number}' => $order['order_number'],
+                '{package_name}' => $order['package_name'] ?? 'N/A',
+                '{amount}' => number_format($order['amount'] ?? 0, 2),
+                '{status}' => ucfirst($order['order_status'])
+            ];
+            
+            $orderConfirmMsg = str_replace(array_keys($orderReplacements), array_values($orderReplacements),
+                $waSettings->get('wa_template_order_confirmation', "Hi {customer_name},\n\nThank you for your order #{order_number}!\n\nPackage: {package_name}\nAmount: KES {amount}\n\nWe will contact you shortly to schedule installation.\n\nThank you for choosing our services!"));
+            $orderProcessingMsg = str_replace(array_keys($orderReplacements), array_values($orderReplacements),
+                $waSettings->get('wa_template_order_processing', "Hi {customer_name},\n\nYour order #{order_number} is being processed.\n\nOur team will contact you to schedule the installation.\n\nThank you!"));
+            $orderInstallMsg = str_replace(array_keys($orderReplacements), array_values($orderReplacements),
+                $waSettings->get('wa_template_order_installation', "Hi {customer_name},\n\nWe're ready to install your service for order #{order_number}.\n\nPlease let us know a convenient time for installation.\n\nThank you!"));
+        ?>
+        <div class="card mt-4 border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Notification</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Send order updates via WhatsApp Web:</p>
+                
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <a href="<?= htmlspecialchars($waOrder->generateWebLink($order['customer_phone'], $orderConfirmMsg)) ?>" 
+                       target="_blank" class="btn btn-outline-success btn-sm"
+                       onclick="logOrderWhatsApp(<?= $order['id'] ?>, 'confirmation')">
+                        <i class="bi bi-bag-check"></i> Order Confirmation
+                    </a>
+                    <a href="<?= htmlspecialchars($waOrder->generateWebLink($order['customer_phone'], $orderProcessingMsg)) ?>" 
+                       target="_blank" class="btn btn-outline-info btn-sm"
+                       onclick="logOrderWhatsApp(<?= $order['id'] ?>, 'processing')">
+                        <i class="bi bi-clock"></i> Processing Update
+                    </a>
+                    <a href="<?= htmlspecialchars($waOrder->generateWebLink($order['customer_phone'], $orderInstallMsg)) ?>" 
+                       target="_blank" class="btn btn-outline-primary btn-sm"
+                       onclick="logOrderWhatsApp(<?= $order['id'] ?>, 'installation')">
+                        <i class="bi bi-tools"></i> Schedule Installation
+                    </a>
+                </div>
+                
+                <div class="input-group input-group-sm">
+                    <textarea class="form-control" id="customOrderWaMessage" rows="2" placeholder="Type a custom message..."><?= "Hi {$order['customer_name']},\n\nRegarding your order #{$order['order_number']}:\n\n" ?></textarea>
+                    <button type="button" class="btn btn-success" onclick="sendOrderWhatsApp()">
+                        <i class="bi bi-whatsapp"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        function sendOrderWhatsApp() {
+            var message = document.getElementById('customOrderWaMessage').value;
+            var phone = '<?= $waOrder->formatPhone($order['customer_phone']) ?>';
+            var url = 'https://web.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(message);
+            window.open(url, '_blank');
+            logOrderWhatsApp(<?= $order['id'] ?>, 'custom');
+        }
+        
+        function logOrderWhatsApp(orderId, messageType) {
+            fetch('?page=api&action=log_whatsapp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({order_id: orderId, message_type: messageType, phone: '<?= $waOrder->formatPhone($order['customer_phone']) ?>'})
+            }).catch(function(e) { console.log('WhatsApp log error:', e); });
+        }
+        </script>
+        <?php endif; ?>
     </div>
 </div>
 

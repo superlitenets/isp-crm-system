@@ -589,6 +589,200 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
     </div>
 </div>
 
+<div class="card mt-4 border-success">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-chat-text"></i> WhatsApp Message Templates</h5>
+        <small class="text-white-50">Customize your notification messages</small>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info mb-4">
+            <i class="bi bi-info-circle"></i> <strong>Available Variables:</strong> 
+            <code>{customer_name}</code>, <code>{ticket_number}</code>, <code>{order_number}</code>, <code>{complaint_number}</code>, 
+            <code>{subject}</code>, <code>{status}</code>, <code>{category}</code>, <code>{package_name}</code>, <code>{amount}</code>
+        </div>
+        
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_whatsapp_templates">
+            
+            <?php
+            $waTemplates = [
+                'wa_template_status_update' => ['label' => 'Ticket Status Update', 'icon' => 'arrow-repeat', 'group' => 'Tickets'],
+                'wa_template_need_info' => ['label' => 'Need More Information', 'icon' => 'question-circle', 'group' => 'Tickets'],
+                'wa_template_resolved' => ['label' => 'Ticket Resolved', 'icon' => 'check-circle', 'group' => 'Tickets'],
+                'wa_template_technician_coming' => ['label' => 'Technician On The Way', 'icon' => 'truck', 'group' => 'Tickets'],
+                'wa_template_scheduled' => ['label' => 'Service Scheduled', 'icon' => 'calendar-check', 'group' => 'Tickets'],
+                'wa_template_order_confirmation' => ['label' => 'Order Confirmation', 'icon' => 'bag-check', 'group' => 'Orders'],
+                'wa_template_order_processing' => ['label' => 'Order Processing', 'icon' => 'clock', 'group' => 'Orders'],
+                'wa_template_order_installation' => ['label' => 'Schedule Installation', 'icon' => 'tools', 'group' => 'Orders'],
+                'wa_template_complaint_received' => ['label' => 'Complaint Received', 'icon' => 'envelope-check', 'group' => 'Complaints'],
+                'wa_template_complaint_review' => ['label' => 'Under Review', 'icon' => 'hourglass-split', 'group' => 'Complaints'],
+                'wa_template_complaint_approved' => ['label' => 'Complaint Approved', 'icon' => 'check-circle', 'group' => 'Complaints'],
+                'wa_template_complaint_rejected' => ['label' => 'Complaint Rejected', 'icon' => 'x-circle', 'group' => 'Complaints']
+            ];
+            
+            $waTemplateDefaults = [
+                'wa_template_status_update' => "Hi {customer_name},\n\nThis is an update on your ticket #{ticket_number}.\n\nCurrent Status: {status}\n\nWe're working on resolving your issue. Thank you for your patience.",
+                'wa_template_need_info' => "Hi {customer_name},\n\nRegarding ticket #{ticket_number}: {subject}\n\nWe need some additional information to proceed. Could you please provide more details?\n\nThank you.",
+                'wa_template_resolved' => "Hi {customer_name},\n\nGreat news! Your ticket #{ticket_number} has been resolved.\n\nIf you have any further questions or issues, please don't hesitate to contact us.\n\nThank you for choosing our services!",
+                'wa_template_technician_coming' => "Hi {customer_name},\n\nRegarding ticket #{ticket_number}:\n\nOur technician is on the way to your location. Please ensure someone is available to receive them.\n\nThank you.",
+                'wa_template_scheduled' => "Hi {customer_name},\n\nYour service visit for ticket #{ticket_number} has been scheduled.\n\nPlease confirm if this time works for you.\n\nThank you.",
+                'wa_template_order_confirmation' => "Hi {customer_name},\n\nThank you for your order #{order_number}!\n\nPackage: {package_name}\nAmount: KES {amount}\n\nWe will contact you shortly to schedule installation.\n\nThank you for choosing our services!",
+                'wa_template_order_processing' => "Hi {customer_name},\n\nYour order #{order_number} is being processed.\n\nOur team will contact you to schedule the installation.\n\nThank you!",
+                'wa_template_order_installation' => "Hi {customer_name},\n\nWe're ready to install your service for order #{order_number}.\n\nPlease let us know a convenient time for installation.\n\nThank you!",
+                'wa_template_complaint_received' => "Hi {customer_name},\n\nWe have received your complaint (Ref: {complaint_number}).\n\nCategory: {category}\n\nOur team will review and respond within 24 hours.\n\nThank you for your feedback.",
+                'wa_template_complaint_review' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nWe are currently reviewing your issue and will update you soon.\n\nThank you for your patience.",
+                'wa_template_complaint_approved' => "Hi {customer_name},\n\nYour complaint {complaint_number} has been approved and a support ticket will be created.\n\nOur team will contact you shortly to resolve the issue.\n\nThank you!",
+                'wa_template_complaint_rejected' => "Hi {customer_name},\n\nRegarding your complaint {complaint_number}:\n\nAfter careful review, we were unable to proceed with this complaint.\n\nIf you have any questions, please contact our support team.\n\nThank you."
+            ];
+            ?>
+            
+            <?php 
+            $groups = [];
+            foreach ($waTemplates as $key => $template) {
+                $groups[$template['group']][$key] = $template;
+            }
+            ?>
+            
+            <?php foreach ($groups as $groupName => $groupTemplates): ?>
+            <h6 class="text-muted mb-3 mt-<?= $groupName === 'Tickets' ? '0' : '4' ?>">
+                <i class="bi bi-<?= $groupName === 'Tickets' ? 'ticket' : ($groupName === 'Orders' ? 'cart' : 'exclamation-triangle') ?>"></i> 
+                <?= $groupName ?>
+            </h6>
+            <div class="row g-3 mb-3">
+                <?php foreach ($groupTemplates as $key => $template): ?>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-light py-2">
+                            <i class="bi bi-<?= $template['icon'] ?> text-success"></i> <?= $template['label'] ?>
+                        </div>
+                        <div class="card-body p-2">
+                            <textarea class="form-control" name="<?= $key ?>" rows="5" 
+                                      style="font-size: 0.8rem;"><?= htmlspecialchars($settings->get($key, $waTemplateDefaults[$key] ?? '')) ?></textarea>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endforeach; ?>
+            
+            <div class="mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg"></i> Save WhatsApp Templates
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="resetTemplates()">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function resetTemplates() {
+    if (!confirm('Reset all WhatsApp templates to defaults?')) return;
+    
+    const defaults = {
+        'wa_template_status_update': `Hi {customer_name},
+
+This is an update on your ticket #{ticket_number}.
+
+Current Status: {status}
+
+We're working on resolving your issue. Thank you for your patience.`,
+        'wa_template_need_info': `Hi {customer_name},
+
+Regarding ticket #{ticket_number}: {subject}
+
+We need some additional information to proceed. Could you please provide more details?
+
+Thank you.`,
+        'wa_template_resolved': `Hi {customer_name},
+
+Great news! Your ticket #{ticket_number} has been resolved.
+
+If you have any further questions or issues, please don't hesitate to contact us.
+
+Thank you for choosing our services!`,
+        'wa_template_technician_coming': `Hi {customer_name},
+
+Regarding ticket #{ticket_number}:
+
+Our technician is on the way to your location. Please ensure someone is available to receive them.
+
+Thank you.`,
+        'wa_template_scheduled': `Hi {customer_name},
+
+Your service visit for ticket #{ticket_number} has been scheduled.
+
+Please confirm if this time works for you.
+
+Thank you.`,
+        'wa_template_order_confirmation': `Hi {customer_name},
+
+Thank you for your order #{order_number}!
+
+Package: {package_name}
+Amount: KES {amount}
+
+We will contact you shortly to schedule installation.
+
+Thank you for choosing our services!`,
+        'wa_template_order_processing': `Hi {customer_name},
+
+Your order #{order_number} is being processed.
+
+Our team will contact you to schedule the installation.
+
+Thank you!`,
+        'wa_template_order_installation': `Hi {customer_name},
+
+We're ready to install your service for order #{order_number}.
+
+Please let us know a convenient time for installation.
+
+Thank you!`,
+        'wa_template_complaint_received': `Hi {customer_name},
+
+We have received your complaint (Ref: {complaint_number}).
+
+Category: {category}
+
+Our team will review and respond within 24 hours.
+
+Thank you for your feedback.`,
+        'wa_template_complaint_review': `Hi {customer_name},
+
+Regarding your complaint {complaint_number}:
+
+We are currently reviewing your issue and will update you soon.
+
+Thank you for your patience.`,
+        'wa_template_complaint_approved': `Hi {customer_name},
+
+Your complaint {complaint_number} has been approved and a support ticket will be created.
+
+Our team will contact you shortly to resolve the issue.
+
+Thank you!`,
+        'wa_template_complaint_rejected': `Hi {customer_name},
+
+Regarding your complaint {complaint_number}:
+
+After careful review, we were unable to proceed with this complaint.
+
+If you have any questions, please contact our support team.
+
+Thank you.`
+    };
+    
+    for (const [key, value] of Object.entries(defaults)) {
+        const textarea = document.querySelector(`textarea[name="${key}"]`);
+        if (textarea) textarea.value = value;
+    }
+}
+</script>
+
 <div class="card mt-4">
     <div class="card-header bg-white">
         <h5 class="mb-0"><i class="bi bi-info-circle"></i> How WhatsApp Web Integration Works</h5>

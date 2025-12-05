@@ -388,6 +388,107 @@ if (isset($_GET['customer_id'])) {
         </div>
         <?php endif; ?>
         
+        <?php 
+        if (!isset($waCustomer)) $waCustomer = new \App\WhatsApp();
+        if ($waCustomer->isEnabled() && !empty($ticketData['customer_phone'])): 
+        ?>
+        <div class="card mb-4 border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Quick WhatsApp Notifications</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Click to open WhatsApp Web with a pre-filled message:</p>
+                
+                <?php
+                $customerName = $ticketData['customer_name'];
+                $ticketNum = $ticketData['ticket_number'];
+                $subject = $ticketData['subject'];
+                $status = ucfirst($ticketData['status']);
+                
+                $waSettings = new \App\Settings();
+                $replacements = [
+                    '{customer_name}' => $customerName,
+                    '{ticket_number}' => $ticketNum,
+                    '{subject}' => $subject,
+                    '{status}' => $status
+                ];
+                
+                $templates = [
+                    'status_update' => str_replace(array_keys($replacements), array_values($replacements), 
+                        $waSettings->get('wa_template_status_update', "Hi {customer_name},\n\nThis is an update on your ticket #{ticket_number}.\n\nCurrent Status: {status}\n\nWe're working on resolving your issue. Thank you for your patience.")),
+                    'need_info' => str_replace(array_keys($replacements), array_values($replacements),
+                        $waSettings->get('wa_template_need_info', "Hi {customer_name},\n\nRegarding ticket #{ticket_number}: {subject}\n\nWe need some additional information to proceed. Could you please provide more details?\n\nThank you.")),
+                    'resolved' => str_replace(array_keys($replacements), array_values($replacements),
+                        $waSettings->get('wa_template_resolved', "Hi {customer_name},\n\nGreat news! Your ticket #{ticket_number} has been resolved.\n\nIf you have any further questions or issues, please don't hesitate to contact us.\n\nThank you for choosing our services!")),
+                    'technician_coming' => str_replace(array_keys($replacements), array_values($replacements),
+                        $waSettings->get('wa_template_technician_coming', "Hi {customer_name},\n\nRegarding ticket #{ticket_number}:\n\nOur technician is on the way to your location. Please ensure someone is available to receive them.\n\nThank you.")),
+                    'scheduled' => "Hi {$customerName},\n\nYour service visit for ticket #{$ticketNum} has been scheduled.\n\nPlease confirm if this time works for you.\n\nThank you."
+                ];
+                ?>
+                
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['status_update'])) ?>" 
+                       target="_blank" class="btn btn-outline-success btn-sm" 
+                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'status_update')">
+                        <i class="bi bi-arrow-repeat"></i> Status Update
+                    </a>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['need_info'])) ?>" 
+                       target="_blank" class="btn btn-outline-warning btn-sm"
+                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'need_info')">
+                        <i class="bi bi-question-circle"></i> Need Info
+                    </a>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['resolved'])) ?>" 
+                       target="_blank" class="btn btn-outline-primary btn-sm"
+                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'resolved')">
+                        <i class="bi bi-check-circle"></i> Resolved
+                    </a>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['technician_coming'])) ?>" 
+                       target="_blank" class="btn btn-outline-info btn-sm"
+                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'technician_coming')">
+                        <i class="bi bi-truck"></i> Tech Coming
+                    </a>
+                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['scheduled'])) ?>" 
+                       target="_blank" class="btn btn-outline-secondary btn-sm"
+                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'scheduled')">
+                        <i class="bi bi-calendar-check"></i> Scheduled
+                    </a>
+                </div>
+                
+                <hr class="my-3">
+                
+                <form id="customWhatsAppForm" class="mb-0">
+                    <label class="form-label small">Custom Message:</label>
+                    <div class="input-group input-group-sm">
+                        <textarea class="form-control" id="customWaMessage" rows="2" placeholder="Type your custom message..."><?= "Hi {$customerName},\n\nRegarding ticket #{$ticketNum}:\n\n" ?></textarea>
+                    </div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-success btn-sm" onclick="sendCustomWhatsApp()">
+                            <i class="bi bi-whatsapp"></i> Send Custom Message
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <script>
+        function sendCustomWhatsApp() {
+            var message = document.getElementById('customWaMessage').value;
+            var phone = '<?= $waCustomer->formatPhone($ticketData['customer_phone']) ?>';
+            var url = 'https://web.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(message);
+            window.open(url, '_blank');
+            logWhatsApp(<?= $ticketData['id'] ?>, 'custom');
+        }
+        
+        function logWhatsApp(ticketId, messageType) {
+            fetch('?page=api&action=log_whatsapp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ticket_id: ticketId, message_type: messageType})
+            }).catch(function(e) { console.log('WhatsApp log error:', e); });
+        }
+        </script>
+        <?php endif; ?>
+        
         <div class="card">
             <div class="card-header bg-white">
                 <h5 class="mb-0">SMS Log</h5>
