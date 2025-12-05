@@ -131,7 +131,12 @@ class Complaint {
 
     public function convertToTicket(int $complaintId, int $userId, ?int $assignTo = null, ?int $teamId = null): ?int {
         $complaint = $this->getById($complaintId);
-        if (!$complaint || $complaint['status'] !== 'approved') {
+        if (!$complaint) {
+            error_log("Complaint not found: $complaintId");
+            return null;
+        }
+        if ($complaint['status'] !== 'approved') {
+            error_log("Complaint status is not approved: " . $complaint['status']);
             return null;
         }
         
@@ -207,8 +212,8 @@ class Complaint {
             
         } catch (\Exception $e) {
             $this->db->rollBack();
-            error_log("Error converting complaint to ticket: " . $e->getMessage());
-            return null;
+            error_log("Error converting complaint to ticket: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
 

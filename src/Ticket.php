@@ -80,6 +80,34 @@ class Ticket {
         return $ticketId;
     }
 
+    public function applySLA(int $ticketId, string $priority): bool {
+        $slaData = $this->getSLA()->calculateSLAForTicket($priority);
+        
+        if (!$slaData['policy_id']) {
+            return false;
+        }
+        
+        $stmt = $this->db->prepare("
+            UPDATE tickets 
+            SET sla_policy_id = ?,
+                sla_response_due = ?,
+                sla_resolution_due = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        $stmt->execute([
+            $slaData['policy_id'],
+            $slaData['response_due'] ? $slaData['response_due']->format('Y-m-d H:i:s') : null,
+            $slaData['resolution_due'] ? $slaData['resolution_due']->format('Y-m-d H:i:s') : null,
+            $ticketId
+        ]);
+        
+        $this->getSLA()->logSLAEvent($ticketId, 'sla_assigned', "SLA policy applied based on {$priority} priority");
+        
+        return true;
+    }
+
     public function update(int $id, array $data): bool {
         $ticket = $this->find($id);
         if (!$ticket) {
