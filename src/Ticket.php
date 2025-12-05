@@ -153,41 +153,58 @@ class Ticket {
         $stmt = $this->db->prepare("UPDATE tickets SET " . implode(', ', $fields) . " WHERE id = ?");
         $result = $stmt->execute($values);
 
-        if ($result && isset($data['status']) && $data['status'] !== $ticket['status']) {
-            $customer = (new Customer())->find($ticket['customer_id']);
-            if ($customer && $customer['phone']) {
-                $statusMessage = $this->getStatusMessage($data['status']);
-                $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
-                $message = $this->buildSMSFromTemplate($templateKey, [
-                    '{ticket_number}' => $ticket['ticket_number'],
-                    '{status}' => ucfirst($data['status']),
-                    '{message}' => $statusMessage,
-                    '{customer_name}' => $customer['name'] ?? 'Customer',
-                    '{subject}' => $ticket['subject'] ?? ''
-                ]);
-                $smsResult = $this->sms->send($customer['phone'], $message);
-                $this->sms->logSMS($id, $customer['phone'], 'customer', "Status update: {$data['status']}", $smsResult['success'] ? 'sent' : 'failed');
-            }
-        }
-
-        if ($result && isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
-            $this->notifyAssignedTechnician($id, $data['assigned_to']);
-        }
-
-        if ($result && isset($data['team_id']) && $data['team_id'] != $ticket['team_id'] && !empty($data['team_id'])) {
-            $this->notifyTeamMembers($id, (int)$data['team_id']);
-        }
-
+        // Post-update operations wrapped in try-catch to prevent blocking the update response
         if ($result) {
-            if (isset($data['status']) && $data['status'] !== $ticket['status']) {
-                $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Status changed to: " . ucfirst($data['status']));
+            try {
+                if (isset($data['status']) && $data['status'] !== $ticket['status']) {
+                    $customer = (new Customer())->find($ticket['customer_id']);
+                    if ($customer && $customer['phone']) {
+                        $statusMessage = $this->getStatusMessage($data['status']);
+                        $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
+                        $message = $this->buildSMSFromTemplate($templateKey, [
+                            '{ticket_number}' => $ticket['ticket_number'],
+                            '{status}' => ucfirst($data['status']),
+                            '{message}' => $statusMessage,
+                            '{customer_name}' => $customer['name'] ?? 'Customer',
+                            '{subject}' => $ticket['subject'] ?? ''
+                        ]);
+                        $smsResult = $this->sms->send($customer['phone'], $message);
+                        $this->sms->logSMS($id, $customer['phone'], 'customer', "Status update: {$data['status']}", $smsResult['success'] ? 'sent' : 'failed');
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to send ticket status SMS: " . $e->getMessage());
             }
-            if (isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
-                $user = $this->getUser($data['assigned_to']);
-                $this->activityLog->log('assign', 'ticket', $id, $ticket['ticket_number'], "Assigned to: " . ($user['name'] ?? 'Unassigned'));
+
+            try {
+                if (isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
+                    $this->notifyAssignedTechnician($id, $data['assigned_to']);
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to notify technician: " . $e->getMessage());
             }
-            if (isset($data['priority']) && $data['priority'] !== $ticket['priority']) {
-                $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Priority changed to: " . ucfirst($data['priority']));
+
+            try {
+                if (isset($data['team_id']) && $data['team_id'] != $ticket['team_id'] && !empty($data['team_id'])) {
+                    $this->notifyTeamMembers($id, (int)$data['team_id']);
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to notify team: " . $e->getMessage());
+            }
+
+            try {
+                if (isset($data['status']) && $data['status'] !== $ticket['status']) {
+                    $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Status changed to: " . ucfirst($data['status']));
+                }
+                if (isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
+                    $user = $this->getUser($data['assigned_to']);
+                    $this->activityLog->log('assign', 'ticket', $id, $ticket['ticket_number'], "Assigned to: " . ($user['name'] ?? 'Unassigned'));
+                }
+                if (isset($data['priority']) && $data['priority'] !== $ticket['priority']) {
+                    $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Priority changed to: " . ucfirst($data['priority']));
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to log activity: " . $e->getMessage());
             }
         }
 
