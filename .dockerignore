@@ -1,16 +1,45 @@
+# Git
 .git
 .gitignore
+
+# Environment
 .env
-*.md
+.env.local
+
+# Documentation (keep README for docker)
+replit.md
+
+# Archives
 *.zip
+*.tar.gz
+
+# Logs
 *.log
+logs/*
+!logs/.gitkeep
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# IDE
 node_modules/
 .idea/
 .vscode/
 *.swp
 *.swo
-replit.md
+
+# Replit specific
 .replit
 replit.nix
+.cache
+.config
+.upm
+
+# Uploads (mounted as volume)
+uploads/*
+!uploads/.gitkeep
+
+# Temporary
+*.tmp
+*.temp
