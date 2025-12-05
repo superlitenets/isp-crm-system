@@ -23,6 +23,11 @@ class Reports {
             $dateWhere .= " AND t.created_at <= ?";
             $params[] = $filters['date_to'] . ' 23:59:59';
         }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
+        }
 
         $stmt = $this->db->prepare("
             SELECT 
@@ -149,6 +154,10 @@ class Reports {
         if (!empty($filters['date_to'])) {
             $dateWhere .= " AND c.created_at <= ?";
             $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND c.reviewed_by = ?";
+            $params[] = (int)$filters['user_id'];
         }
 
         $stmt = $this->db->prepare("

@@ -1,7 +1,7 @@
 <?php
-$dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
-$dateTo = $_GET['date_to'] ?? date('Y-m-d');
-$selectedUser = isset($_GET['user_id']) ? (int)$_GET['user_id'] : null;
+$dateFrom = $_GET['date_from'] ?? '';
+$dateTo = $_GET['date_to'] ?? '';
+$selectedEmployee = isset($_GET['employee_id']) ? (int)$_GET['employee_id'] : null;
 $selectedTab = $_GET['tab'] ?? 'overview';
 
 $ticketStats = ['total_tickets' => 0, 'open_tickets' => 0, 'in_progress_tickets' => 0, 'resolved_tickets' => 0, 'sla_breached' => 0, 'avg_resolution_hours' => 0];
@@ -11,7 +11,6 @@ $userSummary = [];
 $ticketsByUser = [];
 $ordersBySalesperson = [];
 $complaintsByReviewer = [];
-$allUsers = [];
 $allEmployees = [];
 $recentActivities = [];
 $allTickets = [];
@@ -22,10 +21,21 @@ try {
     $reports = new \App\Reports();
     $activityLog = new \App\ActivityLog();
 
-    $filters = [
-        'date_from' => $dateFrom,
-        'date_to' => $dateTo
-    ];
+    $filters = [];
+    if (!empty($dateFrom)) {
+        $filters['date_from'] = $dateFrom;
+    }
+    if (!empty($dateTo)) {
+        $filters['date_to'] = $dateTo;
+    }
+    if ($selectedEmployee) {
+        $empStmt = $db->prepare("SELECT user_id FROM employees WHERE id = ?");
+        $empStmt->execute([$selectedEmployee]);
+        $empRow = $empStmt->fetch(\PDO::FETCH_ASSOC);
+        if ($empRow && $empRow['user_id']) {
+            $filters['user_id'] = $empRow['user_id'];
+        }
+    }
 
     $ticketStats = $reports->getTicketStats($filters) ?: $ticketStats;
     $orderStats = $reports->getOrderStats($filters) ?: $orderStats;
@@ -34,20 +44,21 @@ try {
     $ticketsByUser = $reports->getTicketsByUser($filters) ?: [];
     $ordersBySalesperson = $reports->getOrdersBySalesperson($filters) ?: [];
     $complaintsByReviewer = $reports->getComplaintsByReviewer($filters) ?: [];
-    $allUsers = $reports->getAllUsers() ?: [];
     $allEmployees = $reports->getAllEmployees() ?: [];
     
     $allTickets = $reports->getAllTickets($filters) ?: [];
     $allOrders = $reports->getAllOrders($filters) ?: [];
     $allComplaints = $reports->getAllComplaints($filters) ?: [];
 
-    $activityFilters = [
-        'date_from' => $dateFrom,
-        'date_to' => $dateTo,
-        'limit' => 50
-    ];
-    if ($selectedUser) {
-        $activityFilters['user_id'] = $selectedUser;
+    $activityFilters = ['limit' => 100];
+    if (!empty($dateFrom)) {
+        $activityFilters['date_from'] = $dateFrom;
+    }
+    if (!empty($dateTo)) {
+        $activityFilters['date_to'] = $dateTo;
+    }
+    if (!empty($filters['user_id'])) {
+        $activityFilters['user_id'] = $filters['user_id'];
     }
     $recentActivities = $activityLog->getActivities($activityFilters) ?: [];
 } catch (Exception $e) {
@@ -73,29 +84,14 @@ try {
                 <input type="date" class="form-control" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
             </div>
             <div class="col-md-3">
-                <label class="form-label">Filter by User/Employee</label>
-                <select class="form-select" name="user_id">
-                    <option value="">All Users & Employees</option>
-                    <?php if (!empty($allUsers)): ?>
-                    <optgroup label="System Users">
-                        <?php foreach ($allUsers as $user): ?>
-                            <option value="<?= $user['id'] ?>" <?= $selectedUser == $user['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($user['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                    <?php endif; ?>
-                    <?php if (!empty($allEmployees)): ?>
-                    <optgroup label="Employees">
-                        <?php foreach ($allEmployees as $emp): ?>
-                            <?php if ($emp['user_id']): ?>
-                            <option value="<?= $emp['user_id'] ?>" <?= $selectedUser == $emp['user_id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position'] ?? 'Staff') ?>)
-                            </option>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </optgroup>
-                    <?php endif; ?>
+                <label class="form-label">Filter by Employee</label>
+                <select class="form-select" name="employee_id">
+                    <option value="">All Employees</option>
+                    <?php foreach ($allEmployees as $emp): ?>
+                        <option value="<?= $emp['id'] ?>" <?= $selectedEmployee == $emp['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($emp['name']) ?> <?= !empty($emp['position']) ? '(' . htmlspecialchars($emp['position']) . ')' : '' ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-md-3">
@@ -110,38 +106,38 @@ try {
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'overview' ? 'active' : '' ?>" 
-           href="?page=reports&tab=overview&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
+           href="?page=reports&tab=overview<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
             <i class="bi bi-speedometer2"></i> Overview
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'tickets' ? 'active' : '' ?>" 
-           href="?page=reports&tab=tickets&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
+           href="?page=reports&tab=tickets<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
             <i class="bi bi-ticket"></i> Tickets
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'orders' ? 'active' : '' ?>" 
-           href="?page=reports&tab=orders&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
+           href="?page=reports&tab=orders<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
             <i class="bi bi-cart"></i> Orders
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'complaints' ? 'active' : '' ?>" 
-           href="?page=reports&tab=complaints&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
+           href="?page=reports&tab=complaints<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
             <i class="bi bi-exclamation-triangle"></i> Complaints
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'activity' ? 'active' : '' ?>" 
-           href="?page=reports&tab=activity&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
+           href="?page=reports&tab=activity<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
             <i class="bi bi-activity"></i> Activity Log
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $selectedTab === 'users' ? 'active' : '' ?>" 
-           href="?page=reports&tab=users&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?><?= $selectedUser ? '&user_id='.$selectedUser : '' ?>">
-            <i class="bi bi-people"></i> User Performance
+           href="?page=reports&tab=users<?= $dateFrom ? '&date_from='.$dateFrom : '' ?><?= $dateTo ? '&date_to='.$dateTo : '' ?><?= $selectedEmployee ? '&employee_id='.$selectedEmployee : '' ?>">
+            <i class="bi bi-people"></i> Employee Performance
         </a>
     </li>
 </ul>
