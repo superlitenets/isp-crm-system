@@ -95,18 +95,31 @@ class BiometricSyncService {
         return $device->testConnection();
     }
     
-    public function syncDevice(int $id, ?string $since = null): array {
+    public function syncDevice(int $id, ?string $since = null, bool $debug = false): array {
         $result = [
             'success' => false,
             'records_synced' => 0,
             'records_processed' => 0,
+            'records_received' => 0,
             'message' => ''
         ];
+        
+        if ($debug) {
+            $result['debug'] = [];
+        }
         
         $deviceConfig = $this->getDevice($id);
         if (!$deviceConfig) {
             $result['message'] = 'Device not found';
             return $result;
+        }
+        
+        if ($debug) {
+            $result['debug']['device'] = [
+                'type' => $deviceConfig['device_type'],
+                'ip' => $deviceConfig['ip_address'],
+                'port' => $deviceConfig['port']
+            ];
         }
         
         $device = BiometricDevice::create($deviceConfig);
@@ -118,16 +131,40 @@ class BiometricSyncService {
         if (!$device->connect()) {
             $error = $device->getLastError();
             $result['message'] = $error['message'] ?? 'Connection failed';
+            if ($debug) {
+                $result['debug']['connection_error'] = $error;
+            }
             $this->updateSyncStatus($id, 'failed', $result['message']);
             return $result;
         }
         
+        if ($debug) {
+            $result['debug']['connected'] = true;
+        }
+        
         try {
             if (!$since) {
-                $since = $deviceConfig['last_sync_at'] ?? date('Y-m-d', strtotime('-7 days'));
+                $since = $deviceConfig['last_sync_at'] ?? date('Y-m-d', strtotime('-30 days'));
+            }
+            
+            if ($debug) {
+                $result['debug']['sync_since'] = $since;
             }
             
             $attendance = $device->getAttendance($since);
+            $result['records_received'] = count($attendance);
+            
+            if ($debug) {
+                $result['debug']['attendance_count'] = count($attendance);
+                if (count($attendance) > 0) {
+                    $result['debug']['first_record'] = $attendance[0];
+                    $result['debug']['last_record'] = $attendance[count($attendance) - 1];
+                }
+                $error = $device->getLastError();
+                if ($error) {
+                    $result['debug']['device_error'] = $error;
+                }
+            }
             
             $syncedCount = 0;
             foreach ($attendance as $log) {
@@ -141,12 +178,20 @@ class BiometricSyncService {
             $result['success'] = true;
             $result['records_synced'] = $syncedCount;
             $result['records_processed'] = $processedCount;
-            $result['message'] = "Synced {$syncedCount} records, processed {$processedCount} attendance entries";
+            
+            if ($syncedCount === 0 && count($attendance) === 0) {
+                $result['message'] = "No attendance records found on device since {$since}. Try clearing logs on device and testing again.";
+            } else {
+                $result['message'] = "Synced {$syncedCount} records, processed {$processedCount} attendance entries";
+            }
             
             $this->updateSyncStatus($id, 'success', $result['message']);
             
         } catch (\Exception $e) {
             $result['message'] = $e->getMessage();
+            if ($debug) {
+                $result['debug']['exception'] = $e->getMessage();
+            }
             $this->updateSyncStatus($id, 'failed', $result['message']);
         }
         

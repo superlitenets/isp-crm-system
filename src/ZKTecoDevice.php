@@ -189,6 +189,18 @@ class ZKTecoDevice extends BiometricDevice {
                 
                 if ($data) {
                     $users = $this->parseUserData($data);
+                    if (empty($users) && strlen($data) > 0) {
+                        $users = $this->parseUserDataNewFormat($data);
+                    }
+                }
+            } elseif ($commandId == self::CMD_ACK_OK) {
+                $dataSize = unpack('v', substr($response, 8, 2))[1] ?? 0;
+                if ($dataSize > 0) {
+                    $data = substr($response, 10);
+                    $users = $this->parseUserData($data);
+                    if (empty($users)) {
+                        $users = $this->parseUserDataNewFormat($data);
+                    }
                 }
             }
             
@@ -324,46 +336,92 @@ class ZKTecoDevice extends BiometricDevice {
     
     private function parseAttendanceData(string $data, ?string $since, ?string $until): array {
         $attendance = [];
-        $recordSize = 40;
-        $records = str_split($data, $recordSize);
         
         $sinceTime = $since ? strtotime($since) : null;
         $untilTime = $until ? strtotime($until) : null;
         
-        foreach ($records as $record) {
-            if (strlen($record) < $recordSize) continue;
-            
-            $uid = unpack('v', substr($record, 0, 2))[1];
-            $userId = trim(substr($record, 2, 9));
-            $state = ord($record[26]);
-            $timestamp = unpack('V', substr($record, 27, 4))[1];
-            $type = ord($record[31]);
-            
-            $datetime = $this->decodeTime($timestamp);
-            $time = strtotime($datetime);
-            
-            if ($sinceTime && $time < $sinceTime) continue;
-            if ($untilTime && $time > $untilTime) continue;
-            
-            $direction = 'unknown';
-            if ($state == 0 || $state == 4) $direction = 'in';
-            if ($state == 1 || $state == 5) $direction = 'out';
-            
-            $verificationTypes = [
-                0 => 'password',
-                1 => 'fingerprint',
-                2 => 'card',
-                15 => 'face'
-            ];
-            
-            $attendance[] = [
-                'device_user_id' => $userId,
-                'log_time' => $datetime,
-                'direction' => $direction,
-                'verification_type' => $verificationTypes[$type] ?? 'unknown',
-                'state' => $state,
-                'raw_uid' => $uid
-            ];
+        $recordSizes = [40, 16, 14, 8];
+        
+        foreach ($recordSizes as $recordSize) {
+            if (strlen($data) >= $recordSize && strlen($data) % $recordSize === 0) {
+                $records = str_split($data, $recordSize);
+                $tempAttendance = [];
+                $validRecords = 0;
+                
+                foreach ($records as $record) {
+                    if (strlen($record) < $recordSize) continue;
+                    
+                    $uid = 0;
+                    $userId = '';
+                    $state = 0;
+                    $timestamp = 0;
+                    $type = 0;
+                    
+                    if ($recordSize == 40) {
+                        $uid = unpack('v', substr($record, 0, 2))[1];
+                        $userId = trim(substr($record, 2, 9));
+                        $state = ord($record[26]);
+                        $timestamp = unpack('V', substr($record, 27, 4))[1];
+                        $type = ord($record[31]);
+                    } elseif ($recordSize == 16) {
+                        $uid = unpack('v', substr($record, 0, 2))[1];
+                        $userId = (string)$uid;
+                        $timestamp = unpack('V', substr($record, 4, 4))[1];
+                        $state = ord($record[8]);
+                        $type = ord($record[10]);
+                    } elseif ($recordSize == 14) {
+                        $uid = unpack('v', substr($record, 0, 2))[1];
+                        $userId = (string)$uid;
+                        $timestamp = unpack('V', substr($record, 4, 4))[1];
+                        $state = ord($record[8]);
+                    } elseif ($recordSize == 8) {
+                        $uid = unpack('v', substr($record, 0, 2))[1];
+                        $userId = (string)$uid;
+                        $timestamp = unpack('V', substr($record, 2, 4))[1];
+                        $state = ord($record[6]);
+                    }
+                    
+                    if ($timestamp < 100000 || $timestamp > 2000000000) {
+                        continue;
+                    }
+                    
+                    $datetime = $this->decodeTime($timestamp);
+                    $time = strtotime($datetime);
+                    
+                    if ($time === false || $time < strtotime('2000-01-01') || $time > strtotime('2100-01-01')) {
+                        continue;
+                    }
+                    
+                    $validRecords++;
+                    
+                    if ($sinceTime && $time < $sinceTime) continue;
+                    if ($untilTime && $time > $untilTime) continue;
+                    
+                    $direction = 'unknown';
+                    if ($state == 0 || $state == 4) $direction = 'in';
+                    if ($state == 1 || $state == 5) $direction = 'out';
+                    
+                    $verificationTypes = [
+                        0 => 'password',
+                        1 => 'fingerprint',
+                        2 => 'card',
+                        15 => 'face'
+                    ];
+                    
+                    $tempAttendance[] = [
+                        'device_user_id' => $userId ?: (string)$uid,
+                        'log_time' => $datetime,
+                        'direction' => $direction,
+                        'verification_type' => $verificationTypes[$type] ?? 'unknown',
+                        'state' => $state,
+                        'raw_uid' => $uid
+                    ];
+                }
+                
+                if ($validRecords > 0 && !empty($tempAttendance)) {
+                    return $tempAttendance;
+                }
+            }
         }
         
         return $attendance;
@@ -372,6 +430,11 @@ class ZKTecoDevice extends BiometricDevice {
     private function parseUserData(string $data): array {
         $users = [];
         $recordSize = 72;
+        
+        if (strlen($data) < $recordSize) {
+            return $users;
+        }
+        
         $records = str_split($data, $recordSize);
         
         foreach ($records as $record) {
@@ -384,13 +447,79 @@ class ZKTecoDevice extends BiometricDevice {
             $cardNo = unpack('V', substr($record, 35, 4))[1];
             $userId = trim(substr($record, 48, 9));
             
-            $users[] = [
-                'uid' => $uid,
-                'device_user_id' => $userId ?: (string)$uid,
-                'name' => $name,
-                'role' => $role,
-                'card_no' => $cardNo
-            ];
+            if ($uid > 0 && ($userId || $name)) {
+                $users[] = [
+                    'uid' => $uid,
+                    'device_user_id' => $userId ?: (string)$uid,
+                    'name' => $name,
+                    'role' => $role,
+                    'card_no' => $cardNo
+                ];
+            }
+        }
+        
+        return $users;
+    }
+    
+    private function parseUserDataNewFormat(string $data): array {
+        $users = [];
+        
+        $recordSizes = [28, 32, 46, 52, 56, 64, 80];
+        
+        foreach ($recordSizes as $recordSize) {
+            if (strlen($data) >= $recordSize && strlen($data) % $recordSize === 0) {
+                $records = str_split($data, $recordSize);
+                $tempUsers = [];
+                
+                foreach ($records as $record) {
+                    if (strlen($record) < $recordSize) continue;
+                    
+                    $uid = unpack('v', substr($record, 0, 2))[1];
+                    
+                    $userId = '';
+                    $name = '';
+                    
+                    if ($recordSize == 28) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 16));
+                    } elseif ($recordSize == 32) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 20));
+                    } elseif ($recordSize == 46) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 24));
+                    } elseif ($recordSize == 52) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 28));
+                    } elseif ($recordSize == 56) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 32));
+                    } elseif ($recordSize == 64) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 40));
+                    } elseif ($recordSize == 80) {
+                        $userId = trim(substr($record, 2, 9));
+                        $name = trim(substr($record, 11, 48));
+                    }
+                    
+                    $name = preg_replace('/[^\x20-\x7E]/', '', $name);
+                    $userId = preg_replace('/[^\x20-\x7E]/', '', $userId);
+                    
+                    if ($uid > 0 && ($userId || $name)) {
+                        $tempUsers[] = [
+                            'uid' => $uid,
+                            'device_user_id' => $userId ?: (string)$uid,
+                            'name' => $name ?: 'User ' . $uid,
+                            'role' => 0,
+                            'card_no' => 0
+                        ];
+                    }
+                }
+                
+                if (!empty($tempUsers)) {
+                    return $tempUsers;
+                }
+            }
         }
         
         return $users;

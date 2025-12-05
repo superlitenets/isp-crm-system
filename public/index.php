@@ -182,6 +182,7 @@ if ($page === 'api' && $action === 'sync_biometric_device') {
     }
     
     $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+    $debug = isset($_GET['debug']) && $_GET['debug'] === '1';
     
     if (!$deviceId) {
         echo json_encode(['success' => false, 'message' => 'Device ID required']);
@@ -195,8 +196,44 @@ if ($page === 'api' && $action === 'sync_biometric_device') {
         }
         
         $biometricService = new \App\BiometricSyncService($db);
-        $result = $biometricService->syncDevice($deviceId);
+        $result = $biometricService->syncDevice($deviceId, null, $debug);
         echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($page === 'api' && $action === 'fetch_biometric_users') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'message' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized - Admin access required']);
+        exit;
+    }
+    
+    $deviceId = isset($_GET['device_id']) ? (int)$_GET['device_id'] : 0;
+    
+    if (!$deviceId) {
+        echo json_encode(['success' => false, 'message' => 'Device ID required']);
+        exit;
+    }
+    
+    try {
+        if (!function_exists('socket_create')) {
+            echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled']);
+            exit;
+        }
+        
+        $biometricService = new \App\BiometricSyncService($db);
+        $users = $biometricService->getDeviceUsers($deviceId);
+        echo json_encode(['success' => true, 'users' => $users, 'count' => count($users)]);
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
