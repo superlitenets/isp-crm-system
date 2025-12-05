@@ -746,6 +746,7 @@ function runMigrations(PDO $db): void {
     $columnMigrations = [
         ['orders', 'salesperson_id', 'ALTER TABLE orders ADD COLUMN salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE SET NULL'],
         ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE'],
+        ['orders', 'lead_source', "ALTER TABLE orders ADD COLUMN lead_source VARCHAR(50) DEFAULT 'web'"],
         ['users', 'role_id', 'ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL'],
         ['tickets', 'team_id', 'ALTER TABLE tickets ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL'],
         ['tickets', 'sla_policy_id', 'ALTER TABLE tickets ADD COLUMN sla_policy_id INTEGER REFERENCES sla_policies(id) ON DELETE SET NULL'],
@@ -761,7 +762,8 @@ function runMigrations(PDO $db): void {
         ['equipment_assignments', 'assigned_by', 'ALTER TABLE equipment_assignments ADD COLUMN assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
         ['equipment_assignments', 'return_date', 'ALTER TABLE equipment_assignments ADD COLUMN return_date DATE'],
         ['equipment_assignments', 'status', 'ALTER TABLE equipment_assignments ADD COLUMN status VARCHAR(20) DEFAULT \'assigned\''],
-        ['equipment_assignments', 'notes', 'ALTER TABLE equipment_assignments ADD COLUMN notes TEXT']
+        ['equipment_assignments', 'notes', 'ALTER TABLE equipment_assignments ADD COLUMN notes TEXT'],
+        ['tickets', 'source', "ALTER TABLE tickets ADD COLUMN source VARCHAR(50) DEFAULT 'internal'"]
     ];
     
     foreach ($columnMigrations as $migration) {

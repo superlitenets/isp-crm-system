@@ -1413,6 +1413,9 @@
                             <a href="?page=order" class="btn btn-secondary-outline btn-lg">
                                 <i class="bi bi-telephone me-2"></i>Order Now
                             </a>
+                            <button type="button" class="btn btn-outline-danger btn-lg" data-bs-toggle="modal" data-bs-target="#complaintModal">
+                                <i class="bi bi-exclamation-triangle me-2"></i>Report Issue
+                            </button>
                         </div>
                         <div class="hero-features">
                             <div class="hero-feature">
@@ -2062,6 +2065,71 @@
     </a>
     <?php endif; ?>
 
+    <div class="modal fade" id="complaintModal" tabindex="-1" aria-labelledby="complaintModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="complaintModalLabel">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Report an Issue
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="complaintForm" action="?page=submit_complaint" method="POST">
+                    <div class="modal-body">
+                        <div id="complaintSuccess" class="alert alert-success d-none">
+                            <i class="bi bi-check-circle me-2"></i>Your complaint has been submitted successfully. We'll get back to you soon.
+                        </div>
+                        <div id="complaintError" class="alert alert-danger d-none"></div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Your Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                            <input type="tel" class="form-control" name="phone" placeholder="e.g., 0712345678" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Issue Category <span class="text-danger">*</span></label>
+                            <select class="form-select" name="category" required>
+                                <option value="">Select category...</option>
+                                <option value="connectivity">Internet Connectivity</option>
+                                <option value="speed">Slow Speed</option>
+                                <option value="billing">Billing Issue</option>
+                                <option value="equipment">Equipment Problem</option>
+                                <option value="service">Service Quality</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Subject <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="subject" placeholder="Brief summary of your issue" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="4" placeholder="Please describe your issue in detail..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location/Address</label>
+                            <input type="text" class="form-control" name="location" placeholder="Your location or service address">
+                        </div>
+                        <input type="hidden" name="honeypot" value="">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger" id="submitComplaint">
+                            <i class="bi bi-send me-2"></i>Submit Complaint
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -2100,6 +2168,51 @@
         
         document.querySelectorAll('.animate-on-scroll').forEach(el => {
             observer.observe(el);
+        });
+        
+        document.getElementById('complaintForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const submitBtn = document.getElementById('submitComplaint');
+            const successDiv = document.getElementById('complaintSuccess');
+            const errorDiv = document.getElementById('complaintError');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+            successDiv.classList.add('d-none');
+            errorDiv.classList.add('d-none');
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    successDiv.innerHTML = '<i class="bi bi-check-circle me-2"></i>' + data.message;
+                    if (data.ticket_number) {
+                        successDiv.innerHTML += '<br><small>Reference: ' + data.ticket_number + '</small>';
+                    }
+                    successDiv.classList.remove('d-none');
+                    form.reset();
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('complaintModal'));
+                        if (modal) modal.hide();
+                    }, 3000);
+                } else {
+                    errorDiv.textContent = data.error || 'An error occurred. Please try again.';
+                    errorDiv.classList.remove('d-none');
+                }
+            })
+            .catch(error => {
+                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.classList.remove('d-none');
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>Submit Complaint';
+            });
         });
     </script>
 </body>

@@ -109,8 +109,8 @@ class MobileAPI {
         
         $stmt = $this->db->prepare("
             INSERT INTO orders (order_number, package_id, customer_name, customer_email, customer_phone, 
-                customer_address, amount, salesperson_id, order_status, payment_status, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', 'pending', ?)
+                customer_address, amount, salesperson_id, order_status, payment_status, notes, lead_source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', 'pending', ?, 'mobile')
         ");
         
         $stmt->execute([
@@ -126,6 +126,40 @@ class MobileAPI {
         ]);
         
         return (int) $this->db->lastInsertId();
+    }
+    
+    public function createLead(int $salespersonId, array $data): ?int {
+        $orderNumber = 'LEAD-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        
+        $notes = '';
+        if (!empty($data['location'])) {
+            $notes .= "Location: " . $data['location'];
+        }
+        if (!empty($data['description'])) {
+            $notes .= ($notes ? "\n" : '') . "Description: " . $data['description'];
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO orders (order_number, customer_name, customer_phone, customer_address, 
+                salesperson_id, order_status, payment_status, notes, lead_source, amount)
+            VALUES (?, ?, ?, ?, ?, 'new', 'pending', ?, 'mobile_lead', 0)
+        ");
+        
+        $stmt->execute([
+            $orderNumber,
+            $data['customer_name'],
+            $data['customer_phone'],
+            $data['location'] ?? null,
+            $salespersonId,
+            $notes
+        ]);
+        
+        return (int) $this->db->lastInsertId();
+    }
+    
+    public function getNewOrdersCount(): int {
+        $stmt = $this->db->query("SELECT COUNT(*) FROM orders WHERE order_status = 'new'");
+        return (int) $stmt->fetchColumn();
     }
     
     public function getServicePackages(): array {

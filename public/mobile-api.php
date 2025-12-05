@@ -152,6 +152,29 @@ try {
             echo json_encode(['success' => true, 'order_id' => $orderId]);
             break;
             
+        case 'create-lead':
+            requireAuth();
+            $salesperson = $api->getSalespersonByUserId($user['id']);
+            if (!$salesperson) {
+                echo json_encode(['success' => false, 'error' => 'Not a salesperson']);
+                break;
+            }
+            
+            if (empty($input['customer_name']) || empty($input['customer_phone']) || empty($input['location'])) {
+                echo json_encode(['success' => false, 'error' => 'Customer name, phone, and location are required']);
+                break;
+            }
+            
+            $leadId = $api->createLead($salesperson['id'], $input);
+            echo json_encode(['success' => true, 'lead_id' => $leadId, 'message' => 'Lead submitted successfully']);
+            break;
+            
+        case 'new-orders-count':
+            requireAuth();
+            $count = $api->getNewOrdersCount();
+            echo json_encode(['success' => true, 'count' => $count]);
+            break;
+            
         case 'technician-dashboard':
             requireAuth();
             $data = $api->getTechnicianDashboard($user['id']);

@@ -93,6 +93,10 @@
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
+                <a href="#" class="nav-item" onclick="app.showNewLead()">
+                    <i class="bi bi-person-plus"></i>
+                    <span>New Lead</span>
+                </a>
                 <a href="#" class="nav-item" onclick="app.showNewOrder()">
                     <i class="bi bi-plus-circle"></i>
                     <span>New Order</span>
@@ -180,6 +184,42 @@
                     <span>Performance</span>
                 </a>
             </nav>
+        </div>
+
+        <div id="new-lead-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">New Lead</span>
+                    <span></span>
+                </div>
+            </nav>
+
+            <div class="main-content form-content">
+                <form id="new-lead-form">
+                    <div class="mb-3">
+                        <label class="form-label">Customer Name *</label>
+                        <input type="text" class="form-control" id="lead-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="tel" class="form-control" id="lead-phone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location *</label>
+                        <input type="text" class="form-control" id="lead-location" placeholder="e.g., Westlands, Nairobi" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="lead-description" rows="3" placeholder="Any additional details about the lead..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-person-plus"></i> Submit Lead
+                    </button>
+                </form>
+            </div>
         </div>
 
         <div id="new-order-screen" class="screen">

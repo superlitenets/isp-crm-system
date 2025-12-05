@@ -27,6 +27,11 @@ const app = {
             this.createOrder();
         });
         
+        document.getElementById('new-lead-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.createLead();
+        });
+        
         this.updateClock();
         setInterval(() => this.updateClock(), 1000);
         
@@ -220,6 +225,35 @@ const app = {
             this.loadSalespersonDashboard();
         } else {
             this.showToast(result.error || 'Failed to create order', 'danger');
+        }
+    },
+    
+    showNewLead() {
+        this.showScreen('new-lead-screen');
+    },
+    
+    async createLead() {
+        const data = {
+            customer_name: document.getElementById('lead-name').value,
+            customer_phone: document.getElementById('lead-phone').value,
+            location: document.getElementById('lead-location').value,
+            description: document.getElementById('lead-description').value
+        };
+        
+        if (!data.customer_name || !data.customer_phone || !data.location) {
+            this.showToast('Please fill in all required fields', 'warning');
+            return;
+        }
+        
+        const result = await this.api('create-lead', 'POST', data);
+        
+        if (result.success) {
+            this.showToast('Lead submitted successfully!', 'success');
+            document.getElementById('new-lead-form').reset();
+            this.goBack();
+            this.loadSalespersonDashboard();
+        } else {
+            this.showToast(result.error || 'Failed to submit lead', 'danger');
         }
     },
     

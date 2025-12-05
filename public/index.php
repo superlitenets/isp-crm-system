@@ -146,6 +146,80 @@ if ($page === 'api' && $action === 'sync_biometric_device') {
     exit;
 }
 
+if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    
+    if (!empty($_POST['honeypot'])) {
+        echo json_encode(['success' => false, 'error' => 'Invalid submission']);
+        exit;
+    }
+    
+    $name = trim($_POST['name'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $category = trim($_POST['category'] ?? 'general');
+    $subject = trim($_POST['subject'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $location = trim($_POST['location'] ?? '');
+    
+    if (empty($name) || empty($phone) || empty($subject) || empty($description)) {
+        echo json_encode(['success' => false, 'error' => 'Please fill in all required fields']);
+        exit;
+    }
+    
+    try {
+        $customerId = null;
+        $stmt = $db->prepare("SELECT id FROM customers WHERE phone = ?");
+        $stmt->execute([$phone]);
+        $existingCustomer = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existingCustomer) {
+            $customerId = $existingCustomer['id'];
+        } else {
+            $accountNumber = 'CPL-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            $customerAddress = $location ?: 'Not provided';
+            $stmt = $db->prepare("INSERT INTO customers (account_number, name, phone, email, address, service_plan) VALUES (?, ?, ?, ?, ?, ?) RETURNING id");
+            $stmt->execute([$accountNumber, $name, $phone, $email ?: null, $customerAddress, 'Complaint']);
+            $customerId = $stmt->fetchColumn();
+        }
+        
+        $ticketNumber = 'CPL-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        
+        $categoryMapping = [
+            'connectivity' => 'fault',
+            'speed' => 'fault',
+            'billing' => 'billing',
+            'equipment' => 'fault',
+            'service' => 'general',
+            'other' => 'general'
+        ];
+        $ticketCategory = $categoryMapping[$category] ?? 'general';
+        
+        $fullDescription = $description;
+        if ($location) {
+            $fullDescription .= "\n\nLocation: " . $location;
+        }
+        $fullDescription .= "\n\nSubmitted via: Public Complaint Form";
+        $fullDescription .= "\nCategory: " . ucfirst($category);
+        
+        $stmt = $db->prepare("
+            INSERT INTO tickets (ticket_number, subject, description, category, priority, customer_id, status, source)
+            VALUES (?, ?, ?, ?, 'medium', ?, 'open', 'public')
+        ");
+        $stmt->execute([$ticketNumber, $subject, $fullDescription, $ticketCategory, $customerId]);
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Your complaint has been submitted successfully. We will contact you soon.',
+            'ticket_number' => $ticketNumber
+        ]);
+    } catch (Exception $e) {
+        error_log("Public complaint submission error: " . $e->getMessage());
+        echo json_encode(['success' => false, 'error' => 'An error occurred. Please try again later.']);
+    }
+    exit;
+}
+
 $requestUri = strtok($_SERVER['REQUEST_URI'], '?');
 $isHomepage = ($requestUri === '/' || $requestUri === '/index.php') && !isset($_GET['page']);
 if ($page === 'landing' || $isHomepage) {
@@ -2298,8 +2372,14 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <?php 
+                $newOrdersCount = $db->query("SELECT COUNT(*) FROM orders WHERE order_status = 'new'")->fetchColumn();
+                ?>
                 <a class="nav-link <?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders">
                     <i class="bi bi-cart3"></i> Orders
+                    <?php if ($newOrdersCount > 0): ?>
+                    <span class="badge bg-danger rounded-pill ms-1"><?= $newOrdersCount ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
