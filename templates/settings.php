@@ -1122,7 +1122,13 @@ if ($action === 'sync_device' && $id) {
     
     <?php if ($action === 'map_users' && $id): ?>
     <?php
-    $deviceUsers = $biometricService->getDeviceUsers($id);
+    $deviceUsers = [];
+    $deviceConnectionError = null;
+    try {
+        $deviceUsers = $biometricService->getDeviceUsers($id);
+    } catch (Exception $e) {
+        $deviceConnectionError = $e->getMessage();
+    }
     $mappings = $biometricService->getUserMappings($id);
     $employees = (new \App\Employee($db))->getAllEmployees();
     $mappedDeviceUsers = array_column($mappings, 'device_user_id');
@@ -1133,6 +1139,16 @@ if ($action === 'sync_device' && $id) {
                 <h5 class="mb-0"><i class="bi bi-people"></i> User Mappings</h5>
             </div>
             <div class="card-body">
+                <?php if (empty($deviceUsers)): ?>
+                <div class="alert alert-warning small">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    <?php if ($deviceConnectionError): ?>
+                    Could not connect to device: <?= htmlspecialchars($deviceConnectionError) ?>
+                    <?php else: ?>
+                    Could not fetch users from device. The server may not be able to reach the biometric device. You can still add mappings manually.
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
                 <p class="small text-muted">Map device users to employees to sync their attendance.</p>
                 
                 <?php if (!empty($mappings)): ?>
@@ -1156,7 +1172,7 @@ if ($action === 'sync_device' && $id) {
                 <?php endif; ?>
                 
                 <h6>Add Mapping</h6>
-                <form method="POST">
+                <form method="POST" action="?page=settings&subpage=biometric&action=map_users&id=<?= $id ?>">
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                     <input type="hidden" name="action" value="save_user_mapping">
                     <input type="hidden" name="device_id" value="<?= $id ?>">
