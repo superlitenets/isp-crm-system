@@ -6,6 +6,9 @@ class SmartOLT {
     private $apiUrl;
     private $apiKey;
     private $timeout = 60;
+    private static $cache = [];
+    private static $cacheExpiry = [];
+    private $cacheTTL = 300; // 5 minutes cache
     
     public function __construct(\PDO $db) {
         $this->db = $db;
@@ -70,10 +73,31 @@ class SmartOLT {
             $stmt->execute([$key, $value]);
         }
         
+        self::clearCache();
         return true;
     }
     
-    private function makeRequest(string $endpoint, string $method = 'GET', array $data = []): array {
+    private function getFromCache(string $key): ?array {
+        if (isset(self::$cache[$key]) && isset(self::$cacheExpiry[$key])) {
+            if (self::$cacheExpiry[$key] > time()) {
+                return self::$cache[$key];
+            }
+            unset(self::$cache[$key], self::$cacheExpiry[$key]);
+        }
+        return null;
+    }
+    
+    private function setCache(string $key, array $data): void {
+        self::$cache[$key] = $data;
+        self::$cacheExpiry[$key] = time() + $this->cacheTTL;
+    }
+    
+    public static function clearCache(): void {
+        self::$cache = [];
+        self::$cacheExpiry = [];
+    }
+    
+    private function makeRequest(string $endpoint, string $method = 'GET', array $data = [], bool $useCache = true): array {
         if (!$this->isConfigured()) {
             return ['status' => false, 'error' => 'SmartOLT is not configured'];
         }
@@ -83,6 +107,15 @@ class SmartOLT {
             $baseUrl .= '/api';
         }
         $url = $baseUrl . '/' . ltrim($endpoint, '/');
+        
+        // Check cache for GET requests
+        $cacheKey = md5($url . json_encode($data));
+        if ($method === 'GET' && $useCache) {
+            $cached = $this->getFromCache($cacheKey);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
         
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -138,10 +171,17 @@ class SmartOLT {
         }
         
         if (!isset($decoded['status'])) {
-            return ['status' => true, 'response' => $decoded];
+            $result = ['status' => true, 'response' => $decoded];
+        } else {
+            $result = $decoded;
         }
         
-        return $decoded;
+        // Cache successful GET responses
+        if ($method === 'GET' && $useCache && ($result['status'] ?? false)) {
+            $this->setCache($cacheKey, $result);
+        }
+        
+        return $result;
     }
     
     public function testConnection(): array {

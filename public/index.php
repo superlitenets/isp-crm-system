@@ -252,6 +252,31 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
     exit;
 }
 
+if ($page === 'api' && $action === 'smartolt_stats') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    try {
+        $smartolt = new \App\SmartOLT($db);
+        $forceRefresh = isset($_GET['refresh']);
+        
+        if ($forceRefresh) {
+            \App\SmartOLT::clearCache();
+        }
+        
+        $stats = $smartolt->getDashboardStats();
+        echo json_encode(['success' => true, 'stats' => $stats]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'smartolt_onu_action') {
     ob_clean();
     header('Content-Type: application/json');

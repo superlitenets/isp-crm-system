@@ -4,13 +4,14 @@ $isConfigured = $smartolt->isConfigured();
 $view = $_GET['view'] ?? 'dashboard';
 $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
 $filter = $_GET['filter'] ?? null;
+$useAjax = ($view === 'dashboard' && !$filter && !$oltId);
 
 $stats = [];
 $oltDetails = null;
 $filteredONUs = [];
 $provisioningOptions = [];
 
-if ($isConfigured) {
+if ($isConfigured && !$useAjax) {
     if ($view === 'dashboard' || $view === 'olt') {
         $stats = $smartolt->getDashboardStats();
     }
@@ -62,9 +63,15 @@ if ($isConfigured) {
             <i class="bi bi-router text-primary me-2"></i>SmartOLT
         </h1>
         <?php if ($isConfigured): ?>
+        <?php if ($useAjax): ?>
+        <button type="button" class="btn btn-outline-primary" onclick="loadSmartOLTData(true)" id="refresh-btn">
+            <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
+        </button>
+        <?php else: ?>
         <a href="?page=smartolt" class="btn btn-outline-primary">
             <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
         </a>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 
@@ -363,12 +370,30 @@ if ($isConfigured) {
     
     <?php else: ?>
     
+    <?php if ($useAjax): ?>
+    <div id="smartolt-loading" class="text-center py-5">
+        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted">Loading SmartOLT data... This may take a moment.</p>
+        <small class="text-muted">Data is cached for 5 minutes to improve performance.</small>
+    </div>
+    <div id="smartolt-error" class="alert alert-danger d-none" role="alert">
+        <strong><i class="bi bi-exclamation-triangle me-2"></i>Error loading data:</strong>
+        <span id="smartolt-error-msg"></span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-3" onclick="loadSmartOLTData(true)">
+            <i class="bi bi-arrow-clockwise me-1"></i>Retry
+        </button>
+    </div>
+    <div id="smartolt-content" class="d-none">
+    <?php endif; ?>
+    
     <div class="row g-4 mb-4">
         <div class="col-md-4 col-lg-2">
             <div class="card text-center h-100 border-primary">
                 <div class="card-body">
                     <i class="bi bi-router display-4 text-primary mb-2"></i>
-                    <h3 class="mb-0"><?= $stats['total_olts'] ?? 0 ?></h3>
+                    <h3 class="mb-0" id="stat-total-olts"><?= $stats['total_olts'] ?? 0 ?></h3>
                     <small class="text-muted">Total OLTs</small>
                 </div>
             </div>
@@ -378,7 +403,7 @@ if ($isConfigured) {
                 <div class="card text-center h-100 border-success">
                     <div class="card-body">
                         <i class="bi bi-wifi display-4 text-success mb-2"></i>
-                        <h3 class="mb-0"><?= $stats['online_onus'] ?? 0 ?></h3>
+                        <h3 class="mb-0" id="stat-online-onus"><?= $stats['online_onus'] ?? 0 ?></h3>
                         <small class="text-muted">Online ONUs</small>
                     </div>
                 </div>
@@ -389,7 +414,7 @@ if ($isConfigured) {
                 <div class="card text-center h-100 border-warning">
                     <div class="card-body">
                         <i class="bi bi-question-circle display-4 text-warning mb-2"></i>
-                        <h3 class="mb-0"><?= $stats['unconfigured_onus'] ?? 0 ?></h3>
+                        <h3 class="mb-0" id="stat-unconfigured-onus"><?= $stats['unconfigured_onus'] ?? 0 ?></h3>
                         <small class="text-muted">Unconfigured</small>
                     </div>
                 </div>
@@ -400,7 +425,7 @@ if ($isConfigured) {
                 <div class="card text-center h-100 border-danger">
                     <div class="card-body">
                         <i class="bi bi-x-circle display-4 text-danger mb-2"></i>
-                        <h3 class="mb-0"><?= $stats['los_onus'] ?? 0 ?></h3>
+                        <h3 class="mb-0" id="stat-los-onus"><?= $stats['los_onus'] ?? 0 ?></h3>
                         <small class="text-muted">LOS</small>
                     </div>
                 </div>
@@ -411,7 +436,7 @@ if ($isConfigured) {
                 <div class="card text-center h-100 border-danger">
                     <div class="card-body">
                         <i class="bi bi-lightning display-4 text-danger mb-2"></i>
-                        <h3 class="mb-0"><?= $stats['power_fail_onus'] ?? 0 ?></h3>
+                        <h3 class="mb-0" id="stat-power-fail-onus"><?= $stats['power_fail_onus'] ?? 0 ?></h3>
                         <small class="text-muted">Power Fail</small>
                     </div>
                 </div>
@@ -422,7 +447,7 @@ if ($isConfigured) {
                 <div class="card text-center h-100 border-danger">
                     <div class="card-body">
                         <i class="bi bi-exclamation-triangle display-4 text-danger mb-2"></i>
-                        <h3 class="mb-0"><?= $stats['critical_power_onus'] ?? 0 ?></h3>
+                        <h3 class="mb-0" id="stat-critical-power-onus"><?= $stats['critical_power_onus'] ?? 0 ?></h3>
                         <small class="text-muted">Critical Power</small>
                     </div>
                 </div>
@@ -437,11 +462,11 @@ if ($isConfigured) {
                     <h5 class="mb-0"><i class="bi bi-router me-2"></i>OLT Status</h5>
                 </div>
                 <div class="card-body">
-                    <?php if (empty($stats['olts'])): ?>
+                    <?php if (empty($stats['olts']) && !$useAjax): ?>
                     <p class="text-muted mb-0">No OLTs found or unable to retrieve OLT data.</p>
                     <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover" id="olt-table">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -453,7 +478,7 @@ if ($isConfigured) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($stats['olts'] as $olt): ?>
+                                <?php foreach (($stats['olts'] ?? []) as $olt): ?>
                                 <tr>
                                     <td>
                                         <strong><?= htmlspecialchars($olt['name'] ?? 'N/A') ?></strong>
@@ -534,31 +559,31 @@ if ($isConfigured) {
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span>Configured ONUs</span>
-                            <strong><?= $stats['configured_onus'] ?? 0 ?></strong>
+                            <strong id="summary-configured"><?= $stats['configured_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-success"><i class="bi bi-check-circle me-1"></i> Online</span>
-                            <strong class="text-success"><?= $stats['online_onus'] ?? 0 ?></strong>
+                            <strong class="text-success" id="summary-online"><?= $stats['online_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-secondary"><i class="bi bi-wifi-off me-1"></i> Offline</span>
-                            <strong><?= $stats['offline_onus'] ?? 0 ?></strong>
+                            <strong id="summary-offline"><?= $stats['offline_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-danger"><i class="bi bi-x-circle me-1"></i> LOS</span>
-                            <strong class="text-danger"><?= $stats['los_onus'] ?? 0 ?></strong>
+                            <strong class="text-danger" id="summary-los"><?= $stats['los_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-danger"><i class="bi bi-lightning me-1"></i> Power Fail</span>
-                            <strong class="text-danger"><?= $stats['power_fail_onus'] ?? 0 ?></strong>
+                            <strong class="text-danger" id="summary-power-fail"><?= $stats['power_fail_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-warning"><i class="bi bi-exclamation-circle me-1"></i> Low Power</span>
-                            <strong class="text-warning"><?= $stats['low_power_onus'] ?? 0 ?></strong>
+                            <strong class="text-warning" id="summary-low-power"><?= $stats['low_power_onus'] ?? 0 ?></strong>
                         </li>
                         <li class="list-group-item d-flex justify-content-between px-0">
                             <span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Critical Power</span>
-                            <strong class="text-danger"><?= $stats['critical_power_onus'] ?? 0 ?></strong>
+                            <strong class="text-danger" id="summary-critical"><?= $stats['critical_power_onus'] ?? 0 ?></strong>
                         </li>
                     </ul>
                 </div>
@@ -566,10 +591,140 @@ if ($isConfigured) {
         </div>
     </div>
     
+    <?php if ($useAjax): ?>
+    </div>
+    <?php endif; ?>
+    
     <?php endif; ?>
     
     <?php endif; ?>
 </div>
+
+<?php if ($useAjax): ?>
+<script>
+function loadSmartOLTData(forceRefresh = false) {
+    const loadingEl = document.getElementById('smartolt-loading');
+    const contentEl = document.getElementById('smartolt-content');
+    const errorEl = document.getElementById('smartolt-error');
+    const errorMsgEl = document.getElementById('smartolt-error-msg');
+    
+    loadingEl.classList.remove('d-none');
+    contentEl.classList.add('d-none');
+    errorEl.classList.add('d-none');
+    
+    const url = '?page=api&action=smartolt_stats' + (forceRefresh ? '&refresh=1' : '');
+    
+    fetch(url, { credentials: 'same-origin' })
+        .then(response => response.json())
+        .then(data => {
+            loadingEl.classList.add('d-none');
+            
+            if (data.success && data.stats) {
+                const s = data.stats;
+                document.getElementById('stat-total-olts').textContent = s.total_olts || 0;
+                document.getElementById('stat-online-onus').textContent = s.online_onus || 0;
+                document.getElementById('stat-unconfigured-onus').textContent = s.unconfigured_onus || 0;
+                document.getElementById('stat-los-onus').textContent = s.los_onus || 0;
+                document.getElementById('stat-power-fail-onus').textContent = s.power_fail_onus || 0;
+                document.getElementById('stat-critical-power-onus').textContent = s.critical_power_onus || 0;
+                
+                if (s.olts && s.olts.length > 0) {
+                    updateOLTTable(s.olts);
+                }
+                
+                updateONUSummary(s);
+                
+                if (s.errors && Object.keys(s.errors).length > 0) {
+                    showAPIErrors(s.errors);
+                }
+                
+                contentEl.classList.remove('d-none');
+            } else {
+                errorMsgEl.textContent = data.error || 'Failed to load data';
+                errorEl.classList.remove('d-none');
+            }
+        })
+        .catch(err => {
+            loadingEl.classList.add('d-none');
+            errorMsgEl.textContent = 'Network error: ' + err.message;
+            errorEl.classList.remove('d-none');
+        });
+}
+
+function updateOLTTable(olts) {
+    const tbody = document.querySelector('#olt-table tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    olts.forEach(olt => {
+        const tr = document.createElement('tr');
+        const uptimeClass = olt.uptime ? 'success' : 'secondary';
+        const tempClass = olt.temperature && olt.temperature > 60 ? 'warning' : 'secondary';
+        
+        tr.innerHTML = `
+            <td><a href="?page=smartolt&view=olt&olt_id=${olt.id}"><strong>${escapeHtml(olt.name || 'OLT ' + olt.id)}</strong></a></td>
+            <td><code>${escapeHtml(olt.ip || 'N/A')}</code></td>
+            <td>${escapeHtml(olt.hardware || 'N/A')}</td>
+            <td><span class="badge bg-${uptimeClass}">${escapeHtml(olt.uptime || 'Unknown')}</span></td>
+            <td><span class="badge bg-${tempClass}">${olt.temperature ? olt.temperature + '°C' : 'N/A'}</span></td>
+            <td>${olt.onu_count || 0}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function updateONUSummary(stats) {
+    const elements = {
+        'summary-configured': stats.configured_onus || 0,
+        'summary-online': stats.online_onus || 0,
+        'summary-offline': stats.offline_onus || 0,
+        'summary-los': stats.los_onus || 0,
+        'summary-power-fail': stats.power_fail_onus || 0,
+        'summary-low-power': stats.low_power_onus || 0,
+        'summary-critical': stats.critical_power_onus || 0
+    };
+    
+    for (const [id, value] of Object.entries(elements)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+}
+
+function showAPIErrors(errors) {
+    const container = document.querySelector('.container-fluid');
+    const existingAlert = document.getElementById('api-errors-alert');
+    if (existingAlert) existingAlert.remove();
+    
+    let errorsHtml = '<ul class="mb-0 mt-2">';
+    for (const [endpoint, error] of Object.entries(errors)) {
+        errorsHtml += `<li><strong>${endpoint}:</strong> ${escapeHtml(error)}</li>`;
+    }
+    errorsHtml += '</ul>';
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'api-errors-alert';
+    alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        <strong><i class="bi bi-exclamation-triangle me-2"></i>Some API Errors:</strong>
+        ${errorsHtml}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const firstChild = container.querySelector('.d-flex');
+    if (firstChild) firstChild.after(alertDiv);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSmartOLTData();
+});
+</script>
+<?php endif; ?>
 
 <?php if ($filter === 'unconfigured' && !empty($provisioningOptions)): ?>
 <div class="modal fade" id="provisionModal" tabindex="-1">
