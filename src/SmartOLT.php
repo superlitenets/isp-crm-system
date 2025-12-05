@@ -219,23 +219,23 @@ class SmartOLT {
     }
     
     public function getAllUnconfiguredONUs(): array {
-        return $this->makeRequest('onu/get_unconfigured_onus');
+        return $this->makeRequest('onu/get_unconfigured_onus', 'POST');
     }
     
     public function getUnconfiguredONUsByOLT(int $oltId): array {
-        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}");
+        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}", 'POST');
     }
     
     public function getAllONUsStatuses(): array {
-        return $this->makeRequest('onu/get_all_onus_statuses');
+        return $this->makeRequest('onu/get_all_onus_statuses', 'POST');
     }
     
     public function getAllONUsSignals(): array {
-        return $this->makeRequest('onu/get_all_onus_signals');
+        return $this->makeRequest('onu/get_all_onus_signals', 'POST');
     }
     
     public function getAllONUsDetails(): array {
-        return $this->makeRequest('onu/get_all_onus_details');
+        return $this->makeRequest('onu/get_all_onus_details', 'POST');
     }
     
     public function getONUStatus(string $externalId): array {
