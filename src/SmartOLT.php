@@ -103,10 +103,12 @@ class SmartOLT {
         }
         
         $baseUrl = rtrim($this->apiUrl, '/');
-        if (!preg_match('/\/api\/?$/', $baseUrl)) {
-            $baseUrl .= '/api';
-        }
-        $url = $baseUrl . '/' . ltrim($endpoint, '/');
+        
+        // Remove duplicate /api if user entered it in the URL
+        $baseUrl = preg_replace('/\/api\/?$/', '', $baseUrl);
+        
+        // Build the full URL
+        $url = $baseUrl . '/api/' . ltrim($endpoint, '/');
         
         // Check cache for GET requests
         $cacheKey = md5($url . json_encode($data));
@@ -150,7 +152,7 @@ class SmartOLT {
         }
         
         if ($httpCode !== 200) {
-            return ['status' => false, 'error' => 'HTTP error: ' . $httpCode];
+            return ['status' => false, 'error' => 'HTTP error: ' . $httpCode . ' (URL: ' . $url . ')'];
         }
         
         if (empty($response)) {
@@ -219,23 +221,23 @@ class SmartOLT {
     }
     
     public function getAllUnconfiguredONUs(): array {
-        return $this->makeRequest('onu/get_unconfigured_onus', 'POST');
+        return $this->makeRequest('onu/get_unconfigured_onus');
     }
     
     public function getUnconfiguredONUsByOLT(int $oltId): array {
-        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}", 'POST');
+        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}");
     }
     
     public function getAllONUsStatuses(): array {
-        return $this->makeRequest('onu/get_all_onus_statuses', 'POST');
+        return $this->makeRequest('onu/get_all_onus_statuses');
     }
     
     public function getAllONUsSignals(): array {
-        return $this->makeRequest('onu/get_all_onus_signals', 'POST');
+        return $this->makeRequest('onu/get_all_onus_signals');
     }
     
     public function getAllONUsDetails(): array {
-        return $this->makeRequest('onu/get_all_onus_details', 'POST');
+        return $this->makeRequest('onu/get_all_onus_details');
     }
     
     public function getONUStatus(string $externalId): array {
