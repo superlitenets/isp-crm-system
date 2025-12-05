@@ -3072,7 +3072,7 @@ $sla = new \App\SLA();
 $slaPolicies = $sla->getAllPolicies();
 $businessHours = $sla->getBusinessHours();
 $holidays = $sla->getHolidays();
-$users = $settings->getAllUsers();
+$users = $db->query("SELECT id, name, email FROM users ORDER BY name")->fetchAll();
 $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 ?>
 
