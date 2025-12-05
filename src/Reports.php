@@ -304,6 +304,18 @@ class Reports {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getAllEmployeesWithUsers(): array {
+        $stmt = $this->db->query("
+            SELECT e.id, e.name, e.email, e.position, e.user_id,
+                   u.name as user_name, u.role as user_role
+            FROM employees e
+            LEFT JOIN users u ON e.user_id = u.id
+            WHERE e.employment_status = 'active' OR e.employment_status IS NULL
+            ORDER BY e.name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getActiveUsers(): array {
         $stmt = $this->db->query("
             SELECT DISTINCT u.id, u.name, u.email, u.role
