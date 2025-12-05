@@ -94,8 +94,11 @@ $dashboardStats = $ticket->getStats($userFilterId);
                 <a href="?page=tickets&action=create" class="btn btn-primary btn-sm me-2">
                     <i class="bi bi-plus-circle"></i> New Ticket
                 </a>
-                <a href="?page=customers&action=create" class="btn btn-outline-primary btn-sm">
+                <a href="?page=customers&action=create" class="btn btn-outline-primary btn-sm me-2">
                     <i class="bi bi-person-plus"></i> Add Customer
+                </a>
+                <a href="?page=orders&action=create" class="btn btn-success btn-sm">
+                    <i class="bi bi-cart-plus"></i> New Order
                 </a>
             </div>
         </div>

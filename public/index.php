@@ -2626,37 +2626,74 @@ if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $orderAction = $_GET['action'] ?? '';
+    $orderAction = $_GET['action'] ?? $_POST['action'] ?? '';
     $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
     
     $csrfValid = \App\Auth::validateToken($_POST['csrf_token'] ?? '');
     if (!$csrfValid) {
         $_SESSION['error_message'] = 'Invalid request. Please try again.';
-    } elseif ($orderId) {
+    } else {
         try {
             $orderModel = new \App\Order();
             
-            switch ($orderAction) {
-                case 'confirm':
-                    $orderModel->updateStatus($orderId, 'confirmed');
-                    $_SESSION['success_message'] = 'Order confirmed successfully!';
-                    break;
+            if ($orderAction === 'create_order') {
+                $customerName = trim($_POST['customer_name'] ?? '');
+                $customerPhone = trim($_POST['customer_phone'] ?? '');
+                $customerEmail = trim($_POST['customer_email'] ?? '');
+                $customerAddress = trim($_POST['customer_address'] ?? '');
+                $packageId = !empty($_POST['package_id']) ? (int)$_POST['package_id'] : null;
+                $salespersonId = !empty($_POST['salesperson_id']) ? (int)$_POST['salesperson_id'] : null;
+                $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                $notes = trim($_POST['notes'] ?? '');
+                
+                if (empty($customerName) || empty($customerPhone)) {
+                    $_SESSION['error_message'] = 'Customer name and phone are required.';
+                } else {
+                    $orderData = [
+                        'customer_name' => $customerName,
+                        'customer_phone' => $customerPhone,
+                        'customer_email' => $customerEmail,
+                        'customer_address' => $customerAddress,
+                        'package_id' => $packageId,
+                        'salesperson_id' => $salespersonId,
+                        'customer_id' => $customerId,
+                        'notes' => $notes,
+                        'source' => 'crm',
+                        'created_by' => $currentUser['id']
+                    ];
                     
-                case 'convert':
-                    $ticketId = $orderModel->convertToTicket($orderId, $currentUser['id']);
-                    if ($ticketId) {
-                        $_SESSION['success_message'] = 'Order converted to ticket successfully!';
-                        header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                    $newOrderId = $orderModel->create($orderData);
+                    if ($newOrderId) {
+                        $_SESSION['success_message'] = 'Order created successfully!';
+                        header('Location: ?page=orders&action=view&id=' . $newOrderId);
                         exit;
                     } else {
-                        $_SESSION['error_message'] = 'Failed to convert order to ticket.';
+                        $_SESSION['error_message'] = 'Failed to create order.';
                     }
-                    break;
-                    
-                case 'cancel':
-                    $orderModel->updateStatus($orderId, 'cancelled');
-                    $_SESSION['success_message'] = 'Order cancelled.';
-                    break;
+                }
+            } elseif ($orderId) {
+                switch ($orderAction) {
+                    case 'confirm':
+                        $orderModel->updateStatus($orderId, 'confirmed');
+                        $_SESSION['success_message'] = 'Order confirmed successfully!';
+                        break;
+                        
+                    case 'convert':
+                        $ticketId = $orderModel->convertToTicket($orderId, $currentUser['id']);
+                        if ($ticketId) {
+                            $_SESSION['success_message'] = 'Order converted to ticket successfully!';
+                            header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                            exit;
+                        } else {
+                            $_SESSION['error_message'] = 'Failed to convert order to ticket.';
+                        }
+                        break;
+                        
+                    case 'cancel':
+                        $orderModel->updateStatus($orderId, 'cancelled');
+                        $_SESSION['success_message'] = 'Order cancelled.';
+                        break;
+                }
             }
             \App\Auth::regenerateToken();
         } catch (Exception $e) {

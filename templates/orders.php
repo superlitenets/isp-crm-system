@@ -15,6 +15,9 @@ $stats = $orderModel->getStats($orderUserFilter);
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-cart3"></i> Orders</h2>
     <div class="d-flex gap-2">
+        <a href="?page=orders&action=create" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> New Order
+        </a>
         <form method="GET" class="d-flex gap-2">
             <input type="hidden" name="page" value="orders">
             <select name="status" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
@@ -74,7 +77,140 @@ $stats = $orderModel->getStats($orderUserFilter);
     </div>
 </div>
 
-<?php if ($action === 'view' && $order): ?>
+<?php if ($action === 'create'): ?>
+<?php
+$packages = $db->query("SELECT id, name, speed, speed_unit, price FROM service_packages WHERE is_active = TRUE ORDER BY display_order, name")->fetchAll(PDO::FETCH_ASSOC);
+$customers = $db->query("SELECT id, name, phone, email, account_number FROM customers ORDER BY name LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+?>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-cart-plus"></i> Create New Order</h5>
+                <a href="?page=orders" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="?page=orders">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="action" value="create_order">
+                    
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="customer_type" id="new_customer" value="new" checked onchange="toggleCustomerFields()">
+                                <label class="form-check-label" for="new_customer">New Customer</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="customer_type" id="existing_customer" value="existing" onchange="toggleCustomerFields()">
+                                <label class="form-check-label" for="existing_customer">Existing Customer</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="existing-customer-section" class="mb-3 d-none">
+                        <label class="form-label">Select Customer</label>
+                        <select name="customer_id" id="customer_id" class="form-select" onchange="fillCustomerDetails()">
+                            <option value="">-- Select Customer --</option>
+                            <?php foreach ($customers as $c): ?>
+                            <option value="<?= $c['id'] ?>" data-name="<?= htmlspecialchars($c['name']) ?>" 
+                                    data-phone="<?= htmlspecialchars($c['phone']) ?>" 
+                                    data-email="<?= htmlspecialchars($c['email'] ?? '') ?>">
+                                <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div id="new-customer-section">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                <input type="text" name="customer_name" id="customer_name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="tel" name="customer_phone" id="customer_phone" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="customer_email" id="customer_email" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Location/Address <span class="text-danger">*</span></label>
+                                <input type="text" name="customer_address" class="form-control" required placeholder="e.g., Westlands, Nairobi">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Service Package</label>
+                            <select name="package_id" class="form-select">
+                                <option value="">-- No Package Selected --</option>
+                                <?php foreach ($packages as $pkg): ?>
+                                <option value="<?= $pkg['id'] ?>">
+                                    <?= htmlspecialchars($pkg['name']) ?> - <?= $pkg['speed'] ?> <?= $pkg['speed_unit'] ?? 'Mbps' ?> (KES <?= number_format($pkg['price'], 2) ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Assigned Salesperson</label>
+                            <select name="salesperson_id" class="form-select">
+                                <option value="">-- No Salesperson --</option>
+                                <?php foreach ($activeSalespersons as $sp): ?>
+                                <option value="<?= $sp['id'] ?>"><?= htmlspecialchars($sp['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Any additional notes about this order..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Create Order
+                        </button>
+                        <a href="?page=orders" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleCustomerFields() {
+    const isExisting = document.getElementById('existing_customer').checked;
+    document.getElementById('existing-customer-section').classList.toggle('d-none', !isExisting);
+    document.getElementById('new-customer-section').querySelectorAll('input').forEach(input => {
+        if (input.name === 'customer_name' || input.name === 'customer_phone' || input.name === 'customer_address') {
+            input.required = !isExisting;
+        }
+    });
+}
+
+function fillCustomerDetails() {
+    const select = document.getElementById('customer_id');
+    const option = select.options[select.selectedIndex];
+    if (option.value) {
+        document.getElementById('customer_name').value = option.dataset.name || '';
+        document.getElementById('customer_phone').value = option.dataset.phone || '';
+        document.getElementById('customer_email').value = option.dataset.email || '';
+    }
+}
+</script>
+
+<?php elseif ($action === 'view' && $order): ?>
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">

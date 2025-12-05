@@ -98,6 +98,30 @@ body {
 .stat-card.info { border-left: 4px solid #0dcaf0; }
 .stat-card.danger { border-left: 4px solid #dc3545; }
 
+.quick-action-card {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+}
+
+.quick-action-card i {
+    font-size: 1.75rem;
+}
+
 .stat-value {
     font-size: 1.5rem;
     font-weight: 700;

@@ -27,11 +27,6 @@ const app = {
             this.createOrder();
         });
         
-        document.getElementById('new-lead-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.createLead();
-        });
-        
         this.updateClock();
         setInterval(() => this.updateClock(), 1000);
         
@@ -209,12 +204,15 @@ const app = {
         const data = {
             customer_name: document.getElementById('order-name').value,
             customer_phone: document.getElementById('order-phone').value,
-            customer_email: document.getElementById('order-email').value,
             customer_address: document.getElementById('order-address').value,
-            package_id: document.getElementById('order-package').value,
-            amount: document.getElementById('order-amount').value,
+            package_id: document.getElementById('order-package').value || null,
             notes: document.getElementById('order-notes').value
         };
+        
+        if (!data.customer_name || !data.customer_phone || !data.customer_address) {
+            this.showToast('Please fill in all required fields', 'warning');
+            return;
+        }
         
         const result = await this.api('create-order', 'POST', data);
         
@@ -229,32 +227,7 @@ const app = {
     },
     
     showNewLead() {
-        this.showScreen('new-lead-screen');
-    },
-    
-    async createLead() {
-        const data = {
-            customer_name: document.getElementById('lead-name').value,
-            customer_phone: document.getElementById('lead-phone').value,
-            location: document.getElementById('lead-location').value,
-            description: document.getElementById('lead-description').value
-        };
-        
-        if (!data.customer_name || !data.customer_phone || !data.location) {
-            this.showToast('Please fill in all required fields', 'warning');
-            return;
-        }
-        
-        const result = await this.api('create-lead', 'POST', data);
-        
-        if (result.success) {
-            this.showToast('Lead submitted successfully!', 'success');
-            document.getElementById('new-lead-form').reset();
-            this.goBack();
-            this.loadSalespersonDashboard();
-        } else {
-            this.showToast(result.error || 'Failed to submit lead', 'danger');
-        }
+        this.showNewOrder();
     },
     
     async loadTechnicianDashboard() {

@@ -25,11 +25,23 @@ class Order {
     public function create(array $data): int {
         $orderNumber = $this->generateOrderNumber();
         $createdBy = $data['created_by'] ?? ($_SESSION['user_id'] ?? null);
+        $source = $data['source'] ?? 'public';
+        
+        $amount = $data['amount'] ?? null;
+        if (empty($amount) && !empty($data['package_id'])) {
+            $pkgStmt = $this->db->prepare("SELECT price FROM service_packages WHERE id = ?");
+            $pkgStmt->execute([$data['package_id']]);
+            $pkg = $pkgStmt->fetch(\PDO::FETCH_ASSOC);
+            if ($pkg) {
+                $amount = $pkg['price'];
+            }
+        }
         
         $stmt = $this->db->prepare("
             INSERT INTO orders (order_number, package_id, customer_name, customer_email, 
-                               customer_phone, customer_address, amount, payment_method, notes, salesperson_id, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               customer_phone, customer_address, amount, payment_method, notes, 
+                               salesperson_id, created_by, customer_id, lead_source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
         ");
         
@@ -40,25 +52,34 @@ class Order {
             $data['customer_email'] ?? null,
             $data['customer_phone'],
             $data['customer_address'] ?? null,
-            $data['amount'] ?? null,
+            $amount,
             $data['payment_method'] ?? null,
             $data['notes'] ?? null,
             $data['salesperson_id'] ?? null,
-            $createdBy
+            $createdBy,
+            $data['customer_id'] ?? null,
+            $source
         ]);
         
         $orderId = (int) $stmt->fetchColumn();
         
-        if (!empty($data['salesperson_id']) && $orderId) {
-            $this->createCommission($orderId, (int)$data['salesperson_id'], (float)($data['amount'] ?? 0));
+        if (!empty($data['salesperson_id']) && $orderId && $amount > 0) {
+            $this->createCommission($orderId, (int)$data['salesperson_id'], (float)$amount);
         }
         
-        // Send SMS confirmation to customer
-        if (!empty($data['customer_phone'])) {
-            $this->sendOrderConfirmationSMS($orderNumber, $data);
+        try {
+            if (!empty($data['customer_phone'])) {
+                $this->sendOrderConfirmationSMS($orderNumber, $data);
+            }
+        } catch (\Throwable $e) {
+            error_log("Failed to send order confirmation SMS: " . $e->getMessage());
         }
         
-        $this->activityLog->log('create', 'order', $orderId, $orderNumber, "Created order for: " . ($data['customer_name'] ?? 'Unknown'));
+        try {
+            $this->activityLog->log('create', 'order', $orderId, $orderNumber, "Created order for: " . ($data['customer_name'] ?? 'Unknown'));
+        } catch (\Throwable $e) {
+            error_log("Failed to log order activity: " . $e->getMessage());
+        }
         
         return $orderId;
     }
