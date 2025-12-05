@@ -304,6 +304,33 @@ class Reports {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getActiveUsers(): array {
+        $stmt = $this->db->query("
+            SELECT DISTINCT u.id, u.name, u.email, u.role
+            FROM users u
+            WHERE u.id IN (
+                SELECT assigned_to FROM tickets WHERE assigned_to IS NOT NULL
+                UNION
+                SELECT created_by FROM tickets WHERE created_by IS NOT NULL
+                UNION
+                SELECT created_by FROM orders WHERE created_by IS NOT NULL
+                UNION
+                SELECT reviewed_by FROM complaints WHERE reviewed_by IS NOT NULL
+                UNION
+                SELECT user_id FROM activity_logs WHERE user_id IS NOT NULL
+            )
+            ORDER BY u.name
+        ");
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (empty($result)) {
+            $stmt = $this->db->query("SELECT id, name, email, role FROM users ORDER BY name");
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        return $result;
+    }
+
     public function getAllTickets(array $filters = [], int $limit = 50): array {
         $dateWhere = "";
         $params = [];
