@@ -733,6 +733,28 @@ function runMigrations(PDO $db): void {
                 error_message TEXT,
                 sent_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'complaints' => "
+            CREATE TABLE IF NOT EXISTS complaints (
+                id SERIAL PRIMARY KEY,
+                complaint_number VARCHAR(30) UNIQUE NOT NULL,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                customer_name VARCHAR(100) NOT NULL,
+                customer_phone VARCHAR(20) NOT NULL,
+                customer_email VARCHAR(100),
+                customer_location TEXT,
+                category VARCHAR(50) NOT NULL,
+                subject VARCHAR(200) NOT NULL,
+                description TEXT NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                priority VARCHAR(20) DEFAULT 'medium',
+                reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                reviewed_at TIMESTAMP,
+                review_notes TEXT,
+                converted_ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+                source VARCHAR(50) DEFAULT 'public',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

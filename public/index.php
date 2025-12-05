@@ -74,6 +74,7 @@ require_once __DIR__ . '/../src/Role.php';
 require_once __DIR__ . '/../src/SLA.php';
 require_once __DIR__ . '/../src/Order.php';
 require_once __DIR__ . '/../src/Mpesa.php';
+require_once __DIR__ . '/../src/Complaint.php';
 
 initializeDatabase();
 
@@ -231,43 +232,33 @@ if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($existingCustomer) {
             $customerId = $existingCustomer['id'];
-        } else {
-            $accountNumber = 'CPL-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-            $customerAddress = $location ?: 'Not provided';
-            $stmt = $db->prepare("INSERT INTO customers (account_number, name, phone, email, address, service_plan) VALUES (?, ?, ?, ?, ?, ?) RETURNING id");
-            $stmt->execute([$accountNumber, $name, $phone, $email ?: null, $customerAddress, 'Complaint']);
-            $customerId = $stmt->fetchColumn();
         }
-        
-        $ticketNumber = 'CPL-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-        
-        $categoryMapping = [
-            'connectivity' => 'fault',
-            'speed' => 'fault',
-            'billing' => 'billing',
-            'equipment' => 'fault',
-            'service' => 'general',
-            'other' => 'general'
-        ];
-        $ticketCategory = $categoryMapping[$category] ?? 'general';
         
         $fullDescription = $description;
         if ($location) {
             $fullDescription .= "\n\nLocation: " . $location;
         }
         $fullDescription .= "\n\nSubmitted via: Public Complaint Form";
-        $fullDescription .= "\nCategory: " . ucfirst($category);
         
-        $stmt = $db->prepare("
-            INSERT INTO tickets (ticket_number, subject, description, category, priority, customer_id, status, source)
-            VALUES (?, ?, ?, ?, 'medium', ?, 'open', 'public')
-        ");
-        $stmt->execute([$ticketNumber, $subject, $fullDescription, $ticketCategory, $customerId]);
+        $complaintModel = new \App\Complaint();
+        $complaintId = $complaintModel->create([
+            'customer_id' => $customerId,
+            'customer_name' => $name,
+            'customer_phone' => $phone,
+            'customer_email' => $email ?: null,
+            'customer_location' => $location ?: null,
+            'category' => $category,
+            'subject' => $subject,
+            'description' => $fullDescription,
+            'source' => 'public'
+        ]);
+        
+        $complaint = $complaintModel->getById($complaintId);
         
         echo json_encode([
             'success' => true, 
-            'message' => 'Your complaint has been submitted successfully. We will contact you soon.',
-            'ticket_number' => $ticketNumber
+            'message' => 'Your complaint has been submitted successfully. Our team will review it and contact you soon.',
+            'complaint_number' => $complaint['complaint_number']
         ]);
     } catch (Exception $e) {
         error_log("Public complaint submission error: " . $e->getMessage());
@@ -2229,6 +2220,67 @@ if ($page === 'payments' && isset($_GET['action'])) {
     }
 }
 
+if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $complaintAction = $_GET['action'] ?? '';
+    $complaintId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+    
+    $csrfValid = \App\Auth::validateToken($_POST['csrf_token'] ?? '');
+    if (!$csrfValid) {
+        $_SESSION['error_message'] = 'Invalid request. Please try again.';
+    } elseif ($complaintId) {
+        try {
+            $complaintModel = new \App\Complaint();
+            
+            switch ($complaintAction) {
+                case 'approve':
+                    $notes = trim($_POST['review_notes'] ?? '');
+                    $complaintModel->approve($complaintId, $currentUser['id'], $notes);
+                    $_SESSION['success_message'] = 'Complaint approved successfully! You can now convert it to a ticket.';
+                    break;
+                    
+                case 'reject':
+                    $notes = trim($_POST['review_notes'] ?? '');
+                    if (empty($notes)) {
+                        $_SESSION['error_message'] = 'Please provide a reason for rejection.';
+                    } else {
+                        $complaintModel->reject($complaintId, $currentUser['id'], $notes);
+                        $_SESSION['success_message'] = 'Complaint rejected.';
+                    }
+                    break;
+                    
+                case 'convert':
+                    $assignTo = !empty($_POST['assign_to']) ? (int)$_POST['assign_to'] : null;
+                    $teamId = !empty($_POST['team_id']) ? (int)$_POST['team_id'] : null;
+                    $ticketId = $complaintModel->convertToTicket($complaintId, $currentUser['id'], $assignTo, $teamId);
+                    if ($ticketId) {
+                        $_SESSION['success_message'] = 'Complaint converted to ticket successfully!';
+                        header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                        exit;
+                    } else {
+                        $_SESSION['error_message'] = 'Failed to convert complaint to ticket. Make sure it is approved first.';
+                    }
+                    break;
+                    
+                case 'update_priority':
+                    $priority = $_POST['priority'] ?? 'medium';
+                    $complaintModel->updatePriority($complaintId, $priority);
+                    $_SESSION['success_message'] = 'Priority updated.';
+                    break;
+                    
+                case 'delete':
+                    $complaintModel->delete($complaintId);
+                    $_SESSION['success_message'] = 'Complaint deleted.';
+                    break;
+            }
+            \App\Auth::regenerateToken();
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
+    header('Location: ?page=complaints');
+    exit;
+}
+
 if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $orderAction = $_GET['action'] ?? '';
     $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -2439,6 +2491,17 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <?php 
+                $pendingComplaintsCount = $db->query("SELECT COUNT(*) FROM complaints WHERE status = 'pending'")->fetchColumn();
+                ?>
+                <a class="nav-link <?= $page === 'complaints' ? 'active' : '' ?>" href="?page=complaints">
+                    <i class="bi bi-exclamation-triangle"></i> Complaints
+                    <?php if ($pendingComplaintsCount > 0): ?>
+                    <span class="badge bg-warning text-dark rounded-pill ms-1"><?= $pendingComplaintsCount ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -2485,6 +2548,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'orders':
                 include __DIR__ . '/../templates/orders.php';
+                break;
+            case 'complaints':
+                include __DIR__ . '/../templates/complaints.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();
