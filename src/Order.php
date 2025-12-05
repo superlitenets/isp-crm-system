@@ -6,11 +6,13 @@ class Order {
     private \PDO $db;
     private SMSGateway $sms;
     private Settings $settings;
+    private ActivityLog $activityLog;
     
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
         $this->settings = new Settings();
+        $this->activityLog = new ActivityLog();
     }
     
     public function generateOrderNumber(): string {
@@ -53,6 +55,8 @@ class Order {
         if (!empty($data['customer_phone'])) {
             $this->sendOrderConfirmationSMS($orderNumber, $data);
         }
+        
+        $this->activityLog->log('create', 'order', $orderId, $orderNumber, "Created order for: " . ($data['customer_name'] ?? 'Unknown'));
         
         return $orderId;
     }

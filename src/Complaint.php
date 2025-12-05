@@ -8,11 +8,13 @@ class Complaint {
     private PDO $db;
     private SMSGateway $sms;
     private Settings $settings;
+    private ActivityLog $activityLog;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
         $this->settings = new Settings();
+        $this->activityLog = new ActivityLog();
     }
 
     public function create(array $data): int {
@@ -47,6 +49,8 @@ class Complaint {
         if (!empty($data['customer_phone'])) {
             $this->sendComplaintReceivedSMS($complaintNumber, $data);
         }
+        
+        $this->activityLog->log('create', 'complaint', $complaintId, $complaintNumber, "Complaint received: " . ($data['subject'] ?? 'No subject'));
         
         return $complaintId;
     }
@@ -127,6 +131,7 @@ class Complaint {
     }
 
     public function approve(int $id, int $userId, ?string $notes = null): bool {
+        $complaint = $this->getById($id);
         $stmt = $this->db->prepare("
             UPDATE complaints 
             SET status = 'approved', 
@@ -136,7 +141,13 @@ class Complaint {
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND status = 'pending'
         ");
-        return $stmt->execute([$userId, $notes, $id]);
+        $result = $stmt->execute([$userId, $notes, $id]);
+        
+        if ($result && $complaint) {
+            $this->activityLog->log('approve', 'complaint', $id, $complaint['complaint_number'], "Complaint approved");
+        }
+        
+        return $result;
     }
 
     public function reject(int $id, int $userId, string $notes): bool {
@@ -144,6 +155,7 @@ class Complaint {
             throw new \InvalidArgumentException('Rejection reason is required');
         }
         
+        $complaint = $this->getById($id);
         $stmt = $this->db->prepare("
             UPDATE complaints 
             SET status = 'rejected', 
@@ -153,7 +165,13 @@ class Complaint {
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND status = 'pending'
         ");
-        return $stmt->execute([$userId, $notes, $id]);
+        $result = $stmt->execute([$userId, $notes, $id]);
+        
+        if ($result && $complaint) {
+            $this->activityLog->log('reject', 'complaint', $id, $complaint['complaint_number'], "Complaint rejected: " . substr($notes, 0, 100));
+        }
+        
+        return $result;
     }
 
     public function convertToTicket(int $complaintId, int $userId, ?int $assignTo = null, ?int $teamId = null): ?int {
@@ -235,6 +253,9 @@ class Complaint {
             ")->execute([$ticketId, $complaintId]);
             
             $this->db->commit();
+            
+            $this->activityLog->log('convert', 'complaint', $complaintId, $complaint['complaint_number'], "Converted to ticket: {$ticketNumber}");
+            
             return $ticketId;
             
         } catch (\Exception $e) {

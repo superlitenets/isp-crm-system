@@ -75,6 +75,8 @@ require_once __DIR__ . '/../src/SLA.php';
 require_once __DIR__ . '/../src/Order.php';
 require_once __DIR__ . '/../src/Mpesa.php';
 require_once __DIR__ . '/../src/Complaint.php';
+require_once __DIR__ . '/../src/ActivityLog.php';
+require_once __DIR__ . '/../src/Reports.php';
 
 initializeDatabase();
 
@@ -2791,6 +2793,13 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
+            <?php if (\App\Auth::can('reports.view')): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'reports' ? 'active' : '' ?>" href="?page=reports">
+                    <i class="bi bi-graph-up"></i> Reports
+                </a>
+            </li>
+            <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
@@ -2878,6 +2887,13 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/smartolt.php';
+                }
+                break;
+            case 'reports':
+                if (!\App\Auth::can('reports.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/reports.php';
                 }
                 break;
             case 'settings':

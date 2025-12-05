@@ -7,11 +7,13 @@ class Ticket {
     private SMSGateway $sms;
     private ?SLA $sla = null;
     private Settings $settings;
+    private ActivityLog $activityLog;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
         $this->settings = new Settings();
+        $this->activityLog = new ActivityLog();
     }
 
     private function getSLA(): SLA {
@@ -79,6 +81,13 @@ class Ticket {
 
         if ($teamId) {
             $this->notifyTeamMembers($ticketId, $teamId);
+        }
+
+        $this->activityLog->log('create', 'ticket', $ticketId, $ticketNumber, "Created ticket: {$data['subject']}");
+        
+        if ($assignedTo) {
+            $user = $this->getUser($assignedTo);
+            $this->activityLog->log('assign', 'ticket', $ticketId, $ticketNumber, "Assigned to: " . ($user['name'] ?? 'Unknown'));
         }
 
         return $ticketId;
@@ -165,6 +174,19 @@ class Ticket {
 
         if ($result && isset($data['team_id']) && $data['team_id'] != $ticket['team_id'] && !empty($data['team_id'])) {
             $this->notifyTeamMembers($id, (int)$data['team_id']);
+        }
+
+        if ($result) {
+            if (isset($data['status']) && $data['status'] !== $ticket['status']) {
+                $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Status changed to: " . ucfirst($data['status']));
+            }
+            if (isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) {
+                $user = $this->getUser($data['assigned_to']);
+                $this->activityLog->log('assign', 'ticket', $id, $ticket['ticket_number'], "Assigned to: " . ($user['name'] ?? 'Unassigned'));
+            }
+            if (isset($data['priority']) && $data['priority'] !== $ticket['priority']) {
+                $this->activityLog->log('update', 'ticket', $id, $ticket['ticket_number'], "Priority changed to: " . ucfirst($data['priority']));
+            }
         }
 
         return $result;

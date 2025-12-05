@@ -1,6 +1,23 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added Reports & Activity Logs
+  - New `activity_logs` database table for tracking user actions
+  - New `ActivityLog.php` and `Reports.php` classes for logging and reporting
+  - Reports page (`?page=reports`) with multiple tabs:
+    - **Overview:** Summary stats for tickets, orders, and complaints
+    - **Tickets:** Performance by assigned user (resolution rate, SLA breaches)
+    - **Orders:** Sales performance by salesperson
+    - **Complaints:** Review statistics by reviewer
+    - **Activity Log:** Detailed action history with filters
+    - **User Performance:** Summary of all user activities
+  - Date range and user filters for all reports
+  - Automatic activity logging for:
+    - Ticket creation, assignment, status changes, priority updates
+    - Order creation
+    - Complaint creation, approval, rejection, conversion
+  - Permission-based access (`reports.view` permission for Admin, Manager, Viewer roles)
+  - SMS notifications now use configurable templates from Settings
 - **December 2024**: Added SmartOLT Integration for Network Monitoring
   - New `SmartOLT.php` class with comprehensive API integration
   - Settings stored in existing `settings` table with `smartolt_api_url` and `smartolt_api_key`
