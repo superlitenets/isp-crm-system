@@ -13,15 +13,20 @@ class SmartOLT {
     }
     
     private function loadSettings(): void {
-        $stmt = $this->db->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
-        
-        $stmt->execute(['smartolt_api_url']);
-        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-        $this->apiUrl = $result ? rtrim($result['setting_value'], '/') : '';
-        
-        $stmt->execute(['smartolt_api_key']);
-        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
-        $this->apiKey = $result ? $result['setting_value'] : '';
+        try {
+            $stmt = $this->db->prepare("SELECT setting_value FROM settings WHERE setting_key = ?");
+            
+            $stmt->execute(['smartolt_api_url']);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $this->apiUrl = $result ? rtrim($result['setting_value'], '/') : '';
+            
+            $stmt->execute(['smartolt_api_key']);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $this->apiKey = $result ? $result['setting_value'] : '';
+        } catch (\PDOException $e) {
+            $this->apiUrl = '';
+            $this->apiKey = '';
+        }
     }
     
     public function isConfigured(): bool {
@@ -36,6 +41,17 @@ class SmartOLT {
     }
     
     public static function saveSettings(\PDO $db, array $data): bool {
+        try {
+            $db->exec("CREATE TABLE IF NOT EXISTS settings (
+                id SERIAL PRIMARY KEY,
+                setting_key VARCHAR(100) UNIQUE NOT NULL,
+                setting_value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+        } catch (\PDOException $e) {
+        }
+        
         $settings = [
             'smartolt_api_url' => $data['api_url'] ?? '',
             'smartolt_api_key' => $data['api_key'] ?? ''
