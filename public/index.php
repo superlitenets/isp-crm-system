@@ -307,6 +307,78 @@ if ($page === 'api' && $action === 'smartolt_onu_action') {
     exit;
 }
 
+if ($page === 'api' && $action === 'smartolt_authorize_onu') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized - Admin access required']);
+        exit;
+    }
+    
+    if (!\App\Auth::validateToken($_POST['csrf_token'] ?? '')) {
+        echo json_encode(['success' => false, 'error' => 'Invalid security token']);
+        exit;
+    }
+    
+    $oltId = $_POST['olt_id'] ?? '';
+    $ponType = $_POST['pon_type'] ?? 'gpon';
+    $board = $_POST['board'] ?? '';
+    $port = $_POST['port'] ?? '';
+    $sn = trim($_POST['sn'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $onuType = $_POST['onu_type'] ?? '';
+    $zone = $_POST['zone'] ?? '';
+    $odb = $_POST['odb'] ?? '';
+    $vlan = $_POST['vlan'] ?? '';
+    $speedProfile = $_POST['speed_profile'] ?? '';
+    $onuMode = $_POST['onu_mode'] ?? 'routing';
+    $address = trim($_POST['address'] ?? '');
+    
+    if (empty($oltId) || empty($sn) || empty($name) || empty($onuType)) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID, serial number, name, and ONU type are required']);
+        exit;
+    }
+    
+    try {
+        $smartolt = new \App\SmartOLT($db);
+        
+        $authData = [
+            'olt_id' => $oltId,
+            'pon_type' => $ponType,
+            'sn' => $sn,
+            'onu_type' => $onuType,
+            'onu_mode' => $onuMode,
+            'onu_external_id' => $name,
+            'name' => $name
+        ];
+        
+        if (!empty($board)) $authData['board'] = $board;
+        if (!empty($port)) $authData['port'] = $port;
+        if (!empty($zone)) $authData['zone'] = $zone;
+        if (!empty($odb)) $authData['odb'] = $odb;
+        if (!empty($vlan)) $authData['vlan'] = $vlan;
+        if (!empty($speedProfile)) $authData['speed_profile'] = $speedProfile;
+        if (!empty($address)) $authData['address'] = $address;
+        
+        $result = $smartolt->authorizeONU($authData);
+        
+        if ($result['status'] ?? false) {
+            echo json_encode(['success' => true, 'message' => 'ONU provisioned successfully', 'data' => $result['response'] ?? null]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to provision ONU']);
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     

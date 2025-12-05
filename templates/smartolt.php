@@ -8,6 +8,7 @@ $filter = $_GET['filter'] ?? null;
 $stats = [];
 $oltDetails = null;
 $filteredONUs = [];
+$provisioningOptions = [];
 
 if ($isConfigured) {
     if ($view === 'dashboard' || $view === 'olt') {
@@ -19,6 +20,10 @@ if ($isConfigured) {
         if ($oltResult['status']) {
             $oltDetails = $oltResult['response'];
         }
+    }
+    
+    if ($filter === 'unconfigured') {
+        $provisioningOptions = $smartolt->getProvisioningOptions();
     }
     
     if ($filter) {
@@ -107,14 +112,23 @@ if ($isConfigured) {
                     <thead>
                         <tr>
                             <th>Serial Number</th>
+                            <?php if ($filter !== 'unconfigured'): ?>
                             <th>Name</th>
+                            <?php endif; ?>
                             <th>OLT</th>
                             <th>Board/Port</th>
+                            <?php if ($filter === 'unconfigured'): ?>
+                            <th>PON Type</th>
+                            <th>ONU Type</th>
+                            <?php else: ?>
                             <th>Status</th>
+                            <?php endif; ?>
                             <?php if (in_array($filter, ['critical_power', 'low_power'])): ?>
                             <th>RX Power</th>
                             <?php endif; ?>
+                            <?php if ($filter !== 'unconfigured'): ?>
                             <th>Zone</th>
+                            <?php endif; ?>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -122,9 +136,15 @@ if ($isConfigured) {
                         <?php foreach ($filteredONUs as $onu): ?>
                         <tr>
                             <td><code><?= htmlspecialchars($onu['sn'] ?? $onu['serial_number'] ?? 'N/A') ?></code></td>
+                            <?php if ($filter !== 'unconfigured'): ?>
                             <td><?= htmlspecialchars($onu['name'] ?? $onu['onu_name'] ?? 'N/A') ?></td>
+                            <?php endif; ?>
                             <td><?= htmlspecialchars($onu['olt_name'] ?? 'N/A') ?></td>
                             <td><?= htmlspecialchars(($onu['board'] ?? '-') . '/' . ($onu['port'] ?? $onu['pon_port'] ?? '-')) ?></td>
+                            <?php if ($filter === 'unconfigured'): ?>
+                            <td><span class="badge bg-info"><?= htmlspecialchars($onu['pon_type'] ?? 'GPON') ?></span></td>
+                            <td><?= htmlspecialchars($onu['onu_type'] ?? 'Auto') ?></td>
+                            <?php else: ?>
                             <td>
                                 <?php
                                 $status = $onu['status'] ?? 'Unknown';
@@ -136,6 +156,7 @@ if ($isConfigured) {
                                 ?>
                                 <span class="badge bg-<?= $statusClass ?>"><?= htmlspecialchars($status) ?></span>
                             </td>
+                            <?php endif; ?>
                             <?php if (in_array($filter, ['critical_power', 'low_power'])): ?>
                             <td>
                                 <?php
@@ -149,9 +170,15 @@ if ($isConfigured) {
                                 <span class="text-<?= $powerClass ?> fw-bold"><?= is_numeric($rxPower) ? number_format($rxPower, 2) . ' dBm' : htmlspecialchars($rxPower) ?></span>
                             </td>
                             <?php endif; ?>
+                            <?php if ($filter !== 'unconfigured'): ?>
                             <td><?= htmlspecialchars($onu['zone'] ?? $onu['zone_name'] ?? 'N/A') ?></td>
+                            <?php endif; ?>
                             <td>
-                                <?php if (isset($onu['onu_external_id'])): ?>
+                                <?php if ($filter === 'unconfigured'): ?>
+                                <button class="btn btn-sm btn-success" onclick="openProvisionModal(<?= htmlspecialchars(json_encode($onu)) ?>)">
+                                    <i class="bi bi-plus-circle me-1"></i> Provision
+                                </button>
+                                <?php elseif (isset($onu['onu_external_id'])): ?>
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-outline-primary" onclick="onuAction('reboot', '<?= $onu['onu_external_id'] ?>')" title="Reboot">
                                         <i class="bi bi-arrow-clockwise"></i>
@@ -532,6 +559,128 @@ if ($isConfigured) {
     <?php endif; ?>
 </div>
 
+<?php if ($filter === 'unconfigured' && !empty($provisioningOptions)): ?>
+<div class="modal fade" id="provisionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Provision ONU</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="provisionForm">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                    <input type="hidden" name="action" value="smartolt_authorize_onu">
+                    <input type="hidden" name="olt_id" id="prov_olt_id">
+                    <input type="hidden" name="pon_type" id="prov_pon_type">
+                    <input type="hidden" name="board" id="prov_board">
+                    <input type="hidden" name="port" id="prov_port">
+                    <input type="hidden" name="sn" id="prov_sn">
+                    
+                    <div class="alert alert-info mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Serial Number:</strong> <code id="display_sn"></code>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>OLT:</strong> <span id="display_olt"></span> (Board <span id="display_board"></span>/Port <span id="display_port"></span>)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Customer Name / External ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="prov_name" required placeholder="Enter customer name or ID">
+                            <div class="form-text">This will be used as the ONU external ID</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">ONU Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="onu_type" id="prov_onu_type" required>
+                                <option value="">Select ONU Type</option>
+                                <?php foreach ($provisioningOptions['onu_types'] as $type): ?>
+                                <option value="<?= htmlspecialchars($type['id']) ?>" data-pon="<?= htmlspecialchars($type['pon_type'] ?? '') ?>">
+                                    <?= htmlspecialchars($type['name'] ?? $type['onu_type'] ?? 'Unknown') ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Zone</label>
+                            <select class="form-select" name="zone" id="prov_zone">
+                                <option value="">Select Zone (Optional)</option>
+                                <?php foreach ($provisioningOptions['zones'] as $zone): ?>
+                                <option value="<?= htmlspecialchars($zone['id']) ?>">
+                                    <?= htmlspecialchars($zone['name'] ?? 'Zone ' . $zone['id']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">ODB</label>
+                            <select class="form-select" name="odb" id="prov_odb">
+                                <option value="">Select ODB (Optional)</option>
+                                <?php foreach ($provisioningOptions['odbs'] as $odb): ?>
+                                <option value="<?= htmlspecialchars($odb['id']) ?>">
+                                    <?= htmlspecialchars($odb['name'] ?? 'ODB ' . $odb['id']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">VLAN</label>
+                            <select class="form-select" name="vlan" id="prov_vlan">
+                                <option value="">Select VLAN (Optional)</option>
+                                <?php foreach ($provisioningOptions['vlans'] as $vlan): ?>
+                                <option value="<?= htmlspecialchars($vlan['id']) ?>">
+                                    <?= htmlspecialchars(($vlan['name'] ?? 'VLAN') . ' (' . ($vlan['vlan_id'] ?? $vlan['id']) . ')') ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Speed Profile</label>
+                            <select class="form-select" name="speed_profile" id="prov_speed">
+                                <option value="">Select Speed Profile (Optional)</option>
+                                <?php foreach ($provisioningOptions['speed_profiles'] as $profile): ?>
+                                <option value="<?= htmlspecialchars($profile['id']) ?>">
+                                    <?= htmlspecialchars($profile['name'] ?? 'Profile ' . $profile['id']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">ONU Mode <span class="text-danger">*</span></label>
+                            <select class="form-select" name="onu_mode" id="prov_mode" required>
+                                <option value="routing">Routing (Router Mode)</option>
+                                <option value="bridging">Bridging (Bridge Mode)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Address / Location</label>
+                            <input type="text" class="form-control" name="address" id="prov_address" placeholder="Enter installation address">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="provisionBtn">
+                        <i class="bi bi-plus-circle me-1"></i> Provision ONU
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 function onuAction(action, externalId) {
     if (!confirm('Are you sure you want to ' + action + ' this ONU?')) {
@@ -561,4 +710,63 @@ function onuAction(action, externalId) {
         alert('Error: ' + error.message);
     });
 }
+
+<?php if ($filter === 'unconfigured'): ?>
+function openProvisionModal(onuData) {
+    document.getElementById('prov_olt_id').value = onuData.olt_id || '';
+    document.getElementById('prov_pon_type').value = onuData.pon_type || 'gpon';
+    document.getElementById('prov_board').value = onuData.board || '';
+    document.getElementById('prov_port').value = onuData.port || onuData.pon_port || '';
+    document.getElementById('prov_sn').value = onuData.sn || onuData.serial_number || '';
+    
+    document.getElementById('display_sn').textContent = onuData.sn || onuData.serial_number || 'N/A';
+    document.getElementById('display_olt').textContent = onuData.olt_name || 'OLT ' + onuData.olt_id;
+    document.getElementById('display_board').textContent = onuData.board || '-';
+    document.getElementById('display_port').textContent = onuData.port || onuData.pon_port || '-';
+    
+    document.getElementById('prov_name').value = '';
+    document.getElementById('prov_onu_type').value = '';
+    document.getElementById('prov_zone').value = '';
+    document.getElementById('prov_odb').value = '';
+    document.getElementById('prov_vlan').value = '';
+    document.getElementById('prov_speed').value = '';
+    document.getElementById('prov_mode').value = 'routing';
+    document.getElementById('prov_address').value = '';
+    
+    new bootstrap.Modal(document.getElementById('provisionModal')).show();
+}
+
+document.getElementById('provisionForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('provisionBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Provisioning...';
+    btn.disabled = true;
+    
+    const formData = new FormData(this);
+    
+    fetch('?page=api', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('ONU provisioned successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('provisionModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to provision ONU'));
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
+<?php endif; ?>
 </script>

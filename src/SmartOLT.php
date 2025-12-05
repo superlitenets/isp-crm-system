@@ -198,6 +198,81 @@ class SmartOLT {
         return $this->makeRequest("onu/disable_onu/{$externalId}", 'POST');
     }
     
+    public function deleteONU(string $externalId): array {
+        return $this->makeRequest("onu/delete_onu/{$externalId}", 'POST');
+    }
+    
+    public function getZones(): array {
+        return $this->makeRequest('system/get_zones');
+    }
+    
+    public function getODBs(): array {
+        return $this->makeRequest('system/get_odbs');
+    }
+    
+    public function getVLANs(): array {
+        return $this->makeRequest('system/get_vlans');
+    }
+    
+    public function getSpeedProfiles(): array {
+        return $this->makeRequest('system/get_speed_profiles');
+    }
+    
+    public function getONUTypes(): array {
+        return $this->makeRequest('system/get_onu_types');
+    }
+    
+    public function getONUTypesByPonType(string $ponType): array {
+        return $this->makeRequest("system/get_onu_types_by_pon_type/{$ponType}");
+    }
+    
+    public function authorizeONU(array $data): array {
+        return $this->makeRequest('onu/authorize_onu', 'POST', $data);
+    }
+    
+    public function getProvisioningOptions(): array {
+        $options = [
+            'zones' => [],
+            'odbs' => [],
+            'vlans' => [],
+            'speed_profiles' => [],
+            'onu_types' => [],
+            'olts' => []
+        ];
+        
+        $zonesResult = $this->getZones();
+        if ($zonesResult['status'] && isset($zonesResult['response'])) {
+            $options['zones'] = $zonesResult['response'];
+        }
+        
+        $odbsResult = $this->getODBs();
+        if ($odbsResult['status'] && isset($odbsResult['response'])) {
+            $options['odbs'] = $odbsResult['response'];
+        }
+        
+        $vlansResult = $this->getVLANs();
+        if ($vlansResult['status'] && isset($vlansResult['response'])) {
+            $options['vlans'] = $vlansResult['response'];
+        }
+        
+        $speedResult = $this->getSpeedProfiles();
+        if ($speedResult['status'] && isset($speedResult['response'])) {
+            $options['speed_profiles'] = $speedResult['response'];
+        }
+        
+        $onuTypesResult = $this->getONUTypes();
+        if ($onuTypesResult['status'] && isset($onuTypesResult['response'])) {
+            $options['onu_types'] = $onuTypesResult['response'];
+        }
+        
+        $oltsResult = $this->getOLTs();
+        if ($oltsResult['status'] && isset($oltsResult['response'])) {
+            $options['olts'] = $oltsResult['response'];
+        }
+        
+        return $options;
+    }
+    
     public function getDashboardStats(): array {
         $stats = [
             'olts' => [],

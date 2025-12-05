@@ -15,11 +15,16 @@
     - Critical Power (< -28 dBm) alerts
     - Low Power (-25 to -28 dBm) warnings
   - **OLT Details View:** Cards, PON ports with TX power, average signal, ONU counts
-  - **ONU Actions:** Reboot, resync config, enable/disable
+  - **ONU Actions:** Reboot, resync config, enable/disable, delete
+  - **ONU Provisioning:** Authorize unconfigured ONUs directly from the dashboard
+    - Select ONU type, zone, ODB, VLAN, speed profile
+    - Choose ONU mode (routing/bridging)
+    - Set customer name as external ID
+    - Add installation address
   - Filter views: Click stat cards to see filtered ONU lists
   - Settings > SmartOLT tab for API configuration with test connection
   - Sidebar navigation menu item added
-  - API endpoints: `/api/system/get_olts`, `/api/onu/get_unconfigured_onus`, `/api/onu/get_all_onus_statuses`, `/api/onu/get_all_onus_signals`
+  - API endpoints: `/api/system/get_olts`, `/api/onu/get_unconfigured_onus`, `/api/onu/get_all_onus_statuses`, `/api/onu/get_all_onus_signals`, `/api/onu/authorize_onu`
 - **December 2024**: Added Complaints Module with Approval Workflow
   - New database table: `complaints` for storing public complaints before ticket conversion
   - Complaints now go through approval workflow instead of direct ticket creation
