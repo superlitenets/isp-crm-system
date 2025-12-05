@@ -1,138 +1,18 @@
 # ISP CRM & Ticketing System
 
-## Recent Changes
-- **December 2024**: Added Reports & Activity Logs
-  - New `activity_logs` database table for tracking user actions
-  - New `ActivityLog.php` and `Reports.php` classes for logging and reporting
-  - Reports page (`?page=reports`) with multiple tabs:
-    - **Overview:** Summary stats for tickets, orders, and complaints/
-    - **Tickets:** Performance by assigned user (resolution rate, SLA breaches)
-    - **Orders:** Sales performance by salesperson
-    - **Complaints:** Review statistics by reviewer
-    - **Activity Log:** Detailed action history with filters
-    - **User Performance:** Summar!y of all user activities
-  - Date range and user filters for all reports
-  - Automatic activity logging for:
-    - Ticket creation, assignment, s>>tatus changes, priority updates
-    - Order creation
-    - Complaint creation, approval, rejection, conversion
-  - Permission-based access (`reports.view` permission for Admin, Manager, Viewer roles)
-  - SMS notifications now use configurable templates from Settings
-- **December 2024**: Added SmartOLT Integration for Network Monitoring
-  - New `SmartOLT.php` class with comprehensive API integration
-  - Settings stored in existing `settings` table with `smartolt_api_url` and `smartolt_api_key`
-  - SmartOLT Dashboard page (`?page=smartolt`) with real-time statistics
-  - **OLT Statistics:** Total OLTs, uptime, temperature, hardware info
-  - **ONU Status Monitoring:**
-    - Configured ONUs (provisioned)
-    - Unconfigured ONUs (pending authorization)
-    - Online/Offline counts
-    - LOS (Loss of Signal) detection
-    - Power Fail detection
-    - Critical Power (< -28 dBm) alerts
-    - Low Power (-25 to -28 dBm) warnings
-  - **OLT Details View:** Cards, PON ports with TX power, average signal, ONU counts
-  - **ONU Actions:** Reboot, resync config, enable/disable, delete
-  - **ONU Provisioning:** Authorize unconfigured ONUs directly from the dashboard
-    - Select ONU type, zone, ODB, VLAN, speed profile
-    - Choose ONU mode (routing/bridging)
-    - Set customer name as external ID
-    - Add installation address
-  - Filter views: Click stat cards to see filtered ONU lists
-  - Settings > SmartOLT tab for API configuration with test connection
-  - Sidebar navigation menu item added
-  - API endpoints: `/api/system/get_olts`, `/api/onu/get_unconfigured_onus`, `/api/onu/get_all_onus_statuses`, `/api/onu/get_all_onus_signals`, `/api/onu/authorize_onu`
-- **December 2024**: Added Complaints Module with Approval Workflow
-  - New database table: `complaints` for storing public complaints before ticket conversion
-  - Complaints now go through approval workflow instead of direct ticket creation
-  - Complaint statuses: pending, approved, rejected, converted
-  - Complaints page in admin panel with filtering by status, category, and search
-  - Pending complaints badge in sidebar navigation (yellow warning badge)
-  - Approval workflow: Review → Approve/Reject → Convert to Ticket
-  - Rejection requires mandatory notes explaining the reason
-  - Conversion creates customer (if not exists) and generates ticket with SLA
-  - Can assign ticket to user and/or team during conversion
-  - Priority can be updated before conversion (low, medium, high, critical)
-  - Complaint numbers format: CMP-YYYYMMDD-XXXX
-  - Fixed VPS login issues with environment-aware session cookie settings
-- **December 2024**: Added Mobile Lead Capture and Public Complaint Submission
-  - Mobile app: New "New Lead" form for salespeople to capture leads on the go
-  - Lead fields: customer name, phone, location, description
-  - Leads saved as orders with `lead_source='mobile_lead'` and status 'new'
-  - New orders badge in admin sidebar showing count of orders with status='new'
-  - Landing page: "Report Issue" button in hero section with complaint form modal
-  - Public complaint submission now stores in complaints table for approval
-  - Complaint categories: connectivity, speed, billing, equipment, service, other
-  - Honeypot spam protection on complaint form
-- **December 2024**: Added Real-Time Biometric Attendance with Late Notifications
-  - Database tables: `hr_notification_templates`, `attendance_notification_logs`
-  - Attendance table extended with: `late_minutes`, `source`
-  - Real-time processing of biometric events via webhook API (`/biometric-api.php`)
-  - Automatic late detection when employees clock in after work start time (considers grace period)
-  - SMS notifications sent automatically to late employees using customizable templates
-  - Templates support placeholders: {employee_name}, {clock_in_time}, {work_start_time}, {late_minutes}, {deduction_amount}, etc.
-  - RealTimeAttendanceProcessor class handles clock-in/out processing and notifications
-  - API endpoints for ZKTeco and Hikvision push protocols
-  - Settings > HR Notifications tab for managing notification templates
-  - Notification logs with sent/failed status tracking
-  - API requires authentication (X-API-Key header or api_key parameter)
-- **December 2024**: Added SLA (Service Level Agreement) Management
-  - Database tables: `sla_policies`, `sla_business_hours`, `sla_holidays`, `ticket_sla_logs`
-  - Ticket table extended with: `sla_policy_id`, `first_response_at`, `sla_response_due`, `sla_resolution_due`, `sla_response_breached`, `sla_resolution_breached`
-  - SLA policies auto-applied based on ticket priority (Critical: 1h response/4h resolution, High: 2h/8h, Medium: 4h/24h, Low: 8h/48h)
-  - Business hours configuration (SLA timers only count during working hours)
-  - Holiday management (SLA timers pause on holidays)
-  - SLA status indicators on ticket list and view pages (On Track, At Risk, Breached, Met)
-  - Dashboard shows SLA compliance rates and at-risk/breached ticket counts
-  - First response tracking when staff adds a comment
-  - SLA class in `src/SLA.php` handles all SLA calculations
-  - Settings > SLA Policies tab for managing policies, business hours, and holidays
-- **December 2024**: Added Team-Based Ticket Assignment
-  - Created `teams` and `team_members` database tables
-  - Tickets can now be assigned to teams AND/OR individuals
-  - HR > Teams tab for managing teams and team members (moved from Settings for better organization)
-  - Team notifications: all team members receive SMS when ticket is assigned to team
-  - Ticket list and view pages show team assignment
-- **December 2024**: Integrated Users with Employees
-  - Users and employees are now unified: assign system roles when adding employees
-  - HR employee form now includes role/permissions selection
-  - When creating an employee, login details (email, password, role) are now required
-  - Settings renamed to "Roles & Permissions" (users managed through HR)
-  - Employee::createUserAccount() and updateUserRole() handle role assignment
-- **December 2024**: Added Flexible Roles & Permissions System
-  - Database tables: `roles`, `permissions`, `role_permissions`
-  - Default roles: Administrator, Manager, Technician, Salesperson, Viewer
-  - Granular permissions by category: customers, tickets, hr, inventory, orders, payments, settings, users, reports
-  - Auth class methods: `can()`, `canAny()`, `canAll()`, `requirePermission()`
-  - Roles & Permissions management UI in Settings
-- **December 2024**: Enhanced Mobile PWA with Performance Tracking and Ticket Creation
-  - Accessible at `/mobile/` - installable on Android devices
-  - **Salesperson features:**
-    - Create new orders directly from mobile
-    - View performance dashboard: ranking, conversion rate, sales growth
-    - Achievement badges: Top Performer, 10+ Orders, High Converter, #1 Salesperson
-    - Monthly statistics and comparison with previous month
-  - **Technician features:**
-    - Create new tickets from mobile with customer search
-    - View performance dashboard: resolution rate, SLA compliance, attendance rate
-    - Achievement badges: Problem Solver, SLA Champion, 20+ Resolved, #1 Technician
-    - Ticket management with status updates and comments
-    - Attendance clock in/out with history
-  - Role-based access control for ticket creation
-  - Offline support via service worker
-- Added inventory database tables to auto-migration
-- Fixed PHP 8.3 compatibility in Docker setup
-
 ## Overview
 This project is a PHP-based Customer Relationship Management (CRM) and ticketing system specifically designed for Internet Service Providers (ISPs). Its core purpose is to streamline customer interactions, manage support tickets efficiently, and automate various operational tasks. The system aims to provide a comprehensive solution for ISPs to manage their customer base, track equipment, process orders, handle HR functions including employee attendance and payroll, and facilitate communication through integrated SMS and WhatsApp messaging.
 
 Key capabilities include:
-- End-to-end customer and ticket management.
-- Robust Human Resources module with biometric attendance and automated late deductions.
+- End-to-end customer and ticket management with SLA, team-based assignment, and a complaints approval workflow.
+- Robust Human Resources module with biometric attendance, automated late deductions, and unified user/employee management.
 - Inventory management for ISP equipment with tracking and fault reporting.
-- Sales and marketing tools, including salesperson commission tracking and an online order system.
+- Sales and marketing tools, including salesperson commission tracking, mobile lead capture, and an online order system.
 - Public-facing landing page with dynamic service packages and M-Pesa integration for payments.
 - Secure authentication and communication features like SMS notifications and WhatsApp Web integration.
+- SmartOLT integration for real-time network monitoring and ONU provisioning.
+- Comprehensive reporting and activity logging.
+- Enhanced mobile PWA for salespersons and technicians with performance tracking and offline support.
 
 The business vision is to offer a powerful, all-in-one platform that enhances operational efficiency, improves customer satisfaction, and supports the growth of ISPs by automating critical business processes.
 
@@ -143,33 +23,28 @@ I prefer detailed explanations and expect the agent to ask for confirmation befo
 The system is built on PHP, utilizing a modular architecture to separate concerns.
 
 **UI/UX Decisions:**
-The system features a clean, responsive design. The public-facing landing page is designed to be beautiful and modern, with dynamic content, customizable hero sections, and package cards to showcase service offerings. Internal CRM interfaces prioritize clarity and ease of use for administrative and technical staff.
+The system features a clean, responsive design. The public-facing landing page is designed to be modern with dynamic content, customizable hero sections, and package cards. Internal CRM interfaces prioritize clarity and ease of use for administrative and technical staff, including a mobile PWA for field personnel.
 
 **Technical Implementations:**
-- **Authentication**: Session-based authentication with password hashing, CSRF protection, SQL injection prevention (prepared statements), XSS protection, and role-based access control (admin/technician).
-- **Database**: PostgreSQL is used as the primary database, with a clearly defined schema for various modules like users, customers, tickets, employees, inventory, and transactions.
-- **SMS Integration**: Supports custom SMS gateways (any POST/GET API) and Twilio as a fallback.
-- **WhatsApp Integration**: Facilitates direct messaging via WhatsApp Web without requiring an API key.
+- **Authentication**: Session-based authentication with password hashing, CSRF protection, SQL injection prevention (prepared statements), XSS protection, and a flexible role-based access control (RBAC) system with granular permissions.
+- **Database**: PostgreSQL is used as the primary database with a clearly defined schema for modules like customers, tickets, employees, inventory, transactions, and HR.
+- **SMS Integration**: Supports custom SMS gateways (any POST/GET API) and Twilio. SMS notifications use configurable templates.
+- **WhatsApp Integration**: Facilitates direct messaging via WhatsApp Web.
 - **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
-- **Biometric Integration**: Abstract `BiometricDevice.php` class with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) devices for attendance synchronization.
-- **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing for payment status updates, including sandbox mode for testing.
-- **Order System**: Public order form integration with the CRM, enabling customer detail collection, optional M-Pesa payments, and conversion of confirmed orders to installation tickets.
-- **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive tracking of equipment lifecycle.
-
-**Feature Specifications:**
-- **Customer Management**: CRUD operations for customer data with ISP-specific fields.
-- **Ticketing System**: Comprehensive ticket lifecycle management (creation, assignment, status, priority, comments).
-- **Human Resources**: Employee records, attendance tracking (biometric integration, clock in/out), payroll (salary, deductions, taxes), and performance reviews. Automated late deduction system.
-- **Inventory Management**: Tracking equipment categories, serial numbers, MAC addresses, assignments, loans, fault reporting, and audit trails.
-- **Sales & Marketing**: Salesperson management, commission tracking, performance leaderboards, and order attribution.
-- **Settings Module**: Centralized configuration for company details, SMS gateway, WhatsApp, and ticket templates.
-- **Public Landing Page**: Dynamic display of service packages, customizable content, and online order submission.
+- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
+- **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing.
+- **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
+- **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive equipment lifecycle tracking.
+- **SLA Management**: Auto-applies policies based on ticket priority, considering business hours and holidays for accurate timer calculations.
+- **Complaints Module**: Implements an approval workflow for public complaints before conversion to tickets.
+- **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning capabilities.
+- **Reporting & Activity Logs**: Comprehensive reports for tickets, orders, complaints, and user performance, with detailed activity logging for key system actions.
 
 **System Design Choices:**
-The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`).
+The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
 
 ## External Dependencies
-- **PostgreSQL**: Primary database for data storage.
+- **PostgreSQL**: Primary database.
 - **Twilio**: Optional fallback for SMS notifications.
 - **Advanta SMS (Kenya)**: Recommended SMS gateway integration.
 - **Custom SMS Gateways**: Supports integration with any REST API (POST/GET) for SMS.
@@ -177,3 +52,4 @@ The system adopts a modular design allowing for extensibility. Configuration is 
 - **ZKTeco Biometric Devices**: Integrated for attendance tracking via Push Protocol.
 - **Hikvision Biometric Devices**: Integrated for attendance tracking via ISAPI.
 - **M-Pesa**: Integrated for mobile money payments (STK Push, C2B).
+- **SmartOLT API**: Integrated for network monitoring and ONU management.

@@ -202,9 +202,12 @@ function initializeDatabase(): void {
     CREATE TABLE IF NOT EXISTS whatsapp_logs (
         id SERIAL PRIMARY KEY,
         ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+        complaint_id INTEGER REFERENCES complaints(id) ON DELETE CASCADE,
         recipient_phone VARCHAR(20) NOT NULL,
         recipient_type VARCHAR(20) NOT NULL,
-        message TEXT NOT NULL,
+        message_type VARCHAR(50) DEFAULT 'custom',
+        message TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -799,7 +802,10 @@ function runMigrations(PDO $db): void {
         ['equipment_assignments', 'status', 'ALTER TABLE equipment_assignments ADD COLUMN status VARCHAR(20) DEFAULT \'assigned\''],
         ['equipment_assignments', 'notes', 'ALTER TABLE equipment_assignments ADD COLUMN notes TEXT'],
         ['tickets', 'source', "ALTER TABLE tickets ADD COLUMN source VARCHAR(50) DEFAULT 'internal'"],
-        ['biometric_devices', 'serial_number', 'ALTER TABLE biometric_devices ADD COLUMN serial_number VARCHAR(100)']
+        ['biometric_devices', 'serial_number', 'ALTER TABLE biometric_devices ADD COLUMN serial_number VARCHAR(100)'],
+        ['whatsapp_logs', 'order_id', 'ALTER TABLE whatsapp_logs ADD COLUMN order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE'],
+        ['whatsapp_logs', 'complaint_id', 'ALTER TABLE whatsapp_logs ADD COLUMN complaint_id INTEGER REFERENCES complaints(id) ON DELETE CASCADE'],
+        ['whatsapp_logs', 'message_type', "ALTER TABLE whatsapp_logs ADD COLUMN message_type VARCHAR(50) DEFAULT 'custom'"]
     ];
     
     foreach ($columnMigrations as $migration) {
