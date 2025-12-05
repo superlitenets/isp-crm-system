@@ -370,6 +370,36 @@ class BiometricSyncService {
         return $users;
     }
     
+    public function getDeviceUsersWithDebug(int $deviceId): array {
+        $result = [
+            'users' => [],
+            'debug' => ['error' => 'Device not found']
+        ];
+        
+        $deviceConfig = $this->getDevice($deviceId);
+        if (!$deviceConfig) {
+            return $result;
+        }
+        
+        $device = BiometricDevice::create($deviceConfig);
+        if (!$device) {
+            $result['debug'] = ['error' => 'Unsupported device type'];
+            return $result;
+        }
+        
+        if (method_exists($device, 'getUsersWithDebug')) {
+            return $device->getUsersWithDebug();
+        }
+        
+        $users = $device->getUsers();
+        $device->disconnect();
+        
+        return [
+            'users' => $users,
+            'debug' => ['info' => 'Debug not available for this device type']
+        ];
+    }
+    
     public function getUserMappings(int $deviceId): array {
         $stmt = $this->db->prepare("
             SELECT dum.*, e.name as employee_name, e.employee_id as employee_code

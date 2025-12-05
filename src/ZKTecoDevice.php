@@ -170,13 +170,19 @@ class ZKTecoDevice extends BiometricDevice {
         $this->disableDevice();
         
         try {
-            $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
+            $command = $this->createHeader(self::CMD_USERTEMP_RRQ, chr(0x05), $this->sessionId, $this->replyId);
             
             if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
                 throw new \Exception('Failed to request user data');
             }
             
             $response = $this->receiveData();
+            if ($response === false) {
+                $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
+                @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+                $response = $this->receiveData();
+            }
+            
             if ($response === false) {
                 throw new \Exception('No response for user request');
             }
@@ -187,17 +193,22 @@ class ZKTecoDevice extends BiometricDevice {
                 $dataSize = unpack('V', substr($response, 8, 4))[1];
                 $data = $this->receiveRawData($dataSize);
                 
-                if ($data) {
-                    $users = $this->parseUserData($data);
-                    if (empty($users) && strlen($data) > 0) {
+                if ($data && strlen($data) > 0) {
+                    $users = $this->parseUserDataK40($data);
+                    if (empty($users)) {
+                        $users = $this->parseUserData($data);
+                    }
+                    if (empty($users)) {
                         $users = $this->parseUserDataNewFormat($data);
                     }
                 }
-            } elseif ($commandId == self::CMD_ACK_OK) {
-                $dataSize = unpack('v', substr($response, 8, 2))[1] ?? 0;
-                if ($dataSize > 0) {
-                    $data = substr($response, 10);
-                    $users = $this->parseUserData($data);
+            } elseif ($commandId == self::CMD_ACK_OK || $commandId == self::CMD_ACK_DATA) {
+                $data = substr($response, 8);
+                if (strlen($data) > 0) {
+                    $users = $this->parseUserDataK40($data);
+                    if (empty($users)) {
+                        $users = $this->parseUserData($data);
+                    }
                     if (empty($users)) {
                         $users = $this->parseUserDataNewFormat($data);
                     }
@@ -213,6 +224,91 @@ class ZKTecoDevice extends BiometricDevice {
         
         $this->enableDevice();
         return $users;
+    }
+    
+    public function getUsersWithDebug(): array {
+        $result = [
+            'users' => [],
+            'debug' => [
+                'connected' => false,
+                'command_sent' => false,
+                'response_received' => false,
+                'response_command' => null,
+                'data_size' => 0,
+                'raw_data_length' => 0,
+                'raw_data_hex' => '',
+                'error' => null
+            ]
+        ];
+        
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                $result['debug']['error'] = 'Connection failed';
+                return $result;
+            }
+        }
+        
+        $result['debug']['connected'] = true;
+        $this->disableDevice();
+        
+        try {
+            $command = $this->createHeader(self::CMD_USERTEMP_RRQ, chr(0x05), $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                $result['debug']['error'] = 'Failed to send command';
+                return $result;
+            }
+            
+            $result['debug']['command_sent'] = true;
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
+                @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+                $response = $this->receiveData();
+            }
+            
+            if ($response === false) {
+                $result['debug']['error'] = 'No response from device';
+                return $result;
+            }
+            
+            $result['debug']['response_received'] = true;
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $result['debug']['response_command'] = $commandId;
+            
+            $data = null;
+            
+            if ($commandId == self::CMD_DATA_RDY) {
+                $dataSize = unpack('V', substr($response, 8, 4))[1];
+                $result['debug']['data_size'] = $dataSize;
+                $data = $this->receiveRawData($dataSize);
+            } elseif ($commandId == self::CMD_ACK_OK || $commandId == self::CMD_ACK_DATA) {
+                $data = substr($response, 8);
+            }
+            
+            if ($data && strlen($data) > 0) {
+                $result['debug']['raw_data_length'] = strlen($data);
+                $result['debug']['raw_data_hex'] = substr(bin2hex($data), 0, 200);
+                
+                $result['users'] = $this->parseUserDataK40($data);
+                if (empty($result['users'])) {
+                    $result['users'] = $this->parseUserData($data);
+                }
+                if (empty($result['users'])) {
+                    $result['users'] = $this->parseUserDataNewFormat($data);
+                }
+            }
+            
+            $freeCommand = $this->createHeader(self::CMD_FREE_DATA, '', $this->sessionId, $this->replyId);
+            @\socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
+            
+        } catch (\Exception $e) {
+            $result['debug']['error'] = $e->getMessage();
+        }
+        
+        $this->enableDevice();
+        return $result;
     }
     
     private function getDeviceName(): string {
@@ -427,6 +523,73 @@ class ZKTecoDevice extends BiometricDevice {
         return $attendance;
     }
     
+    private function parseUserDataK40(string $data): array {
+        $users = [];
+        
+        $recordSizes = [28, 29, 72, 73];
+        
+        foreach ($recordSizes as $recordSize) {
+            if (strlen($data) < $recordSize) continue;
+            if (strlen($data) % $recordSize !== 0) continue;
+            
+            $records = str_split($data, $recordSize);
+            $tempUsers = [];
+            
+            foreach ($records as $record) {
+                if (strlen($record) < $recordSize) continue;
+                
+                $uid = unpack('v', substr($record, 0, 2))[1];
+                if ($uid === 0 || $uid > 65000) continue;
+                
+                $userId = '';
+                $name = '';
+                $role = 0;
+                $cardNo = 0;
+                
+                if ($recordSize == 28) {
+                    $role = ord($record[2]);
+                    $password = trim(substr($record, 3, 8));
+                    $name = $this->cleanString(substr($record, 11, 8));
+                    $userId = trim(substr($record, 19, 9)) ?: (string)$uid;
+                } elseif ($recordSize == 29) {
+                    $role = ord($record[2]);
+                    $password = trim(substr($record, 3, 8));
+                    $name = $this->cleanString(substr($record, 11, 8));
+                    $userId = trim(substr($record, 19, 9)) ?: (string)$uid;
+                } elseif ($recordSize == 72 || $recordSize == 73) {
+                    $role = ord($record[2]);
+                    $name = $this->cleanString(substr($record, 11, 24));
+                    $cardNo = unpack('V', substr($record, 35, 4))[1] ?? 0;
+                    $userId = trim(substr($record, 48, 9)) ?: (string)$uid;
+                }
+                
+                if (!$userId && !$name) {
+                    $userId = (string)$uid;
+                }
+                
+                $tempUsers[] = [
+                    'uid' => $uid,
+                    'device_user_id' => $userId,
+                    'name' => $name ?: 'User ' . $uid,
+                    'role' => $role,
+                    'card_no' => $cardNo
+                ];
+            }
+            
+            if (!empty($tempUsers)) {
+                return $tempUsers;
+            }
+        }
+        
+        return $users;
+    }
+    
+    private function cleanString(string $str): string {
+        $str = trim($str);
+        $str = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $str);
+        return $str;
+    }
+    
     private function parseUserData(string $data): array {
         $users = [];
         $recordSize = 72;
@@ -443,7 +606,7 @@ class ZKTecoDevice extends BiometricDevice {
             $uid = unpack('v', substr($record, 0, 2))[1];
             $role = ord($record[2]);
             $password = trim(substr($record, 3, 8));
-            $name = trim(substr($record, 11, 24));
+            $name = $this->cleanString(substr($record, 11, 24));
             $cardNo = unpack('V', substr($record, 35, 4))[1];
             $userId = trim(substr($record, 48, 9));
             
