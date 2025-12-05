@@ -209,6 +209,7 @@ function initializeDatabase(): void {
         port INTEGER DEFAULT 4370,
         username VARCHAR(100),
         password_encrypted TEXT,
+        serial_number VARCHAR(100),
         sync_interval_minutes INTEGER DEFAULT 15,
         is_active BOOLEAN DEFAULT TRUE,
         last_sync_at TIMESTAMP,
@@ -789,7 +790,8 @@ function runMigrations(PDO $db): void {
         ['equipment_assignments', 'return_date', 'ALTER TABLE equipment_assignments ADD COLUMN return_date DATE'],
         ['equipment_assignments', 'status', 'ALTER TABLE equipment_assignments ADD COLUMN status VARCHAR(20) DEFAULT \'assigned\''],
         ['equipment_assignments', 'notes', 'ALTER TABLE equipment_assignments ADD COLUMN notes TEXT'],
-        ['tickets', 'source', "ALTER TABLE tickets ADD COLUMN source VARCHAR(50) DEFAULT 'internal'"]
+        ['tickets', 'source', "ALTER TABLE tickets ADD COLUMN source VARCHAR(50) DEFAULT 'internal'"],
+        ['biometric_devices', 'serial_number', 'ALTER TABLE biometric_devices ADD COLUMN serial_number VARCHAR(100)']
     ];
     
     foreach ($columnMigrations as $migration) {

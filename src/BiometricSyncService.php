@@ -31,8 +31,8 @@ class BiometricSyncService {
     
     public function addDevice(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO biometric_devices (name, device_type, ip_address, port, username, password_encrypted, sync_interval_minutes, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO biometric_devices (name, device_type, ip_address, port, username, password_encrypted, serial_number, sync_interval_minutes, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $password = !empty($data['password']) ? BiometricDevice::encryptPassword($data['password']) : null;
@@ -44,6 +44,7 @@ class BiometricSyncService {
             $data['port'] ?? ($data['device_type'] === 'zkteco' ? 4370 : 80),
             $data['username'] ?? null,
             $password,
+            $data['serial_number'] ?? null,
             $data['sync_interval_minutes'] ?? 15,
             isset($data['is_active']) ? (bool)$data['is_active'] : true
         ]);
@@ -52,7 +53,7 @@ class BiometricSyncService {
     }
     
     public function updateDevice(int $id, array $data): bool {
-        $fields = ['name', 'device_type', 'ip_address', 'port', 'username', 'sync_interval_minutes', 'is_active'];
+        $fields = ['name', 'device_type', 'ip_address', 'port', 'username', 'serial_number', 'sync_interval_minutes', 'is_active'];
         $updates = [];
         $params = [];
         

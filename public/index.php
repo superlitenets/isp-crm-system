@@ -1256,6 +1256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'port' => (int)$_POST['port'],
                             'username' => $_POST['username'] ?? null,
                             'password' => $_POST['password'] ?? null,
+                            'serial_number' => $_POST['serial_number'] ?? null,
                             'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
                             'is_active' => isset($_POST['is_active'])
                         ];
@@ -1283,6 +1284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'ip_address' => $_POST['ip_address'],
                             'port' => (int)$_POST['port'],
                             'username' => $_POST['username'] ?? null,
+                            'serial_number' => $_POST['serial_number'] ?? null,
                             'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
                             'is_active' => isset($_POST['is_active'])
                         ];

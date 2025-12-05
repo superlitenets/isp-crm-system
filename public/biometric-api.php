@@ -1,6 +1,5 @@
 <?php
 
-header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('X-Content-Type-Options: nosniff');
 
@@ -17,6 +16,25 @@ $db = Database::getConnection();
 $processor = new \App\RealTimeAttendanceProcessor($db);
 $biometricService = new \App\BiometricSyncService($db);
 $settings = new \App\Settings();
+
+$action = $_GET['action'] ?? '';
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Handle ZKTeco native push protocol (iclock format)
+// This handles requests like: /biometric-api.php?SN=XXXX&table=ATTLOG&Stamp=...
+if (isset($_GET['SN']) || isset($_REQUEST['SN'])) {
+    handleZKTecoPush($db, $processor, $settings);
+    exit;
+}
+
+// Handle raw POST body for ZKTeco ATTLOG format
+$rawInput = file_get_contents('php://input');
+if ($method === 'POST' && !empty($rawInput) && strpos($rawInput, "\t") !== false) {
+    handleZKTecoRawPush($db, $processor, $settings, $rawInput);
+    exit;
+}
+
+header('Content-Type: application/json');
 
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
@@ -394,4 +412,211 @@ try {
         'error' => 'Internal server error',
         'message' => $e->getMessage()
     ], 500);
+}
+
+/**
+ * Handle ZKTeco native push protocol (iclock format)
+ * The device sends: GET /biometric-api.php?SN=XXXX to register
+ * Then POST /biometric-api.php?SN=XXXX&table=ATTLOG&Stamp=... with attendance data
+ */
+function handleZKTecoPush($db, $processor, $settings) {
+    $sn = $_REQUEST['SN'] ?? '';
+    $table = $_REQUEST['table'] ?? '';
+    $stamp = $_REQUEST['Stamp'] ?? '0';
+    $method = $_SERVER['REQUEST_METHOD'];
+    
+    // Log the request for debugging
+    error_log("ZKTeco Push: SN=$sn, table=$table, stamp=$stamp, method=$method");
+    
+    // Validate device token if configured
+    $deviceToken = $settings->get('zkteco_push_token', '');
+    if (!empty($deviceToken)) {
+        $providedToken = $_GET['token'] ?? $_REQUEST['token'] ?? '';
+        if ($providedToken !== $deviceToken) {
+            error_log("ZKTeco Push: Invalid token for device $sn");
+            header('HTTP/1.1 401 Unauthorized');
+            echo "ERROR";
+            return;
+        }
+    }
+    
+    // Find device by serial number
+    $deviceStmt = $db->prepare("SELECT id, name FROM biometric_devices WHERE serial_number = ? OR name LIKE ? LIMIT 1");
+    $deviceStmt->execute([$sn, "%$sn%"]);
+    $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+    
+    // If device not found, try to auto-register
+    if (!$device && !empty($sn)) {
+        $autoRegister = $settings->get('zkteco_auto_register', '0');
+        if ($autoRegister === '1') {
+            $insertStmt = $db->prepare("INSERT INTO biometric_devices (name, type, ip_address, serial_number, enabled) VALUES (?, 'zkteco', '', ?, true) RETURNING id");
+            $insertStmt->execute(["ZKTeco $sn", $sn]);
+            $device = $insertStmt->fetch(\PDO::FETCH_ASSOC);
+            $device['name'] = "ZKTeco $sn";
+            error_log("ZKTeco Push: Auto-registered device $sn with ID " . $device['id']);
+        }
+    }
+    
+    // Handle GET request (device checking for commands)
+    if ($method === 'GET') {
+        // Device is asking if server has any commands
+        // We respond with OK to acknowledge and optionally send commands
+        header('Content-Type: text/plain');
+        
+        if ($device) {
+            // Update last seen timestamp
+            $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync = NOW() WHERE id = ?");
+            $updateStmt->execute([$device['id']]);
+        }
+        
+        // Return OK with stamp to acknowledge
+        echo "OK";
+        return;
+    }
+    
+    // Handle POST request (device pushing data)
+    if ($method === 'POST') {
+        if (!$device) {
+            error_log("ZKTeco Push: Unknown device $sn");
+            header('Content-Type: text/plain');
+            echo "OK"; // Still acknowledge to prevent device from retrying
+            return;
+        }
+        
+        $rawData = file_get_contents('php://input');
+        error_log("ZKTeco Push Raw Data: " . substr($rawData, 0, 500));
+        
+        $processed = 0;
+        $errors = 0;
+        
+        if ($table === 'ATTLOG' && !empty($rawData)) {
+            // Parse ATTLOG format: PIN\tTime\tStatus\tVerify\tWorkcode\tReserved
+            // Example: 1\t2024-12-05 09:00:00\t0\t1\t0\t0
+            $lines = explode("\n", trim($rawData));
+            
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                
+                $parts = explode("\t", $line);
+                if (count($parts) >= 2) {
+                    $pin = trim($parts[0]);
+                    $time = trim($parts[1]);
+                    $status = isset($parts[2]) ? trim($parts[2]) : '0';
+                    
+                    // Status: 0=Check-In, 1=Check-Out, 2=Break-Out, 3=Break-In, 4=OT-In, 5=OT-Out
+                    $direction = 'unknown';
+                    if ($status === '0' || $status === '3' || $status === '4') {
+                        $direction = 'in';
+                    } elseif ($status === '1' || $status === '2' || $status === '5') {
+                        $direction = 'out';
+                    }
+                    
+                    error_log("ZKTeco Push: Processing PIN=$pin, Time=$time, Status=$status, Direction=$direction");
+                    
+                    try {
+                        $result = $processor->processBiometricEvent(
+                            (int)$device['id'],
+                            (string)$pin,
+                            $time,
+                            $direction
+                        );
+                        
+                        if ($result['success']) {
+                            $processed++;
+                        } else {
+                            $errors++;
+                            error_log("ZKTeco Push: Failed to process - " . ($result['message'] ?? 'Unknown error'));
+                        }
+                    } catch (\Exception $e) {
+                        $errors++;
+                        error_log("ZKTeco Push Error: " . $e->getMessage());
+                    }
+                }
+            }
+        } elseif ($table === 'OPERLOG') {
+            // Operation log - just acknowledge
+            error_log("ZKTeco Push: Received OPERLOG data (ignored)");
+        } elseif ($table === 'USERINFO') {
+            // User info - could be used to sync users
+            error_log("ZKTeco Push: Received USERINFO data");
+            // TODO: Could parse and store user info if needed
+        }
+        
+        error_log("ZKTeco Push: Processed $processed records, $errors errors");
+        
+        // Update device last sync
+        $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync = NOW() WHERE id = ?");
+        $updateStmt->execute([$device['id']]);
+        
+        header('Content-Type: text/plain');
+        echo "OK";
+        return;
+    }
+    
+    header('Content-Type: text/plain');
+    echo "OK";
+}
+
+/**
+ * Handle raw ZKTeco ATTLOG format in POST body
+ * Some devices send raw tab-separated data without query parameters
+ */
+function handleZKTecoRawPush($db, $processor, $settings, $rawInput) {
+    error_log("ZKTeco Raw Push: Received " . strlen($rawInput) . " bytes");
+    
+    // Try to extract device ID from User-Agent or other headers
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $deviceId = null;
+    
+    // Check if device ID is in URL
+    if (isset($_GET['device_id'])) {
+        $deviceId = (int)$_GET['device_id'];
+    }
+    
+    // If no device ID, try to find the first active ZKTeco device
+    if (!$deviceId) {
+        $stmt = $db->query("SELECT id FROM biometric_devices WHERE type = 'zkteco' AND enabled = true ORDER BY id LIMIT 1");
+        $device = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($device) {
+            $deviceId = $device['id'];
+        }
+    }
+    
+    if (!$deviceId) {
+        error_log("ZKTeco Raw Push: No device found");
+        header('Content-Type: text/plain');
+        echo "OK";
+        return;
+    }
+    
+    $processed = 0;
+    $lines = explode("\n", trim($rawInput));
+    
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (empty($line)) continue;
+        
+        $parts = explode("\t", $line);
+        if (count($parts) >= 2) {
+            $pin = trim($parts[0]);
+            $time = trim($parts[1]);
+            $status = isset($parts[2]) ? trim($parts[2]) : '0';
+            
+            $direction = ($status === '0' || $status === '3' || $status === '4') ? 'in' : 
+                        (($status === '1' || $status === '2' || $status === '5') ? 'out' : 'unknown');
+            
+            try {
+                $result = $processor->processBiometricEvent($deviceId, (string)$pin, $time, $direction);
+                if ($result['success']) $processed++;
+            } catch (\Exception $e) {
+                error_log("ZKTeco Raw Push Error: " . $e->getMessage());
+            }
+        }
+    }
+    
+    error_log("ZKTeco Raw Push: Processed $processed records");
+    
+    header('Content-Type: text/plain');
+    echo "OK";
 }

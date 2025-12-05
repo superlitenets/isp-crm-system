@@ -1034,6 +1034,48 @@ if ($action === 'sync_device' && $id) {
                 </div>
             </div>
         </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-cloud-upload text-success"></i> Push Protocol (Real-Time)</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info small mb-3">
+                    <strong>Recommended for Real-Time Attendance!</strong><br>
+                    Push Protocol makes your device send attendance data to your server instantly when employees clock in/out.
+                </div>
+                
+                <h6>Push Server URL:</h6>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control form-control-sm bg-light" readonly 
+                           value="<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'your-domain.com') ?>/biometric-api.php" id="pushUrl">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="copyPushUrl()">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                </div>
+                
+                <h6>ZKTeco K40/K50/K60 Setup:</h6>
+                <ol class="small mb-3">
+                    <li>On device menu: <strong>COMM</strong> → <strong>Cloud Server Setting</strong> (or <strong>Ethernet</strong> → <strong>Push Options</strong>)</li>
+                    <li>Enable: <strong>Enable Cloud Server</strong></li>
+                    <li>Set <strong>Server Address</strong> to your domain (without https://)</li>
+                    <li>Set <strong>Server Port</strong>: <code>443</code> (for HTTPS) or <code>80</code> (for HTTP)</li>
+                    <li>Save and restart the device</li>
+                </ol>
+                
+                <h6>Alternative: Using Push URL directly (newer firmware):</h6>
+                <ol class="small mb-3">
+                    <li>On device: <strong>COMM</strong> → <strong>Push Options</strong></li>
+                    <li>Set <strong>Push Server Address</strong> to the URL above</li>
+                    <li>Enable <strong>Push</strong></li>
+                </ol>
+                
+                <div class="alert alert-success small mb-0">
+                    <strong>Important:</strong> Make sure you add the device's <strong>Serial Number</strong> in the device settings above. 
+                    The device sends its serial number with each push, and the system uses it to identify which device is sending data.
+                </div>
+            </div>
+        </div>
     </div>
     
     <?php if ($action === 'add_device' || $editDevice): ?>
@@ -1092,6 +1134,14 @@ if ($action === 'sync_device' && $id) {
                         <label class="form-label">Password</label>
                         <input type="password" class="form-control" name="password"
                                placeholder="<?= $editDevice ? 'Leave blank to keep current' : 'Device password' ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Serial Number</label>
+                        <input type="text" class="form-control" name="serial_number"
+                               value="<?= htmlspecialchars($editDevice['serial_number'] ?? '') ?>"
+                               placeholder="For Push Protocol identification">
+                        <small class="text-muted">Required for Push Protocol. Find in device menu or test connection.</small>
                     </div>
                     
                     <div class="mb-3">
@@ -1529,6 +1579,24 @@ document.querySelectorAll('.fetch-users-btn').forEach(btn => {
         }
     });
 });
+
+function copyPushUrl() {
+    const pushUrl = document.getElementById('pushUrl');
+    pushUrl.select();
+    pushUrl.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(pushUrl.value).then(() => {
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-success');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
 </script>
 
 <?php elseif ($subpage === 'late_rules'): ?>
