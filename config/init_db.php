@@ -337,13 +337,17 @@ function initializeDatabase(): void {
         if ($checkUsers == 0) {
             $adminPass = password_hash('admin123', PASSWORD_DEFAULT);
             $techPass = password_hash('tech123', PASSWORD_DEFAULT);
+            
+            $adminRoleId = $db->query("SELECT id FROM roles WHERE name = 'administrator' LIMIT 1")->fetchColumn() ?: null;
+            $techRoleId = $db->query("SELECT id FROM roles WHERE name = 'technician' LIMIT 1")->fetchColumn() ?: null;
+            
             $stmt = $db->prepare("
-                INSERT INTO users (name, email, phone, password_hash, role) VALUES
-                ('Admin User', 'admin@isp.com', '+1234567890', ?, 'admin'),
-                ('John Tech', 'john@isp.com', '+1234567891', ?, 'technician'),
-                ('Jane Support', 'jane@isp.com', '+1234567892', ?, 'technician')
+                INSERT INTO users (name, email, phone, password_hash, role, role_id) VALUES
+                ('Admin User', 'admin@isp.com', '+1234567890', ?, 'admin', ?),
+                ('John Tech', 'john@isp.com', '+1234567891', ?, 'technician', ?),
+                ('Jane Support', 'jane@isp.com', '+1234567892', ?, 'technician', ?)
             ");
-            $stmt->execute([$adminPass, $techPass, $techPass]);
+            $stmt->execute([$adminPass, $adminRoleId, $techPass, $techRoleId, $techPass, $techRoleId]);
         }
         
         $initialized = true;
