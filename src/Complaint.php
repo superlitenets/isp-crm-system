@@ -6,9 +6,13 @@ use PDO;
 
 class Complaint {
     private PDO $db;
+    private SMSGateway $sms;
+    private Settings $settings;
 
     public function __construct() {
         $this->db = \Database::getConnection();
+        $this->sms = new SMSGateway();
+        $this->settings = new Settings();
     }
 
     public function create(array $data): int {
@@ -37,7 +41,30 @@ class Complaint {
             $data['source'] ?? 'public'
         ]);
         
-        return $stmt->fetchColumn();
+        $complaintId = $stmt->fetchColumn();
+        
+        // Send SMS receipt to customer
+        if (!empty($data['customer_phone'])) {
+            $this->sendComplaintReceivedSMS($complaintNumber, $data);
+        }
+        
+        return $complaintId;
+    }
+    
+    private function sendComplaintReceivedSMS(string $complaintNumber, array $data): void {
+        $template = $this->settings->get('sms_template_complaint_received', 
+            'Dear {customer_name}, your complaint #{complaint_number} has been received. Category: {category}. Our team will review and respond within 24 hours.');
+        
+        $placeholders = [
+            '{customer_name}' => $data['customer_name'] ?? 'Customer',
+            '{complaint_number}' => $complaintNumber,
+            '{category}' => ucfirst($data['category'] ?? 'General'),
+            '{subject}' => $data['subject'] ?? '',
+            '{customer_phone}' => $data['customer_phone'] ?? ''
+        ];
+        
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
+        $this->sms->send($data['customer_phone'], $message);
     }
 
     public function getAll(array $filters = []): array {

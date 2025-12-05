@@ -6,10 +6,12 @@ class Ticket {
     private \PDO $db;
     private SMSGateway $sms;
     private ?SLA $sla = null;
+    private Settings $settings;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
+        $this->settings = new Settings();
     }
 
     private function getSLA(): SLA {
@@ -60,12 +62,14 @@ class Ticket {
 
         $customer = (new Customer())->find($data['customer_id']);
         if ($customer && $customer['phone']) {
-            $result = $this->sms->notifyCustomer(
-                $customer['phone'],
-                $ticketNumber,
-                'Created',
-                'Your support ticket has been received. We will contact you shortly.'
-            );
+            $message = $this->buildSMSFromTemplate('sms_template_ticket_created', [
+                '{ticket_number}' => $ticketNumber,
+                '{subject}' => $data['subject'] ?? '',
+                '{status}' => 'Open',
+                '{customer_name}' => $customer['name'] ?? 'Customer',
+                '{priority}' => ucfirst($priority)
+            ]);
+            $result = $this->sms->send($customer['phone'], $message);
             $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Ticket created notification', $result['success'] ? 'sent' : 'failed');
         }
 
@@ -142,12 +146,15 @@ class Ticket {
             $customer = (new Customer())->find($ticket['customer_id']);
             if ($customer && $customer['phone']) {
                 $statusMessage = $this->getStatusMessage($data['status']);
-                $smsResult = $this->sms->notifyCustomer(
-                    $customer['phone'],
-                    $ticket['ticket_number'],
-                    ucfirst($data['status']),
-                    $statusMessage
-                );
+                $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
+                $message = $this->buildSMSFromTemplate($templateKey, [
+                    '{ticket_number}' => $ticket['ticket_number'],
+                    '{status}' => ucfirst($data['status']),
+                    '{message}' => $statusMessage,
+                    '{customer_name}' => $customer['name'] ?? 'Customer',
+                    '{subject}' => $ticket['subject'] ?? ''
+                ]);
+                $smsResult = $this->sms->send($customer['phone'], $message);
                 $this->sms->logSMS($id, $customer['phone'], 'customer', "Status update: {$data['status']}", $smsResult['success'] ? 'sent' : 'failed');
             }
         }
@@ -187,6 +194,18 @@ class Ticket {
             'pending' => 'Your ticket is pending further information.',
             default => 'Your ticket status has been updated.'
         };
+    }
+    
+    private function buildSMSFromTemplate(string $templateKey, array $placeholders): string {
+        $defaults = [
+            'sms_template_ticket_created' => 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.',
+            'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
+            'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
+            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.'
+        ];
+        
+        $template = $this->settings->get($templateKey, $defaults[$templateKey] ?? 'ISP Support - Ticket #{ticket_number} - {status}');
+        return str_replace(array_keys($placeholders), array_values($placeholders), $template);
     }
 
     public function delete(int $id): bool {

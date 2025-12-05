@@ -4,9 +4,13 @@ namespace App;
 
 class Order {
     private \PDO $db;
+    private SMSGateway $sms;
+    private Settings $settings;
     
     public function __construct() {
         $this->db = \Database::getConnection();
+        $this->sms = new SMSGateway();
+        $this->settings = new Settings();
     }
     
     public function generateOrderNumber(): string {
@@ -45,7 +49,28 @@ class Order {
             $this->createCommission($orderId, (int)$data['salesperson_id'], (float)($data['amount'] ?? 0));
         }
         
+        // Send SMS confirmation to customer
+        if (!empty($data['customer_phone'])) {
+            $this->sendOrderConfirmationSMS($orderNumber, $data);
+        }
+        
         return $orderId;
+    }
+    
+    private function sendOrderConfirmationSMS(string $orderNumber, array $data): void {
+        $template = $this->settings->get('sms_template_order_confirmation', 
+            'Dear {customer_name}, your order #{order_number} has been received. Amount: KES {amount}. We will contact you shortly. Thank you!');
+        
+        $placeholders = [
+            '{customer_name}' => $data['customer_name'] ?? 'Customer',
+            '{order_number}' => $orderNumber,
+            '{amount}' => number_format((float)($data['amount'] ?? 0)),
+            '{customer_phone}' => $data['customer_phone'] ?? '',
+            '{customer_address}' => $data['customer_address'] ?? ''
+        ];
+        
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
+        $this->sms->send($data['customer_phone'], $message);
     }
     
     private function createCommission(int $orderId, int $salespersonId, float $amount): void {
