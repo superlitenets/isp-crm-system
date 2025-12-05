@@ -20,6 +20,11 @@ session_set_cookie_params([
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+    
+    $sessionId = session_id();
+    $cookieName = session_name();
+    $expires = gmdate('D, d M Y H:i:s T', time() + 86400);
+    header("Set-Cookie: {$cookieName}={$sessionId}; Path=/; Expires={$expires}; Secure; HttpOnly; SameSite=None; Partitioned", false);
 }
 
 ob_start();
