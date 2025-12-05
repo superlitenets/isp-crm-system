@@ -642,6 +642,12 @@ function getSMSGateway() {
 $message = '';
 $messageType = '';
 
+if (isset($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    $messageType = $_SESSION['flash_type'] ?? 'success';
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrfToken = $_POST['csrf_token'] ?? '';
     if (!\App\Auth::validateToken($csrfToken)) {
@@ -1332,9 +1338,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $savedCount += $mpesa->saveConfig('mpesa_callback_url', $_POST['mpesa_callback_url'] ?? '') ? 1 : 0;
                     $savedCount += $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '') ? 1 : 0;
                     $savedCount += $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '') ? 1 : 0;
-                    $message = "M-Pesa settings saved successfully! ($savedCount/8 settings saved)";
-                    $messageType = 'success';
                     \App\Auth::regenerateToken();
+                    $_SESSION['flash_message'] = "M-Pesa settings saved successfully!";
+                    $_SESSION['flash_type'] = 'success';
+                    header('Location: ?page=settings&subpage=mpesa');
+                    exit;
                 } catch (Exception $e) {
                     $message = 'Error saving M-Pesa settings: ' . $e->getMessage();
                     $messageType = 'danger';
