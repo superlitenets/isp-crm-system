@@ -650,6 +650,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         switch ($postAction) {
             case 'create_customer':
+                if (!\App\Auth::can('customers.create')) {
+                    $message = 'You do not have permission to create customers.';
+                    $messageType = 'danger';
+                    break;
+                }
                 $name = trim($_POST['name'] ?? '');
                 $phone = trim($_POST['phone'] ?? '');
                 $address = trim($_POST['address'] ?? '');
@@ -672,6 +677,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'update_customer':
+                if (!\App\Auth::can('customers.edit')) {
+                    $message = 'You do not have permission to edit customers.';
+                    $messageType = 'danger';
+                    break;
+                }
                 $name = trim($_POST['name'] ?? '');
                 $phone = trim($_POST['phone'] ?? '');
                 $address = trim($_POST['address'] ?? '');
@@ -694,8 +704,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'delete_customer':
-                if (!\App\Auth::isAdmin()) {
-                    $message = 'Only administrators can delete customers.';
+                if (!\App\Auth::can('customers.delete')) {
+                    $message = 'You do not have permission to delete customers.';
                     $messageType = 'danger';
                 } else {
                     try {
@@ -713,6 +723,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'create_ticket':
+                if (!\App\Auth::can('tickets.create')) {
+                    $message = 'You do not have permission to create tickets.';
+                    $messageType = 'danger';
+                    break;
+                }
                 $customerId = (int)($_POST['customer_id'] ?? 0);
                 $subject = trim($_POST['subject'] ?? '');
                 $description = trim($_POST['description'] ?? '');
@@ -738,6 +753,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'update_ticket':
+                if (!\App\Auth::can('tickets.edit')) {
+                    $message = 'You do not have permission to edit tickets.';
+                    $messageType = 'danger';
+                    break;
+                }
                 $subject = trim($_POST['subject'] ?? '');
                 $description = trim($_POST['description'] ?? '');
                 $category = trim($_POST['category'] ?? '');
@@ -2703,31 +2723,42 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
             </li>
+            <?php if (\App\Auth::can('customers.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers">
                     <i class="bi bi-people"></i> Customers
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('tickets.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'tickets' ? 'active' : '' ?>" href="?page=tickets">
                     <i class="bi bi-ticket"></i> Tickets
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('hr.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'hr' ? 'active' : '' ?>" href="?page=hr">
                     <i class="bi bi-people-fill"></i> HR
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('inventory.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
                     <i class="bi bi-box-seam"></i> Inventory
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('payments.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments">
                     <i class="bi bi-cash-stack"></i> Payments
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('orders.view')): ?>
             <li class="nav-item">
                 <?php 
                 $newOrdersCount = $db->query("SELECT COUNT(*) FROM orders WHERE order_status = 'new'")->fetchColumn();
@@ -2739,6 +2770,8 @@ $csrfToken = \App\Auth::generateToken();
                     <?php endif; ?>
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('tickets.view')): ?>
             <li class="nav-item">
                 <?php 
                 $pendingComplaintsCount = $db->query("SELECT COUNT(*) FROM complaints WHERE status = 'pending'")->fetchColumn();
@@ -2750,16 +2783,21 @@ $csrfToken = \App\Auth::generateToken();
                     <?php endif; ?>
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'smartolt' ? 'active' : '' ?>" href="?page=smartolt">
                     <i class="bi bi-router"></i> SmartOLT
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
             </li>
+            <?php endif; ?>
         </ul>
         <div class="mt-auto">
             <div class="user-info">
@@ -2781,40 +2819,81 @@ $csrfToken = \App\Auth::generateToken();
         <?php endif; ?>
 
         <?php
+        $accessDenied = false;
         switch ($page) {
             case 'dashboard':
                 include __DIR__ . '/../templates/dashboard.php';
                 break;
             case 'customers':
-                include __DIR__ . '/../templates/customers.php';
+                if (!\App\Auth::can('customers.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/customers.php';
+                }
                 break;
             case 'tickets':
-                include __DIR__ . '/../templates/tickets.php';
+                if (!\App\Auth::can('tickets.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/tickets.php';
+                }
                 break;
             case 'hr':
-                include __DIR__ . '/../templates/hr.php';
+                if (!\App\Auth::can('hr.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/hr.php';
+                }
                 break;
             case 'inventory':
-                include __DIR__ . '/../templates/inventory.php';
+                if (!\App\Auth::can('inventory.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/inventory.php';
+                }
                 break;
             case 'payments':
-                include __DIR__ . '/../templates/payments.php';
+                if (!\App\Auth::can('payments.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/payments.php';
+                }
                 break;
             case 'orders':
-                include __DIR__ . '/../templates/orders.php';
+                if (!\App\Auth::can('orders.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/orders.php';
+                }
                 break;
             case 'complaints':
-                include __DIR__ . '/../templates/complaints.php';
+                if (!\App\Auth::can('tickets.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/complaints.php';
+                }
                 break;
             case 'smartolt':
-                include __DIR__ . '/../templates/smartolt.php';
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/smartolt.php';
+                }
                 break;
             case 'settings':
-                $smsGateway = getSMSGateway();
-                include __DIR__ . '/../templates/settings.php';
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    $smsGateway = getSMSGateway();
+                    include __DIR__ . '/../templates/settings.php';
+                }
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
+        }
+        
+        if ($accessDenied) {
+            echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page. Please contact your administrator if you need access.</div>';
         }
         ?>
     </main>
