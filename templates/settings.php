@@ -553,7 +553,7 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
 
 <div class="card mt-4 border-success">
     <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Settings</h5>
+        <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Gateway Settings</h5>
     </div>
     <div class="card-body">
         <form method="POST">
@@ -562,6 +562,17 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
             
             <div class="row g-3">
                 <div class="col-md-6">
+                    <label class="form-label">WhatsApp Provider</label>
+                    <select class="form-select" name="whatsapp_provider" id="whatsappProvider" onchange="toggleWhatsAppProvider()">
+                        <option value="web" <?= ($whatsappSettings['whatsapp_provider'] ?? 'web') === 'web' ? 'selected' : '' ?>>WhatsApp Web Links (No API)</option>
+                        <option value="meta" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'meta' ? 'selected' : '' ?>>Meta WhatsApp Business API</option>
+                        <option value="waha" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'waha' ? 'selected' : '' ?>>WAHA (Self-Hosted)</option>
+                        <option value="ultramsg" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'ultramsg' ? 'selected' : '' ?>>UltraMsg API</option>
+                        <option value="custom" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'custom' ? 'selected' : '' ?>>Custom API Gateway</option>
+                    </select>
+                    <small class="text-muted">Select how to send WhatsApp messages</small>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Default Country Code</label>
                     <div class="input-group">
                         <span class="input-group-text">+</span>
@@ -569,14 +580,101 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                value="<?= htmlspecialchars($whatsappSettings['whatsapp_country_code'] ?? '254') ?>" 
                                placeholder="254">
                     </div>
-                    <small class="text-muted">Country code to prepend to phone numbers (e.g., 254 for Kenya, 1 for USA)</small>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Default Greeting Message</label>
+                <div class="col-md-3">
+                    <label class="form-label">Default Greeting</label>
                     <input type="text" class="form-control" name="whatsapp_default_message" 
                            value="<?= htmlspecialchars($whatsappSettings['whatsapp_default_message'] ?? '') ?>" 
-                           placeholder="Hello from ISP Support!">
-                    <small class="text-muted">Optional greeting to prepend to WhatsApp messages</small>
+                           placeholder="Hello!">
+                </div>
+            </div>
+            
+            <div id="waProviderMeta" class="provider-config mt-4" style="display: none;">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>Meta WhatsApp Business API</strong> - Requires Facebook Business account and WhatsApp Business API access.
+                    <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" class="alert-link">Setup Guide</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Access Token</label>
+                        <input type="password" class="form-control" name="whatsapp_meta_token" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_meta_token', '')) ?>" 
+                               placeholder="Your Meta access token">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Phone Number ID</label>
+                        <input type="text" class="form-control" name="whatsapp_phone_number_id" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_phone_number_id', '')) ?>" 
+                               placeholder="Phone number ID from Meta">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Business ID</label>
+                        <input type="text" class="form-control" name="whatsapp_business_id" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_business_id', '')) ?>" 
+                               placeholder="WhatsApp Business Account ID">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderWaha" class="provider-config mt-4" style="display: none;">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>WAHA (WhatsApp HTTP API)</strong> - Self-hosted WhatsApp API. 
+                    <a href="https://waha.devlike.pro/" target="_blank" class="alert-link">Learn More</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">WAHA Server URL</label>
+                        <input type="url" class="form-control" name="whatsapp_waha_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_url', '')) ?>" 
+                               placeholder="http://localhost:3000">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Key (Optional)</label>
+                        <input type="password" class="form-control" name="whatsapp_waha_api_key" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_api_key', '')) ?>" 
+                               placeholder="WAHA API key if configured">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderUltramsg" class="provider-config mt-4" style="display: none;">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>UltraMsg</strong> - Cloud WhatsApp API service.
+                    <a href="https://ultramsg.com/" target="_blank" class="alert-link">Get API Key</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Instance ID</label>
+                        <input type="text" class="form-control" name="whatsapp_ultramsg_instance" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_instance', '')) ?>" 
+                               placeholder="instance12345">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Token</label>
+                        <input type="password" class="form-control" name="whatsapp_ultramsg_token" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_token', '')) ?>" 
+                               placeholder="Your UltraMsg token">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderCustom" class="provider-config mt-4" style="display: none;">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>Custom API</strong> - For other WhatsApp gateways. Must accept POST with JSON body: <code>{"phone": "...", "message": "..."}</code>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">API URL</label>
+                        <input type="url" class="form-control" name="whatsapp_custom_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_url', '')) ?>" 
+                               placeholder="https://api.example.com/whatsapp/send">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Key / Bearer Token</label>
+                        <input type="password" class="form-control" name="whatsapp_custom_api_key" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_api_key', '')) ?>" 
+                               placeholder="Authorization token">
+                    </div>
                 </div>
             </div>
             
@@ -584,10 +682,29 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                 <button type="submit" class="btn btn-success">
                     <i class="bi bi-check-lg"></i> Save WhatsApp Settings
                 </button>
+                <button type="button" class="btn btn-outline-primary ms-2" onclick="testWhatsAppGateway()">
+                    <i class="bi bi-send"></i> Test Connection
+                </button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+function toggleWhatsAppProvider() {
+    document.querySelectorAll('.provider-config').forEach(el => el.style.display = 'none');
+    const provider = document.getElementById('whatsappProvider').value;
+    if (provider !== 'web') {
+        const configDiv = document.getElementById('waProvider' + provider.charAt(0).toUpperCase() + provider.slice(1));
+        if (configDiv) configDiv.style.display = 'block';
+    }
+}
+document.addEventListener('DOMContentLoaded', toggleWhatsAppProvider);
+
+function testWhatsAppGateway() {
+    alert('WhatsApp gateway test - Coming soon! For now, save settings and try sending a message from a ticket.');
+}
+</script>
 
 <div class="card mt-4 border-success">
     <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">

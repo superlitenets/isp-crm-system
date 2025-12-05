@@ -316,17 +316,33 @@ class Settings {
             'whatsapp_enabled' => $this->get('whatsapp_enabled', '1'),
             'whatsapp_country_code' => $this->get('whatsapp_country_code', '254'),
             'whatsapp_default_message' => $this->get('whatsapp_default_message', ''),
+            'whatsapp_provider' => $this->get('whatsapp_provider', 'web'),
         ];
     }
 
     public function saveWhatsAppSettings(array $data): bool {
-        $fields = ['whatsapp_country_code', 'whatsapp_default_message'];
+        $fields = [
+            'whatsapp_country_code', 
+            'whatsapp_default_message',
+            'whatsapp_provider',
+            'whatsapp_meta_token',
+            'whatsapp_phone_number_id',
+            'whatsapp_business_id',
+            'whatsapp_waha_url',
+            'whatsapp_waha_api_key',
+            'whatsapp_ultramsg_instance',
+            'whatsapp_ultramsg_token',
+            'whatsapp_custom_url',
+            'whatsapp_custom_api_key'
+        ];
         
-        $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '0');
+        $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '1');
         
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                $this->set($field, $data[$field]);
+                $secretFields = ['whatsapp_meta_token', 'whatsapp_waha_api_key', 'whatsapp_ultramsg_token', 'whatsapp_custom_api_key'];
+                $type = in_array($field, $secretFields) ? 'secret' : 'text';
+                $this->set($field, $data[$field], $type);
             }
         }
         return true;
