@@ -13,23 +13,41 @@ class Auth {
 
     public static function login(string $email, string $password): bool {
         $db = \Database::getConnection();
-        $stmt = $db->prepare("
-            SELECT u.*, r.name as role_name, r.display_name as role_display_name
-            FROM users u
-            LEFT JOIN roles r ON u.role_id = r.id
-            WHERE u.email = ?
-        ");
+        
+        $rolesTableExists = false;
+        try {
+            $check = $db->query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'roles')");
+            $rolesTableExists = $check->fetchColumn();
+        } catch (\PDOException $e) {
+            $rolesTableExists = false;
+        }
+        
+        if ($rolesTableExists) {
+            $stmt = $db->prepare("
+                SELECT u.*, r.name as role_name, r.display_name as role_display_name
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                WHERE u.email = ?
+            ");
+        } else {
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
+        }
+        
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password_hash'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
-            $_SESSION['user_role'] = $user['role_name'] ?? $user['role'];
-            $_SESSION['user_role_id'] = $user['role_id'];
+            $_SESSION['user_role'] = $user['role_name'] ?? $user['role'] ?? 'admin';
+            $_SESSION['user_role_id'] = $user['role_id'] ?? null;
             $_SESSION['user_email'] = $user['email'];
             
-            self::loadPermissions($user['role_id']);
+            if ($rolesTableExists && !empty($user['role_id'])) {
+                self::loadPermissions($user['role_id']);
+            } else {
+                $_SESSION['permissions'] = [];
+            }
             self::regenerateToken();
             return true;
         }
@@ -68,7 +86,8 @@ class Auth {
     }
 
     public static function isAdmin(): bool {
-        return ($_SESSION['user_role'] ?? '') === 'admin';
+        $role = $_SESSION['user_role'] ?? '';
+        return in_array($role, ['admin', 'administrator']);
     }
     
     public static function hasRole(string $role): bool {
