@@ -2,6 +2,26 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
+
+ini_set('session.cookie_secure', '1');
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'None');
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+
+session_set_cookie_params([
+    'lifetime' => 86400,
+    'path' => '/',
+    'domain' => '',
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'None'
+]);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 ob_start();
 
 header('Cache-Control: no-cache, no-store, must-revalidate');
