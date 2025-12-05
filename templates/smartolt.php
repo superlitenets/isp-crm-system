@@ -674,19 +674,29 @@ function updateOLTTable(olts) {
 }
 
 function updateONUSummary(stats) {
+    const onuDataAvailable = stats.onu_data_available !== false;
+    
     const elements = {
-        'summary-configured': stats.configured_onus || 0,
-        'summary-online': stats.online_onus || 0,
-        'summary-offline': stats.offline_onus || 0,
-        'summary-los': stats.los_onus || 0,
-        'summary-power-fail': stats.power_fail_onus || 0,
-        'summary-low-power': stats.low_power_onus || 0,
-        'summary-critical': stats.critical_power_onus || 0
+        'summary-configured': onuDataAvailable ? (stats.configured_onus || 0) : 'N/A',
+        'summary-online': onuDataAvailable ? (stats.online_onus || 0) : 'N/A',
+        'summary-offline': onuDataAvailable ? (stats.offline_onus || 0) : 'N/A',
+        'summary-los': onuDataAvailable ? (stats.los_onus || 0) : 'N/A',
+        'summary-power-fail': onuDataAvailable ? (stats.power_fail_onus || 0) : 'N/A',
+        'summary-low-power': onuDataAvailable ? (stats.low_power_onus || 0) : 'N/A',
+        'summary-critical': onuDataAvailable ? (stats.critical_power_onus || 0) : 'N/A'
     };
     
     for (const [id, value] of Object.entries(elements)) {
         const el = document.getElementById(id);
-        if (el) el.textContent = value;
+        if (el) {
+            el.textContent = value;
+            // Add opacity to cards when data not available
+            const card = el.closest('.card');
+            if (card && value === 'N/A') {
+                card.style.opacity = '0.6';
+                card.style.cursor = 'not-allowed';
+            }
+        }
     }
 }
 
@@ -695,17 +705,38 @@ function showAPIErrors(errors) {
     const existingAlert = document.getElementById('api-errors-alert');
     if (existingAlert) existingAlert.remove();
     
-    let errorsHtml = '<ul class="mb-0 mt-2">';
-    for (const [endpoint, error] of Object.entries(errors)) {
-        errorsHtml += `<li><strong>${endpoint}:</strong> ${escapeHtml(error)}</li>`;
+    // Check if errors are 405 (permission/subscription issues)
+    const has405 = Object.values(errors).some(e => e.includes('405'));
+    
+    let errorsHtml = '';
+    if (has405) {
+        errorsHtml = `
+            <p class="mb-2">Some ONU monitoring features are not available. This is typically due to:</p>
+            <ul class="mb-2">
+                <li>SmartOLT subscription tier not including these API endpoints</li>
+                <li>API key permissions not configured for ONU data access</li>
+            </ul>
+            <p class="mb-0"><strong>OLT data is still available.</strong> Contact SmartOLT support to enable full ONU API access.</p>
+            <details class="mt-2">
+                <summary class="text-muted" style="cursor:pointer;">Technical details</summary>
+                <ul class="mb-0 mt-2 small">`;
+        for (const [endpoint, error] of Object.entries(errors)) {
+            errorsHtml += `<li><strong>${endpoint}:</strong> ${escapeHtml(error)}</li>`;
+        }
+        errorsHtml += '</ul></details>';
+    } else {
+        errorsHtml = '<ul class="mb-0 mt-2">';
+        for (const [endpoint, error] of Object.entries(errors)) {
+            errorsHtml += `<li><strong>${endpoint}:</strong> ${escapeHtml(error)}</li>`;
+        }
+        errorsHtml += '</ul>';
     }
-    errorsHtml += '</ul>';
     
     const alertDiv = document.createElement('div');
     alertDiv.id = 'api-errors-alert';
-    alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+    alertDiv.className = has405 ? 'alert alert-info alert-dismissible fade show' : 'alert alert-warning alert-dismissible fade show';
     alertDiv.innerHTML = `
-        <strong><i class="bi bi-exclamation-triangle me-2"></i>Some API Errors:</strong>
+        <strong><i class="bi bi-info-circle me-2"></i>${has405 ? 'Limited API Access' : 'Some API Errors'}:</strong>
         ${errorsHtml}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;

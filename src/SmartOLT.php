@@ -363,6 +363,7 @@ class SmartOLT {
             'power_fail_onus' => 0,
             'critical_power_onus' => 0,
             'low_power_onus' => 0,
+            'onu_data_available' => true,
             'errors' => []
         ];
         
@@ -394,6 +395,9 @@ class SmartOLT {
             $stats['unconfigured_list'] = $unconfiguredResult['response'];
         } elseif (isset($unconfiguredResult['error'])) {
             $stats['errors']['unconfigured'] = $unconfiguredResult['error'];
+            if (strpos($unconfiguredResult['error'], '405') !== false) {
+                $stats['onu_data_available'] = false;
+            }
         }
         
         $statusesResult = $this->getAllONUsStatuses();
@@ -416,6 +420,9 @@ class SmartOLT {
             }
         } elseif (isset($statusesResult['error'])) {
             $stats['errors']['statuses'] = $statusesResult['error'];
+            if (strpos($statusesResult['error'], '405') !== false) {
+                $stats['onu_data_available'] = false;
+            }
         }
         
         $signalsResult = $this->getAllONUsSignals();
@@ -433,6 +440,9 @@ class SmartOLT {
             }
         } elseif (isset($signalsResult['error'])) {
             $stats['errors']['signals'] = $signalsResult['error'];
+            if (strpos($signalsResult['error'], '405') !== false) {
+                $stats['onu_data_available'] = false;
+            }
         }
         
         return $stats;
