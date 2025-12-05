@@ -972,11 +972,17 @@ if ($action === 'sync_device' && $id) {
                                         <button type="button" class="btn btn-outline-success sync-device-btn" 
                                                 data-device-id="<?= $device['id'] ?>" 
                                                 data-device-name="<?= htmlspecialchars($device['name']) ?>"
-                                                title="Sync Now">
+                                                title="Sync Attendance">
                                             <i class="bi bi-arrow-repeat"></i>
                                         </button>
+                                        <button type="button" class="btn btn-outline-warning fetch-users-btn" 
+                                                data-device-id="<?= $device['id'] ?>" 
+                                                data-device-name="<?= htmlspecialchars($device['name']) ?>"
+                                                title="View Registered Users">
+                                            <i class="bi bi-person-lines-fill"></i>
+                                        </button>
                                         <a href="?page=settings&subpage=biometric&action=map_users&id=<?= $device['id'] ?>" 
-                                           class="btn btn-outline-primary" title="Map Users">
+                                           class="btn btn-outline-primary" title="Map Users to Employees">
                                             <i class="bi bi-people"></i>
                                         </a>
                                         <a href="?page=settings&subpage=biometric&action=edit_device&id=<?= $device['id'] ?>" 
@@ -1332,6 +1338,63 @@ if ($action === 'sync_device' && $id) {
     </div>
 </div>
 
+<div class="modal fade" id="deviceUsersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill"></i> Registered Users - <span id="usersDeviceName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="usersLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 mb-0">Fetching users from device...</p>
+                    <p class="small text-muted">This may take a moment...</p>
+                </div>
+                <div id="usersResult" class="d-none">
+                    <div id="usersSuccess" class="d-none">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle"></i> Found <strong id="usersCount">0</strong> registered users
+                        </div>
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>UID</th>
+                                        <th>User ID</th>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th>Card No</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="usersEmpty" class="d-none">
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> No users found on device
+                            <p class="mb-0 mt-2 small">The device may not have any registered users, or the data format is not supported.</p>
+                        </div>
+                    </div>
+                    <div id="usersFailed" class="d-none">
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle-fill"></i> Failed to fetch users
+                            <p class="mb-0 mt-2 small" id="usersErrorMessage"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.querySelectorAll('.test-connection-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
@@ -1407,6 +1470,62 @@ document.querySelectorAll('.sync-device-btn').forEach(btn => {
             document.getElementById('syncResult').classList.remove('d-none');
             document.getElementById('syncFailed').classList.remove('d-none');
             document.getElementById('syncErrorMessage').textContent = 'Network error: ' + error.message;
+        }
+    });
+});
+
+document.querySelectorAll('.fetch-users-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const deviceId = this.dataset.deviceId;
+        const deviceName = this.dataset.deviceName;
+        
+        document.getElementById('usersDeviceName').textContent = deviceName;
+        document.getElementById('usersLoading').classList.remove('d-none');
+        document.getElementById('usersResult').classList.add('d-none');
+        document.getElementById('usersSuccess').classList.add('d-none');
+        document.getElementById('usersEmpty').classList.add('d-none');
+        document.getElementById('usersFailed').classList.add('d-none');
+        document.getElementById('usersTableBody').innerHTML = '';
+        
+        const modal = new bootstrap.Modal(document.getElementById('deviceUsersModal'));
+        modal.show();
+        
+        try {
+            const response = await fetch(`?page=api&action=fetch_biometric_users&device_id=${deviceId}`);
+            const result = await response.json();
+            
+            document.getElementById('usersLoading').classList.add('d-none');
+            document.getElementById('usersResult').classList.remove('d-none');
+            
+            if (result.success) {
+                if (result.users && result.users.length > 0) {
+                    document.getElementById('usersSuccess').classList.remove('d-none');
+                    document.getElementById('usersCount').textContent = result.count || result.users.length;
+                    
+                    const tbody = document.getElementById('usersTableBody');
+                    result.users.forEach(user => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${user.uid || '-'}</td>
+                            <td><strong>${user.device_user_id || '-'}</strong></td>
+                            <td>${user.name || '<em class="text-muted">No Name</em>'}</td>
+                            <td>${user.role === 0 ? 'User' : (user.role === 14 ? 'Admin' : user.role)}</td>
+                            <td>${user.card_no && user.card_no > 0 ? user.card_no : '-'}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    document.getElementById('usersEmpty').classList.remove('d-none');
+                }
+            } else {
+                document.getElementById('usersFailed').classList.remove('d-none');
+                document.getElementById('usersErrorMessage').textContent = result.message || 'Unknown error';
+            }
+        } catch (error) {
+            document.getElementById('usersLoading').classList.add('d-none');
+            document.getElementById('usersResult').classList.remove('d-none');
+            document.getElementById('usersFailed').classList.remove('d-none');
+            document.getElementById('usersErrorMessage').textContent = 'Network error: ' + error.message;
         }
     });
 });
