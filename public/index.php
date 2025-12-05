@@ -3,28 +3,47 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-ini_set('session.cookie_secure', '1');
+$isReplit = !empty(getenv('REPLIT_DEV_DOMAIN'));
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
+           (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
 ini_set('session.cookie_httponly', '1');
-ini_set('session.cookie_samesite', 'None');
 ini_set('session.use_strict_mode', '1');
 ini_set('session.use_only_cookies', '1');
 
-session_set_cookie_params([
-    'lifetime' => 86400,
-    'path' => '/',
-    'domain' => '',
-    'secure' => true,
-    'httponly' => true,
-    'samesite' => 'None'
-]);
+if ($isReplit) {
+    ini_set('session.cookie_secure', '1');
+    ini_set('session.cookie_samesite', 'None');
+    session_set_cookie_params([
+        'lifetime' => 86400,
+        'path' => '/',
+        'domain' => '',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'None'
+    ]);
+} else {
+    ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+    ini_set('session.cookie_samesite', 'Lax');
+    session_set_cookie_params([
+        'lifetime' => 86400,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
     
-    $sessionId = session_id();
-    $cookieName = session_name();
-    $expires = gmdate('D, d M Y H:i:s T', time() + 86400);
-    header("Set-Cookie: {$cookieName}={$sessionId}; Path=/; Expires={$expires}; Secure; HttpOnly; SameSite=None; Partitioned", false);
+    if ($isReplit) {
+        $sessionId = session_id();
+        $cookieName = session_name();
+        $expires = gmdate('D, d M Y H:i:s T', time() + 86400);
+        header("Set-Cookie: {$cookieName}={$sessionId}; Path=/; Expires={$expires}; Secure; HttpOnly; SameSite=None; Partitioned", false);
+    }
 }
 
 ob_start();
