@@ -41,6 +41,7 @@ function initializeDatabase(): void {
         connection_status VARCHAR(20) DEFAULT 'active',
         installation_date DATE,
         notes TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -50,6 +51,7 @@ function initializeDatabase(): void {
         ticket_number VARCHAR(20) UNIQUE NOT NULL,
         customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
         assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
         subject VARCHAR(200) NOT NULL,
         description TEXT NOT NULL,
         category VARCHAR(50) NOT NULL,
@@ -520,6 +522,7 @@ function runMigrations(PDO $db): void {
                 order_status VARCHAR(20) DEFAULT 'new',
                 notes TEXT,
                 ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )",
@@ -765,6 +768,7 @@ function runMigrations(PDO $db): void {
                 review_notes TEXT,
                 converted_ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
                 source VARCHAR(50) DEFAULT 'public',
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
@@ -805,7 +809,11 @@ function runMigrations(PDO $db): void {
         ['biometric_devices', 'serial_number', 'ALTER TABLE biometric_devices ADD COLUMN serial_number VARCHAR(100)'],
         ['whatsapp_logs', 'order_id', 'ALTER TABLE whatsapp_logs ADD COLUMN order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE'],
         ['whatsapp_logs', 'complaint_id', 'ALTER TABLE whatsapp_logs ADD COLUMN complaint_id INTEGER REFERENCES complaints(id) ON DELETE CASCADE'],
-        ['whatsapp_logs', 'message_type', "ALTER TABLE whatsapp_logs ADD COLUMN message_type VARCHAR(50) DEFAULT 'custom'"]
+        ['whatsapp_logs', 'message_type', "ALTER TABLE whatsapp_logs ADD COLUMN message_type VARCHAR(50) DEFAULT 'custom'"],
+        ['customers', 'created_by', 'ALTER TABLE customers ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['tickets', 'created_by', 'ALTER TABLE tickets ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['orders', 'created_by', 'ALTER TABLE orders ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['complaints', 'created_by', 'ALTER TABLE complaints ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -886,7 +894,12 @@ function seedRolesAndPermissions(PDO $db): void {
         ['roles.manage', 'Manage Roles', 'users', 'Can manage roles and permissions'],
         
         ['reports.view', 'View Reports', 'reports', 'Can view reports and analytics'],
-        ['reports.export', 'Export Reports', 'reports', 'Can export data and reports']
+        ['reports.export', 'Export Reports', 'reports', 'Can export data and reports'],
+        
+        ['tickets.view_all', 'View All Tickets', 'tickets', 'View all tickets (not just assigned)'],
+        ['customers.view_all', 'View All Customers', 'customers', 'View all customers (not just created by user)'],
+        ['orders.view_all', 'View All Orders', 'orders', 'View all orders (not just owned by user)'],
+        ['complaints.view_all', 'View All Complaints', 'complaints', 'View all complaints (not just assigned)']
     ];
     
     $stmt = $db->prepare("INSERT INTO permissions (name, display_name, category, description) VALUES (?, ?, ?, ?)");
@@ -902,7 +915,8 @@ function seedRolesAndPermissions(PDO $db): void {
         'admin' => ['*'],
         'manager' => [
             'dashboard.view', 'customers.*', 'tickets.*', 'hr.view', 'hr.manage', 'hr.attendance',
-            'inventory.*', 'orders.*', 'payments.view', 'settings.view', 'users.view', 'reports.*'
+            'inventory.*', 'orders.*', 'payments.view', 'settings.view', 'users.view', 'reports.*',
+            'tickets.view_all', 'customers.view_all', 'orders.view_all', 'complaints.view_all'
         ],
         'technician' => [
             'dashboard.view', 'customers.view', 'customers.edit', 'tickets.view', 'tickets.create', 

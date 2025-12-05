@@ -324,11 +324,15 @@ $stats = $orderModel->getStats();
 <div class="card">
     <div class="card-body p-0">
         <?php 
-        $orders = $orderModel->getAll([
+        $orderFilters = [
             'status' => $_GET['status'] ?? '',
             'search' => $_GET['search'] ?? '',
             'salesperson_id' => $_GET['salesperson'] ?? ''
-        ]);
+        ];
+        if (!\App\Auth::can('orders.view_all') && !\App\Auth::isAdmin()) {
+            $orderFilters['user_id'] = $_SESSION['user_id'];
+        }
+        $orders = $orderModel->getAll($orderFilters);
         ?>
         <?php if (empty($orders)): ?>
         <div class="text-center py-5 text-muted">

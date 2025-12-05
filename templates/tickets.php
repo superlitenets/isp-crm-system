@@ -579,6 +579,9 @@ if (isset($_GET['customer_id'])) {
                     if ($statusFilter) $filters['status'] = $statusFilter;
                     if ($priorityFilter) $filters['priority'] = $priorityFilter;
                     if ($search) $filters['search'] = $search;
+                    if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
+                        $filters['user_id'] = $_SESSION['user_id'];
+                    }
                     $tickets = $ticket->getAll($filters);
                     $slaHelper = new \App\SLA();
                     foreach ($tickets as $t):

@@ -252,7 +252,11 @@ if ($action === 'view' && $id) {
                 </thead>
                 <tbody>
                     <?php
-                    $customers = $customer->getAll($search);
+                    $customerUserId = null;
+                    if (!\App\Auth::can('customers.view_all') && !\App\Auth::isAdmin()) {
+                        $customerUserId = $_SESSION['user_id'];
+                    }
+                    $customers = $customer->getAll($search, 50, 0, $customerUserId);
                     foreach ($customers as $c):
                     ?>
                     <tr>

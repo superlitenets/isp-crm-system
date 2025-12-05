@@ -24,11 +24,12 @@ class Order {
     
     public function create(array $data): int {
         $orderNumber = $this->generateOrderNumber();
+        $createdBy = $data['created_by'] ?? ($_SESSION['user_id'] ?? null);
         
         $stmt = $this->db->prepare("
             INSERT INTO orders (order_number, package_id, customer_name, customer_email, 
-                               customer_phone, customer_address, amount, payment_method, notes, salesperson_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               customer_phone, customer_address, amount, payment_method, notes, salesperson_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id
         ");
         
@@ -42,7 +43,8 @@ class Order {
             $data['amount'] ?? null,
             $data['payment_method'] ?? null,
             $data['notes'] ?? null,
-            $data['salesperson_id'] ?? null
+            $data['salesperson_id'] ?? null,
+            $createdBy
         ]);
         
         $orderId = (int) $stmt->fetchColumn();
@@ -168,6 +170,12 @@ class Order {
         if (!empty($filters['salesperson_id'])) {
             $where[] = "o.salesperson_id = ?";
             $params[] = (int)$filters['salesperson_id'];
+        }
+        
+        if (!empty($filters['user_id'])) {
+            $where[] = "(o.salesperson_id = ? OR o.created_by = ?)";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
         }
         
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';

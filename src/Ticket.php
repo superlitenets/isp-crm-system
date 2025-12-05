@@ -33,12 +33,13 @@ class Ticket {
         $assignedTo = !empty($data['assigned_to']) ? (int)$data['assigned_to'] : null;
         $teamId = !empty($data['team_id']) ? (int)$data['team_id'] : null;
         $priority = $data['priority'] ?? 'medium';
+        $createdBy = $data['created_by'] ?? ($_SESSION['user_id'] ?? null);
         
         $slaData = $this->getSLA()->calculateSLAForTicket($priority);
         
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -53,7 +54,8 @@ class Ticket {
             'open',
             $slaData['policy_id'],
             $slaData['response_due'] ? $slaData['response_due']->format('Y-m-d H:i:s') : null,
-            $slaData['resolution_due'] ? $slaData['resolution_due']->format('Y-m-d H:i:s') : null
+            $slaData['resolution_due'] ? $slaData['resolution_due']->format('Y-m-d H:i:s') : null,
+            $createdBy
         ]);
 
         $ticketId = (int) $this->db->lastInsertId();
@@ -369,6 +371,12 @@ class Ticket {
             $params[] = $searchTerm;
         }
         
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
+        }
+        
         $sql .= " ORDER BY 
             CASE t.priority 
                 WHEN 'critical' THEN 1 
@@ -416,6 +424,12 @@ class Ticket {
             $params[] = $searchTerm;
             $params[] = $searchTerm;
             $params[] = $searchTerm;
+        }
+        
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
         }
         
         $stmt = $this->db->prepare($sql);

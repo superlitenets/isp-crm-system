@@ -10,6 +10,9 @@ $filters = [];
 if ($statusFilter) $filters['status'] = $statusFilter;
 if ($categoryFilter) $filters['category'] = $categoryFilter;
 if ($searchQuery) $filters['search'] = $searchQuery;
+if (!\App\Auth::can('complaints.view_all') && !\App\Auth::isAdmin()) {
+    $filters['user_id'] = $_SESSION['user_id'];
+}
 
 $complaints = $complaintModel->getAll($filters);
 $stats = $complaintModel->getStats();

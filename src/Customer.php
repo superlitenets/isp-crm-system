@@ -15,8 +15,8 @@ class Customer {
 
     public function create(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO customers (account_number, name, email, phone, address, service_plan, connection_status, installation_date, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO customers (account_number, name, email, phone, address, service_plan, connection_status, installation_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -28,7 +28,8 @@ class Customer {
             $data['service_plan'],
             $data['connection_status'] ?? 'active',
             $data['installation_date'] ?? null,
-            $data['notes'] ?? null
+            $data['notes'] ?? null,
+            $data['created_by'] ?? ($_SESSION['user_id'] ?? null)
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -75,14 +76,19 @@ class Customer {
         return $result ?: null;
     }
 
-    public function getAll(string $search = '', int $limit = 50, int $offset = 0): array {
-        $sql = "SELECT * FROM customers";
+    public function getAll(string $search = '', int $limit = 50, int $offset = 0, ?int $userId = null): array {
+        $sql = "SELECT * FROM customers WHERE 1=1";
         $params = [];
         
         if ($search) {
-            $sql .= " WHERE name ILIKE ? OR account_number ILIKE ? OR phone ILIKE ? OR email ILIKE ?";
+            $sql .= " AND (name ILIKE ? OR account_number ILIKE ? OR phone ILIKE ? OR email ILIKE ?)";
             $searchTerm = "%$search%";
-            $params = [$searchTerm, $searchTerm, $searchTerm, $searchTerm];
+            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        }
+        
+        if ($userId !== null) {
+            $sql .= " AND created_by = ?";
+            $params[] = $userId;
         }
         
         $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
@@ -94,14 +100,19 @@ class Customer {
         return $stmt->fetchAll();
     }
 
-    public function count(string $search = ''): int {
-        $sql = "SELECT COUNT(*) FROM customers";
+    public function count(string $search = '', ?int $userId = null): int {
+        $sql = "SELECT COUNT(*) FROM customers WHERE 1=1";
         $params = [];
         
         if ($search) {
-            $sql .= " WHERE name ILIKE ? OR account_number ILIKE ? OR phone ILIKE ? OR email ILIKE ?";
+            $sql .= " AND (name ILIKE ? OR account_number ILIKE ? OR phone ILIKE ? OR email ILIKE ?)";
             $searchTerm = "%$search%";
-            $params = [$searchTerm, $searchTerm, $searchTerm, $searchTerm];
+            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        }
+        
+        if ($userId !== null) {
+            $sql .= " AND created_by = ?";
+            $params[] = $userId;
         }
         
         $stmt = $this->db->prepare($sql);

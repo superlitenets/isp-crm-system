@@ -19,13 +19,14 @@ class Complaint {
 
     public function create(array $data): int {
         $complaintNumber = 'CMP-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        $createdBy = $data['created_by'] ?? ($_SESSION['user_id'] ?? null);
         
         $stmt = $this->db->prepare("
             INSERT INTO complaints (
                 complaint_number, customer_id, customer_name, customer_phone, 
                 customer_email, customer_location, category, subject, description, 
-                status, priority, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                status, priority, source, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
             RETURNING id
         ");
         
@@ -40,7 +41,8 @@ class Complaint {
             $data['subject'],
             $data['description'],
             $data['priority'] ?? 'medium',
-            $data['source'] ?? 'public'
+            $data['source'] ?? 'public',
+            $createdBy
         ]);
         
         $complaintId = $stmt->fetchColumn();
@@ -97,6 +99,12 @@ class Complaint {
             $sql .= " AND (c.complaint_number ILIKE ? OR c.customer_name ILIKE ? OR c.customer_phone ILIKE ? OR c.subject ILIKE ?)";
             $searchTerm = '%' . $filters['search'] . '%';
             $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        }
+        
+        if (!empty($filters['user_id'])) {
+            $sql .= " AND (c.reviewed_by = ? OR c.created_by = ?)";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
         }
         
         $sql .= " ORDER BY c.created_at DESC";
