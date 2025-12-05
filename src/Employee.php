@@ -52,7 +52,34 @@ class Employee {
             $roleName,
             $roleId
         ]);
-        return (int) $this->db->lastInsertId();
+        $userId = (int) $this->db->lastInsertId();
+        
+        // Auto-create salesperson record if role is salesperson
+        if (in_array($roleName, ['salesperson', 'sales'])) {
+            $this->createSalespersonRecord($userId, $data);
+        }
+        
+        return $userId;
+    }
+    
+    private function createSalespersonRecord(int $userId, array $data): void {
+        // Check if salesperson record already exists
+        $checkStmt = $this->db->prepare("SELECT id FROM salespersons WHERE user_id = ?");
+        $checkStmt->execute([$userId]);
+        if ($checkStmt->fetch()) {
+            return; // Already exists
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO salespersons (user_id, name, email, phone, commission_type, commission_value, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'percentage', 10.00, true, NOW(), NOW())
+        ");
+        $stmt->execute([
+            $userId,
+            $data['name'],
+            $data['email'],
+            $data['phone'] ?? null
+        ]);
     }
     
     public function updateUserRole(int $userId, int $roleId): bool {
@@ -63,7 +90,19 @@ class Employee {
         if (!$roleName) return false;
         
         $stmt = $this->db->prepare("UPDATE users SET role = ?, role_id = ? WHERE id = ?");
-        return $stmt->execute([$roleName, $roleId, $userId]);
+        $result = $stmt->execute([$roleName, $roleId, $userId]);
+        
+        // Auto-create salesperson record if role changed to salesperson
+        if ($result && in_array($roleName, ['salesperson', 'sales'])) {
+            $userStmt = $this->db->prepare("SELECT name, email, phone FROM users WHERE id = ?");
+            $userStmt->execute([$userId]);
+            $user = $userStmt->fetch(\PDO::FETCH_ASSOC);
+            if ($user) {
+                $this->createSalespersonRecord($userId, $user);
+            }
+        }
+        
+        return $result;
     }
     
     public function getUserByEmployeeId(int $employeeId): ?array {
