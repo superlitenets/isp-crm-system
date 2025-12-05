@@ -62,7 +62,11 @@ class SmartOLT {
             return ['status' => false, 'error' => 'SmartOLT is not configured'];
         }
         
-        $url = $this->apiUrl . '/api/' . ltrim($endpoint, '/');
+        $baseUrl = rtrim($this->apiUrl, '/');
+        if (!preg_match('/\/api\/?$/', $baseUrl)) {
+            $baseUrl .= '/api';
+        }
+        $url = $baseUrl . '/' . ltrim($endpoint, '/');
         
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -175,23 +179,23 @@ class SmartOLT {
     }
     
     public function getONURunningConfig(string $externalId): array {
-        return $this->makeRequest("onu/get_running_config/{$externalId}");
+        return $this->makeRequest("onu/get_onu_running_config/{$externalId}");
     }
     
     public function rebootONU(string $externalId): array {
-        return $this->makeRequest("onu/reboot/{$externalId}", 'POST');
+        return $this->makeRequest("onu/reboot_onu/{$externalId}", 'POST');
     }
     
     public function resyncONUConfig(string $externalId): array {
-        return $this->makeRequest("onu/resync_config/{$externalId}", 'POST');
+        return $this->makeRequest("onu/resync_onu_config/{$externalId}", 'POST');
     }
     
     public function enableONU(string $externalId): array {
-        return $this->makeRequest("onu/enable/{$externalId}", 'POST');
+        return $this->makeRequest("onu/enable_onu/{$externalId}", 'POST');
     }
     
     public function disableONU(string $externalId): array {
-        return $this->makeRequest("onu/disable/{$externalId}", 'POST');
+        return $this->makeRequest("onu/disable_onu/{$externalId}", 'POST');
     }
     
     public function getDashboardStats(): array {
