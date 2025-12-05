@@ -2191,8 +2191,8 @@
             .then(data => {
                 if (data.success) {
                     successDiv.innerHTML = '<i class="bi bi-check-circle me-2"></i>' + data.message;
-                    if (data.ticket_number) {
-                        successDiv.innerHTML += '<br><small>Reference: ' + data.ticket_number + '</small>';
+                    if (data.complaint_number) {
+                        successDiv.innerHTML += '<br><small>Reference: ' + data.complaint_number + '</small>';
                     }
                     successDiv.classList.remove('d-none');
                     form.reset();

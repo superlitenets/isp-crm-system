@@ -47,9 +47,13 @@ class Complaint {
         
         $complaintId = $stmt->fetchColumn();
         
-        // Send SMS receipt to customer
+        // Send SMS receipt to customer (non-blocking - don't fail complaint if SMS fails)
         if (!empty($data['customer_phone'])) {
-            $this->sendComplaintReceivedSMS($complaintNumber, $data);
+            try {
+                $this->sendComplaintReceivedSMS($complaintNumber, $data);
+            } catch (\Throwable $e) {
+                error_log("Failed to send complaint SMS: " . $e->getMessage());
+            }
         }
         
         $this->activityLog->log('create', 'complaint', $complaintId, $complaintNumber, "Complaint received: " . ($data['subject'] ?? 'No subject'));
