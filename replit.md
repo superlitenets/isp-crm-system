@@ -1,6 +1,25 @@
 # ISP CRM & Ticketing System
 
 ## Recent Changes
+- **December 2024**: Added SmartOLT Integration for Network Monitoring
+  - New `SmartOLT.php` class with comprehensive API integration
+  - Settings stored in existing `settings` table with `smartolt_api_url` and `smartolt_api_key`
+  - SmartOLT Dashboard page (`?page=smartolt`) with real-time statistics
+  - **OLT Statistics:** Total OLTs, uptime, temperature, hardware info
+  - **ONU Status Monitoring:**
+    - Configured ONUs (provisioned)
+    - Unconfigured ONUs (pending authorization)
+    - Online/Offline counts
+    - LOS (Loss of Signal) detection
+    - Power Fail detection
+    - Critical Power (< -28 dBm) alerts
+    - Low Power (-25 to -28 dBm) warnings
+  - **OLT Details View:** Cards, PON ports with TX power, average signal, ONU counts
+  - **ONU Actions:** Reboot, resync config, enable/disable
+  - Filter views: Click stat cards to see filtered ONU lists
+  - Settings > SmartOLT tab for API configuration with test connection
+  - Sidebar navigation menu item added
+  - API endpoints: `/api/system/get_olts`, `/api/onu/get_unconfigured_onus`, `/api/onu/get_all_onus_statuses`, `/api/onu/get_all_onus_signals`
 - **December 2024**: Added Complaints Module with Approval Workflow
   - New database table: `complaints` for storing public complaints before ticket conversion
   - Complaints now go through approval workflow instead of direct ticket creation

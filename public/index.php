@@ -252,6 +252,61 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
     exit;
 }
 
+if ($page === 'api' && $action === 'smartolt_onu_action') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized - Admin access required']);
+        exit;
+    }
+    
+    $onuAction = $_POST['onu_action'] ?? '';
+    $externalId = $_POST['external_id'] ?? '';
+    
+    if (empty($onuAction) || empty($externalId)) {
+        echo json_encode(['success' => false, 'error' => 'Action and external ID required']);
+        exit;
+    }
+    
+    try {
+        $smartolt = new \App\SmartOLT($db);
+        $result = [];
+        
+        switch ($onuAction) {
+            case 'reboot':
+                $result = $smartolt->rebootONU($externalId);
+                break;
+            case 'resync':
+                $result = $smartolt->resyncONUConfig($externalId);
+                break;
+            case 'enable':
+                $result = $smartolt->enableONU($externalId);
+                break;
+            case 'disable':
+                $result = $smartolt->disableONU($externalId);
+                break;
+            default:
+                echo json_encode(['success' => false, 'error' => 'Invalid action']);
+                exit;
+        }
+        
+        if ($result['status'] ?? false) {
+            echo json_encode(['success' => true, 'message' => ucfirst($onuAction) . ' command sent successfully']);
+        } else {
+            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Action failed']);
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
@@ -1164,6 +1219,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } catch (Exception $e) {
                     $message = 'Error saving M-Pesa settings: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+                break;
+
+            case 'save_smartolt_settings':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can modify SmartOLT settings.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        \App\SmartOLT::saveSettings($db, [
+                            'api_url' => $_POST['smartolt_api_url'] ?? '',
+                            'api_key' => $_POST['smartolt_api_key'] ?? ''
+                        ]);
+                        \App\Settings::clearCache();
+                        $message = 'SmartOLT settings saved successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error saving SmartOLT settings: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
+            case 'test_smartolt_connection':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can test SmartOLT connection.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $smartolt = new \App\SmartOLT($db);
+                        $result = $smartolt->testConnection();
+                        if ($result['success']) {
+                            $message = $result['message'];
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Connection failed: ' . $result['message'];
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error testing connection: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
                 }
                 break;
 
@@ -2555,6 +2654,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'smartolt' ? 'active' : '' ?>" href="?page=smartolt">
+                    <i class="bi bi-router"></i> SmartOLT
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -2604,6 +2708,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'complaints':
                 include __DIR__ . '/../templates/complaints.php';
+                break;
+            case 'smartolt':
+                include __DIR__ . '/../templates/smartolt.php';
                 break;
             case 'settings':
                 $smsGateway = getSMSGateway();
