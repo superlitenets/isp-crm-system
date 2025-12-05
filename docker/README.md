@@ -9,25 +9,22 @@ This Docker setup allows you to run the ISP CRM & Ticketing System locally or on
 
 ## Quick Start
 
-1. **Navigate to the docker directory:**
+1. **Extract and navigate to docker directory:**
    ```bash
-   cd docker
+   unzip isp-crm-docker.zip
+   cd isp-crm/docker
    ```
 
-2. **Copy and configure environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your actual configuration values
-   ```
-
-3. **Build and start the containers:**
+2. **Build and start the containers:**
    ```bash
    docker-compose up -d --build
    ```
 
+3. **Wait for database to be ready** (about 30 seconds on first run)
+
 4. **Access the application:**
    - Open your browser and go to: http://localhost:8080
-   - Default admin credentials: admin@example.com / admin123
+   - Default admin credentials: **admin@isp.com / admin123**
 
 ## Services
 

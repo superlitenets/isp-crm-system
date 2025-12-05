@@ -9,16 +9,18 @@ services:
     ports:
       - "8080:80"
     environment:
-      - DATABASE_URL=postgresql://ispcrm:ispcrm_password@db:5432/ispcrm
+      - DATABASE_URL=postgresql://crm:Mgathoni.2016@db:5432/ispcrm
       - PGHOST=db
       - PGPORT=5432
       - PGDATABASE=ispcrm
-      - PGUSER=ispcrm
-      - PGPASSWORD=ispcrm_password
-      - SESSION_SECRET=your-secure-session-secret-change-in-production
+      - PGUSER=crm
+      - PGPASSWORD=Mgathoni.2016
+      - SESSION_SECRET=isp-crm-secure-session-secret-2025
+      - APP_TIMEZONE=Africa/Nairobi
+      - APP_DEBUG=false
     volumes:
-      - ../uploads:/var/www/html/uploads
-      - ../logs:/var/www/html/logs
+      - uploads_data:/var/www/html/uploads
+      - logs_data:/var/www/html/logs
     depends_on:
       db:
         condition: service_healthy
@@ -30,15 +32,15 @@ services:
     image: postgres:15-alpine
     container_name: isp-crm-db
     environment:
-      - POSTGRES_USER=ispcrm
-      - POSTGRES_PASSWORD=ispcrm_password
+      - POSTGRES_USER=crm
+      - POSTGRES_PASSWORD=Mgathoni.2016
       - POSTGRES_DB=ispcrm
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ispcrm -d ispcrm"]
+      test: ["CMD-SHELL", "pg_isready -U crm -d ispcrm"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -48,6 +50,8 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
+  logs_data:
 
 networks:
   isp-crm-network:
