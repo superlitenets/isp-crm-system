@@ -268,6 +268,15 @@ class Complaint {
             
             $this->activityLog->log('convert', 'complaint', $complaintId, $complaint['complaint_number'], "Converted to ticket: {$ticketNumber}");
             
+            // Send SMS/WhatsApp notification to customer about ticket creation
+            if (!empty($complaint['customer_phone'])) {
+                try {
+                    $this->sendTicketCreatedSMS($ticketNumber, $complaint);
+                } catch (\Throwable $e) {
+                    error_log("Failed to send ticket created SMS for complaint conversion: " . $e->getMessage());
+                }
+            }
+            
             return $ticketId;
             
         } catch (\Exception $e) {
@@ -275,6 +284,23 @@ class Complaint {
             error_log("Error converting complaint to ticket: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
             throw $e;
         }
+    }
+
+    private function sendTicketCreatedSMS(string $ticketNumber, array $complaint): void {
+        $template = $this->settings->get('sms_template_ticket_created', 
+            'Dear {customer_name}, your complaint has been converted to ticket #{ticket_number}. Our team will address it shortly. Thank you for your patience.');
+        
+        $placeholders = [
+            '{customer_name}' => $complaint['customer_name'] ?? 'Customer',
+            '{ticket_number}' => $ticketNumber,
+            '{complaint_number}' => $complaint['complaint_number'] ?? '',
+            '{category}' => ucfirst($complaint['category'] ?? 'General'),
+            '{subject}' => $complaint['subject'] ?? '',
+            '{customer_phone}' => $complaint['customer_phone'] ?? ''
+        ];
+        
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
+        $this->sms->send($complaint['customer_phone'], $message);
     }
 
     public function updatePriority(int $id, string $priority): bool {

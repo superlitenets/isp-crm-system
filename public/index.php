@@ -2597,8 +2597,8 @@ if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $teamId = !empty($_POST['team_id']) ? (int)$_POST['team_id'] : null;
                     $ticketId = $complaintModel->convertToTicket($complaintId, $currentUser['id'], $assignTo, $teamId);
                     if ($ticketId) {
-                        $_SESSION['success_message'] = 'Complaint converted to ticket successfully!';
-                        header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                        $_SESSION['success_message'] = 'Complaint converted to ticket! Please assign a technician.';
+                        header('Location: ?page=tickets&action=edit&id=' . $ticketId);
                         exit;
                     } else {
                         $_SESSION['error_message'] = 'Failed to convert complaint to ticket. Make sure it is approved first.';
@@ -2681,8 +2681,8 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     case 'convert':
                         $ticketId = $orderModel->convertToTicket($orderId, $currentUser['id']);
                         if ($ticketId) {
-                            $_SESSION['success_message'] = 'Order converted to ticket successfully!';
-                            header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                            $_SESSION['success_message'] = 'Order converted to ticket! Please assign a technician.';
+                            header('Location: ?page=tickets&action=edit&id=' . $ticketId);
                             exit;
                         } else {
                             $_SESSION['error_message'] = 'Failed to convert order to ticket.';

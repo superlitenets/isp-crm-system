@@ -316,7 +316,33 @@ class Order {
         
         $this->linkTicket($orderId, $ticketId);
         
+        // Send SMS/WhatsApp notification to customer about ticket creation
+        if (!empty($order['customer_phone'])) {
+            try {
+                $this->sendTicketCreatedSMS($ticketNumber, $order);
+            } catch (\Throwable $e) {
+                error_log("Failed to send ticket created SMS for order conversion: " . $e->getMessage());
+            }
+        }
+        
         return $ticketId;
+    }
+    
+    private function sendTicketCreatedSMS(string $ticketNumber, array $order): void {
+        $template = $this->settings->get('sms_template_order_to_ticket', 
+            'Dear {customer_name}, your order #{order_number} has been scheduled for installation. Ticket #{ticket_number} has been created. Our technician will contact you shortly.');
+        
+        $placeholders = [
+            '{customer_name}' => $order['customer_name'] ?? 'Customer',
+            '{ticket_number}' => $ticketNumber,
+            '{order_number}' => $order['order_number'] ?? '',
+            '{package_name}' => $order['package_name'] ?? 'Service Package',
+            '{customer_phone}' => $order['customer_phone'] ?? '',
+            '{customer_address}' => $order['customer_address'] ?? ''
+        ];
+        
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
+        $this->sms->send($order['customer_phone'], $message);
     }
     
     public function getStats(?int $userId = null): array {
