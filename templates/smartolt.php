@@ -569,7 +569,7 @@ if ($isConfigured) {
             </div>
             <form id="provisionForm">
                 <div class="modal-body">
-                    <input type="hidden" name="csrf_token" value="<?= \App\Auth::getToken() ?>">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                     <input type="hidden" name="action" value="smartolt_authorize_onu">
                     <input type="hidden" name="olt_id" id="prov_olt_id">
                     <input type="hidden" name="pon_type" id="prov_pon_type">
@@ -691,7 +691,7 @@ function onuAction(action, externalId) {
     formData.append('action', 'smartolt_onu_action');
     formData.append('onu_action', action);
     formData.append('external_id', externalId);
-    formData.append('csrf_token', '<?= \App\Auth::getToken() ?>');
+    formData.append('csrf_token', '<?= $csrfToken ?>');
     
     fetch('?page=api', {
         method: 'POST',
