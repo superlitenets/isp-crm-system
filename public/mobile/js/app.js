@@ -804,6 +804,237 @@ const app = {
                 this.createTicket();
             });
         }
+    },
+    
+    setActiveNav(element) {
+        const nav = element.closest('.bottom-nav');
+        if (nav) {
+            nav.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+        }
+    },
+    
+    async showAvailableTickets() {
+        this.showScreen('available-tickets-screen');
+        this.loadAvailableTickets();
+    },
+    
+    async loadAvailableTickets() {
+        const container = document.getElementById('available-tickets-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('available-tickets');
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(ticket => `
+                <div class="list-item">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${ticket.subject}</h6>
+                            <p class="list-item-subtitle">${ticket.ticket_number} - ${ticket.customer_name || 'Unknown'}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(ticket.status)}">${ticket.status}</span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
+                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                    </div>
+                    ${ticket.customer_phone ? `<div class="list-item-meta"><span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span></div>` : ''}
+                    ${ticket.customer_address ? `<div class="list-item-meta"><span><i class="bi bi-geo-alt"></i> ${ticket.customer_address}</span></div>` : ''}
+                    <div class="mt-2">
+                        <button class="btn btn-success btn-sm w-100" onclick="app.claimTicket(${ticket.id})">
+                            <i class="bi bi-hand-index"></i> Claim This Ticket
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>No available tickets</p><p class="text-muted small">All tickets are currently assigned</p></div>';
+        }
+    },
+    
+    async claimTicket(ticketId) {
+        if (!confirm('Claim this ticket and assign it to yourself?')) return;
+        
+        const result = await this.api('claim-ticket', 'POST', { ticket_id: ticketId });
+        
+        if (result.success) {
+            this.showToast('Ticket claimed successfully!', 'success');
+            this.loadAvailableTickets();
+            this.loadTechnicianDashboard();
+        } else {
+            this.showToast(result.error || 'Failed to claim ticket', 'danger');
+        }
+    },
+    
+    async showTechEquipment() {
+        this.showScreen('tech-equipment-screen');
+        const container = document.getElementById('tech-equipment-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('technician-equipment');
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(eq => `
+                <div class="list-item">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${eq.name || eq.equipment_name || 'Equipment'}</h6>
+                            <p class="list-item-subtitle">${eq.brand || ''} ${eq.model || ''}</p>
+                        </div>
+                        <span class="badge ${eq.assignment_status === 'assigned' ? 'bg-success' : 'bg-secondary'}">${eq.assignment_status || 'N/A'}</span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span><i class="bi bi-upc-scan"></i> ${eq.serial_number || 'N/A'}</span>
+                        ${eq.mac_address ? `<span><i class="bi bi-ethernet"></i> ${eq.mac_address}</span>` : ''}
+                    </div>
+                    ${eq.customer_name ? `
+                    <div class="list-item-meta">
+                        <span><i class="bi bi-person"></i> ${eq.customer_name}</span>
+                    </div>` : ''}
+                    ${eq.customer_address ? `
+                    <div class="list-item-meta">
+                        <span><i class="bi bi-geo-alt"></i> ${eq.customer_address}</span>
+                    </div>` : ''}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><p>No equipment assigned</p></div>';
+        }
+    },
+    
+    async showTicketDetailAny(ticketId) {
+        const result = await this.api('ticket-detail-any&id=' + ticketId);
+        
+        if (result.success) {
+            const ticket = result.data;
+            const container = document.getElementById('ticket-detail-content');
+            
+            let equipmentHtml = '';
+            if (ticket.equipment && ticket.equipment.length > 0) {
+                equipmentHtml = `
+                    <div class="ticket-detail-card">
+                        <h6><i class="bi bi-box-seam"></i> Customer Equipment</h6>
+                        ${ticket.equipment.map(eq => `
+                            <div class="equipment-item p-2 border-bottom">
+                                <strong>${eq.name}</strong> - ${eq.serial_number || 'N/A'}
+                                <div class="small text-muted">${eq.brand || ''} ${eq.model || ''}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = `
+                <div class="ticket-detail-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5>${ticket.subject}</h5>
+                            <p class="text-muted mb-0">${ticket.ticket_number}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(ticket.status)}">${ticket.status}</span>
+                    </div>
+                    ${ticket.assigned_name ? `<p class="small text-info mt-2 mb-0"><i class="bi bi-person-badge"></i> Assigned to: ${ticket.assigned_name}</p>` : '<p class="small text-warning mt-2 mb-0"><i class="bi bi-exclamation-triangle"></i> Unassigned</p>'}
+                    <hr>
+                    <p>${ticket.description || 'No description'}</p>
+                    <div class="d-flex gap-3 text-muted small">
+                        <span><i class="bi bi-flag"></i> ${ticket.priority}</span>
+                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                    </div>
+                </div>
+                
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-person"></i> Customer</h6>
+                    <p class="mb-1"><strong>${ticket.customer_name || 'Unknown'}</strong></p>
+                    ${ticket.customer_phone ? `<p class="mb-1"><i class="bi bi-telephone"></i> ${ticket.customer_phone}</p>` : ''}
+                    ${ticket.customer_address ? `<p class="mb-1"><i class="bi bi-geo-alt"></i> ${ticket.customer_address}</p>` : ''}
+                    ${ticket.customer_phone ? `
+                    <div class="customer-actions">
+                        <a href="tel:${ticket.customer_phone}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-telephone"></i> Call
+                        </a>
+                        <a href="https://wa.me/${ticket.customer_phone.replace(/[^0-9]/g, '')}" class="btn btn-outline-success btn-sm" target="_blank">
+                            <i class="bi bi-whatsapp"></i> WhatsApp
+                        </a>
+                    </div>` : ''}
+                </div>
+                
+                ${equipmentHtml}
+                
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-arrow-repeat"></i> Update Status</h6>
+                    <div class="status-actions">
+                        ${!ticket.assigned_to ? `<button class="btn btn-primary btn-sm" onclick="app.claimAndUpdate(${ticket.id})">Claim & Start</button>` : ''}
+                        ${ticket.status !== 'in_progress' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
+                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'resolved')">Mark Resolved</button>` : ''}
+                        ${ticket.status !== 'on_hold' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatusAny(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
+                    </div>
+                </div>
+                
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-chat-dots"></i> Comments</h6>
+                    <div class="comment-list">
+                        ${(ticket.comments || []).map(c => `
+                            <div class="comment-item">
+                                <div class="d-flex justify-content-between">
+                                    <span class="author">${c.user_name || 'System'}</span>
+                                    <span class="time">${this.formatDate(c.created_at)}</span>
+                                </div>
+                                <div class="text">${c.comment}</div>
+                            </div>
+                        `).join('') || '<p class="text-muted">No comments yet</p>'}
+                    </div>
+                    <div class="mt-3">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="new-comment-any" placeholder="Add a comment...">
+                            <button class="btn btn-primary" onclick="app.addCommentAny(${ticket.id})">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            this.showScreen('ticket-detail-screen');
+        } else {
+            this.showToast('Failed to load ticket', 'danger');
+        }
+    },
+    
+    async claimAndUpdate(ticketId) {
+        const claimResult = await this.api('claim-ticket', 'POST', { ticket_id: ticketId });
+        if (claimResult.success) {
+            await this.api('update-ticket-any', 'POST', { ticket_id: ticketId, status: 'in_progress' });
+            this.showToast('Ticket claimed and started!', 'success');
+            this.showTicketDetailAny(ticketId);
+        } else {
+            this.showToast(claimResult.error || 'Failed to claim', 'danger');
+        }
+    },
+    
+    async updateTicketStatusAny(ticketId, status) {
+        const result = await this.api('update-ticket-any', 'POST', { ticket_id: ticketId, status });
+        
+        if (result.success) {
+            this.showToast('Status updated', 'success');
+            this.showTicketDetailAny(ticketId);
+        } else {
+            this.showToast(result.error || 'Failed to update', 'danger');
+        }
+    },
+    
+    async addCommentAny(ticketId) {
+        const input = document.getElementById('new-comment-any');
+        const comment = input.value.trim();
+        
+        if (!comment) return;
+        
+        const result = await this.api('add-comment-any', 'POST', { ticket_id: ticketId, comment });
+        
+        if (result.success) {
+            input.value = '';
+            this.showTicketDetailAny(ticketId);
+        } else {
+            this.showToast(result.error || 'Failed to add comment', 'danger');
+        }
     }
 };
 

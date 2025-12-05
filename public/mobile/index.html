@@ -159,19 +159,56 @@
             </div>
 
             <nav class="bottom-nav bg-success">
-                <a href="#" class="nav-item active" onclick="app.loadTechnicianDashboard()">
+                <a href="#" class="nav-item active" onclick="app.loadTechnicianDashboard(); app.setActiveNav(this);">
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showNewTicket()">
-                    <i class="bi bi-plus-circle"></i>
-                    <span>New Ticket</span>
+                <a href="#" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this);">
+                    <i class="bi bi-inbox"></i>
+                    <span>Available</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showTechPerformance()">
+                <a href="#" class="nav-item" onclick="app.showTechEquipment(); app.setActiveNav(this);">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Equipment</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showTechPerformance(); app.setActiveNav(this);">
                     <i class="bi bi-bar-chart"></i>
                     <span>Stats</span>
                 </a>
             </nav>
+        </div>
+
+        <div id="available-tickets-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Available Tickets</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.loadAvailableTickets()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <p class="text-muted small px-3">Unassigned tickets you can claim</p>
+                <div id="available-tickets-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="tech-equipment-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">My Equipment</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="tech-equipment-list" class="list-container"></div>
+            </div>
         </div>
 
         <div id="new-order-screen" class="screen">

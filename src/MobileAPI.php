@@ -630,4 +630,114 @@ class MobileAPI {
         $stmt->execute(['%' . $query . '%', '%' . $query . '%', $limit]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
+    
+    public function getAvailableTickets(int $limit = 50): array {
+        $stmt = $this->db->prepare("
+            SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            WHERE t.assigned_to IS NULL AND t.status NOT IN ('resolved', 'closed')
+            ORDER BY 
+                CASE t.priority 
+                    WHEN 'critical' THEN 1 
+                    WHEN 'high' THEN 2 
+                    WHEN 'medium' THEN 3 
+                    ELSE 4 
+                END,
+                t.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function claimTicket(int $ticketId, int $userId): bool {
+        $stmt = $this->db->prepare("
+            UPDATE tickets SET assigned_to = ?, updated_at = NOW() 
+            WHERE id = ? AND assigned_to IS NULL
+        ");
+        return $stmt->execute([$userId, $ticketId]);
+    }
+    
+    public function getTicketEquipment(int $ticketId): array {
+        $stmt = $this->db->prepare("
+            SELECT e.*, ea.status as assignment_status, ea.assignment_date,
+                   c.name as customer_name
+            FROM equipment e
+            LEFT JOIN equipment_assignments ea ON e.id = ea.equipment_id
+            LEFT JOIN tickets t ON t.customer_id = ea.customer_id
+            LEFT JOIN customers c ON ea.customer_id = c.id
+            WHERE t.id = ?
+            ORDER BY ea.assignment_date DESC
+        ");
+        $stmt->execute([$ticketId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getTechnicianEquipment(int $userId): array {
+        $stmt = $this->db->prepare("
+            SELECT e.*, ea.status as assignment_status, ea.assignment_date,
+                   c.name as customer_name, c.address as customer_address
+            FROM equipment e
+            JOIN equipment_assignments ea ON e.id = ea.equipment_id
+            LEFT JOIN customers c ON ea.customer_id = c.id
+            WHERE ea.assigned_by = ? OR ea.technician_id = ?
+            ORDER BY ea.assignment_date DESC
+            LIMIT 50
+        ");
+        $stmt->execute([$userId, $userId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getTicketDetailsAny(int $ticketId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT t.*, c.name as customer_name, c.phone as customer_phone, 
+                   c.address as customer_address, c.email as customer_email,
+                   u.name as assigned_name
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN users u ON t.assigned_to = u.id
+            WHERE t.id = ?
+        ");
+        $stmt->execute([$ticketId]);
+        $ticket = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($ticket) {
+            $stmt = $this->db->prepare("
+                SELECT tc.*, u.name as user_name 
+                FROM ticket_comments tc
+                LEFT JOIN users u ON tc.user_id = u.id
+                WHERE tc.ticket_id = ?
+                ORDER BY tc.created_at DESC
+            ");
+            $stmt->execute([$ticketId]);
+            $ticket['comments'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            $ticket['equipment'] = $this->getTicketEquipment($ticketId);
+        }
+        
+        return $ticket ?: null;
+    }
+    
+    public function updateTicketStatusAny(int $ticketId, int $userId, string $status, ?string $comment = null): bool {
+        $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
+        $result = $stmt->execute([$status, $ticketId]);
+        
+        if ($result && $comment) {
+            $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
+            $stmt->execute([$ticketId, $userId, $comment]);
+        }
+        
+        if ($status === 'resolved') {
+            $stmt = $this->db->prepare("UPDATE tickets SET resolved_at = NOW() WHERE id = ?");
+            $stmt->execute([$ticketId]);
+        }
+        
+        return $result;
+    }
+    
+    public function addTicketCommentAny(int $ticketId, int $userId, string $comment): bool {
+        $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
+        return $stmt->execute([$ticketId, $userId, $comment]);
+    }
 }

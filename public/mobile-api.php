@@ -362,6 +362,79 @@ try {
             echo json_encode(['success' => true, 'data' => $customers]);
             break;
             
+        case 'available-tickets':
+            requireAuth();
+            $tickets = $api->getAvailableTickets();
+            echo json_encode(['success' => true, 'data' => $tickets]);
+            break;
+            
+        case 'claim-ticket':
+            requireAuth();
+            $ticketId = (int) ($input['ticket_id'] ?? 0);
+            if (!$ticketId) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
+                break;
+            }
+            
+            $result = $api->claimTicket($ticketId, $user['id']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Ticket claimed successfully']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to claim ticket. It may already be assigned.']);
+            }
+            break;
+            
+        case 'technician-equipment':
+            requireAuth();
+            $equipment = $api->getTechnicianEquipment($user['id']);
+            echo json_encode(['success' => true, 'data' => $equipment]);
+            break;
+            
+        case 'ticket-detail-any':
+            requireAuth();
+            $ticketId = (int) ($_GET['id'] ?? 0);
+            if (!$ticketId) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
+                break;
+            }
+            
+            $ticket = $api->getTicketDetailsAny($ticketId);
+            if ($ticket) {
+                echo json_encode(['success' => true, 'data' => $ticket]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+            }
+            break;
+            
+        case 'update-ticket-any':
+            requireAuth();
+            $ticketId = (int) ($input['ticket_id'] ?? 0);
+            $status = $input['status'] ?? '';
+            $comment = $input['comment'] ?? null;
+            
+            if (!$ticketId || !$status) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID and status required']);
+                break;
+            }
+            
+            $result = $api->updateTicketStatusAny($ticketId, $user['id'], $status, $comment);
+            echo json_encode(['success' => $result]);
+            break;
+            
+        case 'add-comment-any':
+            requireAuth();
+            $ticketId = (int) ($input['ticket_id'] ?? 0);
+            $comment = $input['comment'] ?? '';
+            
+            if (!$ticketId || !$comment) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID and comment required']);
+                break;
+            }
+            
+            $result = $api->addTicketCommentAny($ticketId, $user['id'], $comment);
+            echo json_encode(['success' => $result]);
+            break;
+            
         default:
             echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }
