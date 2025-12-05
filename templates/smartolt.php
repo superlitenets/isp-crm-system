@@ -76,6 +76,18 @@ if ($isConfigured) {
     </div>
     <?php else: ?>
     
+    <?php if (!empty($stats['errors'])): ?>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong><i class="bi bi-exclamation-triangle me-2"></i>API Errors:</strong>
+        <ul class="mb-0 mt-2">
+            <?php foreach ($stats['errors'] as $endpoint => $error): ?>
+            <li><strong><?= ucfirst($endpoint) ?>:</strong> <?= htmlspecialchars($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <?php endif; ?>
+    
     <?php if ($filter): ?>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">

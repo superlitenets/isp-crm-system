@@ -5,7 +5,7 @@ class SmartOLT {
     private $db;
     private $apiUrl;
     private $apiKey;
-    private $timeout = 30;
+    private $timeout = 60;
     
     public function __construct(\PDO $db) {
         $this->db = $db;
@@ -89,11 +89,15 @@ class SmartOLT {
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_HTTPHEADER => [
                 'X-Token: ' . $this->apiKey,
-                'Content-Type: application/json'
+                'Content-Type: application/json',
+                'Accept: application/json'
             ],
-            CURLOPT_SSL_VERIFYPEER => true
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_FOLLOWLOCATION => true
         ]);
         
         if ($method === 'POST') {
@@ -116,9 +120,25 @@ class SmartOLT {
             return ['status' => false, 'error' => 'HTTP error: ' . $httpCode];
         }
         
+        if (empty($response)) {
+            return ['status' => false, 'error' => 'Empty response from API'];
+        }
+        
         $decoded = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return ['status' => false, 'error' => 'Invalid JSON response'];
+            return ['status' => false, 'error' => 'Invalid JSON response: ' . json_last_error_msg()];
+        }
+        
+        if (!is_array($decoded)) {
+            return ['status' => false, 'error' => 'Unexpected response format'];
+        }
+        
+        if (isset($decoded['status']) && $decoded['status'] === false) {
+            return ['status' => false, 'error' => $decoded['error'] ?? 'API returned error'];
+        }
+        
+        if (!isset($decoded['status'])) {
+            return ['status' => true, 'response' => $decoded];
         }
         
         return $decoded;
@@ -300,17 +320,20 @@ class SmartOLT {
             'los_onus' => 0,
             'power_fail_onus' => 0,
             'critical_power_onus' => 0,
-            'low_power_onus' => 0
+            'low_power_onus' => 0,
+            'errors' => []
         ];
         
         $oltsResult = $this->getOLTs();
-        if ($oltsResult['status'] && isset($oltsResult['response'])) {
+        if (isset($oltsResult['status']) && $oltsResult['status'] && isset($oltsResult['response'])) {
             $stats['olts'] = $oltsResult['response'];
             $stats['total_olts'] = count($oltsResult['response']);
+        } elseif (isset($oltsResult['error'])) {
+            $stats['errors']['olts'] = $oltsResult['error'];
         }
         
         $uptimeResult = $this->getOLTsUptimeAndTemperature();
-        if ($uptimeResult['status'] && isset($uptimeResult['response'])) {
+        if (isset($uptimeResult['status']) && $uptimeResult['status'] && isset($uptimeResult['response'])) {
             foreach ($uptimeResult['response'] as $oltUptime) {
                 foreach ($stats['olts'] as &$olt) {
                     if ($olt['id'] == $oltUptime['olt_id']) {
@@ -324,13 +347,15 @@ class SmartOLT {
         }
         
         $unconfiguredResult = $this->getAllUnconfiguredONUs();
-        if ($unconfiguredResult['status'] && isset($unconfiguredResult['response'])) {
+        if (isset($unconfiguredResult['status']) && $unconfiguredResult['status'] && isset($unconfiguredResult['response'])) {
             $stats['unconfigured_onus'] = count($unconfiguredResult['response']);
             $stats['unconfigured_list'] = $unconfiguredResult['response'];
+        } elseif (isset($unconfiguredResult['error'])) {
+            $stats['errors']['unconfigured'] = $unconfiguredResult['error'];
         }
         
         $statusesResult = $this->getAllONUsStatuses();
-        if ($statusesResult['status'] && isset($statusesResult['response'])) {
+        if (isset($statusesResult['status']) && $statusesResult['status'] && isset($statusesResult['response'])) {
             foreach ($statusesResult['response'] as $onu) {
                 $stats['configured_onus']++;
                 $status = strtolower($onu['status'] ?? '');
@@ -347,10 +372,12 @@ class SmartOLT {
                     $stats['offline_onus']++;
                 }
             }
+        } elseif (isset($statusesResult['error'])) {
+            $stats['errors']['statuses'] = $statusesResult['error'];
         }
         
         $signalsResult = $this->getAllONUsSignals();
-        if ($signalsResult['status'] && isset($signalsResult['response'])) {
+        if (isset($signalsResult['status']) && $signalsResult['status'] && isset($signalsResult['response'])) {
             $stats['signals_list'] = $signalsResult['response'];
             foreach ($signalsResult['response'] as $signal) {
                 $rxPower = $this->parseSignalPower($signal['onu_rx_power'] ?? null);
@@ -362,6 +389,8 @@ class SmartOLT {
                     }
                 }
             }
+        } elseif (isset($signalsResult['error'])) {
+            $stats['errors']['signals'] = $signalsResult['error'];
         }
         
         return $stats;
