@@ -5,15 +5,15 @@
   - New `activity_logs` database table for tracking user actions
   - New `ActivityLog.php` and `Reports.php` classes for logging and reporting
   - Reports page (`?page=reports`) with multiple tabs:
-    - **Overview:** Summary stats for tickets, orders, and complaints
+    - **Overview:** Summary stats for tickets, orders, and complaints/
     - **Tickets:** Performance by assigned user (resolution rate, SLA breaches)
     - **Orders:** Sales performance by salesperson
     - **Complaints:** Review statistics by reviewer
     - **Activity Log:** Detailed action history with filters
-    - **User Performance:** Summary of all user activities
+    - **User Performance:** Summar!y of all user activities
   - Date range and user filters for all reports
   - Automatic activity logging for:
-    - Ticket creation, assignment, status changes, priority updates
+    - Ticket creation, assignment, s>>tatus changes, priority updates
     - Order creation
     - Complaint creation, approval, rejection, conversion
   - Permission-based access (`reports.view` permission for Admin, Manager, Viewer roles)
