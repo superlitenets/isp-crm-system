@@ -395,8 +395,9 @@ class Reports {
             $params[] = $filters['date_to'] . ' 23:59:59';
         }
         if (!empty($filters['user_id'])) {
-            $dateWhere .= " AND o.created_by = ?";
-            $params[] = $filters['user_id'];
+            $dateWhere .= " AND (o.created_by = ? OR o.salesperson_id IN (SELECT id FROM salespersons WHERE user_id = ?))";
+            $params[] = (int)$filters['user_id'];
+            $params[] = (int)$filters['user_id'];
         }
 
         $params[] = $limit;
@@ -429,6 +430,10 @@ class Reports {
         if (!empty($filters['date_to'])) {
             $dateWhere .= " AND c.created_at <= ?";
             $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        if (!empty($filters['user_id'])) {
+            $dateWhere .= " AND c.reviewed_by = ?";
+            $params[] = (int)$filters['user_id'];
         }
 
         $params[] = $limit;
