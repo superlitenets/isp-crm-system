@@ -1124,14 +1124,28 @@ if ($action === 'sync_device' && $id) {
     <?php
     $deviceUsers = [];
     $deviceConnectionError = null;
+    $mappings = [];
+    $employees = [];
+    $mappedDeviceUsers = [];
+    
     try {
         $deviceUsers = $biometricService->getDeviceUsers($id);
-    } catch (Exception $e) {
+    } catch (\Throwable $e) {
         $deviceConnectionError = $e->getMessage();
     }
-    $mappings = $biometricService->getUserMappings($id);
-    $employees = (new \App\Employee($db))->getAllEmployees();
-    $mappedDeviceUsers = array_column($mappings, 'device_user_id');
+    
+    try {
+        $mappings = $biometricService->getUserMappings($id);
+        $mappedDeviceUsers = array_column($mappings, 'device_user_id');
+    } catch (\Throwable $e) {
+        // Mappings table might not exist
+    }
+    
+    try {
+        $employees = (new \App\Employee($dbConn))->getAllEmployees();
+    } catch (\Throwable $e) {
+        // Employees might not be available
+    }
     ?>
     <div class="col-md-4">
         <div class="card">
