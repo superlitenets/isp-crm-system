@@ -800,17 +800,25 @@ class DeviceMonitor {
         
         $ip = $device['ip_address'];
         
-        // Test ping using shell_exec for better compatibility
+        // Test ping using shell_exec
         $pingOutput = @shell_exec("ping -c 1 -W 2 " . escapeshellarg($ip) . " 2>&1");
         if ($pingOutput !== null && (strpos($pingOutput, '1 received') !== false || strpos($pingOutput, '1 packets received') !== false || strpos($pingOutput, 'bytes from') !== false)) {
             $results['ping'] = true;
         } else {
-            // Try alternative ping
-            $pingOutput2 = @shell_exec("ping -c 1 " . escapeshellarg($ip) . " 2>&1");
-            if ($pingOutput2 !== null && strpos($pingOutput2, 'bytes from') !== false) {
-                $results['ping'] = true;
+            // Check if ping failed due to permissions
+            if ($pingOutput !== null && (strpos($pingOutput, 'Operation not permitted') !== false || strpos($pingOutput, 'cap_net_raw') !== false)) {
+                // Ping requires root - use TCP connectivity test instead
+                $testPort = $device['ssh_enabled'] ? ($device['ssh_port'] ?? 22) : ($device['telnet_port'] ?? 23);
+                $tcpSocket = @fsockopen($ip, $testPort, $errno, $errstr, 2);
+                if ($tcpSocket) {
+                    $results['ping'] = true;
+                    $results['ping_error'] = 'ICMP ping unavailable - TCP connectivity confirmed on port ' . $testPort;
+                    fclose($tcpSocket);
+                } else {
+                    $results['ping_error'] = 'ICMP ping requires root privileges. TCP test also failed.';
+                }
             } else {
-                $results['ping_error'] = 'Host unreachable or ping blocked';
+                $results['ping_error'] = 'Host unreachable or ICMP blocked';
             }
         }
         
