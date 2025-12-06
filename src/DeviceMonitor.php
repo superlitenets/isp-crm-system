@@ -857,9 +857,15 @@ class DeviceMonitor {
             }
         }
         
-        // Update status
-        $status = $results['ping'] ? 'online' : 'offline';
+        // Update status - device is online if ANY test passes
+        $isOnline = $results['ping'] || $results['snmp'] || $results['telnet'];
+        $status = $isOnline ? 'online' : 'offline';
         $this->updateDeviceStatus($deviceId, $status);
+        
+        // Add note if ping fails but other tests pass
+        if (!$results['ping'] && ($results['snmp'] || $results['telnet'])) {
+            $results['ping_error'] = 'ICMP blocked (normal for many devices). Device is reachable via other protocols.';
+        }
         
         return ['success' => true, 'results' => $results];
     }
