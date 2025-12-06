@@ -199,29 +199,30 @@ class SmartOLT {
         ];
     }
     
-    // SmartOLT API requires POST method for all endpoints (even read operations)
+    // SmartOLT API: System endpoints use GET, ONU endpoints use POST
     
     public function getOLTs(): array {
-        return $this->makeRequest('system/get_olts', 'POST', []);
+        return $this->makeRequest('system/get_olts', 'GET', []);
     }
     
     public function getOLTsUptimeAndTemperature(): array {
-        return $this->makeRequest('olt/get_olts_uptime_and_env_temperature', 'POST', []);
+        return $this->makeRequest('olt/get_olts_uptime_and_env_temperature', 'GET', []);
     }
     
     public function getOLTCardsDetails(int $oltId): array {
-        return $this->makeRequest("system/get_olt_cards_details/{$oltId}", 'POST', []);
+        return $this->makeRequest("system/get_olt_cards_details/{$oltId}", 'GET', []);
     }
     
     public function getOLTPonPortsDetails(int $oltId): array {
-        return $this->makeRequest("system/get_olt_pon_ports_details/{$oltId}", 'POST', []);
+        return $this->makeRequest("system/get_olt_pon_ports_details/{$oltId}", 'GET', []);
     }
     
     public function getOLTUplinkPortsDetails(int $oltId): array {
-        return $this->makeRequest("system/get_olt_uplink_ports_details/{$oltId}", 'POST', []);
+        return $this->makeRequest("system/get_olt_uplink_ports_details/{$oltId}", 'GET', []);
     }
     
     public function getAllUnconfiguredONUs(): array {
+        // Try POST first, fall back to GET if needed
         return $this->makeRequest('onu/get_unconfigured_onus', 'POST', []);
     }
     
@@ -242,23 +243,23 @@ class SmartOLT {
     }
     
     public function getONUStatus(string $externalId): array {
-        return $this->makeRequest("onu/get_onu_status/{$externalId}", 'POST', []);
+        return $this->makeRequest("onu/get_onu_status/{$externalId}", 'GET', []);
     }
     
     public function getONUSignal(string $externalId): array {
-        return $this->makeRequest("onu/get_onu_signal/{$externalId}", 'POST', []);
+        return $this->makeRequest("onu/get_onu_signal/{$externalId}", 'GET', []);
     }
     
     public function getONUDetails(string $externalId): array {
-        return $this->makeRequest("onu/get_onu_details/{$externalId}", 'POST', []);
+        return $this->makeRequest("onu/get_onu_details/{$externalId}", 'GET', []);
     }
     
     public function getONUFullStatusInfo(string $externalId): array {
-        return $this->makeRequest("onu/get_onu_full_status_info/{$externalId}", 'POST', []);
+        return $this->makeRequest("onu/get_onu_full_status_info/{$externalId}", 'GET', []);
     }
     
     public function getONURunningConfig(string $externalId): array {
-        return $this->makeRequest("onu/get_onu_running_config/{$externalId}", 'POST', []);
+        return $this->makeRequest("onu/get_onu_running_config/{$externalId}", 'GET', []);
     }
     
     public function rebootONU(string $externalId): array {
@@ -282,27 +283,27 @@ class SmartOLT {
     }
     
     public function getZones(): array {
-        return $this->makeRequest('system/get_zones', 'POST', []);
+        return $this->makeRequest('system/get_zones', 'GET', []);
     }
     
     public function getODBs(): array {
-        return $this->makeRequest('system/get_odbs', 'POST', []);
+        return $this->makeRequest('system/get_odbs', 'GET', []);
     }
     
     public function getVLANs(): array {
-        return $this->makeRequest('system/get_vlans', 'POST', []);
+        return $this->makeRequest('system/get_vlans', 'GET', []);
     }
     
     public function getSpeedProfiles(): array {
-        return $this->makeRequest('system/get_speed_profiles', 'POST', []);
+        return $this->makeRequest('system/get_speed_profiles', 'GET', []);
     }
     
     public function getONUTypes(): array {
-        return $this->makeRequest('system/get_onu_types', 'POST', []);
+        return $this->makeRequest('system/get_onu_types', 'GET', []);
     }
     
     public function getONUTypesByPonType(string $ponType): array {
-        return $this->makeRequest("system/get_onu_types_by_pon_type/{$ponType}", 'POST', []);
+        return $this->makeRequest("system/get_onu_types_by_pon_type/{$ponType}", 'GET', []);
     }
     
     public function authorizeONU(array $data): array {
