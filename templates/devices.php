@@ -211,6 +211,11 @@
                     <i class="bi bi-graph-up"></i> Traffic Graphs
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#vlansTab">
+                    <i class="bi bi-diagram-3"></i> VLANs
+                </a>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -504,6 +509,68 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="vlansTab">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <select class="form-select" id="vlanDeviceSelect" onchange="loadVlans()">
+                            <option value="">Select Device</option>
+                            <?php foreach ($devices ?? [] as $device): ?>
+                            <option value="<?= $device['id'] ?>"><?= htmlspecialchars($device['name']) ?> (<?= $device['ip_address'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" onclick="pollVlans()">
+                            <i class="bi bi-arrow-repeat"></i> Poll VLANs
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>VLAN List</h6>
+                                <span class="badge bg-primary" id="vlanCount">0 VLANs</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>VLAN ID</th>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th>Tagged Ports</th>
+                                                <th>Untagged Ports</th>
+                                                <th>In Rate</th>
+                                                <th>Out Rate</th>
+                                                <th>Graph</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="vlansTableBody">
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted py-4">Select a device and poll VLANs</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>VLAN Bandwidth</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="vlanBandwidthChart" height="250"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1135,6 +1202,157 @@
             modal.addEventListener('hidden.bs.modal', () => {
                 modal.remove();
             });
+        }
+
+        let vlanBandwidthChart = null;
+
+        async function loadVlans() {
+            const deviceId = document.getElementById('vlanDeviceSelect').value;
+            if (!deviceId) {
+                document.getElementById('vlansTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Select a device and poll VLANs</td></tr>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/?page=devices', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'get_vlans', device_id: deviceId})
+                });
+                const data = await response.json();
+                
+                if (data.success && data.vlans) {
+                    renderVlans(data.vlans);
+                    renderVlanChart(data.vlans);
+                }
+            } catch (err) {
+                console.error('Error loading VLANs:', err);
+            }
+        }
+
+        async function pollVlans() {
+            const deviceId = document.getElementById('vlanDeviceSelect').value;
+            if (!deviceId) {
+                alert('Please select a device first');
+                return;
+            }
+
+            const btn = event.target.closest('button');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Polling...';
+
+            try {
+                const response = await fetch('/?page=devices', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'poll_vlans', device_id: deviceId})
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Polled ' + data.count + ' VLANs');
+                    loadVlans();
+                } else {
+                    alert('Poll failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error polling VLANs');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Poll VLANs';
+            }
+        }
+
+        function renderVlans(vlans) {
+            const tbody = document.getElementById('vlansTableBody');
+            document.getElementById('vlanCount').textContent = vlans.length + ' VLANs';
+
+            if (!vlans.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No VLANs found. Poll the device to discover VLANs.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = vlans.map(v => `
+                <tr>
+                    <td><strong>VLAN ${v.vlan_id}</strong></td>
+                    <td>${v.vlan_name || '-'}</td>
+                    <td><span class="badge bg-${v.vlan_status === 'active' ? 'success' : 'secondary'}">${v.vlan_status}</span></td>
+                    <td><small class="text-muted">${v.tagged_ports || '-'}</small></td>
+                    <td><small class="text-muted">${v.untagged_ports || '-'}</small></td>
+                    <td><span class="text-success">${formatBits(v.in_rate || v.avg_in_rate || 0)}</span></td>
+                    <td><span class="text-primary">${formatBits(v.out_rate || v.avg_out_rate || 0)}</span></td>
+                    <td><button class="btn btn-sm btn-outline-info" onclick="showVlanGraph(${v.id}, 'VLAN ${v.vlan_id}')">
+                        <i class="bi bi-graph-up"></i>
+                    </button></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderVlanChart(vlans) {
+            const ctx = document.getElementById('vlanBandwidthChart').getContext('2d');
+            
+            if (vlanBandwidthChart) {
+                vlanBandwidthChart.destroy();
+            }
+
+            const topVlans = vlans.sort((a, b) => (b.in_rate + b.out_rate) - (a.in_rate + a.out_rate)).slice(0, 10);
+            const labels = topVlans.map(v => 'VLAN ' + v.vlan_id);
+            const inData = topVlans.map(v => Math.round((v.in_rate || 0) / 1000000));
+            const outData = topVlans.map(v => Math.round((v.out_rate || 0) / 1000000));
+
+            vlanBandwidthChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'In (Mbps)',
+                            data: inData,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Out (Mbps)',
+                            data: outData,
+                            backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                            borderColor: 'rgba(13, 110, 253, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Mbps' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function showVlanGraph(vlanId, name) {
+            try {
+                const response = await fetch('/?page=devices', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'get_vlan_history', vlan_id: vlanId, hours: 24})
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data.length) {
+                    showInterfaceModal(name, data.data);
+                } else {
+                    alert('No historical data available. Poll the device regularly to collect data.');
+                }
+            } catch (err) {
+                console.error('Error loading VLAN history:', err);
+            }
         }
     </script>
 </body>

@@ -2148,6 +2148,33 @@ if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'data' => $summary]);
             exit;
+            
+        case 'get_vlans':
+            $deviceId = (int)($input['device_id'] ?? 0);
+            $vlans = $deviceMonitor->getVlanTrafficSummary($deviceId, 24);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'vlans' => $vlans]);
+            exit;
+            
+        case 'poll_vlans':
+            if (!\App\Auth::can('settings.manage')) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Permission denied']);
+                exit;
+            }
+            $deviceId = (int)($input['device_id'] ?? 0);
+            $result = $deviceMonitor->pollVlans($deviceId);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'get_vlan_history':
+            $vlanId = (int)($input['vlan_id'] ?? 0);
+            $hours = (int)($input['hours'] ?? 24);
+            $history = $deviceMonitor->getVlanHistory($vlanId, $hours);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'data' => $history]);
+            exit;
     }
 }
 

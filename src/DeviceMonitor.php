@@ -31,6 +31,18 @@ class DeviceMonitor {
     const OID_ZTE_ONU_STATUS = '1.3.6.1.4.1.3902.1082.500.10.2.3.3.1.2';
     const OID_ZTE_ONU_RX_POWER = '1.3.6.1.4.1.3902.1082.500.10.2.3.8.1.2';
     
+    // VLAN OIDs (Q-BRIDGE-MIB)
+    const OID_VLAN_STATIC_NAME = '1.3.6.1.2.1.17.7.1.4.3.1.1';       // dot1qVlanStaticName
+    const OID_VLAN_FDB_ID = '1.3.6.1.2.1.17.7.1.4.2.1.3';            // dot1qVlanFdbId
+    const OID_VLAN_CURRENT_EGRESS_PORTS = '1.3.6.1.2.1.17.7.1.4.2.1.4';  // dot1qVlanCurrentEgressPorts
+    const OID_VLAN_CURRENT_UNTAGGED_PORTS = '1.3.6.1.2.1.17.7.1.4.2.1.5'; // dot1qVlanCurrentUntaggedPorts
+    const OID_VLAN_STATUS = '1.3.6.1.2.1.17.7.1.4.3.1.5';            // dot1qVlanStaticRowStatus
+    
+    // Interface VLAN counters (via interface table with VLAN sub-interfaces)
+    const OID_IF_HC_IN_OCTETS = '1.3.6.1.2.1.31.1.1.1.6';    // 64-bit in octets
+    const OID_IF_HC_OUT_OCTETS = '1.3.6.1.2.1.31.1.1.1.10';  // 64-bit out octets
+    const OID_IF_NAME = '1.3.6.1.2.1.31.1.1.1.1';            // Interface name (ifName)
+    
     public function __construct($db) {
         $this->db = $db;
     }
@@ -147,11 +159,46 @@ class DeviceMonitor {
             )
         ");
         
+        // VLANs table
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS device_vlans (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER REFERENCES network_devices(id) ON DELETE CASCADE,
+                vlan_id INTEGER NOT NULL,
+                vlan_name VARCHAR(100),
+                vlan_status VARCHAR(20) DEFAULT 'active',
+                ports TEXT,
+                tagged_ports TEXT,
+                untagged_ports TEXT,
+                in_octets BIGINT DEFAULT 0,
+                out_octets BIGINT DEFAULT 0,
+                in_rate BIGINT DEFAULT 0,
+                out_rate BIGINT DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(device_id, vlan_id)
+            )
+        ");
+        
+        // VLAN traffic history
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS vlan_history (
+                id SERIAL PRIMARY KEY,
+                vlan_record_id INTEGER REFERENCES device_vlans(id) ON DELETE CASCADE,
+                in_octets BIGINT DEFAULT 0,
+                out_octets BIGINT DEFAULT 0,
+                in_rate BIGINT DEFAULT 0,
+                out_rate BIGINT DEFAULT 0,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        
         // Create indexes
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_device_onus_customer ON device_onus(customer_id)");
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_device_onus_status ON device_onus(status)");
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_monitoring_log_device ON device_monitoring_log(device_id, recorded_at)");
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_interface_history_time ON interface_history(interface_id, recorded_at)");
+        $this->db->exec("CREATE INDEX IF NOT EXISTS idx_device_vlans_device ON device_vlans(device_id)");
+        $this->db->exec("CREATE INDEX IF NOT EXISTS idx_vlan_history_time ON vlan_history(vlan_record_id, recorded_at)");
         
         return true;
     }
@@ -978,5 +1025,274 @@ class DeviceMonitor {
         }
         
         return $optical;
+    }
+    
+    /**
+     * Poll VLANs from device via SNMP
+     */
+    public function pollVlans($deviceId) {
+        $device = $this->getDevice($deviceId);
+        if (!$device) {
+            return ['success' => false, 'error' => 'Device not found'];
+        }
+        
+        $vlans = [];
+        
+        // Get VLAN names
+        $vlanNames = $this->snmpWalk($device, self::OID_VLAN_STATIC_NAME);
+        if ($vlanNames['success'] && !empty($vlanNames['values'])) {
+            foreach ($vlanNames['values'] as $oid => $name) {
+                // Extract VLAN ID from OID
+                $parts = explode('.', $oid);
+                $vlanId = end($parts);
+                
+                $vlans[$vlanId] = [
+                    'vlan_id' => intval($vlanId),
+                    'vlan_name' => $this->parseSnmpValue($name),
+                    'vlan_status' => 'active',
+                    'ports' => '',
+                    'tagged_ports' => '',
+                    'untagged_ports' => ''
+                ];
+            }
+        }
+        
+        // If no VLANs found via Q-BRIDGE, try to get VLAN interfaces from ifName
+        if (empty($vlans)) {
+            $ifNames = $this->snmpWalk($device, self::OID_IF_NAME);
+            if ($ifNames['success'] && !empty($ifNames['values'])) {
+                foreach ($ifNames['values'] as $oid => $name) {
+                    $name = $this->parseSnmpValue($name);
+                    // Look for VLAN interfaces (e.g., Vlan100, vlan.100, etc)
+                    if (preg_match('/[Vv]lan\.?(\d+)/i', $name, $matches)) {
+                        $vlanId = intval($matches[1]);
+                        $vlans[$vlanId] = [
+                            'vlan_id' => $vlanId,
+                            'vlan_name' => $name,
+                            'vlan_status' => 'active',
+                            'ports' => '',
+                            'tagged_ports' => '',
+                            'untagged_ports' => '',
+                            'if_index' => intval(end(explode('.', $oid)))
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // Get VLAN egress ports
+        $egressPorts = $this->snmpWalk($device, self::OID_VLAN_CURRENT_EGRESS_PORTS);
+        if ($egressPorts['success'] && !empty($egressPorts['values'])) {
+            foreach ($egressPorts['values'] as $oid => $value) {
+                $parts = explode('.', $oid);
+                $vlanId = end($parts);
+                if (isset($vlans[$vlanId])) {
+                    $vlans[$vlanId]['ports'] = $this->parsePortBitmap($value);
+                }
+            }
+        }
+        
+        // Get VLAN untagged ports
+        $untaggedPorts = $this->snmpWalk($device, self::OID_VLAN_CURRENT_UNTAGGED_PORTS);
+        if ($untaggedPorts['success'] && !empty($untaggedPorts['values'])) {
+            foreach ($untaggedPorts['values'] as $oid => $value) {
+                $parts = explode('.', $oid);
+                $vlanId = end($parts);
+                if (isset($vlans[$vlanId])) {
+                    $vlans[$vlanId]['untagged_ports'] = $this->parsePortBitmap($value);
+                    // Tagged = Egress - Untagged
+                    $vlans[$vlanId]['tagged_ports'] = $this->subtractPorts(
+                        $vlans[$vlanId]['ports'],
+                        $vlans[$vlanId]['untagged_ports']
+                    );
+                }
+            }
+        }
+        
+        // Get bandwidth for VLANs (via VLAN interfaces)
+        foreach ($vlans as $vlanId => &$vlan) {
+            if (isset($vlan['if_index'])) {
+                $ifIndex = $vlan['if_index'];
+                
+                // Get current octets
+                $inOctets = $this->snmpGet($device, self::OID_IF_HC_IN_OCTETS . '.' . $ifIndex);
+                $outOctets = $this->snmpGet($device, self::OID_IF_HC_OUT_OCTETS . '.' . $ifIndex);
+                
+                if ($inOctets['success']) {
+                    $vlan['in_octets'] = intval($this->parseSnmpValue($inOctets['value']));
+                }
+                if ($outOctets['success']) {
+                    $vlan['out_octets'] = intval($this->parseSnmpValue($outOctets['value']));
+                }
+            }
+        }
+        
+        // Save to database
+        foreach ($vlans as $vlanData) {
+            $this->saveVlan($deviceId, $vlanData);
+        }
+        
+        return ['success' => true, 'vlans' => array_values($vlans), 'count' => count($vlans)];
+    }
+    
+    /**
+     * Save VLAN data and calculate rates
+     */
+    private function saveVlan($deviceId, $data) {
+        // Get existing VLAN for rate calculation
+        $stmt = $this->db->prepare("SELECT * FROM device_vlans WHERE device_id = ? AND vlan_id = ?");
+        $stmt->execute([$deviceId, $data['vlan_id']]);
+        $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $inRate = 0;
+        $outRate = 0;
+        
+        if ($existing && isset($data['in_octets'])) {
+            $timeDiff = time() - strtotime($existing['last_updated']);
+            if ($timeDiff > 0) {
+                $inDiff = ($data['in_octets'] ?? 0) - ($existing['in_octets'] ?? 0);
+                $outDiff = ($data['out_octets'] ?? 0) - ($existing['out_octets'] ?? 0);
+                
+                // Handle counter wrap
+                if ($inDiff >= 0) $inRate = ($inDiff * 8) / $timeDiff; // bits per second
+                if ($outDiff >= 0) $outRate = ($outDiff * 8) / $timeDiff;
+            }
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO device_vlans (device_id, vlan_id, vlan_name, vlan_status, ports, tagged_ports, untagged_ports, in_octets, out_octets, in_rate, out_rate, last_updated)
+            VALUES (:device_id, :vlan_id, :vlan_name, :vlan_status, :ports, :tagged_ports, :untagged_ports, :in_octets, :out_octets, :in_rate, :out_rate, NOW())
+            ON CONFLICT (device_id, vlan_id) DO UPDATE SET
+                vlan_name = EXCLUDED.vlan_name,
+                vlan_status = EXCLUDED.vlan_status,
+                ports = EXCLUDED.ports,
+                tagged_ports = EXCLUDED.tagged_ports,
+                untagged_ports = EXCLUDED.untagged_ports,
+                in_octets = EXCLUDED.in_octets,
+                out_octets = EXCLUDED.out_octets,
+                in_rate = EXCLUDED.in_rate,
+                out_rate = EXCLUDED.out_rate,
+                last_updated = NOW()
+            RETURNING id
+        ");
+        
+        $stmt->execute([
+            ':device_id' => $deviceId,
+            ':vlan_id' => $data['vlan_id'],
+            ':vlan_name' => $data['vlan_name'] ?? 'VLAN ' . $data['vlan_id'],
+            ':vlan_status' => $data['vlan_status'] ?? 'active',
+            ':ports' => $data['ports'] ?? '',
+            ':tagged_ports' => $data['tagged_ports'] ?? '',
+            ':untagged_ports' => $data['untagged_ports'] ?? '',
+            ':in_octets' => $data['in_octets'] ?? 0,
+            ':out_octets' => $data['out_octets'] ?? 0,
+            ':in_rate' => $inRate,
+            ':out_rate' => $outRate
+        ]);
+        
+        $vlanRecordId = $stmt->fetchColumn();
+        
+        // Save to history
+        if ($vlanRecordId && ($inRate > 0 || $outRate > 0)) {
+            $histStmt = $this->db->prepare("
+                INSERT INTO vlan_history (vlan_record_id, in_octets, out_octets, in_rate, out_rate)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $histStmt->execute([
+                $vlanRecordId,
+                $data['in_octets'] ?? 0,
+                $data['out_octets'] ?? 0,
+                $inRate,
+                $outRate
+            ]);
+        }
+    }
+    
+    /**
+     * Get VLANs for a device
+     */
+    public function getVlans($deviceId) {
+        $stmt = $this->db->prepare("
+            SELECT * FROM device_vlans 
+            WHERE device_id = ? 
+            ORDER BY vlan_id
+        ");
+        $stmt->execute([$deviceId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get VLAN traffic summary with bandwidth
+     */
+    public function getVlanTrafficSummary($deviceId, $hours = 24) {
+        $stmt = $this->db->prepare("
+            SELECT 
+                v.*,
+                COALESCE(AVG(h.in_rate), 0) as avg_in_rate,
+                COALESCE(AVG(h.out_rate), 0) as avg_out_rate,
+                COALESCE(MAX(h.in_rate), 0) as max_in_rate,
+                COALESCE(MAX(h.out_rate), 0) as max_out_rate
+            FROM device_vlans v
+            LEFT JOIN vlan_history h ON v.id = h.vlan_record_id 
+                AND h.recorded_at >= NOW() - INTERVAL '{$hours} hours'
+            WHERE v.device_id = ?
+            GROUP BY v.id
+            ORDER BY v.vlan_id
+        ");
+        $stmt->execute([$deviceId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get VLAN traffic history for graphs
+     */
+    public function getVlanHistory($vlanRecordId, $hours = 24) {
+        $stmt = $this->db->prepare("
+            SELECT in_rate, out_rate, in_octets, out_octets, recorded_at
+            FROM vlan_history
+            WHERE vlan_record_id = ?
+            AND recorded_at >= NOW() - INTERVAL '{$hours} hours'
+            ORDER BY recorded_at ASC
+        ");
+        $stmt->execute([$vlanRecordId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Parse port bitmap from SNMP (PortList)
+     */
+    private function parsePortBitmap($bitmap) {
+        $bitmap = $this->parseSnmpValue($bitmap);
+        $ports = [];
+        
+        // Handle hex string format
+        if (preg_match('/^[0-9a-fA-F\s]+$/', $bitmap)) {
+            $bytes = str_split(str_replace(' ', '', $bitmap), 2);
+            $portNum = 1;
+            foreach ($bytes as $byte) {
+                $val = hexdec($byte);
+                for ($bit = 7; $bit >= 0; $bit--) {
+                    if ($val & (1 << $bit)) {
+                        $ports[] = $portNum;
+                    }
+                    $portNum++;
+                }
+            }
+        }
+        
+        return implode(',', $ports);
+    }
+    
+    /**
+     * Subtract port lists (tagged = all - untagged)
+     */
+    private function subtractPorts($allPorts, $untaggedPorts) {
+        if (empty($allPorts)) return '';
+        
+        $all = array_filter(explode(',', $allPorts));
+        $untagged = array_filter(explode(',', $untaggedPorts));
+        $tagged = array_diff($all, $untagged);
+        
+        return implode(',', $tagged);
     }
 }
