@@ -406,11 +406,15 @@ class DeviceMonitor {
         $output = @shell_exec($cmd);
         
         if ($output === null || strpos($output, 'Timeout') !== false || strpos($output, 'No Response') !== false) {
-            return ['success' => false, 'error' => 'SNMP timeout or no response'];
+            return ['success' => false, 'error' => 'SNMP timeout - check: 1) SNMP enabled on device, 2) Community string correct, 3) UDP port 161 open, 4) CRM must be on same network'];
         }
         
         if (strpos($output, 'command not found') !== false) {
             return ['success' => false, 'error' => 'SNMP tools not installed. Run: apt install snmp'];
+        }
+        
+        if (strpos($output, 'No Such Object') !== false || strpos($output, 'No Such Instance') !== false) {
+            return ['success' => false, 'error' => 'OID not supported by this device'];
         }
         
         // Parse output: SNMPv2-MIB::sysDescr.0 = STRING: Linux router
@@ -495,11 +499,15 @@ class DeviceMonitor {
         $output = @shell_exec($cmd);
         
         if ($output === null || strpos($output, 'Timeout') !== false || strpos($output, 'No Response') !== false) {
-            return ['success' => false, 'error' => 'SNMP timeout or no response'];
+            return ['success' => false, 'error' => 'SNMP timeout - check: 1) SNMP enabled on device, 2) Community string correct, 3) UDP port 161 open, 4) CRM must be on same network'];
         }
         
         if (strpos($output, 'command not found') !== false) {
             return ['success' => false, 'error' => 'SNMP tools not installed. Run: apt install snmp'];
+        }
+        
+        if (strpos($output, 'No Such Object') !== false || strpos($output, 'No Such Instance') !== false) {
+            return ['success' => false, 'error' => 'OID not supported by device - device may not support this SNMP query'];
         }
         
         // Parse output lines: OID = TYPE: value
@@ -513,7 +521,7 @@ class DeviceMonitor {
         }
         
         if (empty($values)) {
-            return ['success' => false, 'error' => 'No SNMP data returned'];
+            return ['success' => false, 'error' => 'No SNMP data returned - verify community string and SNMP version match device settings'];
         }
         
         return ['success' => true, 'values' => $values];
