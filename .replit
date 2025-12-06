@@ -59,10 +59,6 @@ localPort = 38385
 externalPort = 5000
 
 [[ports]]
-localPort = 39201
-externalPort = 8080
-
-[[ports]]
 localPort = 39207
 externalPort = 6800
 
@@ -80,7 +76,7 @@ externalPort = 8000
 
 [nix]
 channel = "stable-25_05"
-packages = ["zip", "net-snmp"]
+packages = ["zip", "net-snmp", "iputils"]
 
 [userenv]
 
