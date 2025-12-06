@@ -771,6 +771,87 @@ function runMigrations(PDO $db): void {
                 created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'network_devices' => "
+            CREATE TABLE IF NOT EXISTS network_devices (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                device_type VARCHAR(50) NOT NULL DEFAULT 'olt',
+                vendor VARCHAR(50),
+                model VARCHAR(100),
+                ip_address VARCHAR(45) NOT NULL,
+                snmp_version VARCHAR(10) DEFAULT 'v2c',
+                snmp_community VARCHAR(100) DEFAULT 'public',
+                snmp_port INTEGER DEFAULT 161,
+                snmpv3_username VARCHAR(100),
+                snmpv3_auth_protocol VARCHAR(20),
+                snmpv3_auth_password VARCHAR(255),
+                snmpv3_priv_protocol VARCHAR(20),
+                snmpv3_priv_password VARCHAR(255),
+                telnet_username VARCHAR(100),
+                telnet_password VARCHAR(255),
+                telnet_port INTEGER DEFAULT 23,
+                ssh_enabled BOOLEAN DEFAULT FALSE,
+                ssh_port INTEGER DEFAULT 22,
+                location VARCHAR(255),
+                status VARCHAR(20) DEFAULT 'unknown',
+                last_polled TIMESTAMP,
+                poll_interval INTEGER DEFAULT 300,
+                enabled BOOLEAN DEFAULT TRUE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'device_interfaces' => "
+            CREATE TABLE IF NOT EXISTS device_interfaces (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER REFERENCES network_devices(id) ON DELETE CASCADE,
+                if_index INTEGER NOT NULL,
+                if_name VARCHAR(100),
+                if_descr VARCHAR(255),
+                if_type VARCHAR(50),
+                if_speed BIGINT,
+                if_status VARCHAR(20),
+                in_octets BIGINT DEFAULT 0,
+                out_octets BIGINT DEFAULT 0,
+                in_errors BIGINT DEFAULT 0,
+                out_errors BIGINT DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(device_id, if_index)
+            )",
+        'device_onus' => "
+            CREATE TABLE IF NOT EXISTS device_onus (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER REFERENCES network_devices(id) ON DELETE CASCADE,
+                onu_id VARCHAR(50) NOT NULL,
+                serial_number VARCHAR(50),
+                mac_address VARCHAR(17),
+                pon_port VARCHAR(20),
+                slot INTEGER,
+                port INTEGER,
+                onu_index INTEGER,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                status VARCHAR(20) DEFAULT 'unknown',
+                rx_power DECIMAL(10,2),
+                tx_power DECIMAL(10,2),
+                distance INTEGER,
+                description VARCHAR(255),
+                profile VARCHAR(100),
+                last_online TIMESTAMP,
+                last_offline TIMESTAMP,
+                last_polled TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(device_id, onu_id)
+            )",
+        'device_monitoring_log' => "
+            CREATE TABLE IF NOT EXISTS device_monitoring_log (
+                id SERIAL PRIMARY KEY,
+                device_id INTEGER REFERENCES network_devices(id) ON DELETE CASCADE,
+                metric_type VARCHAR(50) NOT NULL,
+                metric_name VARCHAR(100),
+                metric_value TEXT,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

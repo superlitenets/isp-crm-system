@@ -2017,7 +2017,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'add_device':
+                if (!\App\Auth::can('settings.manage')) {
+                    $message = 'You do not have permission to add devices.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $deviceMonitor = new \App\DeviceMonitor($db);
+                        $deviceMonitor->initializeTables();
+                        $deviceId = $deviceMonitor->addDevice($_POST);
+                        if ($page === 'devices') {
+                            header('Content-Type: application/json');
+                            echo json_encode(['success' => true, 'id' => $deviceId]);
+                            exit;
+                        }
+                        $message = 'Device added successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        if ($page === 'devices') {
+                            header('Content-Type: application/json');
+                            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                            exit;
+                        }
+                        $message = 'Error adding device: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
         }
+    }
+}
+
+if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    $action = $input['action'] ?? $_POST['action'] ?? '';
+    
+    if (!\App\Auth::can('settings.view')) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied']);
+        exit;
+    }
+    
+    $deviceMonitor = new \App\DeviceMonitor($db);
+    $deviceMonitor->initializeTables();
+    
+    switch ($action) {
+        case 'test_device':
+            $result = $deviceMonitor->testConnection((int)$input['id']);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'poll_device':
+            $result = $deviceMonitor->pollInterfaces((int)$input['id']);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'delete_device':
+            if (!\App\Auth::can('settings.manage')) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Permission denied']);
+                exit;
+            }
+            $result = $deviceMonitor->deleteDevice((int)$input['id']);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => $result]);
+            exit;
+            
+        case 'get_interfaces':
+            $stmt = $db->prepare("SELECT * FROM device_interfaces WHERE device_id = ? ORDER BY if_index");
+            $stmt->execute([(int)$input['id']]);
+            $interfaces = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            header('Content-Type: application/json');
+            echo json_encode(['interfaces' => $interfaces]);
+            exit;
+            
+        case 'telnet_command':
+            if (!\App\Auth::can('settings.manage')) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Permission denied']);
+                exit;
+            }
+            $device = $deviceMonitor->getDevice((int)$input['id']);
+            if ($device && $device['vendor'] === 'Huawei') {
+                $result = $deviceMonitor->huaweiCommand((int)$input['id'], $input['command']);
+            } else {
+                $result = $deviceMonitor->telnetCommand($device, $input['command']);
+            }
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'get_device_info':
+            $result = $deviceMonitor->getDeviceInfo((int)$input['id']);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
     }
 }
 
@@ -2898,8 +2996,8 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
-                <a class="nav-link <?= $page === 'smartolt' ? 'active' : '' ?>" href="?page=smartolt">
-                    <i class="bi bi-router"></i> SmartOLT
+                <a class="nav-link <?= $page === 'devices' || $page === 'smartolt' ? 'active' : '' ?>" href="?page=devices">
+                    <i class="bi bi-hdd-network"></i> Network Devices
                 </a>
             </li>
             <?php endif; ?>
@@ -2993,10 +3091,19 @@ $csrfToken = \App\Auth::generateToken();
                 }
                 break;
             case 'smartolt':
+            case 'devices':
                 if (!\App\Auth::can('settings.view')) {
                     $accessDenied = true;
                 } else {
-                    include __DIR__ . '/../templates/smartolt.php';
+                    $deviceMonitor = new \App\DeviceMonitor($db);
+                    $deviceMonitor->initializeTables();
+                    $devices = $deviceMonitor->getDevices();
+                    $stats = $deviceMonitor->getStatistics();
+                    $onus = [];
+                    if (!empty($_GET['device'])) {
+                        $onus = $deviceMonitor->getOnus((int)$_GET['device'], ['status' => $_GET['status'] ?? '']);
+                    }
+                    include __DIR__ . '/../templates/devices.php';
                 }
                 break;
             case 'reports':
