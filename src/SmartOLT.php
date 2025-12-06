@@ -137,9 +137,8 @@ class SmartOLT {
         
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
-            if (!empty($data)) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            }
+            // Always send JSON body for POST requests (SmartOLT requires empty {} for some endpoints)
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
         }
         
         $response = curl_exec($ch);
@@ -221,11 +220,13 @@ class SmartOLT {
     }
     
     public function getAllUnconfiguredONUs(): array {
-        return $this->makeRequest('onu/get_unconfigured_onus');
+        // SmartOLT API requires POST with empty JSON body for this endpoint
+        return $this->makeRequest('onu/get_unconfigured_onus', 'POST', []);
     }
     
     public function getUnconfiguredONUsByOLT(int $oltId): array {
-        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}");
+        // SmartOLT API requires POST with empty JSON body for this endpoint
+        return $this->makeRequest("onu/get_unconfigured_onus/{$oltId}", 'POST', []);
     }
     
     public function getAllONUsStatuses(): array {
