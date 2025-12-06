@@ -428,6 +428,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="addDeviceForm" onsubmit="saveDevice(event)">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                     <div class="modal-body">
                         <ul class="nav nav-pills mb-3" id="addDeviceTabs">
                             <li class="nav-item">

@@ -2064,6 +2064,22 @@ if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $deviceMonitor->initializeTables();
     
     switch ($action) {
+        case 'add_device':
+            if (!\App\Auth::can('settings.manage')) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Permission denied']);
+                exit;
+            }
+            try {
+                $deviceId = $deviceMonitor->addDevice($_POST);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'id' => $deviceId]);
+            } catch (Exception $e) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+            
         case 'test_device':
             $result = $deviceMonitor->testConnection((int)$input['id']);
             header('Content-Type: application/json');
