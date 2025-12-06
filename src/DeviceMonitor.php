@@ -340,98 +340,183 @@ class DeviceMonitor {
      * SNMP Get single value
      */
     public function snmpGet($device, $oid) {
-        if (!function_exists('snmpget')) {
-            return ['success' => false, 'error' => 'SNMP extension not installed'];
+        // Try PHP extension first
+        if (function_exists('snmpget')) {
+            try {
+                $timeout = 1000000; // 1 second
+                $retries = 2;
+                
+                if ($device['snmp_version'] === 'v3') {
+                    $value = @snmp3_get(
+                        $device['ip_address'],
+                        $device['snmpv3_username'],
+                        $this->getSnmpSecLevel($device),
+                        $device['snmpv3_auth_protocol'] ?? 'SHA',
+                        $device['snmpv3_auth_password'] ?? '',
+                        $device['snmpv3_priv_protocol'] ?? 'AES',
+                        $device['snmpv3_priv_password'] ?? '',
+                        $oid,
+                        $timeout,
+                        $retries
+                    );
+                } else {
+                    $value = @snmpget(
+                        $device['ip_address'],
+                        $device['snmp_community'],
+                        $oid,
+                        $timeout,
+                        $retries
+                    );
+                }
+                
+                if ($value !== false) {
+                    return ['success' => true, 'value' => $this->parseSnmpValue($value)];
+                }
+            } catch (\Exception $e) {
+                // Fall through to command-line
+            }
         }
         
-        try {
-            $timeout = 1000000; // 1 second
-            $retries = 2;
+        // Fallback to command-line snmpget
+        return $this->snmpGetCli($device, $oid);
+    }
+    
+    /**
+     * SNMP Get using command-line tool
+     */
+    private function snmpGetCli($device, $oid) {
+        $ip = escapeshellarg($device['ip_address']);
+        $community = escapeshellarg($device['snmp_community'] ?? 'public');
+        $oidEsc = escapeshellarg($oid);
+        
+        if ($device['snmp_version'] === 'v3') {
+            $user = escapeshellarg($device['snmpv3_username'] ?? '');
+            $authProto = escapeshellarg($device['snmpv3_auth_protocol'] ?? 'SHA');
+            $authPass = escapeshellarg($device['snmpv3_auth_password'] ?? '');
+            $privProto = escapeshellarg($device['snmpv3_priv_protocol'] ?? 'AES');
+            $privPass = escapeshellarg($device['snmpv3_priv_password'] ?? '');
             
-            if ($device['snmp_version'] === 'v3') {
-                $value = @snmp3_get(
-                    $device['ip_address'],
-                    $device['snmpv3_username'],
-                    $this->getSnmpSecLevel($device),
-                    $device['snmpv3_auth_protocol'] ?? 'SHA',
-                    $device['snmpv3_auth_password'] ?? '',
-                    $device['snmpv3_priv_protocol'] ?? 'AES',
-                    $device['snmpv3_priv_password'] ?? '',
-                    $oid,
-                    $timeout,
-                    $retries
-                );
-            } else {
-                $version = $device['snmp_version'] === 'v1' ? SNMP::VERSION_1 : SNMP::VERSION_2c;
-                $value = @snmpget(
-                    $device['ip_address'],
-                    $device['snmp_community'],
-                    $oid,
-                    $timeout,
-                    $retries
-                );
-            }
-            
-            if ($value === false) {
-                return ['success' => false, 'error' => 'SNMP get failed'];
-            }
-            
-            return ['success' => true, 'value' => $this->parseSnmpValue($value)];
-            
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
+            $cmd = "snmpget -v3 -l authPriv -u {$user} -a {$authProto} -A {$authPass} -x {$privProto} -X {$privPass} -t 2 -r 1 {$ip} {$oidEsc} 2>&1";
+        } elseif ($device['snmp_version'] === 'v1') {
+            $cmd = "snmpget -v1 -c {$community} -t 2 -r 1 {$ip} {$oidEsc} 2>&1";
+        } else {
+            $cmd = "snmpget -v2c -c {$community} -t 2 -r 1 {$ip} {$oidEsc} 2>&1";
         }
+        
+        $output = @shell_exec($cmd);
+        
+        if ($output === null || strpos($output, 'Timeout') !== false || strpos($output, 'No Response') !== false) {
+            return ['success' => false, 'error' => 'SNMP timeout or no response'];
+        }
+        
+        if (strpos($output, 'command not found') !== false) {
+            return ['success' => false, 'error' => 'SNMP tools not installed. Run: apt install snmp'];
+        }
+        
+        // Parse output: SNMPv2-MIB::sysDescr.0 = STRING: Linux router
+        if (preg_match('/=\s*(.+)$/m', $output, $matches)) {
+            return ['success' => true, 'value' => trim($matches[1])];
+        }
+        
+        return ['success' => true, 'value' => trim($output)];
     }
     
     /**
      * SNMP Walk - get multiple values
      */
     public function snmpWalk($device, $oid) {
-        if (!function_exists('snmpwalk')) {
-            return ['success' => false, 'error' => 'SNMP extension not installed'];
+        // Try PHP extension first
+        if (function_exists('snmpwalk')) {
+            try {
+                $timeout = 2000000; // 2 seconds
+                $retries = 2;
+                
+                if ($device['snmp_version'] === 'v3') {
+                    $values = @snmp3_walk(
+                        $device['ip_address'],
+                        $device['snmpv3_username'],
+                        $this->getSnmpSecLevel($device),
+                        $device['snmpv3_auth_protocol'] ?? 'SHA',
+                        $device['snmpv3_auth_password'] ?? '',
+                        $device['snmpv3_priv_protocol'] ?? 'AES',
+                        $device['snmpv3_priv_password'] ?? '',
+                        $oid,
+                        $timeout,
+                        $retries
+                    );
+                } else {
+                    $values = @snmpwalk(
+                        $device['ip_address'],
+                        $device['snmp_community'],
+                        $oid,
+                        $timeout,
+                        $retries
+                    );
+                }
+                
+                if ($values !== false) {
+                    $parsed = [];
+                    foreach ($values as $key => $value) {
+                        $parsed[$key] = $this->parseSnmpValue($value);
+                    }
+                    return ['success' => true, 'values' => $parsed];
+                }
+            } catch (\Exception $e) {
+                // Fall through to command-line
+            }
         }
         
-        try {
-            $timeout = 2000000; // 2 seconds
-            $retries = 2;
+        // Fallback to command-line snmpwalk
+        return $this->snmpWalkCli($device, $oid);
+    }
+    
+    /**
+     * SNMP Walk using command-line tool
+     */
+    private function snmpWalkCli($device, $oid) {
+        $ip = escapeshellarg($device['ip_address']);
+        $community = escapeshellarg($device['snmp_community'] ?? 'public');
+        $oidEsc = escapeshellarg($oid);
+        
+        if ($device['snmp_version'] === 'v3') {
+            $user = escapeshellarg($device['snmpv3_username'] ?? '');
+            $authProto = escapeshellarg($device['snmpv3_auth_protocol'] ?? 'SHA');
+            $authPass = escapeshellarg($device['snmpv3_auth_password'] ?? '');
+            $privProto = escapeshellarg($device['snmpv3_priv_protocol'] ?? 'AES');
+            $privPass = escapeshellarg($device['snmpv3_priv_password'] ?? '');
             
-            if ($device['snmp_version'] === 'v3') {
-                $values = @snmp3_walk(
-                    $device['ip_address'],
-                    $device['snmpv3_username'],
-                    $this->getSnmpSecLevel($device),
-                    $device['snmpv3_auth_protocol'] ?? 'SHA',
-                    $device['snmpv3_auth_password'] ?? '',
-                    $device['snmpv3_priv_protocol'] ?? 'AES',
-                    $device['snmpv3_priv_password'] ?? '',
-                    $oid,
-                    $timeout,
-                    $retries
-                );
-            } else {
-                $values = @snmpwalk(
-                    $device['ip_address'],
-                    $device['snmp_community'],
-                    $oid,
-                    $timeout,
-                    $retries
-                );
-            }
-            
-            if ($values === false) {
-                return ['success' => false, 'error' => 'SNMP walk failed'];
-            }
-            
-            $parsed = [];
-            foreach ($values as $key => $value) {
-                $parsed[$key] = $this->parseSnmpValue($value);
-            }
-            
-            return ['success' => true, 'values' => $parsed];
-            
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
+            $cmd = "snmpwalk -v3 -l authPriv -u {$user} -a {$authProto} -A {$authPass} -x {$privProto} -X {$privPass} -t 3 -r 1 {$ip} {$oidEsc} 2>&1";
+        } elseif ($device['snmp_version'] === 'v1') {
+            $cmd = "snmpwalk -v1 -c {$community} -t 3 -r 1 {$ip} {$oidEsc} 2>&1";
+        } else {
+            $cmd = "snmpwalk -v2c -c {$community} -t 3 -r 1 {$ip} {$oidEsc} 2>&1";
         }
+        
+        $output = @shell_exec($cmd);
+        
+        if ($output === null || strpos($output, 'Timeout') !== false || strpos($output, 'No Response') !== false) {
+            return ['success' => false, 'error' => 'SNMP timeout or no response'];
+        }
+        
+        if (strpos($output, 'command not found') !== false) {
+            return ['success' => false, 'error' => 'SNMP tools not installed. Run: apt install snmp'];
+        }
+        
+        // Parse output lines: OID = TYPE: value
+        $values = [];
+        $lines = explode("\n", trim($output));
+        foreach ($lines as $line) {
+            if (preg_match('/^([^\s]+)\s*=\s*(.+)$/m', $line, $matches)) {
+                $oidKey = trim($matches[1]);
+                $values[$oidKey] = trim($matches[2]);
+            }
+        }
+        
+        if (empty($values)) {
+            return ['success' => false, 'error' => 'No SNMP data returned'];
+        }
+        
+        return ['success' => true, 'values' => $values];
     }
     
     /**
