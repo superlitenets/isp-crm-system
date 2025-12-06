@@ -793,18 +793,41 @@
                 const data = await response.json();
                 
                 let html = '<table class="table table-sm">';
-                html += '<tr><td><i class="bi bi-' + (data.results?.ping ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td><td>Ping</td><td>' + (data.results?.ping ? 'OK' : 'Failed') + '</td></tr>';
-                html += '<tr><td><i class="bi bi-' + (data.results?.snmp ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td><td>SNMP</td><td>' + (data.results?.snmp ? 'OK' : 'Failed') + '</td></tr>';
-                html += '<tr><td><i class="bi bi-' + (data.results?.telnet ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td><td>Telnet</td><td>' + (data.results?.telnet ? 'OK' : 'Failed') + '</td></tr>';
-                if (data.results?.snmp_info) {
-                    html += '<tr><td colspan="3"><small class="text-muted">' + data.results.snmp_info + '</small></td></tr>';
+                
+                // Ping result
+                html += '<tr><td><i class="bi bi-' + (data.results?.ping ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td>';
+                html += '<td><strong>Ping</strong></td>';
+                html += '<td>' + (data.results?.ping ? '<span class="text-success">OK</span>' : '<span class="text-danger">Failed</span>') + '</td></tr>';
+                if (data.results?.ping_error) {
+                    html += '<tr><td></td><td colspan="2"><small class="text-muted">' + data.results.ping_error + '</small></td></tr>';
                 }
+                
+                // SNMP result
+                html += '<tr><td><i class="bi bi-' + (data.results?.snmp ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td>';
+                html += '<td><strong>SNMP</strong></td>';
+                html += '<td>' + (data.results?.snmp ? '<span class="text-success">OK</span>' : '<span class="text-danger">Failed</span>') + '</td></tr>';
+                if (data.results?.snmp_error) {
+                    html += '<tr><td></td><td colspan="2"><small class="text-muted">' + data.results.snmp_error + '</small></td></tr>';
+                }
+                if (data.results?.snmp_info) {
+                    html += '<tr><td></td><td colspan="2"><small class="text-info">' + data.results.snmp_info + '</small></td></tr>';
+                }
+                
+                // Telnet result
+                html += '<tr><td><i class="bi bi-' + (data.results?.telnet ? 'check-circle text-success' : 'x-circle text-danger') + '"></i></td>';
+                html += '<td><strong>Telnet/SSH</strong></td>';
+                html += '<td>' + (data.results?.telnet ? '<span class="text-success">OK</span>' : '<span class="text-danger">Failed</span>') + '</td></tr>';
+                if (data.results?.telnet_error) {
+                    html += '<tr><td></td><td colspan="2"><small class="text-muted">' + data.results.telnet_error + '</small></td></tr>';
+                }
+                
                 html += '</table>';
+                html += '<div class="alert alert-info mt-3 mb-0"><small><i class="bi bi-info-circle me-1"></i>Note: Tests run from the CRM server. Ensure the device is reachable from your server\'s network.</small></div>';
                 
                 document.getElementById('testResultContent').innerHTML = html;
                 new bootstrap.Modal(document.getElementById('testResultModal')).show();
             } catch (err) {
-                alert('Error testing device');
+                alert('Error testing device: ' + err.message);
             }
         }
 

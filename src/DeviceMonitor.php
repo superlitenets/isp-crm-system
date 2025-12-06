@@ -707,26 +707,68 @@ class DeviceMonitor {
         $results = [
             'ping' => false,
             'snmp' => false,
-            'telnet' => false
+            'telnet' => false,
+            'ping_error' => '',
+            'snmp_error' => '',
+            'telnet_error' => ''
         ];
         
-        // Test ping
-        $pingResult = exec("ping -c 1 -W 2 " . escapeshellarg($device['ip_address']), $output, $returnCode);
-        $results['ping'] = ($returnCode === 0);
+        $ip = $device['ip_address'];
         
-        // Test SNMP
-        $snmpResult = $this->snmpGet($device, self::OID_SYSTEM_DESCR);
-        $results['snmp'] = $snmpResult['success'];
-        if ($snmpResult['success']) {
-            $results['snmp_info'] = $snmpResult['value'];
+        // Test ping using shell_exec for better compatibility
+        $pingOutput = @shell_exec("ping -c 1 -W 2 " . escapeshellarg($ip) . " 2>&1");
+        if ($pingOutput !== null && (strpos($pingOutput, '1 received') !== false || strpos($pingOutput, '1 packets received') !== false || strpos($pingOutput, 'bytes from') !== false)) {
+            $results['ping'] = true;
+        } else {
+            // Try alternative ping
+            $pingOutput2 = @shell_exec("ping -c 1 " . escapeshellarg($ip) . " 2>&1");
+            if ($pingOutput2 !== null && strpos($pingOutput2, 'bytes from') !== false) {
+                $results['ping'] = true;
+            } else {
+                $results['ping_error'] = 'Host unreachable or ping blocked';
+            }
         }
         
-        // Test Telnet if credentials provided
-        if (!empty($device['telnet_username']) && !empty($device['telnet_password'])) {
-            $socket = @fsockopen($device['ip_address'], $device['telnet_port'] ?? 23, $errno, $errstr, 5);
-            if ($socket) {
+        // Test SNMP - try PHP extension first, then command line
+        $snmpResult = $this->snmpGet($device, self::OID_SYSTEM_DESCR);
+        if ($snmpResult['success']) {
+            $results['snmp'] = true;
+            $results['snmp_info'] = $snmpResult['value'];
+        } else {
+            // Try command-line snmpget as fallback
+            $community = escapeshellarg($device['snmp_community'] ?? 'public');
+            $snmpCmd = "snmpget -v2c -c {$community} -t 2 -r 1 " . escapeshellarg($ip) . " " . escapeshellarg(self::OID_SYSTEM_DESCR) . " 2>&1";
+            $snmpOutput = @shell_exec($snmpCmd);
+            
+            if ($snmpOutput !== null && strpos($snmpOutput, 'Timeout') === false && strpos($snmpOutput, 'No Response') === false && strlen(trim($snmpOutput)) > 0) {
+                $results['snmp'] = true;
+                $results['snmp_info'] = trim($snmpOutput);
+            } else {
+                $results['snmp_error'] = $snmpResult['error'] ?? 'SNMP timeout or wrong community string';
+            }
+        }
+        
+        // Test Telnet/SSH port connectivity
+        $telnetPort = $device['telnet_port'] ?? 23;
+        if ($device['ssh_enabled']) {
+            $telnetPort = $device['ssh_port'] ?? 22;
+        }
+        
+        // Use fsockopen with shorter timeout
+        $errno = 0;
+        $errstr = '';
+        $socket = @fsockopen($ip, $telnetPort, $errno, $errstr, 3);
+        
+        if ($socket) {
+            $results['telnet'] = true;
+            fclose($socket);
+        } else {
+            // Try using shell command
+            $ncOutput = @shell_exec("timeout 3 bash -c 'echo > /dev/tcp/" . escapeshellarg($ip) . "/" . $telnetPort . "' 2>&1");
+            if ($ncOutput === '') {
                 $results['telnet'] = true;
-                fclose($socket);
+            } else {
+                $results['telnet_error'] = "Port $telnetPort not reachable: " . ($errstr ?: 'Connection refused');
             }
         }
         
