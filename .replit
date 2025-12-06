@@ -71,3 +71,5 @@ packages = ["zip"]
 [userenv.shared]
 ONE_ISP_EMAIL = "demo@one-isp.net"
 ONE_ISP_PASSWORD = "demo@123"
+SMARTOLT_API_URL = "https://betacom.smartolt.com"
+SMARTOLT_API_KEY = "470e8903ab194051af3e6cb67dffc309"
