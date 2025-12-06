@@ -132,10 +132,26 @@ class DeviceMonitor {
             )
         ");
         
+        // Interface history for graphs (LibreNMS-style)
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS interface_history (
+                id SERIAL PRIMARY KEY,
+                interface_id INTEGER REFERENCES device_interfaces(id) ON DELETE CASCADE,
+                in_octets BIGINT DEFAULT 0,
+                out_octets BIGINT DEFAULT 0,
+                in_rate BIGINT DEFAULT 0,
+                out_rate BIGINT DEFAULT 0,
+                in_errors BIGINT DEFAULT 0,
+                out_errors BIGINT DEFAULT 0,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        
         // Create indexes
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_device_onus_customer ON device_onus(customer_id)");
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_device_onus_status ON device_onus(status)");
         $this->db->exec("CREATE INDEX IF NOT EXISTS idx_monitoring_log_device ON device_monitoring_log(device_id, recorded_at)");
+        $this->db->exec("CREATE INDEX IF NOT EXISTS idx_interface_history_time ON interface_history(interface_id, recorded_at)");
         
         return true;
     }
@@ -711,6 +727,99 @@ class DeviceMonitor {
             WHERE id = :id
         ");
         return $stmt->execute([':id' => $onuId, ':customer_id' => $customerId]);
+    }
+    
+    /**
+     * Record interface history for graphs
+     */
+    public function recordInterfaceHistory($interfaceId, $inOctets, $outOctets, $inErrors = 0, $outErrors = 0) {
+        // Get previous values to calculate rates
+        $stmt = $this->db->prepare("
+            SELECT in_octets, out_octets, recorded_at 
+            FROM interface_history 
+            WHERE interface_id = :id 
+            ORDER BY recorded_at DESC LIMIT 1
+        ");
+        $stmt->execute([':id' => $interfaceId]);
+        $prev = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $inRate = 0;
+        $outRate = 0;
+        
+        if ($prev) {
+            $timeDiff = time() - strtotime($prev['recorded_at']);
+            if ($timeDiff > 0) {
+                // Handle counter wrap
+                $inDiff = $inOctets >= $prev['in_octets'] ? $inOctets - $prev['in_octets'] : $inOctets;
+                $outDiff = $outOctets >= $prev['out_octets'] ? $outOctets - $prev['out_octets'] : $outOctets;
+                $inRate = ($inDiff * 8) / $timeDiff; // bits per second
+                $outRate = ($outDiff * 8) / $timeDiff;
+            }
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO interface_history (interface_id, in_octets, out_octets, in_rate, out_rate, in_errors, out_errors)
+            VALUES (:interface_id, :in_octets, :out_octets, :in_rate, :out_rate, :in_errors, :out_errors)
+        ");
+        $stmt->execute([
+            ':interface_id' => $interfaceId,
+            ':in_octets' => $inOctets,
+            ':out_octets' => $outOctets,
+            ':in_rate' => (int)$inRate,
+            ':out_rate' => (int)$outRate,
+            ':in_errors' => $inErrors,
+            ':out_errors' => $outErrors
+        ]);
+    }
+    
+    /**
+     * Get interface history for graphs
+     */
+    public function getInterfaceHistory($interfaceId, $hours = 24) {
+        $stmt = $this->db->prepare("
+            SELECT in_rate, out_rate, in_errors, out_errors, recorded_at
+            FROM interface_history 
+            WHERE interface_id = :id 
+            AND recorded_at > NOW() - INTERVAL '{$hours} hours'
+            ORDER BY recorded_at ASC
+        ");
+        $stmt->execute([':id' => $interfaceId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get device traffic summary for graphs
+     */
+    public function getDeviceTrafficSummary($deviceId, $hours = 24) {
+        $stmt = $this->db->prepare("
+            SELECT 
+                di.id, di.if_descr, di.if_index,
+                COALESCE(AVG(ih.in_rate), 0) as avg_in_rate,
+                COALESCE(AVG(ih.out_rate), 0) as avg_out_rate,
+                COALESCE(MAX(ih.in_rate), 0) as max_in_rate,
+                COALESCE(MAX(ih.out_rate), 0) as max_out_rate,
+                COALESCE(SUM(ih.in_errors), 0) as total_in_errors,
+                COALESCE(SUM(ih.out_errors), 0) as total_out_errors
+            FROM device_interfaces di
+            LEFT JOIN interface_history ih ON di.id = ih.interface_id 
+                AND ih.recorded_at > NOW() - INTERVAL '{$hours} hours'
+            WHERE di.device_id = :device_id
+            GROUP BY di.id, di.if_descr, di.if_index
+            ORDER BY di.if_index
+        ");
+        $stmt->execute([':device_id' => $deviceId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Cleanup old history data (keep last 7 days)
+     */
+    public function cleanupHistory($days = 7) {
+        $stmt = $this->db->prepare("
+            DELETE FROM interface_history 
+            WHERE recorded_at < NOW() - INTERVAL '{$days} days'
+        ");
+        return $stmt->execute();
     }
     
     /**

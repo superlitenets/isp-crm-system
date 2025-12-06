@@ -2132,6 +2132,22 @@ if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Content-Type: application/json');
             echo json_encode($result);
             exit;
+            
+        case 'get_interface_history':
+            $interfaceId = (int)($input['interface_id'] ?? 0);
+            $hours = (int)($input['hours'] ?? 24);
+            $history = $deviceMonitor->getInterfaceHistory($interfaceId, $hours);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'data' => $history]);
+            exit;
+            
+        case 'get_traffic_summary':
+            $deviceId = (int)($input['device_id'] ?? $input['id'] ?? 0);
+            $hours = (int)($input['hours'] ?? 24);
+            $summary = $deviceMonitor->getDeviceTrafficSummary($deviceId, $hours);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'data' => $summary]);
+            exit;
     }
 }
 

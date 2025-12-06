@@ -6,6 +6,8 @@
     <title>Device Monitoring - ISP CRM</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
         :root {
             --primary-color: #0d6efd;
@@ -202,6 +204,11 @@
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#telnetTab">
                     <i class="bi bi-terminal"></i> Telnet Console
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#graphsTab">
+                    <i class="bi bi-graph-up"></i> Traffic Graphs
                 </a>
             </li>
         </ul>
@@ -413,6 +420,90 @@
                         </div>
                         <div class="bg-dark text-success p-3 rounded font-monospace" style="height: 400px; overflow-y: auto;" id="telnetOutput">
                             <pre class="mb-0">Telnet console ready. Select a device and enter commands.</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="graphsTab">
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <select class="form-select" id="graphDeviceSelect" onchange="loadDeviceGraphs()">
+                            <option value="">Select Device</option>
+                            <?php foreach ($devices ?? [] as $device): ?>
+                            <option value="<?= $device['id'] ?>"><?= htmlspecialchars($device['name']) ?> (<?= $device['ip_address'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="graphTimeRange" onchange="loadDeviceGraphs()">
+                            <option value="1">Last 1 Hour</option>
+                            <option value="6">Last 6 Hours</option>
+                            <option value="24" selected>Last 24 Hours</option>
+                            <option value="168">Last 7 Days</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-primary" onclick="loadDeviceGraphs()">
+                            <i class="bi bi-arrow-repeat"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-4" id="graphsContainer">
+                    <div class="col-12 text-center text-muted py-5">
+                        <i class="bi bi-graph-up fs-1 d-block mb-3"></i>
+                        <p>Select a device to view traffic graphs</p>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-4">
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-arrow-down-up text-primary me-2"></i>Total Bandwidth (In/Out)</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="totalBandwidthChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Interface Errors</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="errorsChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Interface Traffic Summary</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Interface</th>
+                                        <th>Avg In</th>
+                                        <th>Avg Out</th>
+                                        <th>Max In</th>
+                                        <th>Max Out</th>
+                                        <th>Errors</th>
+                                        <th>Graph</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trafficSummaryBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">Select a device to view traffic data</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -778,6 +869,272 @@
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatBits(bps) {
+            if (!bps || bps < 0) return '0 bps';
+            const k = 1000;
+            const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+            const i = Math.floor(Math.log(bps) / Math.log(k));
+            return parseFloat((bps / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        let bandwidthChart = null;
+        let errorsChart = null;
+        let interfaceCharts = {};
+
+        async function loadDeviceGraphs() {
+            const deviceId = document.getElementById('graphDeviceSelect').value;
+            const hours = document.getElementById('graphTimeRange').value;
+            
+            if (!deviceId) {
+                document.getElementById('graphsContainer').innerHTML = `
+                    <div class="col-12 text-center text-muted py-5">
+                        <i class="bi bi-graph-up fs-1 d-block mb-3"></i>
+                        <p>Select a device to view traffic graphs</p>
+                    </div>`;
+                return;
+            }
+
+            try {
+                const response = await fetch('/?page=devices', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'get_traffic_summary', device_id: deviceId, hours: hours})
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    renderTrafficSummary(data.data);
+                    renderBandwidthChart(data.data);
+                    renderErrorsChart(data.data);
+                }
+            } catch (err) {
+                console.error('Error loading graphs:', err);
+            }
+        }
+
+        function renderTrafficSummary(interfaces) {
+            const tbody = document.getElementById('trafficSummaryBody');
+            if (!interfaces.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No traffic data available. Poll the device to collect data.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = interfaces.map(i => `
+                <tr>
+                    <td><strong>${i.if_descr || 'Port ' + i.if_index}</strong></td>
+                    <td><span class="text-success">${formatBits(i.avg_in_rate)}</span></td>
+                    <td><span class="text-primary">${formatBits(i.avg_out_rate)}</span></td>
+                    <td><span class="text-success">${formatBits(i.max_in_rate)}</span></td>
+                    <td><span class="text-primary">${formatBits(i.max_out_rate)}</span></td>
+                    <td><span class="badge ${parseInt(i.total_in_errors) + parseInt(i.total_out_errors) > 0 ? 'bg-warning' : 'bg-secondary'}">
+                        ${parseInt(i.total_in_errors) + parseInt(i.total_out_errors)}
+                    </span></td>
+                    <td><button class="btn btn-sm btn-outline-info" onclick="showInterfaceGraph(${i.id}, '${i.if_descr}')">
+                        <i class="bi bi-graph-up"></i>
+                    </button></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderBandwidthChart(interfaces) {
+            const ctx = document.getElementById('totalBandwidthChart').getContext('2d');
+            
+            if (bandwidthChart) {
+                bandwidthChart.destroy();
+            }
+
+            const labels = interfaces.map(i => i.if_descr || 'Port ' + i.if_index).slice(0, 10);
+            const inData = interfaces.map(i => Math.round(i.avg_in_rate / 1000000)).slice(0, 10);
+            const outData = interfaces.map(i => Math.round(i.avg_out_rate / 1000000)).slice(0, 10);
+
+            bandwidthChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'In (Mbps)',
+                            data: inData,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Out (Mbps)',
+                            data: outData,
+                            backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                            borderColor: 'rgba(13, 110, 253, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Mbps' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderErrorsChart(interfaces) {
+            const ctx = document.getElementById('errorsChart').getContext('2d');
+            
+            if (errorsChart) {
+                errorsChart.destroy();
+            }
+
+            const labels = interfaces.map(i => i.if_descr || 'Port ' + i.if_index).slice(0, 10);
+            const inErrors = interfaces.map(i => parseInt(i.total_in_errors) || 0).slice(0, 10);
+            const outErrors = interfaces.map(i => parseInt(i.total_out_errors) || 0).slice(0, 10);
+
+            errorsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'In Errors',
+                            data: inErrors,
+                            backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                            borderColor: 'rgba(255, 193, 7, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Out Errors',
+                            data: outErrors,
+                            backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Error Count' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function showInterfaceGraph(interfaceId, name) {
+            const hours = document.getElementById('graphTimeRange').value;
+            
+            try {
+                const response = await fetch('/?page=devices', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'get_interface_history', interface_id: interfaceId, hours: hours})
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data.length) {
+                    showInterfaceModal(name, data.data);
+                } else {
+                    alert('No historical data available for this interface. Poll the device to collect data.');
+                }
+            } catch (err) {
+                console.error('Error loading interface history:', err);
+            }
+        }
+
+        function showInterfaceModal(name, history) {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-graph-up"></i> Traffic Graph: ${name}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <canvas id="interfaceDetailChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            modal.addEventListener('shown.bs.modal', () => {
+                const ctx = document.getElementById('interfaceDetailChart').getContext('2d');
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: history.map(h => new Date(h.recorded_at).toLocaleTimeString()),
+                        datasets: [
+                            {
+                                label: 'In (bps)',
+                                data: history.map(h => h.in_rate),
+                                borderColor: 'rgba(40, 167, 69, 1)',
+                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Out (bps)',
+                                data: history.map(h => h.out_rate),
+                                borderColor: 'rgba(13, 110, 253, 1)',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + formatBits(context.raw);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { display: true, title: { display: true, text: 'Time' } },
+                            y: {
+                                display: true,
+                                title: { display: true, text: 'Traffic (bps)' },
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) { return formatBits(value); }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+            
+            modal.addEventListener('hidden.bs.modal', () => {
+                modal.remove();
+            });
         }
     </script>
 </body>
