@@ -187,7 +187,7 @@ class DeviceMonitor {
             ':notes' => $data['notes'] ?? null
         ]);
         
-        return $stmt->fetch(\\PDO::FETCH_ASSOC)['id'];
+        return $stmt->fetch(\PDO::FETCH_ASSOC)['id'];
     }
     
     /**

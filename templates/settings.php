@@ -107,8 +107,8 @@ if ($action === 'edit_template' && $id) {
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link <?= $subpage === 'smartolt' ? 'active' : '' ?>" href="?page=settings&subpage=smartolt">
-            <i class="bi bi-router"></i> SmartOLT
+        <a class="nav-link <?= $subpage === 'devices' ? 'active' : '' ?>" href="?page=settings&subpage=devices">
+            <i class="bi bi-router"></i> Device Monitoring
         </a>
     </li>
 </ul>
@@ -4361,161 +4361,86 @@ document.querySelector('textarea[name="sms_template"]').dispatchEvent(new Event(
 
 <?php endif; ?>
 
-<?php elseif ($subpage === 'smartolt'): ?>
-
-<?php
-$smartolt = new \App\SmartOLT($db);
-$smartoltSettings = $smartolt->getSettings();
-$isConfigured = $smartolt->isConfigured();
-?>
+<?php elseif ($subpage === 'devices'): ?>
 
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-router"></i> SmartOLT API Configuration</h5>
+                <h5 class="mb-0"><i class="bi bi-router"></i> Device Monitoring Configuration</h5>
             </div>
             <div class="card-body">
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="action" value="save_smartolt_settings">
-                    
-                    <div class="mb-3">
-                        <label class="form-label">API URL</label>
-                        <input type="url" class="form-control" name="smartolt_api_url" 
-                               value="<?= htmlspecialchars($smartoltSettings['api_url'] ?? '') ?>"
-                               placeholder="https://yourcompany.smartolt.com">
-                        <div class="form-text">Enter your SmartOLT instance URL (e.g., https://yourcompany.smartolt.com)</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">API Key</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" name="smartolt_api_key" id="smartolt_api_key"
-                                   value="<?= htmlspecialchars($smartoltSettings['api_key'] ?? '') ?>"
-                                   placeholder="Enter your SmartOLT API key">
-                            <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('smartolt_api_key')">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                        <div class="form-text">Generate an API key from SmartOLT: Settings &rarr; API KEY</div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg"></i> Save Settings
-                        </button>
-                        <button type="submit" name="action" value="test_smartolt_connection" class="btn btn-outline-secondary">
-                            <i class="bi bi-wifi"></i> Test Connection
-                        </button>
-                    </div>
-                </form>
+                <p class="text-muted mb-4">Configure SNMP and Telnet settings for monitoring your network devices (OLTs, switches, routers).</p>
+                
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Devices are managed in the <strong>Network Devices</strong> page. Go there to add, edit, or monitor your OLTs and switches.
+                </div>
+                
+                <a href="?page=devices" class="btn btn-primary">
+                    <i class="bi bi-speedometer2 me-1"></i> Open Network Devices
+                </a>
             </div>
         </div>
         
         <div class="card mt-4 border-info">
             <div class="card-header bg-info text-white">
-                <i class="bi bi-info-circle"></i> How to Get Your API Key
+                <i class="bi bi-info-circle"></i> Supported Protocols
             </div>
             <div class="card-body">
-                <ol class="mb-0">
-                    <li>Log in to your SmartOLT dashboard</li>
-                    <li>Go to <strong>Settings &rarr; API KEY</strong> tab</li>
-                    <li>Generate a new API key or copy your existing one</li>
-                    <li>Configure allowed IP addresses:
-                        <ul>
-                            <li>Add your server's IP address for security</li>
-                            <li>Or use <code>0.0.0.0/0</code> to allow any IP (not recommended for production)</li>
-                        </ul>
-                    </li>
-                    <li>Paste the API key above and save</li>
-                </ol>
+                <ul class="mb-0">
+                    <li><strong>SNMP v1/v2c:</strong> Community-based authentication</li>
+                    <li><strong>SNMP v3:</strong> User-based security (USM) with authentication and encryption</li>
+                    <li><strong>Telnet:</strong> Direct command-line access to devices</li>
+                    <li><strong>SSH:</strong> Secure shell access (where supported)</li>
+                </ul>
             </div>
         </div>
     </div>
     
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-activity"></i> Connection Status</h5>
-                <?php if ($isConfigured): ?>
-                <span class="badge bg-success">Configured</span>
-                <?php else: ?>
-                <span class="badge bg-warning">Not Configured</span>
-                <?php endif; ?>
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Device Monitoring Features</h5>
             </div>
             <div class="card-body">
-                <?php if ($isConfigured): ?>
-                <div class="alert alert-success mb-3">
-                    <i class="bi bi-check-circle me-2"></i>
-                    SmartOLT integration is configured. Use the Test Connection button to verify.
-                </div>
-                
-                <p class="mb-3"><strong>Available Features:</strong></p>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-router me-2"></i> OLT Statistics</span>
-                        <span class="badge bg-success">Available</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-wifi me-2"></i> Online/Offline ONUs</span>
-                        <span class="badge bg-success">Available</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-question-circle me-2"></i> Unconfigured ONUs</span>
-                        <span class="badge bg-success">Available</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-x-circle me-2"></i> LOS Detection</span>
-                        <span class="badge bg-success">Available</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-exclamation-triangle me-2"></i> Critical Power Alerts</span>
-                        <span class="badge bg-success">Available</span>
-                    </li>
+                <p class="text-muted mb-3">The device monitoring system provides:</p>
+                <ul class="mb-0">
+                    <li><strong>Device Management:</strong> Add OLTs, switches, routers, and access points</li>
+                    <li><strong>SNMP Polling:</strong> Monitor device status, interfaces, and traffic</li>
+                    <li><strong>Interface Monitoring:</strong> View port status, traffic counters, and errors</li>
+                    <li><strong>ONU Tracking:</strong> Discover and manage ONUs per OLT</li>
+                    <li><strong>Telnet Console:</strong> Send commands directly to devices</li>
+                    <li><strong>Connection Testing:</strong> Test ping, SNMP, and Telnet connectivity</li>
+                    <li><strong>Activity Logging:</strong> Track all monitoring events and changes</li>
                 </ul>
-                
-                <div class="mt-4">
-                    <a href="?page=smartolt" class="btn btn-primary">
-                        <i class="bi bi-speedometer2 me-1"></i> Open SmartOLT Dashboard
-                    </a>
-                </div>
-                <?php else: ?>
-                <div class="alert alert-warning mb-0">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    Please configure your SmartOLT API credentials to enable ONU monitoring and management features.
-                </div>
-                <?php endif; ?>
             </div>
         </div>
         
         <div class="card mt-4">
             <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-list-check"></i> SmartOLT Features</h5>
+                <h5 class="mb-0"><i class="bi bi-hdd-network"></i> Supported Vendors</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-3">Once configured, the SmartOLT integration provides:</p>
-                <ul class="mb-0">
-                    <li><strong>Dashboard View:</strong> Real-time overview of all OLTs and ONUs</li>
-                    <li><strong>Configured ONUs:</strong> List of all provisioned ONUs with status</li>
-                    <li><strong>Unconfigured ONUs:</strong> New ONUs waiting for authorization</li>
-                    <li><strong>LOS Detection:</strong> ONUs experiencing Loss of Signal</li>
-                    <li><strong>Power Fail:</strong> ONUs with power failure status</li>
-                    <li><strong>Critical Power:</strong> ONUs with signal below -28 dBm</li>
-                    <li><strong>Low Power:</strong> ONUs with signal between -25 and -28 dBm</li>
-                    <li><strong>OLT Details:</strong> Hardware info, uptime, temperature, PON ports</li>
-                    <li><strong>ONU Actions:</strong> Reboot, resync config, enable/disable</li>
-                </ul>
+                <div class="row">
+                    <div class="col-6">
+                        <ul class="mb-0">
+                            <li>Huawei</li>
+                            <li>ZTE</li>
+                            <li>Cisco</li>
+                        </ul>
+                    </div>
+                    <div class="col-6">
+                        <ul class="mb-0">
+                            <li>Mikrotik</li>
+                            <li>Ubiquiti</li>
+                            <li>Nokia</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-function togglePassword(inputId) {
-    const input = document.getElementById(inputId);
-    input.type = input.type === 'password' ? 'text' : 'password';
-}
-</script>
 
 <?php endif; ?>
