@@ -382,9 +382,49 @@ try {
                     $device['username'],
                     $device['password']
                 );
-                $result = $hikDevice->addUser((string)$employeeNo, $name, $cardNo);
+                $startEnrollment = $input['start_enrollment'] ?? true;
+                $result = $hikDevice->addUserWithEnrollment((string)$employeeNo, $name, $cardNo, $startEnrollment);
             } else {
                 $result = ['success' => false, 'error' => 'User registration not supported for this device type'];
+            }
+            
+            jsonResponse($result, $result['success'] ? 200 : 400);
+            break;
+            
+        case 'start-enrollment':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeNo = $input['employee_no'] ?? null;
+            $enrollType = $input['type'] ?? 'face';
+            
+            if (!$deviceId || !$employeeNo) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $device['password']
+            );
+            
+            if ($enrollType === 'fingerprint') {
+                $result = $hikDevice->startFingerprintEnrollment((string)$employeeNo);
+            } else {
+                $result = $hikDevice->startFaceEnrollment((string)$employeeNo);
             }
             
             jsonResponse($result, $result['success'] ? 200 : 400);
@@ -436,9 +476,11 @@ try {
             $successCount = 0;
             $failCount = 0;
             
+            $startEnrollment = $input['start_enrollment'] ?? true;
+            
             foreach ($employees as $emp) {
                 $bioId = $emp['biometric_id'] ?: (string)$emp['id'];
-                $result = $hikDevice->addUser($bioId, $emp['name'], $emp['card_number']);
+                $result = $hikDevice->addUserWithEnrollment($bioId, $emp['name'], $emp['card_number'], $startEnrollment);
                 $results[] = [
                     'employee_id' => $emp['id'],
                     'name' => $emp['name'],

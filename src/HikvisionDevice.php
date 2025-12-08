@@ -309,6 +309,89 @@ XML;
         return [];
     }
     
+    public function startFaceEnrollment(string $employeeNo): array {
+        $captureData = [
+            'FaceCapture' => [
+                'employeeNo' => $employeeNo,
+                'faceLibType' => 'blackFD'
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FaceCapture/Start?format=json',
+            'PUT',
+            json_encode($captureData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'Face enrollment started on device. Employee should look at the camera.'];
+        }
+        
+        $error = 'Failed to start face enrollment';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
+        $fpData = [
+            'FingerPrintCfg' => [
+                'employeeNo' => $employeeNo,
+                'fingerPrintID' => $fingerNo,
+                'fingerType' => 'normalFP'
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/Capture?format=json',
+            'PUT',
+            json_encode($fpData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'Fingerprint enrollment started on device. Employee should place finger on scanner.'];
+        }
+        
+        $error = 'Failed to start fingerprint enrollment';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function addUserWithEnrollment(string $employeeNo, string $name, ?string $cardNo = null, bool $startEnrollment = true): array {
+        $addResult = $this->addUser($employeeNo, $name, $cardNo);
+        
+        if (!$addResult['success']) {
+            if (strpos($addResult['error'] ?? '', 'reEdit') !== false || strpos($addResult['error'] ?? '', 'exist') !== false) {
+                $addResult = $this->updateUser($employeeNo, $name, $cardNo);
+            }
+            
+            if (!$addResult['success']) {
+                return $addResult;
+            }
+        }
+        
+        if ($startEnrollment) {
+            $enrollResult = $this->startFaceEnrollment($employeeNo);
+            return [
+                'success' => true,
+                'message' => 'User registered. ' . ($enrollResult['success'] ? $enrollResult['message'] : 'Face enrollment not available.'),
+                'enrollment_started' => $enrollResult['success'],
+                'user_added' => true
+            ];
+        }
+        
+        return $addResult;
+    }
+    
     private function sendRequest(string $endpoint, string $method = 'GET', ?string $data = null, string $contentType = 'application/xml'): array {
         $url = "http://{$this->ip}:{$this->port}{$endpoint}";
         
