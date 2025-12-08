@@ -104,14 +104,26 @@ function logApiAccess(string $action, bool $authenticated): void {
     error_log("Biometric API Access: action={$action}, auth=" . ($authenticated ? 'yes' : 'no') . ", ip={$ip}");
 }
 
+function isSessionAuthenticated(): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    return !empty($_SESSION['user_id']) || !empty($_SESSION['user']);
+}
+
 $publicActions = ['health'];
+$sessionActions = ['fetch-device-users', 'sync-employees-to-device', 'register-user', 'delete-device-user', 'start-enrollment', 'link-device-user'];
 $requiresAuth = !in_array($action, $publicActions);
 
 if ($requiresAuth) {
-    $authResult = validateApiKey();
-    if (!$authResult['valid']) {
-        logApiAccess($action, false);
-        jsonResponse(['success' => false, 'error' => $authResult['error']], 401);
+    if (in_array($action, $sessionActions) && isSessionAuthenticated()) {
+        // Allow session-based auth for internal CRM actions
+    } else {
+        $authResult = validateApiKey();
+        if (!$authResult['valid']) {
+            logApiAccess($action, false);
+            jsonResponse(['success' => false, 'error' => $authResult['error']], 401);
+        }
     }
 }
 
