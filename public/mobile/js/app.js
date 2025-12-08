@@ -606,10 +606,22 @@ const app = {
     async showEquipment() {
         this.showScreen('equipment-screen');
         
-        const result = await this.api('assigned-equipment');
         const container = document.getElementById('equipment-list');
+        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>';
         
-        if (result.success && result.data.length > 0) {
+        const result = await this.api('assigned-equipment');
+        
+        if (!result.success) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    <p>${result.error || 'Failed to load equipment'}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        if (result.data && result.data.length > 0) {
             container.innerHTML = result.data.map(eq => `
                 <div class="list-item">
                     <h6 class="list-item-title">${eq.equipment_name}</h6>
@@ -627,7 +639,7 @@ const app = {
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="bi bi-box"></i>
-                    <p>No equipment assigned</p>
+                    <p>No equipment assigned to you</p>
                 </div>
             `;
         }
