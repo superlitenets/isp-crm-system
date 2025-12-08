@@ -495,12 +495,6 @@ const app = {
     },
     
     async showCloseTicketModal(ticketId) {
-        const response = await fetch('/mobile-api.php?action=available-equipment&ticket_id=' + ticketId, {
-            headers: { 'Authorization': 'Bearer ' + this.token }
-        });
-        const equipmentResult = await response.json();
-        const equipment = equipmentResult.success ? equipmentResult.data : [];
-        
         const modalHtml = `
             <div class="modal-overlay" id="close-ticket-modal">
                 <div class="modal-content">
@@ -514,25 +508,13 @@ const app = {
                             <input type="number" class="form-control" id="close-cable-meters" min="0" step="0.5" placeholder="e.g., 25">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Router/Equipment Used</label>
-                            <select class="form-select" id="close-equipment-id" onchange="app.updateEquipmentDetails(this)">
-                                <option value="">-- Select Equipment --</option>
-                                ${equipment.map(eq => `
-                                    <option value="${eq.id}" data-model="${eq.brand || ''} ${eq.model || ''}" data-serial="${eq.serial_number || ''}">
-                                        ${eq.name} - ${eq.serial_number || 'No S/N'}
-                                    </option>
-                                `).join('')}
-                            </select>
+                            <label class="form-label">Router/Equipment Name</label>
+                            <input type="text" class="form-control" id="close-router-model" placeholder="e.g., TP-Link Archer C6">
                         </div>
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Router Model</label>
-                                <input type="text" class="form-control" id="close-router-model" placeholder="Auto-filled or manual">
-                            </div>
-                            <div class="col-6 mb-3">
-                                <label class="form-label">Serial Number</label>
-                                <input type="text" class="form-control" id="close-router-serial" placeholder="Auto-filled or manual">
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Serial Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="close-router-serial" placeholder="Enter serial number" required>
+                            <div class="invalid-feedback">Serial number is required</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Resolution Notes</label>
@@ -552,26 +534,28 @@ const app = {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     },
     
-    updateEquipmentDetails(select) {
-        const option = select.options[select.selectedIndex];
-        if (option.value) {
-            document.getElementById('close-router-model').value = option.dataset.model || '';
-            document.getElementById('close-router-serial').value = option.dataset.serial || '';
-        }
-    },
-    
     hideCloseTicketModal() {
         const modal = document.getElementById('close-ticket-modal');
         if (modal) modal.remove();
     },
     
     async submitCloseTicket(ticketId) {
+        const serialInput = document.getElementById('close-router-serial');
+        const serialValue = serialInput.value.trim();
+        
+        if (!serialValue) {
+            serialInput.classList.add('is-invalid');
+            this.showToast('Serial number is required', 'warning');
+            serialInput.focus();
+            return;
+        }
+        serialInput.classList.remove('is-invalid');
+        
         const data = {
             ticket_id: ticketId,
             cable_meters: document.getElementById('close-cable-meters').value || null,
-            equipment_id: document.getElementById('close-equipment-id').value || null,
             router_model: document.getElementById('close-router-model').value || null,
-            router_serial: document.getElementById('close-router-serial').value || null,
+            router_serial: serialValue,
             comment: document.getElementById('close-comment').value || ''
         };
         
