@@ -30,8 +30,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3001/status"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
   php:
     build: .
@@ -40,8 +40,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      whatsapp:
-        condition: service_started
     environment:
       - PGHOST=db
       - PGPORT=5432
@@ -72,13 +70,20 @@ services:
     volumes:
       - ./logs:/var/www/html/logs
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   nginx:
     image: nginx:stable-alpine
     container_name: isp_crm_nginx
     restart: unless-stopped
     depends_on:
-      - php
+      php:
+        condition: service_healthy
     ports:
       - "80:80"
     volumes:
