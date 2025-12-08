@@ -60,15 +60,26 @@ class SMS {
     }
 
     public function notifyCustomer(string $phone, string $ticketNumber, string $status, string $message = ''): array {
-        $text = "ISP Support - Ticket #$ticketNumber\nStatus: $status";
-        if ($message) {
-            $text .= "\n$message";
-        }
+        $settings = new Settings();
+        $template = $settings->get('sms_template_ticket_updated', 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}');
+        $text = str_replace(['{ticket_number}', '{status}', '{message}'], [$ticketNumber, $status, $message], $template);
         return $this->send($phone, $text);
     }
 
-    public function notifyTechnician(string $phone, string $ticketNumber, string $customerName, string $subject): array {
-        $text = "New Ticket Assigned - #$ticketNumber\nCustomer: $customerName\nSubject: $subject";
+    public function notifyTechnician(string $phone, string $ticketNumber, string $customerName, string $subject, array $extra = []): array {
+        $settings = new Settings();
+        $template = $settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}');
+        $placeholders = array_merge([
+            '{ticket_number}' => $ticketNumber,
+            '{customer_name}' => $customerName,
+            '{subject}' => $subject,
+            '{customer_phone}' => $extra['customer_phone'] ?? '',
+            '{customer_address}' => $extra['customer_address'] ?? '',
+            '{priority}' => $extra['priority'] ?? 'Medium',
+            '{category}' => $extra['category'] ?? '',
+            '{technician_name}' => $extra['technician_name'] ?? ''
+        ], $extra);
+        $text = str_replace(array_keys($placeholders), array_values($placeholders), $template);
         return $this->send($phone, $text);
     }
 

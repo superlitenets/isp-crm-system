@@ -642,12 +642,17 @@ class Ticket {
 
         foreach ($members as $member) {
             if ($member['phone'] && $customer) {
-                $result = $this->sms->notifyTechnician(
-                    $member['phone'],
-                    $ticket['ticket_number'],
-                    $customer['name'],
-                    $ticket['subject']
-                );
+                $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', [
+                    '{ticket_number}' => $ticket['ticket_number'],
+                    '{customer_name}' => $customer['name'] ?? 'Customer',
+                    '{customer_phone}' => $customer['phone'] ?? '',
+                    '{customer_address}' => $customer['address'] ?? '',
+                    '{subject}' => $ticket['subject'] ?? '',
+                    '{category}' => $ticket['category'] ?? '',
+                    '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
+                    '{technician_name}' => $member['user_name'] ?? $member['name'] ?? 'Team Member'
+                ]);
+                $result = $this->sms->send($member['phone'], $message);
                 $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
             }
         }
