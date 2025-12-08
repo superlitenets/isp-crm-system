@@ -85,17 +85,21 @@
             </div>
 
             <nav class="bottom-nav">
-                <a href="#" class="nav-item active" onclick="app.loadSalespersonDashboard()">
+                <a href="#" class="nav-item active" onclick="app.loadSalespersonDashboard(); app.setActiveNav(this);">
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showNewOrder()">
+                <a href="#" class="nav-item" onclick="app.showNewOrder(); app.setActiveNav(this);">
                     <i class="bi bi-plus-circle"></i>
                     <span>Add Order</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showPerformance()">
+                <a href="#" class="nav-item" onclick="app.showPerformance(); app.setActiveNav(this);">
                     <i class="bi bi-bar-chart"></i>
                     <span>Stats</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showProfile(); app.setActiveNav(this);" style="position: relative;">
+                    <i class="bi bi-person-circle"></i>
+                    <span>Profile</span>
                 </a>
             </nav>
         </div>
@@ -163,17 +167,21 @@
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
+                <a href="#" class="nav-item" onclick="app.showCustomerSearch(); app.setActiveNav(this);">
+                    <i class="bi bi-search"></i>
+                    <span>Customers</span>
+                </a>
                 <a href="#" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this);">
                     <i class="bi bi-inbox"></i>
                     <span>Available</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showTechEquipment(); app.setActiveNav(this);">
-                    <i class="bi bi-box-seam"></i>
-                    <span>Equipment</span>
-                </a>
                 <a href="#" class="nav-item" onclick="app.showTechPerformance(); app.setActiveNav(this);">
                     <i class="bi bi-bar-chart"></i>
                     <span>Stats</span>
+                </a>
+                <a href="#" class="nav-item" onclick="app.showProfile(); app.setActiveNav(this);">
+                    <i class="bi bi-person-circle"></i>
+                    <span>Profile</span>
                 </a>
             </nav>
         </div>
@@ -355,6 +363,76 @@
                 </form>
             </div>
         </div>
+
+        <div id="profile-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Profile</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="profile-content"></div>
+            </div>
+        </div>
+
+        <div id="notifications-screen" class="screen">
+            <nav class="navbar navbar-dark bg-primary fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Notifications</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.markAllNotificationsRead()">
+                        <i class="bi bi-check-all"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="notifications-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="customer-search-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Search Customer</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div class="search-box">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" class="form-control" id="customer-search-input" placeholder="Search by name, phone, or address...">
+                </div>
+                <div id="customer-results-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="customer-detail-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Customer Details</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="customer-detail-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ptr-indicator" class="ptr-indicator">
+        <div class="spinner-border text-primary" role="status"></div>
     </div>
 
     <div id="loading-overlay" class="d-none">
