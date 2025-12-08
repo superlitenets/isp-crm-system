@@ -325,7 +325,7 @@ $allRoles = $roleManager->getAllRoles();
                 $bioDevices = [];
                 try {
                     $bioDb = Database::getConnection();
-                    $bioDevices = $bioDb->query("SELECT id, name, type FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+                    $bioDevices = $bioDb->query("SELECT id, name, device_type FROM biometric_devices WHERE is_active = true AND device_type = 'hikvision'")->fetchAll();
                 } catch (\Exception $e) {
                     // Table may not exist
                 }
@@ -336,7 +336,7 @@ $allRoles = $roleManager->getAllRoles();
                     <label class="form-label">Select Device:</label>
                     <select id="biometricDeviceSelect" class="form-select">
                         <?php foreach ($bioDevices as $dev): ?>
-                        <option value="<?= $dev['id'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['type']) ?>)</option>
+                        <option value="<?= $dev['id'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['device_type']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -486,7 +486,7 @@ function removeFromBiometric(employeeId) {
         $hikDevices = [];
         try {
             $bioDb = Database::getConnection();
-            $hikDevices = $bioDb->query("SELECT id, name FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+            $hikDevices = $bioDb->query("SELECT id, name FROM biometric_devices WHERE is_active = true AND device_type = 'hikvision'")->fetchAll();
         } catch (\Exception $e) {
             // Table may not exist
         }

@@ -373,14 +373,14 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
-            if ($device['type'] === 'hikvision') {
+            if ($device['device_type'] === 'hikvision') {
                 require_once __DIR__ . '/../src/HikvisionDevice.php';
                 $hikDevice = new \App\HikvisionDevice(
                     $device['id'],
                     $device['ip_address'],
                     $device['port'] ?: 80,
                     $device['username'],
-                    $device['password']
+                    $device['password_encrypted']
                 );
                 $startEnrollment = $input['start_enrollment'] ?? true;
                 $result = $hikDevice->addUserWithEnrollment((string)$employeeNo, $name, $cardNo, $startEnrollment);
@@ -408,7 +408,7 @@ try {
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['type'] !== 'hikvision') {
+            if (!$device || $device['device_type'] !== 'hikvision') {
                 jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
             }
             
@@ -418,7 +418,7 @@ try {
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password']
+                $device['password_encrypted']
             );
             
             if ($enrollType === 'fingerprint') {
@@ -450,7 +450,7 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
-            if ($device['type'] !== 'hikvision') {
+            if ($device['device_type'] !== 'hikvision') {
                 jsonResponse(['success' => false, 'error' => 'Employee sync only supported for Hikvision devices'], 400);
             }
             
@@ -460,7 +460,7 @@ try {
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password']
+                $device['password_encrypted']
             );
             
             if (empty($employeeIds)) {
@@ -524,7 +524,7 @@ try {
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['type'] !== 'hikvision') {
+            if (!$device || $device['device_type'] !== 'hikvision') {
                 jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
             }
             
@@ -534,7 +534,7 @@ try {
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password']
+                $device['password_encrypted']
             );
             $result = $hikDevice->deleteUser((string)$employeeNo);
             jsonResponse($result, $result['success'] ? 200 : 400);
