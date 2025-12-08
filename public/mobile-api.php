@@ -262,6 +262,11 @@ try {
             $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
             $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
             
+            if ($latitude === null || $longitude === null) {
+                echo json_encode(['success' => false, 'error' => 'Location coordinates are required to clock in']);
+                break;
+            }
+            
             $result = $api->clockIn($employee['id'], $latitude, $longitude);
             echo json_encode($result);
             break;
@@ -276,6 +281,11 @@ try {
             
             $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
             $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
+            
+            if ($latitude === null || $longitude === null) {
+                echo json_encode(['success' => false, 'error' => 'Location coordinates are required to clock out']);
+                break;
+            }
             
             $result = $api->clockOut($employee['id'], $latitude, $longitude);
             echo json_encode($result);

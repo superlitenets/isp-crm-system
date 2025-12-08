@@ -341,8 +341,9 @@ const app = {
         this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
         
-        if (location.error) {
-            this.showToast('Warning: ' + location.error + '. Clocking in without location.', 'warning');
+        if (location.error || !location.latitude || !location.longitude) {
+            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
+            return;
         }
         
         const result = await this.api('clock-in', 'POST', {
@@ -351,11 +352,7 @@ const app = {
         });
         
         if (result.success) {
-            let msg = result.message;
-            if (result.location_captured) {
-                msg += ' (Location captured)';
-            }
-            this.showToast(msg, 'success');
+            this.showToast(result.message, 'success');
             this.loadAttendanceStatus();
         } else {
             this.showToast(result.message || result.error, 'warning');
@@ -366,8 +363,9 @@ const app = {
         this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
         
-        if (location.error) {
-            this.showToast('Warning: ' + location.error + '. Clocking out without location.', 'warning');
+        if (location.error || !location.latitude || !location.longitude) {
+            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
+            return;
         }
         
         const result = await this.api('clock-out', 'POST', {
@@ -376,11 +374,7 @@ const app = {
         });
         
         if (result.success) {
-            let msg = result.message;
-            if (result.location_captured) {
-                msg += ' (Location captured)';
-            }
-            this.showToast(msg, 'success');
+            this.showToast(result.message, 'success');
             this.loadAttendanceStatus();
         } else {
             this.showToast(result.message || result.error, 'warning');
