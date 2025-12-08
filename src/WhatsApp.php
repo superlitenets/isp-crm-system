@@ -110,19 +110,29 @@ class WhatsApp {
         
         $phone = preg_replace('/[^0-9]/', '', $phone);
         
+        if (empty($phone)) {
+            return '';
+        }
+        
         if (str_starts_with($phone, '0')) {
             $phone = $this->defaultCountryCode . substr($phone, 1);
         }
         
-        if (strlen($phone) === 9 && $this->defaultCountryCode === '254') {
-            $phone = '254' . $phone;
+        if (strlen($phone) === 9 && preg_match('/^[1-9]/', $phone)) {
+            $phone = $this->defaultCountryCode . $phone;
+        }
+        
+        if (strlen($phone) === 10 && !str_starts_with($phone, $this->defaultCountryCode)) {
+            if (preg_match('/^[1-9]/', $phone)) {
+                $phone = $this->defaultCountryCode . $phone;
+            }
         }
         
         if (strlen($phone) < 10) {
             $phone = $this->defaultCountryCode . $phone;
         }
         
-        if (!str_starts_with($phone, $this->defaultCountryCode) && strlen($phone) === 10 && str_starts_with($phone, '7')) {
+        if (!str_starts_with($phone, $this->defaultCountryCode) && strlen($phone) >= 9 && strlen($phone) <= 10) {
             $phone = $this->defaultCountryCode . $phone;
         }
         

@@ -105,6 +105,44 @@ class SMSGateway {
         return $this->provider;
     }
 
+    public function formatPhone(string $phone, string $countryCode = '254'): string {
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        
+        if (str_starts_with($phone, '+')) {
+            $phone = substr($phone, 1);
+        }
+        
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        
+        if (empty($phone)) {
+            return '';
+        }
+        
+        if (str_starts_with($phone, '0')) {
+            $phone = $countryCode . substr($phone, 1);
+        }
+        
+        if (strlen($phone) === 9 && preg_match('/^[1-9]/', $phone)) {
+            $phone = $countryCode . $phone;
+        }
+        
+        if (strlen($phone) === 10 && !str_starts_with($phone, $countryCode)) {
+            if (preg_match('/^[1-9]/', $phone)) {
+                $phone = $countryCode . $phone;
+            }
+        }
+        
+        if (strlen($phone) < 10) {
+            $phone = $countryCode . $phone;
+        }
+        
+        if (!str_starts_with($phone, $countryCode) && strlen($phone) >= 9 && strlen($phone) <= 10) {
+            $phone = $countryCode . $phone;
+        }
+        
+        return $phone;
+    }
+
     public function send(string $to, string $message): array {
         if (!$this->enabled) {
             return [
@@ -119,20 +157,14 @@ class SMSGateway {
             $url = $this->apiUrl;
             $headers = [];
 
+            $formattedPhone = $this->formatPhone($to);
+            
             if ($this->provider === 'advanta') {
-                // Format phone for Advanta (Kenya): 0701234567 -> 254701234567
-                $mobile = preg_replace('/[^0-9]/', '', $to);
-                if (substr($mobile, 0, 1) === '0') {
-                    $mobile = '254' . substr($mobile, 1);
-                } elseif (substr($mobile, 0, 3) !== '254') {
-                    $mobile = '254' . $mobile;
-                }
-                
                 $data = [
                     'apikey' => $this->apiKey,
                     'partnerID' => $this->partnerId,
                     'shortcode' => $this->senderId,
-                    'mobile' => $mobile,
+                    'mobile' => $formattedPhone,
                     'message' => $message
                 ];
                 $headers[] = 'Content-Type: application/json';
@@ -140,7 +172,7 @@ class SMSGateway {
                 curl_setopt($ch, CURLOPT_POST, true);
             } elseif (strpos($this->apiUrl, 'twilio.com') !== false) {
                 $data = [
-                    $this->phoneParam => $to,
+                    $this->phoneParam => '+' . $formattedPhone,
                     $this->messageParam => $message,
                     $this->senderParam => $this->senderId
                 ];
@@ -149,7 +181,7 @@ class SMSGateway {
                 curl_setopt($ch, CURLOPT_POST, true);
             } else {
                 $data = [
-                    $this->phoneParam => $to,
+                    $this->phoneParam => $formattedPhone,
                     $this->messageParam => $message,
                     $this->senderParam => $this->senderId
                 ];
