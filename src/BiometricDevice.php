@@ -85,17 +85,13 @@ abstract class BiometricDevice {
     public static function decryptPassword(string $encrypted): string {
         if (empty($encrypted)) return '';
         
-        // Try base64 decode first
-        $data = base64_decode($encrypted, true);
-        
-        // If decode fails or data is too short for encrypted format (IV + data), treat as plain text
-        if ($data === false || strlen($data) < 17) {
-            return $encrypted; // Return as-is (plain text)
-        }
-        
-        // Try to decrypt
         $secret = getenv('SESSION_SECRET') ?: 'default_encryption_key_change_me';
         $key = hash('sha256', $secret, true);
+        
+        $data = base64_decode($encrypted);
+        if ($data === false || strlen($data) < 17) {
+            return '';
+        }
         
         $iv = substr($data, 0, 16);
         $encryptedData = substr($data, 16);
@@ -103,9 +99,8 @@ abstract class BiometricDevice {
         $decrypted = openssl_decrypt($encryptedData, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
         
         if ($decrypted === false) {
-            // Decryption failed - likely plain text that happened to be valid base64
-            error_log('Decryption failed, treating as plain text password');
-            return $encrypted;
+            error_log('OpenSSL decrypt failed: ' . openssl_error_string());
+            return '';
         }
         
         return $decrypted;
