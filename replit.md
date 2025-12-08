@@ -40,6 +40,13 @@ The system features a clean, responsive design. The public-facing landing page i
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning capabilities.
 - **Reporting & Activity Logs**: Comprehensive reports for tickets, orders, complaints, and user performance, with detailed activity logging for key system actions.
 - **Ticket Commission System**: Auto-calculates employee earnings when tickets are resolved/closed. Supports configurable rates per ticket category, individual assignment, and team-based split (equal share among active members). Integrates with payroll processing.
+- **Ticket Enhancements (Dec 2025)**: Comprehensive improvements including:
+  - Timeline/activity history showing chronological ticket events (comments, status changes, SLA logs, escalations)
+  - Quick status change buttons with automatic commission calculation
+  - Customer satisfaction rating system (5-star with feedback) after ticket closure
+  - Statistics dashboard cards (open, in-progress, resolved, SLA breached, escalated, avg satisfaction)
+  - Ticket escalation feature with reason, reassignment, priority change, and notifications
+  - Advanced filters for escalated tickets and SLA breached tickets
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
