@@ -400,6 +400,43 @@ function initializeDatabase(): void {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS ticket_commission_rates (
+        id SERIAL PRIMARY KEY,
+        category VARCHAR(50) NOT NULL UNIQUE,
+        rate DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'KES',
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_earnings (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+        category VARCHAR(50) NOT NULL,
+        full_rate DECIMAL(12, 2) NOT NULL,
+        earned_amount DECIMAL(12, 2) NOT NULL,
+        share_count INTEGER DEFAULT 1,
+        currency VARCHAR(10) DEFAULT 'KES',
+        status VARCHAR(20) DEFAULT 'pending',
+        payroll_id INTEGER REFERENCES payroll(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS payroll_commissions (
+        id SERIAL PRIMARY KEY,
+        payroll_id INTEGER REFERENCES payroll(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        commission_type VARCHAR(50) NOT NULL DEFAULT 'ticket',
+        description TEXT,
+        amount DECIMAL(12, 2) NOT NULL,
+        details JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_minutes INTEGER DEFAULT 0;
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'manual';
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS biometric_log_id INTEGER;
@@ -977,6 +1014,43 @@ function runMigrations(PDO $db): void {
                 metric_name VARCHAR(100),
                 metric_value TEXT,
                 recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'ticket_commission_rates' => "
+            CREATE TABLE IF NOT EXISTS ticket_commission_rates (
+                id SERIAL PRIMARY KEY,
+                category VARCHAR(50) NOT NULL UNIQUE,
+                rate DECIMAL(12, 2) NOT NULL DEFAULT 0,
+                currency VARCHAR(10) DEFAULT 'KES',
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'ticket_earnings' => "
+            CREATE TABLE IF NOT EXISTS ticket_earnings (
+                id SERIAL PRIMARY KEY,
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+                category VARCHAR(50) NOT NULL,
+                full_rate DECIMAL(12, 2) NOT NULL,
+                earned_amount DECIMAL(12, 2) NOT NULL,
+                share_count INTEGER DEFAULT 1,
+                currency VARCHAR(10) DEFAULT 'KES',
+                status VARCHAR(20) DEFAULT 'pending',
+                payroll_id INTEGER REFERENCES payroll(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'payroll_commissions' => "
+            CREATE TABLE IF NOT EXISTS payroll_commissions (
+                id SERIAL PRIMARY KEY,
+                payroll_id INTEGER REFERENCES payroll(id) ON DELETE CASCADE,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                commission_type VARCHAR(50) NOT NULL DEFAULT 'ticket',
+                description TEXT,
+                amount DECIMAL(12, 2) NOT NULL,
+                details JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

@@ -1141,13 +1141,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'create_payroll':
                 try {
                     $payrollId = $employee->createPayroll($_POST);
+                    $additions = [];
                     
-                    if ($payrollId && !empty($_POST['include_late_deductions']) && !empty($_POST['employee_id']) && !empty($_POST['pay_period_start'])) {
+                    if ($payrollId && !empty($_POST['employee_id']) && !empty($_POST['pay_period_start'])) {
                         $payrollDb = Database::getConnection();
-                        $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
                         $payPeriodMonth = date('Y-m', strtotime($_POST['pay_period_start']));
-                        $lateCalculator->applyDeductionsToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
-                        $message = 'Payroll record created with late deductions applied!';
+                        
+                        if (!empty($_POST['include_late_deductions'])) {
+                            $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
+                            $lateCalculator->applyDeductionsToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
+                            $additions[] = 'late deductions';
+                        }
+                        
+                        if (!empty($_POST['include_ticket_commissions'])) {
+                            $ticketCommission = new \App\TicketCommission($payrollDb);
+                            $ticketCommission->applyToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
+                            $additions[] = 'ticket commissions';
+                        }
+                    }
+                    
+                    if (!empty($additions)) {
+                        $message = 'Payroll record created with ' . implode(' and ', $additions) . ' applied!';
                     } else {
                         $message = 'Payroll record created successfully!';
                     }
@@ -2030,6 +2044,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error saving commission settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'seed_commission_rates':
+                try {
+                    $ticketCommission = new \App\TicketCommission($db);
+                    $ticketCommission->seedDefaultRates();
+                    $message = 'Default commission rates loaded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error loading default rates: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_commission_rate':
+                try {
+                    $ticketCommission = new \App\TicketCommission($db);
+                    $ticketCommission->addRate([
+                        'category' => $_POST['category'],
+                        'rate' => (float)$_POST['rate'],
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'description' => $_POST['description'] ?? null,
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Commission rate added successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error adding commission rate: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_commission_rate':
+                try {
+                    $ticketCommission = new \App\TicketCommission($db);
+                    $ticketCommission->updateRate((int)$_POST['rate_id'], [
+                        'category' => $_POST['category'],
+                        'rate' => (float)$_POST['rate'],
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'description' => $_POST['description'] ?? null,
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Commission rate updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating commission rate: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_commission_rate':
+                try {
+                    $ticketCommission = new \App\TicketCommission($db);
+                    $ticketCommission->deleteRate((int)$_POST['rate_id']);
+                    $message = 'Commission rate deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting commission rate: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

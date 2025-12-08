@@ -83,7 +83,12 @@ if ($action === 'edit_template' && $id) {
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'sales' ? 'active' : '' ?>" href="?page=settings&subpage=sales">
-            <i class="bi bi-graph-up-arrow"></i> Commissions
+            <i class="bi bi-graph-up-arrow"></i> Sales Commissions
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'ticket_commissions' ? 'active' : '' ?>" href="?page=settings&subpage=ticket_commissions">
+            <i class="bi bi-ticket-perforated"></i> Ticket Commissions
         </a>
     </li>
     <li class="nav-item">
@@ -4788,6 +4793,192 @@ document.querySelector('textarea[name="sms_template"]').dispatchEvent(new Event(
             </div>
         </div>
     </div>
+</div>
+
+<?php elseif ($subpage === 'ticket_commissions'): ?>
+
+<?php
+$ticketCommission = new \App\TicketCommission($db);
+$commissionRates = $ticketCommission->getCommissionRates();
+$editRate = null;
+if ($action === 'edit_rate' && $id) {
+    $editRate = array_filter($commissionRates, fn($r) => $r['id'] == $id);
+    $editRate = reset($editRate) ?: null;
+}
+
+$ticketModel = new \App\Ticket($db);
+$categories = $ticketModel->getCategories();
+?>
+
+<div class="row g-4">
+    <div class="col-md-<?= ($action === 'add_rate' || $editRate) ? '7' : '12' ?>">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-ticket-perforated text-success"></i> Ticket Commission Rates</h5>
+                <div>
+                    <?php if (empty($commissionRates)): ?>
+                    <form method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                        <input type="hidden" name="action" value="seed_commission_rates">
+                        <button type="submit" class="btn btn-sm btn-outline-success me-2">
+                            <i class="bi bi-magic"></i> Load Defaults
+                        </button>
+                    </form>
+                    <?php endif; ?>
+                    <a href="?page=settings&subpage=ticket_commissions&action=add_rate" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg"></i> Add Rate
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Configure commission rates for each ticket category. When a ticket is closed, the assigned employee earns the configured amount. For team assignments, the commission is split equally among team members.
+                </p>
+                
+                <?php if (empty($commissionRates)): ?>
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-ticket-perforated fs-1"></i>
+                    <p class="mb-0">No commission rates configured</p>
+                    <p class="small">Add rates to enable ticket-based earnings for employees</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Category</th>
+                                <th>Rate</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($commissionRates as $rate): ?>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-primary"><?= htmlspecialchars(ucfirst($rate['category'])) ?></span>
+                                </td>
+                                <td>
+                                    <strong><?= $rate['currency'] ?> <?= number_format($rate['rate'], 2) ?></strong>
+                                </td>
+                                <td class="text-muted small"><?= htmlspecialchars($rate['description'] ?? '-') ?></td>
+                                <td>
+                                    <?php if ($rate['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=ticket_commissions&action=edit_rate&id=<?= $rate['id'] ?>" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this rate?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_commission_rate">
+                                        <input type="hidden" name="rate_id" value="<?= $rate['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-info-circle"></i> How Ticket Commissions Work
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Individual Assignment:</strong> When a ticket is closed and assigned to a single technician, they receive the full commission amount.</li>
+                    <li><strong>Team Assignment:</strong> When a ticket is assigned to a team, the commission is split equally among all active team members.</li>
+                    <li><strong>Payroll Integration:</strong> Pending commissions are automatically added to payroll when processing monthly salaries.</li>
+                    <li><strong>Mobile App:</strong> Employees can view their earnings and team earnings through the mobile app.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <?php if ($action === 'add_rate' || $editRate): ?>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-<?= $editRate ? 'pencil' : 'plus-lg' ?>"></i>
+                    <?= $editRate ? 'Edit' : 'Add' ?> Commission Rate
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editRate ? 'update_commission_rate' : 'add_commission_rate' ?>">
+                    <?php if ($editRate): ?>
+                    <input type="hidden" name="rate_id" value="<?= $editRate['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Category <span class="text-danger">*</span></label>
+                        <select class="form-select" name="category" required <?= $editRate ? 'disabled' : '' ?>>
+                            <option value="">Select Category</option>
+                            <?php foreach ($categories as $key => $label): ?>
+                            <option value="<?= $key ?>" <?= ($editRate && $editRate['category'] === $key) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($label) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($editRate): ?>
+                        <input type="hidden" name="category" value="<?= $editRate['category'] ?>">
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-8">
+                            <label class="form-label">Rate Amount <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" class="form-control" name="rate" 
+                                   value="<?= $editRate['rate'] ?? '' ?>" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Currency</label>
+                            <select class="form-select" name="currency">
+                                <option value="KES" <?= ($editRate && $editRate['currency'] === 'KES') ? 'selected' : '' ?>>KES</option>
+                                <option value="USD" <?= ($editRate && $editRate['currency'] === 'USD') ? 'selected' : '' ?>>USD</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"><?= htmlspecialchars($editRate['description'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
+                                   <?= (!$editRate || $editRate['is_active']) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="is_active">Active</label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editRate ? 'Update' : 'Add' ?> Rate
+                        </button>
+                        <a href="?page=settings&subpage=ticket_commissions" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php endif; ?>

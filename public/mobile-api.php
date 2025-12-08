@@ -524,6 +524,67 @@ try {
             echo json_encode(['success' => true, 'data' => $equipment]);
             break;
             
+        case 'my-teams':
+            requireAuth();
+            $teams = $api->getEmployeeTeams($user['id']);
+            echo json_encode(['success' => true, 'data' => $teams]);
+            break;
+            
+        case 'team-details':
+            requireAuth();
+            $teamId = (int) ($_GET['team_id'] ?? 0);
+            if (!$teamId) {
+                echo json_encode(['success' => false, 'error' => 'Team ID required']);
+                break;
+            }
+            $team = $api->getTeamDetails($teamId, $user['id']);
+            if ($team) {
+                echo json_encode(['success' => true, 'data' => $team]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Team not found or not a member']);
+            }
+            break;
+            
+        case 'team-tickets':
+            requireAuth();
+            $teamId = (int) ($_GET['team_id'] ?? 0);
+            if (!$teamId) {
+                echo json_encode(['success' => false, 'error' => 'Team ID required']);
+                break;
+            }
+            $status = $_GET['status'] ?? '';
+            $limit = (int) ($_GET['limit'] ?? 50);
+            $tickets = $api->getTeamTickets($teamId, $user['id'], $status, $limit);
+            echo json_encode(['success' => true, 'data' => $tickets]);
+            break;
+            
+        case 'my-earnings':
+            requireAuth();
+            $month = $_GET['month'] ?? date('Y-m');
+            $data = $api->getEmployeeEarnings($user['id'], $month);
+            if (isset($data['error'])) {
+                echo json_encode(['success' => false, 'error' => $data['error']]);
+            } else {
+                echo json_encode(['success' => true, 'data' => $data]);
+            }
+            break;
+            
+        case 'team-earnings':
+            requireAuth();
+            $teamId = (int) ($_GET['team_id'] ?? 0);
+            if (!$teamId) {
+                echo json_encode(['success' => false, 'error' => 'Team ID required']);
+                break;
+            }
+            $month = $_GET['month'] ?? date('Y-m');
+            $data = $api->getTeamEarnings($teamId, $user['id'], $month);
+            if (isset($data['error'])) {
+                echo json_encode(['success' => false, 'error' => $data['error']]);
+            } else {
+                echo json_encode(['success' => true, 'data' => $data]);
+            }
+            break;
+            
         default:
             echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }

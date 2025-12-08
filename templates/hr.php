@@ -740,6 +740,11 @@ function syncAllEmployeesToDevice(deviceId) {
             <i class="bi bi-people-fill"></i> Teams
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'commissions' ? 'active' : '' ?>" href="?page=hr&subpage=commissions">
+            <i class="bi bi-ticket-perforated"></i> Commissions
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'departments'): ?>
@@ -1111,6 +1116,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 <input class="form-check-input" type="checkbox" name="include_late_deductions" id="includeLateDeductions" value="1" checked>
                                 <label class="form-check-label" for="includeLateDeductions">
                                     <i class="bi bi-alarm text-warning"></i> Include late arrival deductions automatically
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_ticket_commissions" id="includeTicketCommissions" value="1" checked>
+                                <label class="form-check-label" for="includeTicketCommissions">
+                                    <i class="bi bi-ticket-perforated text-success"></i> Include ticket commissions automatically
                                 </label>
                             </div>
                             <div id="lateDeductionPreview" class="alert alert-info mt-2 d-none">
@@ -2131,6 +2142,204 @@ function resetTeamForm() {
     document.querySelector('#teamModal form').reset();
 }
 </script>
+
+<?php elseif ($subpage === 'commissions'): ?>
+
+<?php
+$ticketCommission = new \App\TicketCommission($db);
+$selectedMonth = $_GET['month'] ?? date('Y-m');
+$selectedEmployeeId = isset($_GET['employee_id']) ? (int)$_GET['employee_id'] : null;
+
+$currentUser = \App\Auth::getUser();
+$currentEmployee = $employee->getByUserId($currentUser['id']);
+$isAdminOrManager = in_array($currentUser['role'], ['admin', 'manager']);
+
+if (!$isAdminOrManager && $currentEmployee) {
+    $selectedEmployeeId = $currentEmployee['id'];
+}
+
+$allEmployeesList = $isAdminOrManager ? $employee->getAll() : [];
+$earningsData = [];
+$summaryData = null;
+
+if ($selectedEmployeeId) {
+    $earningsData = $ticketCommission->getEmployeeEarnings($selectedEmployeeId, $selectedMonth);
+    $summaryData = $ticketCommission->getEmployeeEarningsSummary($selectedEmployeeId, $selectedMonth);
+}
+?>
+
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-ticket-perforated text-success"></i> Ticket Commissions</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="row g-3 mb-4">
+                    <input type="hidden" name="page" value="hr">
+                    <input type="hidden" name="subpage" value="commissions">
+                    <?php if ($isAdminOrManager): ?>
+                    <div class="col-md-4">
+                        <label class="form-label">Employee</label>
+                        <select class="form-select" name="employee_id">
+                            <option value="">Select Employee</option>
+                            <?php foreach ($allEmployeesList as $emp): ?>
+                            <option value="<?= $emp['id'] ?>" <?= $selectedEmployeeId == $emp['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($emp['name']) ?> (<?= htmlspecialchars($emp['position']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div class="col-md-3">
+                        <label class="form-label">Month</label>
+                        <input type="month" class="form-control" name="month" value="<?= htmlspecialchars($selectedMonth) ?>">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i> View
+                        </button>
+                    </div>
+                </form>
+                
+                <?php if ($summaryData): ?>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-success bg-opacity-10">
+                            <div class="card-body text-center">
+                                <h4 class="text-success mb-0"><?= $summaryData['currency'] ?? 'KES' ?> <?= number_format($summaryData['total_earnings'] ?? 0, 2) ?></h4>
+                                <small class="text-muted">Total Earnings</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-primary bg-opacity-10">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary mb-0"><?= $summaryData['total_tickets'] ?? 0 ?></h4>
+                                <small class="text-muted">Tickets Completed</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info bg-opacity-10">
+                            <div class="card-body text-center">
+                                <h4 class="text-info mb-0"><?= $summaryData['pending'] ?? 0 ?></h4>
+                                <small class="text-muted">Pending Payment</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning bg-opacity-10">
+                            <div class="card-body text-center">
+                                <h4 class="text-warning mb-0"><?= $summaryData['paid'] ?? 0 ?></h4>
+                                <small class="text-muted">Paid</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($earningsData)): ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Ticket #</th>
+                                <th>Category</th>
+                                <th>Customer</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($earningsData as $earning): ?>
+                            <tr>
+                                <td><?= date('M d, Y', strtotime($earning['created_at'])) ?></td>
+                                <td>
+                                    <a href="?page=tickets&action=view&id=<?= $earning['ticket_id'] ?>" class="text-decoration-none">
+                                        #<?= $earning['ticket_id'] ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary"><?= htmlspecialchars($earning['category'] ?? '-') ?></span>
+                                </td>
+                                <td><?= htmlspecialchars($earning['customer_name'] ?? '-') ?></td>
+                                <td>
+                                    <?php if ($earning['team_id']): ?>
+                                    <span class="badge bg-info"><i class="bi bi-people"></i> Team Split</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-success"><i class="bi bi-person"></i> Individual</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-success fw-bold">
+                                    <?= $earning['currency'] ?? 'KES' ?> <?= number_format($earning['earned_amount'], 2) ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $statusColors = ['pending' => 'warning', 'paid' => 'success', 'cancelled' => 'danger'];
+                                    $statusColor = $statusColors[$earning['status']] ?? 'secondary';
+                                    ?>
+                                    <span class="badge bg-<?= $statusColor ?>"><?= ucfirst($earning['status']) ?></span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php elseif ($selectedEmployeeId): ?>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No commission earnings found for the selected period.
+                </div>
+                <?php else: ?>
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle"></i> Select an employee and month to view their commission earnings.
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> About Ticket Commissions</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Employees earn commissions based on ticket categories:</p>
+                <ul class="mb-0">
+                    <li>Commissions are calculated when tickets are resolved or closed</li>
+                    <li>Team-assigned tickets split the commission equally among members</li>
+                    <li>Commission rates are configured in Settings &gt; Ticket Commissions</li>
+                    <li>Earnings can be included in payroll processing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Quick Links</h6>
+            </div>
+            <div class="card-body">
+                <?php if ($isAdminOrManager): ?>
+                <a href="?page=settings&tab=commissions" class="btn btn-outline-primary me-2 mb-2">
+                    <i class="bi bi-sliders"></i> Configure Rates
+                </a>
+                <a href="?page=hr&subpage=payroll" class="btn btn-outline-success me-2 mb-2">
+                    <i class="bi bi-cash-stack"></i> Process Payroll
+                </a>
+                <?php endif; ?>
+                <a href="?page=tickets" class="btn btn-outline-secondary mb-2">
+                    <i class="bi bi-ticket"></i> View Tickets
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php else: ?>
 

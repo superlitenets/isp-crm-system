@@ -878,4 +878,174 @@ class MobileAPI {
         $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
         return $stmt->execute([$ticketId, $userId, $comment]);
     }
+    
+    public function getEmployeeTeams(int $userId): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return [];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT t.*, 
+                   (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as member_count
+            FROM teams t
+            JOIN team_members tm ON t.id = tm.team_id
+            WHERE tm.employee_id = ? AND t.is_active = true
+            ORDER BY t.name
+        ");
+        $stmt->execute([$employee['id']]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getTeamDetails(int $teamId, int $userId): ?array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return null;
+        }
+        
+        $memberCheck = $this->db->prepare("SELECT 1 FROM team_members WHERE team_id = ? AND employee_id = ?");
+        $memberCheck->execute([$teamId, $employee['id']]);
+        if (!$memberCheck->fetch()) {
+            return null;
+        }
+        
+        $stmt = $this->db->prepare("SELECT * FROM teams WHERE id = ?");
+        $stmt->execute([$teamId]);
+        $team = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$team) {
+            return null;
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT e.id, e.name, e.phone, e.email, u.id as user_id, tm.joined_at
+            FROM team_members tm
+            JOIN employees e ON tm.employee_id = e.id
+            LEFT JOIN users u ON e.user_id = u.id
+            WHERE tm.team_id = ?
+            ORDER BY e.name
+        ");
+        $stmt->execute([$teamId]);
+        $team['members'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $thisMonth = date('Y-m-01');
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COUNT(CASE WHEN status IN ('resolved', 'closed') THEN 1 END) as completed_tickets
+            FROM tickets
+            WHERE team_id = ? AND created_at >= ?
+        ");
+        $stmt->execute([$teamId, $thisMonth]);
+        $team['stats'] = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return $team;
+    }
+    
+    public function getTeamTickets(int $teamId, int $userId, string $status = '', int $limit = 50): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return [];
+        }
+        
+        $memberCheck = $this->db->prepare("SELECT 1 FROM team_members WHERE team_id = ? AND employee_id = ?");
+        $memberCheck->execute([$teamId, $employee['id']]);
+        if (!$memberCheck->fetch()) {
+            return [];
+        }
+        
+        $sql = "
+            SELECT t.*, c.name as customer_name, c.phone as customer_phone,
+                   u.name as assigned_to_name
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN users u ON t.assigned_to = u.id
+            WHERE t.team_id = ?
+        ";
+        $params = [$teamId];
+        
+        if ($status) {
+            $sql .= " AND t.status = ?";
+            $params[] = $status;
+        }
+        
+        $sql .= " ORDER BY t.created_at DESC LIMIT ?";
+        $params[] = $limit;
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getEmployeeEarnings(int $userId, ?string $month = null): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return ['error' => 'Employee not found'];
+        }
+        
+        $month = $month ?? date('Y-m');
+        
+        $ticketCommission = new TicketCommission($this->db);
+        $earnings = $ticketCommission->getEmployeeEarnings($employee['id'], $month);
+        $summary = $ticketCommission->getEmployeeEarningsSummary($employee['id'], $month);
+        
+        return [
+            'month' => $month,
+            'employee_id' => $employee['id'],
+            'employee_name' => $employee['name'],
+            'summary' => $summary,
+            'earnings' => $earnings
+        ];
+    }
+    
+    public function getTeamEarnings(int $teamId, int $userId, ?string $month = null): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return ['error' => 'Employee not found'];
+        }
+        
+        $memberCheck = $this->db->prepare("SELECT 1 FROM team_members WHERE team_id = ? AND employee_id = ?");
+        $memberCheck->execute([$teamId, $employee['id']]);
+        if (!$memberCheck->fetch()) {
+            return ['error' => 'Not a team member'];
+        }
+        
+        $month = $month ?? date('Y-m');
+        
+        $ticketCommission = new TicketCommission($this->db);
+        $earnings = $ticketCommission->getTeamEarnings($teamId, $month);
+        
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COALESCE(SUM(earned_amount), 0) as total_earnings,
+                currency
+            FROM ticket_earnings
+            WHERE team_id = ? 
+              AND created_at BETWEEN ? AND ?
+              AND status != 'cancelled'
+            GROUP BY currency
+        ");
+        $stmt->execute([$teamId, $startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        $summary = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [
+            'total_tickets' => 0,
+            'total_earnings' => 0,
+            'currency' => 'KES'
+        ];
+        
+        $stmt = $this->db->prepare("SELECT name FROM teams WHERE id = ?");
+        $stmt->execute([$teamId]);
+        $team = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return [
+            'month' => $month,
+            'team_id' => $teamId,
+            'team_name' => $team['name'] ?? 'Team',
+            'summary' => $summary,
+            'earnings' => $earnings
+        ];
+    }
 }

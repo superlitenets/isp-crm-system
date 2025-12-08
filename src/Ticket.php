@@ -248,6 +248,18 @@ class Ticket {
             } catch (\Throwable $e) {
                 error_log("Failed to log activity: " . $e->getMessage());
             }
+
+            try {
+                if (isset($data['status']) && in_array($data['status'], ['resolved', 'closed']) && !in_array($ticket['status'], ['resolved', 'closed'])) {
+                    $ticketCommission = new TicketCommission($this->db);
+                    $commissionResult = $ticketCommission->processTicketClosure($id);
+                    if ($commissionResult['success']) {
+                        $this->activityLog->log('commission', 'ticket', $id, $ticket['ticket_number'], $commissionResult['message']);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to process ticket commission: " . $e->getMessage());
+            }
         }
 
         return $result;
