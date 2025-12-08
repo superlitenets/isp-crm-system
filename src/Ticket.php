@@ -5,6 +5,7 @@ namespace App;
 class Ticket {
     private \PDO $db;
     private SMSGateway $sms;
+    private WhatsApp $whatsapp;
     private ?SLA $sla = null;
     private Settings $settings;
     private ActivityLog $activityLog;
@@ -12,6 +13,7 @@ class Ticket {
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
+        $this->whatsapp = new WhatsApp();
         $this->settings = new Settings();
         $this->activityLog = new ActivityLog();
     }
@@ -66,7 +68,7 @@ class Ticket {
 
         $customer = (new Customer())->find($data['customer_id']);
         if ($customer && $customer['phone']) {
-            $message = $this->buildSMSFromTemplate('sms_template_ticket_created', [
+            $placeholders = [
                 '{ticket_number}' => $ticketNumber,
                 '{subject}' => $data['subject'] ?? '',
                 '{description}' => substr($data['description'] ?? '', 0, 100),
@@ -77,9 +79,17 @@ class Ticket {
                 '{customer_phone}' => $customer['phone'] ?? '',
                 '{customer_address}' => $customer['address'] ?? '',
                 '{customer_email}' => $customer['email'] ?? ''
-            ]);
+            ];
+            $message = $this->buildSMSFromTemplate('sms_template_ticket_created', $placeholders);
+            
             $result = $this->sms->send($customer['phone'], $message);
             $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Ticket created notification', $result['success'] ? 'sent' : 'failed');
+            
+            $waMessage = $this->buildSMSFromTemplate('wa_template_ticket_created', $placeholders);
+            if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
+                $waMessage = $message;
+            }
+            $this->whatsapp->send($customer['phone'], $waMessage, $ticketId);
         }
 
         if ($assignedTo) {
@@ -229,7 +239,7 @@ class Ticket {
         $customer = (new Customer())->find($ticket['customer_id']);
 
         if ($technician && $technician['phone'] && $customer) {
-            $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', [
+            $placeholders = [
                 '{ticket_number}' => $ticket['ticket_number'],
                 '{subject}' => $ticket['subject'] ?? '',
                 '{description}' => substr($ticket['description'] ?? '', 0, 100),
@@ -241,13 +251,20 @@ class Ticket {
                 '{customer_email}' => $customer['email'] ?? '',
                 '{technician_name}' => $technician['name'] ?? 'Technician',
                 '{technician_phone}' => $technician['phone'] ?? ''
-            ]);
+            ];
+            
+            $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', $placeholders);
             $result = $this->sms->send($technician['phone'], $message);
             $this->sms->logSMS($ticketId, $technician['phone'], 'technician', 'Ticket assignment notification', $result['success'] ? 'sent' : 'failed');
             
-            // Also notify customer that technician has been assigned
+            $waMessage = $this->buildSMSFromTemplate('wa_template_technician_assigned', $placeholders);
+            if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
+                $waMessage = $message;
+            }
+            $this->whatsapp->send($technician['phone'], $waMessage, $ticketId);
+            
             if ($customer['phone']) {
-                $customerMessage = $this->buildSMSFromTemplate('sms_template_ticket_assigned', [
+                $customerPlaceholders = [
                     '{ticket_number}' => $ticket['ticket_number'],
                     '{subject}' => $ticket['subject'] ?? '',
                     '{description}' => substr($ticket['description'] ?? '', 0, 100),
@@ -257,9 +274,17 @@ class Ticket {
                     '{customer_phone}' => $customer['phone'] ?? '',
                     '{technician_name}' => $technician['name'] ?? 'Technician',
                     '{technician_phone}' => $technician['phone'] ?? ''
-                ]);
+                ];
+                
+                $customerMessage = $this->buildSMSFromTemplate('sms_template_ticket_assigned', $customerPlaceholders);
                 $customerResult = $this->sms->send($customer['phone'], $customerMessage);
                 $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Technician assignment notification', $customerResult['success'] ? 'sent' : 'failed');
+                
+                $waCustomerMessage = $this->buildSMSFromTemplate('wa_template_ticket_assigned', $customerPlaceholders);
+                if (empty(trim(str_replace(array_keys($customerPlaceholders), '', $waCustomerMessage)))) {
+                    $waCustomerMessage = $customerMessage;
+                }
+                $this->whatsapp->send($customer['phone'], $waCustomerMessage, $ticketId);
             }
         }
     }
