@@ -345,10 +345,9 @@ if (isset($_GET['customer_id'])) {
                     if ($waCustomer->isEnabled()):
                         $customerMsg = "Hi " . $ticketData['customer_name'] . ",\n\nRegarding ticket #" . $ticketData['ticket_number'] . ":\n";
                     ?>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $customerMsg)) ?>" 
-                       target="_blank" class="btn btn-sm btn-success">
+                    <button type="button" class="btn btn-sm btn-success" onclick="sendTicketWA('quick_customer', <?= htmlspecialchars(json_encode($customerMsg)) ?>)">
                         <i class="bi bi-whatsapp"></i> WhatsApp
-                    </a>
+                    </button>
                     <?php endif; ?>
                     <?php else: ?>
                     <span class="text-muted small">No phone number</span>
@@ -375,10 +374,9 @@ if (isset($_GET['customer_id'])) {
                     if ($waCustomer->isEnabled()):
                         $techMsg = "Hi " . $ticketData['assigned_name'] . ",\n\nRegarding ticket #" . $ticketData['ticket_number'] . " for " . $ticketData['customer_name'] . ":\n";
                     ?>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['assigned_phone'], $techMsg)) ?>" 
-                       target="_blank" class="btn btn-sm btn-success">
+                    <button type="button" class="btn btn-sm btn-success" onclick="sendTicketWAToTech(<?= htmlspecialchars(json_encode($techMsg)) ?>, '<?= $ticketData['assigned_phone'] ?>')">
                         <i class="bi bi-whatsapp"></i> WhatsApp
-                    </a>
+                    </button>
                     <?php endif; ?>
                 </div>
                 <?php else: ?>
@@ -397,7 +395,8 @@ if (isset($_GET['customer_id'])) {
                 <h5 class="mb-0"><i class="bi bi-whatsapp"></i> Quick WhatsApp Notifications</h5>
             </div>
             <div class="card-body">
-                <p class="small text-muted mb-3">Click to open WhatsApp Web with a pre-filled message:</p>
+                <p class="small text-muted mb-3">Send WhatsApp messages via session:</p>
+                <div id="waTicketStatus" class="alert alert-info d-none mb-3"></div>
                 
                 <?php
                 $customerName = $ticketData['customer_name'];
@@ -422,36 +421,27 @@ if (isset($_GET['customer_id'])) {
                         $waSettings->get('wa_template_resolved', "Hi {customer_name},\n\nGreat news! Your ticket #{ticket_number} has been resolved.\n\nIf you have any further questions or issues, please don't hesitate to contact us.\n\nThank you for choosing our services!")),
                     'technician_coming' => str_replace(array_keys($replacements), array_values($replacements),
                         $waSettings->get('wa_template_technician_coming', "Hi {customer_name},\n\nRegarding ticket #{ticket_number}:\n\nOur technician is on the way to your location. Please ensure someone is available to receive them.\n\nThank you.")),
-                    'scheduled' => "Hi {$customerName},\n\nYour service visit for ticket #{$ticketNum} has been scheduled.\n\nPlease confirm if this time works for you.\n\nThank you."
+                    'scheduled' => str_replace(array_keys($replacements), array_values($replacements),
+                        $waSettings->get('wa_template_scheduled', "Hi {customer_name},\n\nYour service visit for ticket #{ticket_number} has been scheduled.\n\nPlease confirm if this time works for you.\n\nThank you."))
                 ];
                 ?>
                 
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['status_update'])) ?>" 
-                       target="_blank" class="btn btn-outline-success btn-sm" 
-                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'status_update')">
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="sendTicketWA('status_update', <?= htmlspecialchars(json_encode($templates['status_update'])) ?>)">
                         <i class="bi bi-arrow-repeat"></i> Status Update
-                    </a>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['need_info'])) ?>" 
-                       target="_blank" class="btn btn-outline-warning btn-sm"
-                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'need_info')">
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="sendTicketWA('need_info', <?= htmlspecialchars(json_encode($templates['need_info'])) ?>)">
                         <i class="bi bi-question-circle"></i> Need Info
-                    </a>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['resolved'])) ?>" 
-                       target="_blank" class="btn btn-outline-primary btn-sm"
-                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'resolved')">
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="sendTicketWA('resolved', <?= htmlspecialchars(json_encode($templates['resolved'])) ?>)">
                         <i class="bi bi-check-circle"></i> Resolved
-                    </a>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['technician_coming'])) ?>" 
-                       target="_blank" class="btn btn-outline-info btn-sm"
-                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'technician_coming')">
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="sendTicketWA('technician_coming', <?= htmlspecialchars(json_encode($templates['technician_coming'])) ?>)">
                         <i class="bi bi-truck"></i> Tech Coming
-                    </a>
-                    <a href="<?= htmlspecialchars($waCustomer->generateWebLink($ticketData['customer_phone'], $templates['scheduled'])) ?>" 
-                       target="_blank" class="btn btn-outline-secondary btn-sm"
-                       onclick="logWhatsApp(<?= $ticketData['id'] ?>, 'scheduled')">
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="sendTicketWA('scheduled', <?= htmlspecialchars(json_encode($templates['scheduled'])) ?>)">
                         <i class="bi bi-calendar-check"></i> Scheduled
-                    </a>
+                    </button>
                 </div>
                 
                 <hr class="my-3">
@@ -462,7 +452,7 @@ if (isset($_GET['customer_id'])) {
                         <textarea class="form-control" id="customWaMessage" rows="2" placeholder="Type your custom message..."><?= "Hi {$customerName},\n\nRegarding ticket #{$ticketNum}:\n\n" ?></textarea>
                     </div>
                     <div class="mt-2">
-                        <button type="button" class="btn btn-success btn-sm" onclick="sendCustomWhatsApp()">
+                        <button type="button" class="btn btn-success btn-sm" onclick="sendTicketWA('custom', document.getElementById('customWaMessage').value)">
                             <i class="bi bi-whatsapp"></i> Send Custom Message
                         </button>
                     </div>
@@ -471,20 +461,75 @@ if (isset($_GET['customer_id'])) {
         </div>
         
         <script>
-        function sendCustomWhatsApp() {
-            var message = document.getElementById('customWaMessage').value;
-            var phone = '<?= $waCustomer->formatPhone($ticketData['customer_phone']) ?>';
-            var url = 'https://web.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(message);
-            window.open(url, '_blank');
-            logWhatsApp(<?= $ticketData['id'] ?>, 'custom');
-        }
-        
-        function logWhatsApp(ticketId, messageType) {
-            fetch('?page=api&action=log_whatsapp', {
+        function sendTicketWA(messageType, message) {
+            var statusDiv = document.getElementById('waTicketStatus');
+            if (statusDiv) {
+                statusDiv.className = 'alert alert-info mb-3';
+                statusDiv.textContent = 'Sending WhatsApp message...';
+                statusDiv.classList.remove('d-none');
+            }
+            
+            fetch('?page=api&action=send_whatsapp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ticket_id: ticketId, message_type: messageType})
-            }).catch(function(e) { console.log('WhatsApp log error:', e); });
+                body: JSON.stringify({
+                    ticket_id: <?= $ticketData['id'] ?>,
+                    phone: '<?= $ticketData['customer_phone'] ?>',
+                    message: message,
+                    message_type: messageType
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (statusDiv) {
+                    if (data.success) {
+                        statusDiv.className = 'alert alert-success mb-3';
+                        statusDiv.textContent = 'WhatsApp message sent successfully!';
+                    } else {
+                        statusDiv.className = 'alert alert-danger mb-3';
+                        statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+                    }
+                    setTimeout(function() { statusDiv.classList.add('d-none'); }, 5000);
+                } else {
+                    if (data.success) {
+                        alert('WhatsApp message sent successfully!');
+                    } else {
+                        alert('Failed: ' + (data.error || 'Unknown error'));
+                    }
+                }
+            })
+            .catch(function(e) {
+                if (statusDiv) {
+                    statusDiv.className = 'alert alert-danger mb-3';
+                    statusDiv.textContent = 'Error: ' + e.message;
+                } else {
+                    alert('Error: ' + e.message);
+                }
+            });
+        }
+        
+        function sendTicketWAToTech(message, phone) {
+            fetch('?page=api&action=send_whatsapp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    ticket_id: <?= $ticketData['id'] ?>,
+                    phone: phone,
+                    message: message,
+                    message_type: 'technician_message'
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    alert('WhatsApp message sent to technician!');
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(function(e) {
+                alert('Error: ' + e.message);
+            });
         }
         </script>
         <?php endif; ?>
