@@ -1708,10 +1708,18 @@
                                 <span class="package-period">/month</span>
                             </div>
                             <ul class="package-features">
-                                <li><i class="bi bi-check-circle-fill"></i> Unlimited Data</li>
-                                <li><i class="bi bi-check-circle-fill"></i> Free Installation</li>
-                                <li><i class="bi bi-check-circle-fill"></i> Free WiFi Router</li>
-                                <li><i class="bi bi-check-circle-fill"></i> 24/7 Support</li>
+                                <?php 
+                                $features = [];
+                                if (!empty($pkg['features'])) {
+                                    $features = is_string($pkg['features']) ? json_decode($pkg['features'], true) : $pkg['features'];
+                                }
+                                if (empty($features)) {
+                                    $features = ['Unlimited Data', 'Free Installation', 'Free WiFi Router', '24/7 Support'];
+                                }
+                                foreach ($features as $feature): 
+                                ?>
+                                <li><i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($feature) ?></li>
+                                <?php endforeach; ?>
                             </ul>
                             <a href="?page=order&package=<?= $pkg['id'] ?>" class="btn package-btn <?= $isPopular ? 'primary' : 'outline' ?>">
                                 Select Plan
