@@ -310,7 +310,117 @@ $allRoles = $roleManager->getAllRoles();
             </div>
         </div>
     </div>
+    
+    <div class="col-md-6">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-fingerprint"></i> Biometric Registration</h5>
+            </div>
+            <div class="card-body">
+                <div id="biometricSyncStatus" class="alert d-none mb-3"></div>
+                <p class="mb-2"><strong>Biometric ID:</strong> <?= htmlspecialchars($employeeData['biometric_id'] ?? $employeeData['id']) ?></p>
+                <p class="mb-3"><strong>Card Number:</strong> <?= htmlspecialchars($employeeData['card_number'] ?? 'Not set') ?></p>
+                
+                <?php
+                $bioDb = Database::getConnection();
+                $bioDevices = $bioDb->query("SELECT id, name, type FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+                ?>
+                
+                <?php if (!empty($bioDevices)): ?>
+                <div class="mb-3">
+                    <label class="form-label">Select Device:</label>
+                    <select id="biometricDeviceSelect" class="form-select">
+                        <?php foreach ($bioDevices as $dev): ?>
+                        <option value="<?= $dev['id'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['type']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
+                        <i class="bi bi-upload"></i> Register to Device
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="removeFromBiometric(<?= $employeeData['id'] ?>)">
+                        <i class="bi bi-trash"></i> Remove from Device
+                    </button>
+                </div>
+                <?php else: ?>
+                <p class="text-muted mb-0">No Hikvision biometric devices configured. Add devices in Settings.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function syncEmployeeToBiometric(employeeId) {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.textContent = 'Registering employee to biometric device...';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=sync-employees-to-device', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            employee_ids: [employeeId]
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.success_count > 0) {
+            statusDiv.className = 'alert alert-success mb-3';
+            statusDiv.textContent = 'Employee registered to biometric device successfully!';
+        } else if (data.results && data.results[0]) {
+            statusDiv.className = 'alert alert-warning mb-3';
+            statusDiv.textContent = data.results[0].message || 'Registration completed with notes';
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.textContent = 'Error: ' + e.message;
+    });
+}
+
+function removeFromBiometric(employeeId) {
+    if (!confirm('Remove this employee from the biometric device?')) return;
+    
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.textContent = 'Removing employee from device...';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=delete-device-user', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            employee_no: bioId
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.className = 'alert alert-success mb-3';
+            statusDiv.textContent = 'Employee removed from biometric device.';
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.textContent = 'Error: ' + e.message;
+    });
+}
+</script>
 
 <?php elseif ($action === 'create_department' || $action === 'edit_department'): ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -366,15 +476,65 @@ $allRoles = $roleManager->getAllRoles();
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-people-fill"></i> Human Resources</h2>
     <?php if ($subpage === 'employees'): ?>
-    <a href="?page=hr&action=create_employee" class="btn btn-primary">
-        <i class="bi bi-person-plus"></i> Add Employee
-    </a>
+    <div class="d-flex gap-2">
+        <?php
+        $bioDb = Database::getConnection();
+        $hikDevices = $bioDb->query("SELECT id, name FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+        if (!empty($hikDevices)):
+        ?>
+        <div class="dropdown">
+            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-fingerprint"></i> Sync to Device
+            </button>
+            <ul class="dropdown-menu">
+                <?php foreach ($hikDevices as $dev): ?>
+                <li><a class="dropdown-item" href="#" onclick="syncAllEmployeesToDevice(<?= $dev['id'] ?>); return false;"><?= htmlspecialchars($dev['name']) ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
+        <a href="?page=hr&action=create_employee" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> Add Employee
+        </a>
+    </div>
     <?php elseif ($subpage === 'departments'): ?>
     <a href="?page=hr&action=create_department" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> Add Department
     </a>
     <?php endif; ?>
 </div>
+
+<div id="bulkSyncStatus" class="alert d-none mb-3"></div>
+
+<script>
+function syncAllEmployeesToDevice(deviceId) {
+    var statusDiv = document.getElementById('bulkSyncStatus');
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing all active employees to biometric device... This may take a moment.';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=sync-employees-to-device', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ device_id: deviceId })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.className = 'alert alert-success mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-check-circle"></i> Sync complete! ' + data.success_count + ' employees registered, ' + data.fail_count + ' failed.';
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+        }
+        setTimeout(function() { statusDiv.classList.add('d-none'); }, 10000);
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.textContent = 'Error: ' + e.message;
+    });
+}
+</script>
 
 <div class="row g-4 mb-4">
     <div class="col-md-3">
