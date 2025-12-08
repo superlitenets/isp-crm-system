@@ -338,12 +338,7 @@ const app = {
     },
     
     async clockIn() {
-        const location = await this.getLocation();
-        
-        const result = await this.api('clock-in', 'POST', {
-            latitude: location.latitude || null,
-            longitude: location.longitude || null
-        });
+        const result = await this.api('clock-in', 'POST', {});
         
         if (result.success) {
             this.showToast(result.message, 'success');
@@ -354,12 +349,7 @@ const app = {
     },
     
     async clockOut() {
-        const location = await this.getLocation();
-        
-        const result = await this.api('clock-out', 'POST', {
-            latitude: location.latitude || null,
-            longitude: location.longitude || null
-        });
+        const result = await this.api('clock-out', 'POST', {});
         
         if (result.success) {
             this.showToast(result.message, 'success');
