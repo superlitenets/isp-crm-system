@@ -797,6 +797,15 @@ function resetToDefaults() {
                         <small class="text-muted">URL of the WhatsApp session service</small>
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label">Session API Secret</label>
+                        <input type="password" class="form-control" name="whatsapp_session_secret" id="waSessionSecret"
+                               value="<?= htmlspecialchars($settings->get('whatsapp_session_secret', '')) ?>" 
+                               placeholder="Enter the API secret from WhatsApp service">
+                        <small class="text-muted">Required to authenticate with the WhatsApp session service</small>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
                         <label class="form-label">Session Status</label>
                         <div id="waSessionStatus" class="border rounded p-3 bg-light">
                             <span class="text-muted">Click "Check Status" to view</span>
