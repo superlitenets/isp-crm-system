@@ -453,16 +453,21 @@ class MobileAPI {
     }
     
     public function getAssignedEquipment(int $userId): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return [];
+        }
+        
         $stmt = $this->db->prepare("
             SELECT ea.*, e.name as equipment_name, e.serial_number, e.brand, e.model,
                    c.name as customer_name, c.address as customer_address
             FROM equipment_assignments ea
             JOIN equipment e ON ea.equipment_id = e.id
             LEFT JOIN customers c ON ea.customer_id = c.id
-            WHERE ea.assigned_by = ? AND ea.status = 'assigned'
-            ORDER BY ea.assignment_date DESC
+            WHERE ea.employee_id = ? AND ea.status = 'assigned'
+            ORDER BY ea.assigned_date DESC
         ");
-        $stmt->execute([$userId]);
+        $stmt->execute([$employee['id']]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
