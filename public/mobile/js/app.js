@@ -376,10 +376,24 @@ const app = {
                     <h6><i class="bi bi-arrow-repeat"></i> Update Status</h6>
                     <div class="status-actions">
                         ${ticket.status !== 'in_progress' ? `<button class="btn btn-warning btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'in_progress')">Start Working</button>` : ''}
-                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'resolved')">Mark Resolved</button>` : ''}
+                        ${ticket.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="app.showCloseTicketModal(${ticket.id})">Close Ticket</button>` : ''}
                         ${ticket.status !== 'on_hold' ? `<button class="btn btn-secondary btn-sm" onclick="app.updateTicketStatus(${ticket.id}, 'on_hold')">On Hold</button>` : ''}
                     </div>
                 </div>
+                
+                ${ticket.equipment && ticket.equipment.length > 0 ? `
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-box-seam"></i> Customer Equipment</h6>
+                    ${ticket.equipment.map(eq => `
+                        <div class="equipment-item p-2 mb-2 bg-light rounded">
+                            <strong>${eq.name || 'Equipment'}</strong>
+                            <div class="small text-muted">${eq.brand || ''} ${eq.model || ''}</div>
+                            ${eq.serial_number ? `<div class="small"><i class="bi bi-upc"></i> ${eq.serial_number}</div>` : ''}
+                            ${eq.mac_address ? `<div class="small"><i class="bi bi-ethernet"></i> ${eq.mac_address}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                ` : ''}
                 
                 <div class="ticket-detail-card">
                     <h6><i class="bi bi-chat-dots"></i> Comments</h6>
@@ -417,6 +431,99 @@ const app = {
             this.showTicketDetail(ticketId);
         } else {
             this.showToast(result.error || 'Failed to update', 'danger');
+        }
+    },
+    
+    async showCloseTicketModal(ticketId) {
+        const response = await fetch('/mobile-api.php?action=available-equipment&ticket_id=' + ticketId, {
+            headers: { 'Authorization': 'Bearer ' + this.token }
+        });
+        const equipmentResult = await response.json();
+        const equipment = equipmentResult.success ? equipmentResult.data : [];
+        
+        const modalHtml = `
+            <div class="modal-overlay" id="close-ticket-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5><i class="bi bi-check-circle"></i> Close Ticket</h5>
+                        <button class="btn-close" onclick="app.hideCloseTicketModal()"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Cable Used (meters)</label>
+                            <input type="number" class="form-control" id="close-cable-meters" min="0" step="0.5" placeholder="e.g., 25">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Router/Equipment Used</label>
+                            <select class="form-select" id="close-equipment-id" onchange="app.updateEquipmentDetails(this)">
+                                <option value="">-- Select Equipment --</option>
+                                ${equipment.map(eq => `
+                                    <option value="${eq.id}" data-model="${eq.brand || ''} ${eq.model || ''}" data-serial="${eq.serial_number || ''}">
+                                        ${eq.name} - ${eq.serial_number || 'No S/N'}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Router Model</label>
+                                <input type="text" class="form-control" id="close-router-model" placeholder="Auto-filled or manual">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Serial Number</label>
+                                <input type="text" class="form-control" id="close-router-serial" placeholder="Auto-filled or manual">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Resolution Notes</label>
+                            <textarea class="form-control" id="close-comment" rows="3" placeholder="What was done to resolve this ticket?"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" onclick="app.hideCloseTicketModal()">Cancel</button>
+                        <button class="btn btn-success" onclick="app.submitCloseTicket(${ticketId})">
+                            <i class="bi bi-check-lg"></i> Close Ticket
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+    
+    updateEquipmentDetails(select) {
+        const option = select.options[select.selectedIndex];
+        if (option.value) {
+            document.getElementById('close-router-model').value = option.dataset.model || '';
+            document.getElementById('close-router-serial').value = option.dataset.serial || '';
+        }
+    },
+    
+    hideCloseTicketModal() {
+        const modal = document.getElementById('close-ticket-modal');
+        if (modal) modal.remove();
+    },
+    
+    async submitCloseTicket(ticketId) {
+        const data = {
+            ticket_id: ticketId,
+            cable_meters: document.getElementById('close-cable-meters').value || null,
+            equipment_id: document.getElementById('close-equipment-id').value || null,
+            router_model: document.getElementById('close-router-model').value || null,
+            router_serial: document.getElementById('close-router-serial').value || null,
+            comment: document.getElementById('close-comment').value || ''
+        };
+        
+        const result = await this.api('close-ticket', 'POST', data);
+        
+        if (result.success) {
+            this.hideCloseTicketModal();
+            this.showToast('Ticket closed successfully!', 'success');
+            this.loadTechnicianDashboard();
+            this.goBack();
+        } else {
+            this.showToast(result.error || 'Failed to close ticket', 'danger');
         }
     },
     
@@ -707,6 +814,7 @@ const app = {
                 </div>
                 
                 <div class="performance-summary">
+                    <h6 class="mb-2"><i class="bi bi-ticket"></i> Tickets This Month</h6>
                     <div class="summary-row">
                         <span>Total Tickets</span>
                         <span>${p.this_month.total_tickets}</span>
@@ -720,6 +828,34 @@ const app = {
                         <span class="text-danger">${p.this_month.sla_breached || 0}</span>
                     </div>
                 </div>
+                
+                ${p.attendance_stats ? `
+                <div class="performance-summary mt-3">
+                    <h6 class="mb-2"><i class="bi bi-clock"></i> Attendance This Month</h6>
+                    <div class="summary-row">
+                        <span>Days Present</span>
+                        <span class="text-success">${p.attendance_stats.days_present}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Days On Time</span>
+                        <span class="text-success">${p.attendance_stats.days_on_time}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Days Late</span>
+                        <span class="${p.attendance_stats.days_late > 0 ? 'text-warning' : ''}">${p.attendance_stats.days_late}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total Hours Worked</span>
+                        <span>${p.attendance_stats.total_hours}h</span>
+                    </div>
+                    ${p.attendance_stats.avg_clock_in ? `
+                    <div class="summary-row">
+                        <span>Avg Clock-in Time</span>
+                        <span>${p.attendance_stats.avg_clock_in}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                ` : ''}
             `;
         } else {
             container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Could not load performance data</p></div>';

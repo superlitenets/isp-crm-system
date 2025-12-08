@@ -306,6 +306,9 @@ function initializeDatabase(): void {
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'manual';
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS biometric_log_id INTEGER;
 
+    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closure_details JSONB DEFAULT '{}';
+    ALTER TABLE tickets ADD COLUMN IF NOT EXISTS equipment_used_id INTEGER REFERENCES equipment(id);
+
     CREATE INDEX IF NOT EXISTS idx_tickets_customer ON tickets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON tickets(assigned_to);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);

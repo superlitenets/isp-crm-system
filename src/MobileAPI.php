@@ -283,6 +283,83 @@ class MobileAPI {
         return $stmt->execute([$ticketId, $userId, $comment]);
     }
     
+    public function closeTicketWithDetails(int $ticketId, int $userId, array $closureDetails, string $userRole = 'technician'): bool {
+        if ($userRole === 'admin' || $userRole === 'manager') {
+            $stmt = $this->db->prepare("SELECT id FROM tickets WHERE id = ?");
+            $stmt->execute([$ticketId]);
+        } else {
+            $stmt = $this->db->prepare("SELECT id FROM tickets WHERE id = ? AND assigned_to = ?");
+            $stmt->execute([$ticketId, $userId]);
+        }
+        
+        if (!$stmt->fetch()) {
+            return false;
+        }
+        
+        $cableMeters = isset($closureDetails['cable_meters']) && is_numeric($closureDetails['cable_meters']) 
+            ? (float)$closureDetails['cable_meters'] : null;
+        $closureDetails['cable_meters'] = $cableMeters;
+        
+        $equipmentId = !empty($closureDetails['equipment_id']) ? (int)$closureDetails['equipment_id'] : null;
+        
+        if ($equipmentId) {
+            $stmt = $this->db->prepare("SELECT name, brand, model, serial_number FROM equipment WHERE id = ?");
+            $stmt->execute([$equipmentId]);
+            $equipment = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($equipment) {
+                $closureDetails['router_model'] = trim(($equipment['brand'] ?? '') . ' ' . ($equipment['model'] ?? ''));
+                $closureDetails['router_serial'] = $equipment['serial_number'] ?? $closureDetails['router_serial'] ?? null;
+                $closureDetails['equipment_name'] = $equipment['name'];
+            }
+        }
+        
+        $detailsJson = json_encode($closureDetails);
+        
+        $stmt = $this->db->prepare("
+            UPDATE tickets SET 
+                status = 'resolved',
+                resolved_at = NOW(),
+                closure_details = ?,
+                equipment_used_id = ?,
+                updated_at = NOW()
+            WHERE id = ?
+        ");
+        $result = $stmt->execute([$detailsJson, $equipmentId, $ticketId]);
+        
+        if ($result && !empty($closureDetails['comment'])) {
+            $comment = "Ticket resolved. ";
+            if (!empty($closureDetails['cable_meters'])) {
+                $comment .= "Cable used: " . $closureDetails['cable_meters'] . "m. ";
+            }
+            if (!empty($closureDetails['router_model'])) {
+                $comment .= "Router: " . $closureDetails['router_model'] . ". ";
+            }
+            if (!empty($closureDetails['router_serial'])) {
+                $comment .= "S/N: " . $closureDetails['router_serial'] . ". ";
+            }
+            $comment .= $closureDetails['comment'];
+            
+            $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
+            $stmt->execute([$ticketId, $userId, $comment]);
+        }
+        
+        return $result;
+    }
+    
+    public function getAvailableEquipmentForTicket(int $ticketId): array {
+        $stmt = $this->db->prepare("
+            SELECT e.id, e.name, e.serial_number, e.brand, e.model, e.mac_address,
+                   CASE WHEN ea.id IS NOT NULL THEN 'assigned' ELSE 'available' END as status
+            FROM equipment e
+            LEFT JOIN equipment_assignments ea ON e.id = ea.equipment_id AND ea.status = 'assigned'
+            WHERE e.status = 'in_stock' OR e.status = 'available' OR ea.id IS NOT NULL
+            ORDER BY e.name
+            LIMIT 100
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     public function getTechnicianStats(int $userId): array {
         $stmt = $this->db->prepare("
             SELECT 
@@ -535,16 +612,41 @@ class MobileAPI {
         }
         
         $attendanceRate = 0;
+        $attendanceStats = [
+            'days_present' => 0,
+            'days_late' => 0,
+            'days_on_time' => 0,
+            'total_hours' => 0,
+            'avg_clock_in' => null
+        ];
+        
         if ($employee) {
             $workingDays = cal_days_in_month(CAL_GREGORIAN, (int)date('m'), (int)date('Y')) - 8;
             $stmt = $this->db->prepare("
-                SELECT COUNT(*) as present_days
+                SELECT 
+                    COUNT(*) as present_days,
+                    COUNT(CASE WHEN late_minutes > 0 THEN 1 END) as late_days,
+                    COUNT(CASE WHEN late_minutes = 0 OR late_minutes IS NULL THEN 1 END) as on_time_days,
+                    COALESCE(SUM(hours_worked), 0) as total_hours,
+                    AVG(EXTRACT(HOUR FROM clock_in::time) + EXTRACT(MINUTE FROM clock_in::time)/60.0) as avg_clock_in_hour
                 FROM attendance 
                 WHERE employee_id = ? AND date >= ? AND status = 'present'
             ");
             $stmt->execute([$employee['id'], $thisMonth]);
-            $presentDays = $stmt->fetch(\PDO::FETCH_ASSOC)['present_days'];
-            $attendanceRate = $workingDays > 0 ? round(($presentDays / $workingDays) * 100, 1) : 0;
+            $attData = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            $attendanceStats['days_present'] = (int)$attData['present_days'];
+            $attendanceStats['days_late'] = (int)$attData['late_days'];
+            $attendanceStats['days_on_time'] = (int)$attData['on_time_days'];
+            $attendanceStats['total_hours'] = round((float)$attData['total_hours'], 1);
+            
+            if ($attData['avg_clock_in_hour']) {
+                $hours = floor($attData['avg_clock_in_hour']);
+                $minutes = round(($attData['avg_clock_in_hour'] - $hours) * 60);
+                $attendanceStats['avg_clock_in'] = sprintf('%02d:%02d', $hours, $minutes);
+            }
+            
+            $attendanceRate = $workingDays > 0 ? round(($attData['present_days'] / $workingDays) * 100, 1) : 0;
             $attendanceRate = min(100, $attendanceRate);
         }
         
@@ -570,6 +672,7 @@ class MobileAPI {
             'rank' => $rank,
             'total_technicians' => $totalTechnicians,
             'attendance_rate' => $attendanceRate,
+            'attendance_stats' => $attendanceStats,
             'achievements' => $achievements
         ];
     }

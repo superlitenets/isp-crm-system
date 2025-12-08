@@ -480,6 +480,50 @@ try {
             }
             break;
             
+        case 'close-ticket':
+            requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            $userRole = $user['role'] ?? '';
+            if (!in_array($userRole, $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized']);
+                break;
+            }
+            
+            $ticketId = (int) ($input['ticket_id'] ?? 0);
+            if (!$ticketId) {
+                echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
+                break;
+            }
+            
+            $closureDetails = [
+                'cable_meters' => $input['cable_meters'] ?? null,
+                'router_model' => $input['router_model'] ?? null,
+                'router_serial' => $input['router_serial'] ?? null,
+                'equipment_id' => $input['equipment_id'] ?? null,
+                'comment' => $input['comment'] ?? ''
+            ];
+            
+            $result = $api->closeTicketWithDetails($ticketId, $user['id'], $closureDetails, $userRole);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Ticket closed successfully']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to close ticket. You may not have permission.']);
+            }
+            break;
+            
+        case 'available-equipment':
+            requireAuth();
+            $allowedRoles = ['admin', 'technician', 'manager'];
+            if (!in_array($user['role'] ?? '', $allowedRoles)) {
+                echo json_encode(['success' => false, 'error' => 'Not authorized']);
+                break;
+            }
+            
+            $ticketId = (int) ($_GET['ticket_id'] ?? 0);
+            $equipment = $api->getAvailableEquipmentForTicket($ticketId);
+            echo json_encode(['success' => true, 'data' => $equipment]);
+            break;
+            
         default:
             echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }
