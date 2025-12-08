@@ -11,6 +11,7 @@ class WhatsApp {
     private ?string $phoneNumberId = null;
     private ?string $businessId = null;
     private string $sessionServiceUrl = 'http://localhost:3001';
+    private ?string $sessionApiSecret = null;
     
     public function __construct() {
         $settings = new Settings();
@@ -18,6 +19,7 @@ class WhatsApp {
         $this->defaultCountryCode = $settings->get('whatsapp_country_code', '254');
         $this->provider = $settings->get('whatsapp_provider', 'web');
         $this->sessionServiceUrl = $settings->get('whatsapp_session_url', 'http://localhost:3001');
+        $this->sessionApiSecret = $settings->get('whatsapp_session_secret', '') ?: $this->loadSessionSecretFromFile();
         
         if ($this->provider === 'meta') {
             $this->apiKey = $settings->get('whatsapp_meta_token', '') ?: getenv('WHATSAPP_META_TOKEN') ?: null;
@@ -37,6 +39,22 @@ class WhatsApp {
         } elseif ($this->provider === 'session') {
             $this->apiUrl = $this->sessionServiceUrl;
         }
+    }
+    
+    private function loadSessionSecretFromFile(): ?string {
+        $secretFile = __DIR__ . '/../whatsapp-service/.api_secret';
+        if (file_exists($secretFile)) {
+            return trim(file_get_contents($secretFile));
+        }
+        return null;
+    }
+    
+    private function getSessionHeaders(): array {
+        $headers = ['Content-Type: application/json'];
+        if ($this->sessionApiSecret) {
+            $headers[] = 'X-Api-Key: ' . $this->sessionApiSecret;
+        }
+        return $headers;
     }
     
     public function isEnabled(): bool {
@@ -343,6 +361,7 @@ class WhatsApp {
             curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/status');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -384,7 +403,7 @@ class WhatsApp {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -407,6 +426,7 @@ class WhatsApp {
             curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/qr');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -430,7 +450,7 @@ class WhatsApp {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -453,6 +473,7 @@ class WhatsApp {
             curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -481,7 +502,7 @@ class WhatsApp {
                 'phone' => $formattedPhone,
                 'message' => $message
             ]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             
@@ -545,7 +566,7 @@ class WhatsApp {
                 'groupId' => $groupId,
                 'message' => $message
             ]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             

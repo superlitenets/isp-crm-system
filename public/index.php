@@ -440,6 +440,65 @@ if ($page === 'api' && $action === 'log_whatsapp') {
     exit;
 }
 
+if ($page === 'api' && $action === 'whatsapp_session') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $operation = $_GET['op'] ?? 'status';
+    $whatsapp = new \App\WhatsApp();
+    
+    try {
+        switch ($operation) {
+            case 'status':
+                $result = $whatsapp->getSessionStatus();
+                break;
+            case 'initialize':
+                $result = $whatsapp->initializeSession();
+                break;
+            case 'qr':
+                $result = $whatsapp->getSessionQR();
+                break;
+            case 'logout':
+                $result = $whatsapp->logoutSession();
+                break;
+            case 'groups':
+                $result = $whatsapp->getSessionGroups();
+                break;
+            case 'send':
+                $input = json_decode(file_get_contents('php://input'), true);
+                $phone = $input['phone'] ?? '';
+                $message = $input['message'] ?? '';
+                if (empty($phone) || empty($message)) {
+                    $result = ['success' => false, 'error' => 'Phone and message required'];
+                } else {
+                    $result = $whatsapp->sendViaSession($phone, $message);
+                }
+                break;
+            case 'send-group':
+                $input = json_decode(file_get_contents('php://input'), true);
+                $groupId = $input['groupId'] ?? '';
+                $message = $input['message'] ?? '';
+                if (empty($groupId) || empty($message)) {
+                    $result = ['success' => false, 'error' => 'Group ID and message required'];
+                } else {
+                    $result = $whatsapp->sendToGroup($groupId, $message);
+                }
+                break;
+            default:
+                $result = ['success' => false, 'error' => 'Unknown operation'];
+        }
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     

@@ -951,13 +951,13 @@ function toggleWhatsAppProvider() {
 }
 document.addEventListener('DOMContentLoaded', toggleWhatsAppProvider);
 
-const waSessionUrl = '<?= htmlspecialchars($settings->get('whatsapp_session_url', 'http://localhost:3001')) ?>';
+const waApiBase = '?page=api&action=whatsapp_session&op=';
 
 function checkSessionStatus() {
     const statusDiv = document.getElementById('waSessionStatus');
     statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Checking...</span>';
     
-    fetch(waSessionUrl + '/status')
+    fetch(waApiBase + 'status')
         .then(r => r.json())
         .then(data => {
             let html = '';
@@ -974,18 +974,20 @@ function checkSessionStatus() {
             } else if (data.status === 'initializing') {
                 html = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Initializing...</span>';
                 setTimeout(checkSessionStatus, 2000);
+            } else if (data.status === 'service_unavailable') {
+                html = '<span class="text-danger"><i class="bi bi-x-circle"></i> Service not running</span><br><small class="text-muted">Start the WhatsApp service first</small>';
             } else {
                 html = '<span class="text-secondary"><i class="bi bi-x-circle"></i> ' + (data.status || 'Disconnected') + '</span>';
             }
             statusDiv.innerHTML = html;
         })
         .catch(err => {
-            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Service not running</span><br><small class="text-muted">Start the WhatsApp service first</small>';
+            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Error checking status</span>';
         });
 }
 
 function fetchQRCode() {
-    fetch(waSessionUrl + '/qr')
+    fetch(waApiBase + 'qr')
         .then(r => r.json())
         .then(data => {
             if (data.qr) {
@@ -1001,7 +1003,7 @@ function initializeSession() {
     const statusDiv = document.getElementById('waSessionStatus');
     statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Starting session...</span>';
     
-    fetch(waSessionUrl + '/initialize', { method: 'POST' })
+    fetch(waApiBase + 'initialize', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             setTimeout(checkSessionStatus, 3000);
@@ -1017,7 +1019,7 @@ function logoutSession() {
     const statusDiv = document.getElementById('waSessionStatus');
     statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Logging out...</span>';
     
-    fetch(waSessionUrl + '/logout', { method: 'POST' })
+    fetch(waApiBase + 'logout', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             statusDiv.innerHTML = '<span class="text-secondary"><i class="bi bi-check-circle"></i> Logged out</span>';
@@ -1034,7 +1036,7 @@ function loadGroups() {
     groupsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Loading...</td></tr>';
     document.getElementById('waGroupsList').style.display = 'block';
     
-    fetch(waSessionUrl + '/groups')
+    fetch(waApiBase + 'groups')
         .then(r => r.json())
         .then(data => {
             if (data.groups && data.groups.length > 0) {
@@ -1054,7 +1056,7 @@ function testGroupMessage(groupId) {
     const message = prompt('Enter test message for this group:');
     if (!message) return;
     
-    fetch(waSessionUrl + '/send-group', {
+    fetch(waApiBase + 'send-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ groupId, message })
