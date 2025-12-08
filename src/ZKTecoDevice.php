@@ -351,13 +351,15 @@ class ZKTecoDevice extends BiometricDevice {
             return null;
         }
         
+        $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+        
         $respCommandId = unpack('v', substr($response, 0, 2))[1];
         
         if ($respCommandId == self::CMD_ACK_OK || $respCommandId == self::CMD_ACK_DATA) {
-            $result = trim(substr($response, 8));
+            $result = trim(substr($response, 8), "\x00\x20");
             if (strpos($result, '=') !== false) {
                 $parts = explode('=', $result, 2);
-                return trim($parts[1] ?? $result);
+                return trim($parts[1] ?? $result, "\x00\x20");
             }
             return $result;
         }
@@ -369,6 +371,7 @@ class ZKTecoDevice extends BiometricDevice {
         $command = $this->createHeader(self::CMD_ENABLEDEVICE, '', $this->sessionId, $this->replyId);
         @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
         $this->receiveData();
+        $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
         return true;
     }
     
@@ -376,6 +379,7 @@ class ZKTecoDevice extends BiometricDevice {
         $command = $this->createHeader(self::CMD_DISABLEDEVICE, '', $this->sessionId, $this->replyId);
         @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
         $this->receiveData();
+        $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
         return true;
     }
     
@@ -391,10 +395,12 @@ class ZKTecoDevice extends BiometricDevice {
             return null;
         }
         
+        $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+        
         $respCommandId = unpack('v', substr($response, 0, 2))[1];
         
         if ($respCommandId == self::CMD_ACK_OK || $respCommandId == self::CMD_ACK_DATA) {
-            return trim(substr($response, 8));
+            return trim(substr($response, 8), "\x00\x20");
         }
         
         return null;
