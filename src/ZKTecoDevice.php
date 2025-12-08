@@ -12,8 +12,8 @@ class ZKTecoDevice extends BiometricDevice {
     private const CMD_ENABLEDEVICE = 1002;
     private const CMD_DISABLEDEVICE = 1003;
     private const CMD_GET_VERSION = 1100;
-    private const CMD_GET_SERIALNUMBER = 1101;
-    private const CMD_GET_DEVICENAME = 1102;
+    private const CMD_GET_SERIAL = 11;
+    private const CMD_OPTIONS_RRQ = 13;
     private const CMD_ACK_OK = 2000;
     private const CMD_ACK_ERROR = 2001;
     private const CMD_ACK_DATA = 2002;
@@ -312,15 +312,41 @@ class ZKTecoDevice extends BiometricDevice {
     }
     
     private function getDeviceName(): string {
-        return $this->executeCommand(self::CMD_GET_DEVICENAME) ?: 'Unknown';
+        return $this->executeCommandWithData(self::CMD_OPTIONS_RRQ, "~DeviceName\x00") ?: 'Unknown';
     }
     
     private function getSerialNumber(): string {
-        return $this->executeCommand(self::CMD_GET_SERIALNUMBER) ?: 'Unknown';
+        return $this->executeCommand(self::CMD_GET_SERIAL) ?: 'Unknown';
     }
     
     private function getVersion(): string {
         return $this->executeCommand(self::CMD_GET_VERSION) ?: 'Unknown';
+    }
+    
+    private function executeCommandWithData(int $commandId, string $data): ?string {
+        $command = $this->createHeader($commandId, $data, $this->sessionId, $this->replyId);
+        
+        if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+            return null;
+        }
+        
+        $response = $this->receiveData();
+        if ($response === false) {
+            return null;
+        }
+        
+        $respCommandId = unpack('v', substr($response, 0, 2))[1];
+        
+        if ($respCommandId == self::CMD_ACK_OK || $respCommandId == self::CMD_ACK_DATA) {
+            $result = trim(substr($response, 8));
+            if (strpos($result, '=') !== false) {
+                $parts = explode('=', $result, 2);
+                return trim($parts[1] ?? $result);
+            }
+            return $result;
+        }
+        
+        return null;
     }
     
     private function enableDevice(): bool {
