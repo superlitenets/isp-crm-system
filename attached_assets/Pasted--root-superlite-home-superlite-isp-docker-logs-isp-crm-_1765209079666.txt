@@ -1,0 +1,103 @@
+
+root@superlite:/home/superlite/isp# docker logs isp_crm_php 2>&1 | tail -100
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:41:05 +0000 "GET /index.php" 200
+172.18.0.5 -  08/Dec/2025:15:41:11 +0000 "GET /index.php" 200
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column c.reviewed_by does not exist
+LINE 6:             LEFT JOIN users u ON c.reviewed_by = u.id
+                                         ^ in /var/www/html/src/Complaint.php:126
+Stack trace:
+#0 /var/www/html/src/Complaint.php(126): PDOStatement->execute()
+#1 /var/www/html/templates/complaints.php(17): App\Complaint->getAll()
+#2 /var/www/html/public/index.php(3275): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Complaint.php on line 126
+172.18.0.5 -  08/Dec/2025:15:41:15 +0000 "GET /index.php" 500
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:41:18 +0000 "GET /index.php" 500
+172.18.0.5 -  08/Dec/2025:15:41:21 +0000 "GET /index.php" 200
+NOTICE: PHP message: Public complaint submission error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "customer_location" of relation "complaints" does not exist
+LINE 4:                 customer_email, customer_location, category,...
+                                        ^
+172.18.0.5 -  08/Dec/2025:15:41:43 +0000 "POST /index.php" 200
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:41:49 +0000 "GET /index.php" 500
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+172.18.0.5 -  08/Dec/2025:15:41:52 +0000 "GET /index.php" 500
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:41:57 +0000 "POST /index.php" 200
+NOTICE: PHP message: Public complaint submission error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "customer_location" of relation "complaints" does not exist
+LINE 4:                 customer_email, customer_location, category,...
+                                        ^
+NOTICE: PHP message: Public complaint submission error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "customer_location" of relation "complaints" does not exist
+172.18.0.5 -  08/Dec/2025:15:42:01 +0000 "POST /index.php" 200
+LINE 4:                 customer_email, customer_location, category,...
+                                        ^
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:42:05 +0000 "GET /index.php" 500
+172.18.0.5 -  08/Dec/2025:15:42:07 +0000 "GET /index.php" 500
+NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to undefined method App\Customer::getCustomers() in /var/www/html/templates/payments.php:72
+Stack trace:
+#0 /var/www/html/public/index.php(3261): include()
+#1 {main}
+  thrown in /var/www/html/templates/payments.php on line 72
+172.18.0.5 -  08/Dec/2025:15:42:09 +0000 "GET /index.php" 200
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:44:28 +0000 "GET /index.php" 500
+172.18.0.5 -  08/Dec/2025:15:44:31 +0000 "GET /index.php" 200
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column o.ticket_id does not exist
+LINE 10:             LEFT JOIN tickets t ON o.ticket_id = t.id
+                                            ^ in /var/www/html/src/Order.php:240
+Stack trace:
+172.18.0.5 -  08/Dec/2025:15:44:34 +0000 "GET /index.php" 500
+#0 /var/www/html/src/Order.php(240): PDOStatement->execute()
+#1 /var/www/html/templates/orders.php(475): App\Order->getAll()
+#2 /var/www/html/public/index.php(3268): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Order.php on line 240
+172.18.0.5 -  08/Dec/2025:15:48:43 +0000 "GET /index.php" 200
+172.18.0.5 -  08/Dec/2025:15:48:44 +0000 "POST /index.php" 302
+172.18.0.5 -  08/Dec/2025:15:48:45 +0000 "GET /view/systemConfig/management/nmc_sync.php" 404
+root@superlite:/home/superlite/isp#
