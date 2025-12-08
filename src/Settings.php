@@ -325,6 +325,8 @@ class Settings {
             'whatsapp_country_code', 
             'whatsapp_default_message',
             'whatsapp_provider',
+            'whatsapp_session_url',
+            'whatsapp_session_secret',
             'whatsapp_meta_token',
             'whatsapp_phone_number_id',
             'whatsapp_business_id',
@@ -340,7 +342,7 @@ class Settings {
         
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                $secretFields = ['whatsapp_meta_token', 'whatsapp_waha_api_key', 'whatsapp_ultramsg_token', 'whatsapp_custom_api_key'];
+                $secretFields = ['whatsapp_meta_token', 'whatsapp_waha_api_key', 'whatsapp_ultramsg_token', 'whatsapp_custom_api_key', 'whatsapp_session_secret'];
                 $type = in_array($field, $secretFields) ? 'secret' : 'text';
                 $this->set($field, $data[$field], $type);
             }
