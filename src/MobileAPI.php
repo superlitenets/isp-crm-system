@@ -253,8 +253,21 @@ class MobileAPI {
     }
     
     public function updateTicketStatus(int $ticketId, int $userId, string $status, ?string $comment = null): bool {
-        $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ? AND assigned_to = ?");
-        $result = $stmt->execute([$status, $ticketId, $userId]);
+        $stmt = $this->db->prepare("
+            SELECT t.*, c.phone as customer_phone, c.name as customer_name, t.ticket_number
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            WHERE t.id = ? AND t.assigned_to = ?
+        ");
+        $stmt->execute([$ticketId, $userId]);
+        $ticket = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$ticket) {
+            return false;
+        }
+        
+        $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
+        $result = $stmt->execute([$status, $ticketId]);
         
         if ($result && $comment) {
             $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
@@ -266,7 +279,59 @@ class MobileAPI {
             $stmt->execute([$ticketId]);
         }
         
+        if ($result && !empty($ticket['customer_phone'])) {
+            $this->sendStatusNotification($ticket, $status);
+        }
+        
         return $result;
+    }
+    
+    private function sendStatusNotification(array $ticket, string $status): void {
+        try {
+            $settings = new Settings();
+            $smsEnabled = $settings->get('sms_enabled', false);
+            $waEnabled = $settings->get('whatsapp_enabled', false);
+            
+            if (!$smsEnabled && !$waEnabled) {
+                return;
+            }
+            
+            $statusLabels = [
+                'open' => 'Open',
+                'in_progress' => 'In Progress',
+                'pending' => 'Pending',
+                'resolved' => 'Resolved',
+                'closed' => 'Closed'
+            ];
+            
+            $statusLabel = $statusLabels[$status] ?? ucfirst($status);
+            $ticketNumber = $ticket['ticket_number'] ?? $ticket['id'];
+            
+            $template = $settings->get('sms_template_status_update', 
+                'Your ticket #{ticket_number} status has been updated to: {status}. Thank you for your patience.');
+            
+            $message = str_replace(
+                ['{ticket_number}', '{status}', '{customer_name}'],
+                [$ticketNumber, $statusLabel, $ticket['customer_name'] ?? 'Customer'],
+                $template
+            );
+            
+            if ($smsEnabled) {
+                $sms = new SMSGateway();
+                if ($sms->isEnabled()) {
+                    $sms->send($ticket['customer_phone'], $message);
+                }
+            }
+            
+            if ($waEnabled) {
+                $wa = new WhatsApp();
+                if ($wa->isEnabled()) {
+                    $wa->send($ticket['customer_phone'], $message);
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("MobileAPI notification error: " . $e->getMessage());
+        }
     }
     
     public function addTicketComment(int $ticketId, int $userId, string $comment): bool {
@@ -871,6 +936,15 @@ class MobileAPI {
             return false;
         }
         
+        $stmt = $this->db->prepare("
+            SELECT t.*, c.phone as customer_phone, c.name as customer_name, t.ticket_number
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            WHERE t.id = ?
+        ");
+        $stmt->execute([$ticketId]);
+        $ticket = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
         $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
         $result = $stmt->execute([$status, $ticketId]);
         
@@ -882,6 +956,10 @@ class MobileAPI {
         if ($status === 'resolved') {
             $stmt = $this->db->prepare("UPDATE tickets SET resolved_at = NOW() WHERE id = ?");
             $stmt->execute([$ticketId]);
+        }
+        
+        if ($result && $ticket && !empty($ticket['customer_phone'])) {
+            $this->sendStatusNotification($ticket, $status);
         }
         
         return $result;
