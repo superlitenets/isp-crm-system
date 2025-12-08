@@ -654,3 +654,123 @@ body {
 .equipment-item {
     border-left: 3px solid #198754;
 }
+
+/* Location Permission Modal */
+.location-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.location-modal {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.location-modal-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.location-modal-icon i {
+    font-size: 2rem;
+    color: white;
+}
+
+.location-modal-icon.error {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+}
+
+.location-modal h5 {
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.location-modal p {
+    color: #666;
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+}
+
+.location-modal.error h5 {
+    color: #dc3545;
+}
+
+.location-checklist {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+    text-align: left;
+}
+
+.location-checklist li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #444;
+}
+
+.location-checklist li:last-child {
+    border-bottom: none;
+}
+
+.location-checklist i {
+    color: #198754;
+    font-size: 1rem;
+}
+
+.location-modal-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.location-modal-buttons .btn {
+    flex: 1;
+    padding: 0.65rem 1rem;
+    font-weight: 500;
+}
+
+.location-spinner {
+    margin-bottom: 1rem;
+}
+
+.location-spinner .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
