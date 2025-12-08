@@ -338,17 +338,11 @@ const app = {
     },
     
     async clockIn() {
-        this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
         
-        if (location.error || !location.latitude || !location.longitude) {
-            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
-            return;
-        }
-        
         const result = await this.api('clock-in', 'POST', {
-            latitude: location.latitude,
-            longitude: location.longitude
+            latitude: location.latitude || null,
+            longitude: location.longitude || null
         });
         
         if (result.success) {
@@ -360,17 +354,11 @@ const app = {
     },
     
     async clockOut() {
-        this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
         
-        if (location.error || !location.latitude || !location.longitude) {
-            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
-            return;
-        }
-        
         const result = await this.api('clock-out', 'POST', {
-            latitude: location.latitude,
-            longitude: location.longitude
+            latitude: location.latitude || null,
+            longitude: location.longitude || null
         });
         
         if (result.success) {
