@@ -492,7 +492,6 @@ const app = {
                         <div class="mb-3">
                             <label class="form-label">Serial Number <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="close-router-serial" placeholder="Enter serial number" required>
-                            <div class="invalid-feedback">Serial number is required</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Resolution Notes</label>
@@ -522,12 +521,10 @@ const app = {
         const serialValue = serialInput.value.trim();
         
         if (!serialValue) {
-            serialInput.classList.add('is-invalid');
             this.showToast('Serial number is required', 'warning');
             serialInput.focus();
             return;
         }
-        serialInput.classList.remove('is-invalid');
         
         const data = {
             ticket_id: ticketId,

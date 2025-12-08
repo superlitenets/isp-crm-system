@@ -296,37 +296,16 @@ class MobileAPI {
             return false;
         }
         
-        $cableMeters = isset($closureDetails['cable_meters']) && is_numeric($closureDetails['cable_meters']) 
-            ? (float)$closureDetails['cable_meters'] : null;
-        $closureDetails['cable_meters'] = $cableMeters;
-        
-        $equipmentId = !empty($closureDetails['equipment_id']) ? (int)$closureDetails['equipment_id'] : null;
-        
-        if ($equipmentId) {
-            $stmt = $this->db->prepare("SELECT name, brand, model, serial_number FROM equipment WHERE id = ?");
-            $stmt->execute([$equipmentId]);
-            $equipment = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($equipment) {
-                $closureDetails['router_model'] = trim(($equipment['brand'] ?? '') . ' ' . ($equipment['model'] ?? ''));
-                $closureDetails['router_serial'] = $equipment['serial_number'] ?? $closureDetails['router_serial'] ?? null;
-                $closureDetails['equipment_name'] = $equipment['name'];
-            }
-        }
-        
-        $detailsJson = json_encode($closureDetails);
-        
         $stmt = $this->db->prepare("
             UPDATE tickets SET 
                 status = 'resolved',
                 resolved_at = NOW(),
-                closure_details = ?,
-                equipment_used_id = ?,
                 updated_at = NOW()
             WHERE id = ?
         ");
-        $result = $stmt->execute([$detailsJson, $equipmentId, $ticketId]);
+        $result = $stmt->execute([$ticketId]);
         
-        if ($result && !empty($closureDetails['comment'])) {
+        if ($result) {
             $comment = "Ticket resolved. ";
             if (!empty($closureDetails['cable_meters'])) {
                 $comment .= "Cable used: " . $closureDetails['cable_meters'] . "m. ";
@@ -337,7 +316,9 @@ class MobileAPI {
             if (!empty($closureDetails['router_serial'])) {
                 $comment .= "S/N: " . $closureDetails['router_serial'] . ". ";
             }
-            $comment .= $closureDetails['comment'];
+            if (!empty($closureDetails['comment'])) {
+                $comment .= $closureDetails['comment'];
+            }
             
             $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
             $stmt->execute([$ticketId, $userId, $comment]);
