@@ -442,7 +442,7 @@ class MobileAPI {
             JOIN equipment e ON ea.equipment_id = e.id
             LEFT JOIN customers c ON ea.customer_id = c.id
             WHERE ea.employee_id = ? AND ea.status = 'assigned'
-            ORDER BY ea.assigned_date DESC
+            ORDER BY ea.assignment_date DESC
         ");
         $stmt->execute([$employee['id']]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
