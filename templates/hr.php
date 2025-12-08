@@ -344,6 +344,9 @@ $allRoles = $roleManager->getAllRoles();
                     <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
                         <i class="bi bi-upload"></i> Register to Device
                     </button>
+                    <button type="button" class="btn btn-outline-info" onclick="viewDeviceUsers()">
+                        <i class="bi bi-people"></i> View Device Users
+                    </button>
                     <button type="button" class="btn btn-outline-danger" onclick="removeFromBiometric(<?= $employeeData['id'] ?>)">
                         <i class="bi bi-trash"></i> Remove from Device
                     </button>
@@ -424,6 +427,98 @@ function removeFromBiometric(employeeId) {
         statusDiv.className = 'alert alert-danger mb-3';
         statusDiv.textContent = 'Error: ' + e.message;
     });
+}
+
+function viewDeviceUsers() {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.textContent = 'Fetching users from device...';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=fetch-device-users&device_id=' + deviceId)
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.classList.add('d-none');
+            showDeviceUsersModal(data);
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.textContent = 'Error: ' + e.message;
+    });
+}
+
+function showDeviceUsersModal(data) {
+    var existingModal = document.getElementById('deviceUsersModal');
+    if (existingModal) existingModal.remove();
+    
+    var modalHtml = '<div class="modal fade" id="deviceUsersModal" tabindex="-1">' +
+        '<div class="modal-dialog modal-lg">' +
+        '<div class="modal-content">' +
+        '<div class="modal-header">' +
+        '<h5 class="modal-title"><i class="bi bi-people"></i> Device Users - ' + data.device_name + '</h5>' +
+        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+        '<p class="text-muted">Total users on device: <strong>' + data.user_count + '</strong></p>' +
+        '<div class="table-responsive"><table class="table table-sm table-striped">' +
+        '<thead><tr><th>Device User ID</th><th>Name</th><th>Linked Employee</th><th>Actions</th></tr></thead>' +
+        '<tbody>';
+    
+    if (data.users && data.users.length > 0) {
+        data.users.forEach(function(user) {
+            var linkedText = user.linked_employee ? 
+                '<span class="text-success"><i class="bi bi-check-circle"></i> ' + user.linked_employee.name + ' (ID: ' + user.linked_employee.id + ')</span>' : 
+                '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Not linked</span>';
+            modalHtml += '<tr>' +
+                '<td><strong>' + user.device_user_id + '</strong></td>' +
+                '<td>' + (user.name || '-') + '</td>' +
+                '<td>' + linkedText + '</td>' +
+                '<td><button class="btn btn-sm btn-outline-primary" onclick="linkDeviceUser(\'' + user.device_user_id + '\')"><i class="bi bi-link"></i> Link</button></td>' +
+                '</tr>';
+        });
+    } else {
+        modalHtml += '<tr><td colspan="4" class="text-center text-muted">No users found on device</td></tr>';
+    }
+    
+    modalHtml += '</tbody></table></div></div>' +
+        '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>' +
+        '</div></div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    var modal = new bootstrap.Modal(document.getElementById('deviceUsersModal'));
+    modal.show();
+}
+
+function linkDeviceUser(deviceUserId) {
+    var empId = prompt('Enter Employee ID to link with device user ' + deviceUserId + ':');
+    if (!empId) return;
+    
+    var db = window.Database || null;
+    fetch('/biometric-api.php?action=link-device-user', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_user_id: deviceUserId,
+            employee_id: parseInt(empId)
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Device user ' + deviceUserId + ' linked to employee ID ' + empId);
+            bootstrap.Modal.getInstance(document.getElementById('deviceUsersModal')).hide();
+        } else {
+            alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(e => alert('Error: ' + e.message));
 }
 </script>
 

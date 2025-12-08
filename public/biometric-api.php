@@ -508,6 +508,76 @@ try {
             ]);
             break;
             
+        case 'link-device-user':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceUserId = $input['device_user_id'] ?? null;
+            $employeeId = $input['employee_id'] ?? null;
+            
+            if (!$deviceUserId || !$employeeId) {
+                jsonResponse(['success' => false, 'error' => 'device_user_id and employee_id are required'], 400);
+            }
+            
+            $updateStmt = $db->prepare("UPDATE employees SET biometric_id = ? WHERE id = ?");
+            $updateStmt->execute([$deviceUserId, $employeeId]);
+            
+            if ($updateStmt->rowCount() > 0) {
+                jsonResponse(['success' => true, 'message' => "Employee $employeeId linked to device user $deviceUserId"]);
+            } else {
+                jsonResponse(['success' => false, 'error' => 'Employee not found'], 404);
+            }
+            break;
+            
+        case 'fetch-device-users':
+            $deviceId = $_GET['device_id'] ?? $input['device_id'] ?? null;
+            
+            if (!$deviceId) {
+                jsonResponse(['success' => false, 'error' => 'device_id is required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $device['password_encrypted']
+            );
+            
+            $users = $hikDevice->getUsers();
+            
+            $empStmt = $db->query("SELECT id, name, biometric_id FROM employees");
+            $employees = $empStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $empMap = [];
+            foreach ($employees as $emp) {
+                if ($emp['biometric_id']) {
+                    $empMap[$emp['biometric_id']] = $emp;
+                }
+                $empMap[(string)$emp['id']] = $emp;
+            }
+            
+            foreach ($users as &$user) {
+                $user['linked_employee'] = $empMap[$user['device_user_id']] ?? null;
+            }
+            
+            jsonResponse([
+                'success' => true,
+                'device_name' => $device['name'],
+                'user_count' => count($users),
+                'users' => $users
+            ]);
+            break;
+            
         case 'delete-device-user':
             if ($method !== 'POST') {
                 jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
