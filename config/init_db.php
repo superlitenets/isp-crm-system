@@ -377,6 +377,30 @@ function initializeDatabase(): void {
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'manual';
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS biometric_log_id INTEGER;
 
+    CREATE TABLE IF NOT EXISTS equipment_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS equipment (
+        id SERIAL PRIMARY KEY,
+        category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+        name VARCHAR(100) NOT NULL,
+        serial_number VARCHAR(100),
+        model VARCHAR(100),
+        manufacturer VARCHAR(100),
+        purchase_date DATE,
+        purchase_price DECIMAL(12, 2),
+        status VARCHAR(20) DEFAULT 'available',
+        condition VARCHAR(20) DEFAULT 'good',
+        location VARCHAR(100),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS closure_details JSONB DEFAULT '{}';
     ALTER TABLE tickets ADD COLUMN IF NOT EXISTS equipment_used_id INTEGER REFERENCES equipment(id);
 
