@@ -134,16 +134,18 @@ XML;
         $hasMore = true;
         
         while ($hasMore) {
-            $xml = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<UserInfoSearchCond>
-    <searchID>0</searchID>
-    <searchResultPosition>{$searchPosition}</searchResultPosition>
-    <maxResults>{$maxResults}</maxResults>
-</UserInfoSearchCond>
-XML;
+            $json = json_encode([
+                'UserInfoSearchCond' => [
+                    'searchID' => '0',
+                    'searchResultPosition' => $searchPosition,
+                    'maxResults' => $maxResults
+                ]
+            ]);
             
-            $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $xml);
+            $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $json, 'application/json');
+            
+            error_log("Hikvision getUsers response code: " . $response['code']);
+            error_log("Hikvision getUsers response body: " . substr($response['body'] ?? '', 0, 500));
             
             if ($response['code'] !== 200) {
                 $this->setError('Failed to get users: ' . ($response['error'] ?? 'HTTP ' . $response['code']));
@@ -152,21 +154,37 @@ XML;
             
             $data = json_decode($response['body'], true);
             
-            if (!$data || !isset($data['UserInfoSearch']['UserInfo'])) {
+            if (!$data) {
+                error_log("Hikvision getUsers: Failed to parse JSON response");
                 break;
             }
             
-            foreach ($data['UserInfoSearch']['UserInfo'] as $userInfo) {
+            if (!isset($data['UserInfoSearch']['UserInfo'])) {
+                error_log("Hikvision getUsers: No UserInfo in response. Keys: " . implode(', ', array_keys($data)));
+                $totalMatches = $data['UserInfoSearch']['totalMatches'] ?? 0;
+                if ($totalMatches == 0) {
+                    break;
+                }
+            }
+            
+            $userList = $data['UserInfoSearch']['UserInfo'] ?? [];
+            if (!is_array($userList)) {
+                $userList = [$userList];
+            }
+            
+            foreach ($userList as $userInfo) {
                 $users[] = [
                     'device_user_id' => $userInfo['employeeNo'] ?? '',
                     'name' => $userInfo['name'] ?? '',
                     'card_no' => $userInfo['numOfCard'] ?? 0,
+                    'has_fingerprint' => ($userInfo['numOfFP'] ?? 0) > 0,
+                    'has_face' => ($userInfo['numOfFace'] ?? 0) > 0,
                     'role' => 0
                 ];
             }
             
             $totalMatches = $data['UserInfoSearch']['totalMatches'] ?? 0;
-            $numOfMatches = $data['UserInfoSearch']['numOfMatches'] ?? 0;
+            $numOfMatches = $data['UserInfoSearch']['numOfMatches'] ?? count($userList);
             
             $searchPosition += $numOfMatches;
             $hasMore = $searchPosition < $totalMatches && $numOfMatches > 0;
@@ -300,19 +318,18 @@ XML;
     }
     
     public function userExists(string $employeeNo): bool {
-        $xml = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<UserInfoSearchCond>
-    <searchID>0</searchID>
-    <searchResultPosition>0</searchResultPosition>
-    <maxResults>1</maxResults>
-    <EmployeeNoList>
-        <employeeNo>{$employeeNo}</employeeNo>
-    </EmployeeNoList>
-</UserInfoSearchCond>
-XML;
+        $json = json_encode([
+            'UserInfoSearchCond' => [
+                'searchID' => '0',
+                'searchResultPosition' => 0,
+                'maxResults' => 1,
+                'EmployeeNoList' => [
+                    ['employeeNo' => $employeeNo]
+                ]
+            ]
+        ]);
         
-        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $xml);
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $json, 'application/json');
         
         if ($response['code'] === 200) {
             $data = json_decode($response['body'], true);
@@ -324,24 +341,30 @@ XML;
     }
     
     public function getUser(string $employeeNo): ?array {
-        $xml = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<UserInfoSearchCond>
-    <searchID>0</searchID>
-    <searchResultPosition>0</searchResultPosition>
-    <maxResults>1</maxResults>
-    <EmployeeNoList>
-        <employeeNo>{$employeeNo}</employeeNo>
-    </EmployeeNoList>
-</UserInfoSearchCond>
-XML;
+        $json = json_encode([
+            'UserInfoSearchCond' => [
+                'searchID' => '0',
+                'searchResultPosition' => 0,
+                'maxResults' => 1,
+                'EmployeeNoList' => [
+                    ['employeeNo' => $employeeNo]
+                ]
+            ]
+        ]);
         
-        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $xml);
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $json, 'application/json');
+        
+        error_log("Hikvision getUser($employeeNo) response code: " . $response['code']);
+        error_log("Hikvision getUser($employeeNo) response body: " . substr($response['body'] ?? '', 0, 500));
         
         if ($response['code'] === 200) {
             $data = json_decode($response['body'], true);
-            if (!empty($data['UserInfoSearch']['UserInfo'])) {
-                $userInfo = $data['UserInfoSearch']['UserInfo'][0];
+            $userList = $data['UserInfoSearch']['UserInfo'] ?? [];
+            if (!is_array($userList)) {
+                $userList = [$userList];
+            }
+            if (!empty($userList)) {
+                $userInfo = $userList[0];
                 return [
                     'device_user_id' => $userInfo['employeeNo'] ?? '',
                     'name' => $userInfo['name'] ?? '',
