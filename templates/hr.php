@@ -944,7 +944,7 @@ function syncAllEmployeesToDevice(deviceId) {
     <div class="col-md-4">
         <div class="card bg-success text-white">
             <div class="card-body">
-                <h4>$<?= number_format($payrollStats['total_paid'] ?? 0, 2) ?></h4>
+                <h4><?= $currencySymbol ?> <?= number_format($payrollStats['total_paid'] ?? 0, 2) ?></h4>
                 <small>Total Paid</small>
             </div>
         </div>
@@ -952,7 +952,7 @@ function syncAllEmployeesToDevice(deviceId) {
     <div class="col-md-4">
         <div class="card bg-warning text-dark">
             <div class="card-body">
-                <h4>$<?= number_format($payrollStats['total_pending'] ?? 0, 2) ?></h4>
+                <h4><?= $currencySymbol ?> <?= number_format($payrollStats['total_pending'] ?? 0, 2) ?></h4>
                 <small>Pending Payment</small>
             </div>
         </div>
@@ -1602,9 +1602,9 @@ $lastSync = $biometricService->getLastSyncTime();
                             <small class="text-muted d-block"><?= htmlspecialchars($late['employee_code'] ?? '') ?></small>
                         </td>
                         <td><?= htmlspecialchars($late['department_name'] ?? '-') ?></td>
-                        <td><?= date('g:i A', strtotime($late['expected_time'])) ?></td>
+                        <td><?= $late['expected_time'] ? date('g:i A', strtotime($late['expected_time'])) : '-' ?></td>
                         <td>
-                            <span class="text-danger"><?= date('g:i A', strtotime($late['actual_time'])) ?></span>
+                            <span class="text-danger"><?= $late['clock_in'] ? date('g:i A', strtotime($late['clock_in'])) : '-' ?></span>
                         </td>
                         <td>
                             <span class="badge bg-warning text-dark">
@@ -1612,8 +1612,8 @@ $lastSync = $biometricService->getLastSyncTime();
                             </span>
                         </td>
                         <td>
-                            <?php if ($late['deduction_amount'] > 0): ?>
-                            <span class="text-danger"><?= $late['currency'] ?? 'KES' ?> <?= number_format($late['deduction_amount'], 2) ?></span>
+                            <?php if (($late['deduction'] ?? 0) > 0): ?>
+                            <span class="text-danger"><?= $late['currency'] ?? 'KES' ?> <?= number_format($late['deduction'], 2) ?></span>
                             <?php else: ?>
                             <span class="text-muted">-</span>
                             <?php endif; ?>
@@ -1660,7 +1660,7 @@ $lastSync = $biometricService->getLastSyncTime();
                         }
                         $employeeSummary[$empId]['days']++;
                         $employeeSummary[$empId]['minutes'] += $late['late_minutes'];
-                        $employeeSummary[$empId]['deductions'] += $late['deduction_amount'];
+                        $employeeSummary[$empId]['deductions'] += ($late['deduction'] ?? 0);
                     }
                     usort($employeeSummary, fn($a, $b) => $b['deductions'] <=> $a['deductions']);
                     ?>
