@@ -106,6 +106,23 @@ if ($page === 'logout') {
     exit;
 }
 
+if ($page === 'download' && $action === 'zip') {
+    $file = __DIR__ . '/isp-crm-complete.zip';
+    if (file_exists($file)) {
+        ob_end_clean();
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="isp-crm-complete.zip"');
+        header('Content-Length: ' . filesize($file));
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Pragma: public');
+        readfile($file);
+        exit;
+    }
+    http_response_code(404);
+    echo 'File not found';
+    exit;
+}
+
 if ($page === 'api' && $action === 'late_deductions') {
     header('Content-Type: application/json');
     
