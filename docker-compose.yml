@@ -11,11 +11,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   whatsapp:
     build:
@@ -26,20 +21,13 @@ services:
     volumes:
       - whatsapp_session:/app/.wwebjs_auth
       - whatsapp_secret:/app/.api_secret_dir
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
 
   php:
     build: .
     container_name: isp_crm_php
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
       - PGHOST=db
       - PGPORT=5432
