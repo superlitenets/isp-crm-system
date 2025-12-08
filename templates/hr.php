@@ -322,8 +322,13 @@ $allRoles = $roleManager->getAllRoles();
                 <p class="mb-3"><strong>Card Number:</strong> <?= htmlspecialchars($employeeData['card_number'] ?? 'Not set') ?></p>
                 
                 <?php
-                $bioDb = Database::getConnection();
-                $bioDevices = $bioDb->query("SELECT id, name, type FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+                $bioDevices = [];
+                try {
+                    $bioDb = Database::getConnection();
+                    $bioDevices = $bioDb->query("SELECT id, name, type FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+                } catch (\Exception $e) {
+                    // Table may not exist
+                }
                 ?>
                 
                 <?php if (!empty($bioDevices)): ?>
@@ -478,8 +483,13 @@ function removeFromBiometric(employeeId) {
     <?php if ($subpage === 'employees'): ?>
     <div class="d-flex gap-2">
         <?php
-        $bioDb = Database::getConnection();
-        $hikDevices = $bioDb->query("SELECT id, name FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+        $hikDevices = [];
+        try {
+            $bioDb = Database::getConnection();
+            $hikDevices = $bioDb->query("SELECT id, name FROM biometric_devices WHERE enabled = true AND type = 'hikvision'")->fetchAll();
+        } catch (\Exception $e) {
+            // Table may not exist
+        }
         if (!empty($hikDevices)):
         ?>
         <div class="dropdown">
