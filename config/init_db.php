@@ -477,7 +477,7 @@ function initializeDatabase(): void {
             $adminPass = password_hash('admin123', PASSWORD_DEFAULT);
             $techPass = password_hash('tech123', PASSWORD_DEFAULT);
             
-            $adminRoleId = $db->query("SELECT id FROM roles WHERE name = 'administrator' LIMIT 1")->fetchColumn() ?: null;
+            $adminRoleId = $db->query("SELECT id FROM roles WHERE name = 'admin' LIMIT 1")->fetchColumn() ?: null;
             $techRoleId = $db->query("SELECT id FROM roles WHERE name = 'technician' LIMIT 1")->fetchColumn() ?: null;
             
             $stmt = $db->prepare("
