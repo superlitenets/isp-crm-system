@@ -815,7 +815,8 @@ const app = {
                 </div>
             `;
         } else {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Could not load performance data</p></div>';
+            const errorMsg = result.error || 'Could not load performance data';
+            container.innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>${errorMsg}</p></div>`;
         }
     },
     
@@ -918,7 +919,8 @@ const app = {
                 ` : ''}
             `;
         } else {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Could not load performance data</p></div>';
+            const errorMsg = result.error || 'Could not load performance data';
+            container.innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>${errorMsg}</p></div>`;
         }
     },
     
