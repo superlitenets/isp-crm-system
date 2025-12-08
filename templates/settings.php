@@ -758,7 +758,8 @@ function resetToDefaults() {
                 <div class="col-md-6">
                     <label class="form-label">WhatsApp Provider</label>
                     <select class="form-select" name="whatsapp_provider" id="whatsappProvider" onchange="toggleWhatsAppProvider()">
-                        <option value="web" <?= ($whatsappSettings['whatsapp_provider'] ?? 'web') === 'web' ? 'selected' : '' ?>>WhatsApp Web Links (No API)</option>
+                        <option value="web" <?= ($whatsappSettings['whatsapp_provider'] ?? 'web') === 'web' ? 'selected' : '' ?>>WhatsApp Web Links (Manual)</option>
+                        <option value="session" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'session' ? 'selected' : '' ?>>WhatsApp Web Session (Automated)</option>
                         <option value="meta" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'meta' ? 'selected' : '' ?>>Meta WhatsApp Business API</option>
                         <option value="waha" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'waha' ? 'selected' : '' ?>>WAHA (Self-Hosted)</option>
                         <option value="ultramsg" <?= ($whatsappSettings['whatsapp_provider'] ?? '') === 'ultramsg' ? 'selected' : '' ?>>UltraMsg API</option>
@@ -780,6 +781,61 @@ function resetToDefaults() {
                     <input type="text" class="form-control" name="whatsapp_default_message" 
                            value="<?= htmlspecialchars($whatsappSettings['whatsapp_default_message'] ?? '') ?>" 
                            placeholder="Hello!">
+                </div>
+            </div>
+            
+            <div id="waProviderSession" class="provider-config mt-4" style="display: none;">
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>WhatsApp Web Session</strong> - Sends messages automatically via your WhatsApp account. Scan QR code to connect. <em>Best for local/self-hosted deployments.</em>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Session Service URL</label>
+                        <input type="url" class="form-control" name="whatsapp_session_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_session_url', 'http://localhost:3001')) ?>" 
+                               placeholder="http://localhost:3001">
+                        <small class="text-muted">URL of the WhatsApp session service</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Session Status</label>
+                        <div id="waSessionStatus" class="border rounded p-3 bg-light">
+                            <span class="text-muted">Click "Check Status" to view</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <button type="button" class="btn btn-primary" onclick="checkSessionStatus()">
+                        <i class="bi bi-arrow-repeat"></i> Check Status
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="initializeSession()">
+                        <i class="bi bi-play-fill"></i> Start Session
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="logoutSession()">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="loadGroups()">
+                        <i class="bi bi-people"></i> Load Groups
+                    </button>
+                </div>
+                <div id="waQRContainer" class="text-center mb-3" style="display: none;">
+                    <h6 class="mb-2">Scan this QR Code with WhatsApp</h6>
+                    <img id="waQRCode" src="" alt="QR Code" style="max-width: 300px;">
+                    <p class="text-muted small mt-2">Open WhatsApp on your phone > Menu > Linked Devices > Link a Device</p>
+                </div>
+                <div id="waGroupsList" class="mb-3" style="display: none;">
+                    <h6 class="mb-2">Your WhatsApp Groups</h6>
+                    <div id="waGroupsTable" class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Group Name</th>
+                                    <th>Members</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="waGroupsBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             
@@ -895,8 +951,132 @@ function toggleWhatsAppProvider() {
 }
 document.addEventListener('DOMContentLoaded', toggleWhatsAppProvider);
 
+const waSessionUrl = '<?= htmlspecialchars($settings->get('whatsapp_session_url', 'http://localhost:3001')) ?>';
+
+function checkSessionStatus() {
+    const statusDiv = document.getElementById('waSessionStatus');
+    statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Checking...</span>';
+    
+    fetch(waSessionUrl + '/status')
+        .then(r => r.json())
+        .then(data => {
+            let html = '';
+            if (data.status === 'connected') {
+                html = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Connected</span>';
+                if (data.info) {
+                    html += '<br><small class="text-muted">Phone: ' + (data.info.phone || 'N/A') + '</small>';
+                    html += '<br><small class="text-muted">Name: ' + (data.info.pushname || 'N/A') + '</small>';
+                }
+                document.getElementById('waQRContainer').style.display = 'none';
+            } else if (data.status === 'qr_ready') {
+                html = '<span class="text-warning"><i class="bi bi-qr-code"></i> Waiting for QR scan</span>';
+                fetchQRCode();
+            } else if (data.status === 'initializing') {
+                html = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Initializing...</span>';
+                setTimeout(checkSessionStatus, 2000);
+            } else {
+                html = '<span class="text-secondary"><i class="bi bi-x-circle"></i> ' + (data.status || 'Disconnected') + '</span>';
+            }
+            statusDiv.innerHTML = html;
+        })
+        .catch(err => {
+            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Service not running</span><br><small class="text-muted">Start the WhatsApp service first</small>';
+        });
+}
+
+function fetchQRCode() {
+    fetch(waSessionUrl + '/qr')
+        .then(r => r.json())
+        .then(data => {
+            if (data.qr) {
+                document.getElementById('waQRCode').src = data.qr;
+                document.getElementById('waQRContainer').style.display = 'block';
+                setTimeout(checkSessionStatus, 5000);
+            }
+        })
+        .catch(err => console.error('QR fetch error:', err));
+}
+
+function initializeSession() {
+    const statusDiv = document.getElementById('waSessionStatus');
+    statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Starting session...</span>';
+    
+    fetch(waSessionUrl + '/initialize', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            setTimeout(checkSessionStatus, 3000);
+        })
+        .catch(err => {
+            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Failed to start</span>';
+        });
+}
+
+function logoutSession() {
+    if (!confirm('Are you sure you want to logout from WhatsApp?')) return;
+    
+    const statusDiv = document.getElementById('waSessionStatus');
+    statusDiv.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Logging out...</span>';
+    
+    fetch(waSessionUrl + '/logout', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            statusDiv.innerHTML = '<span class="text-secondary"><i class="bi bi-check-circle"></i> Logged out</span>';
+            document.getElementById('waQRContainer').style.display = 'none';
+            document.getElementById('waGroupsList').style.display = 'none';
+        })
+        .catch(err => {
+            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Logout failed</span>';
+        });
+}
+
+function loadGroups() {
+    const groupsBody = document.getElementById('waGroupsBody');
+    groupsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Loading...</td></tr>';
+    document.getElementById('waGroupsList').style.display = 'block';
+    
+    fetch(waSessionUrl + '/groups')
+        .then(r => r.json())
+        .then(data => {
+            if (data.groups && data.groups.length > 0) {
+                groupsBody.innerHTML = data.groups.map(g => 
+                    '<tr><td>' + g.name + '</td><td>' + (g.participantsCount || 'N/A') + '</td><td><button class="btn btn-sm btn-outline-success" onclick="testGroupMessage(\'' + g.id + '\')"><i class="bi bi-send"></i></button></td></tr>'
+                ).join('');
+            } else {
+                groupsBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No groups found</td></tr>';
+            }
+        })
+        .catch(err => {
+            groupsBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Failed to load groups</td></tr>';
+        });
+}
+
+function testGroupMessage(groupId) {
+    const message = prompt('Enter test message for this group:');
+    if (!message) return;
+    
+    fetch(waSessionUrl + '/send-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, message })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Message sent successfully!');
+        } else {
+            alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Error: ' + err.message));
+}
+
 function testWhatsAppGateway() {
-    alert('WhatsApp gateway test - Coming soon! For now, save settings and try sending a message from a ticket.');
+    const provider = document.getElementById('whatsappProvider').value;
+    if (provider === 'session') {
+        checkSessionStatus();
+    } else {
+        alert('WhatsApp gateway test - Coming soon! For now, save settings and try sending a message from a ticket.');
+    }
 }
 </script>
 

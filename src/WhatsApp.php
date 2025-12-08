@@ -10,12 +10,14 @@ class WhatsApp {
     private ?string $apiKey = null;
     private ?string $phoneNumberId = null;
     private ?string $businessId = null;
+    private string $sessionServiceUrl = 'http://localhost:3001';
     
     public function __construct() {
         $settings = new Settings();
         $this->enabled = $settings->get('whatsapp_enabled', '1') === '1';
         $this->defaultCountryCode = $settings->get('whatsapp_country_code', '254');
         $this->provider = $settings->get('whatsapp_provider', 'web');
+        $this->sessionServiceUrl = $settings->get('whatsapp_session_url', 'http://localhost:3001');
         
         if ($this->provider === 'meta') {
             $this->apiKey = $settings->get('whatsapp_meta_token', '') ?: getenv('WHATSAPP_META_TOKEN') ?: null;
@@ -32,6 +34,8 @@ class WhatsApp {
         } elseif ($this->provider === 'custom') {
             $this->apiUrl = $settings->get('whatsapp_custom_url', '') ?: getenv('WHATSAPP_CUSTOM_URL') ?: null;
             $this->apiKey = $settings->get('whatsapp_custom_api_key', '') ?: getenv('WHATSAPP_CUSTOM_API_KEY') ?: null;
+        } elseif ($this->provider === 'session') {
+            $this->apiUrl = $this->sessionServiceUrl;
         }
     }
     
@@ -57,13 +61,14 @@ class WhatsApp {
         
         $types = [
             'web' => 'WhatsApp Web Links',
+            'session' => 'WhatsApp Web Session',
             'meta' => 'Meta WhatsApp Business API',
             'waha' => 'WAHA (WhatsApp HTTP API)',
             'ultramsg' => 'UltraMsg API',
             'custom' => 'Custom API Gateway'
         ];
         
-        $configured = $this->provider === 'web' || $this->isApiConfigured();
+        $configured = $this->provider === 'web' || $this->provider === 'session' || $this->isApiConfigured();
         
         return [
             'status' => $configured ? 'Enabled' : 'Not Configured',
@@ -107,7 +112,7 @@ class WhatsApp {
             ];
         }
         
-        if ($this->provider === 'web' || !$this->isApiConfigured()) {
+        if ($this->provider === 'web') {
             return [
                 'success' => true,
                 'method' => 'web',
@@ -116,6 +121,22 @@ class WhatsApp {
                 'message' => $message,
                 'phone' => $this->formatPhone($phone),
                 'note' => 'Click the link to send via WhatsApp Web'
+            ];
+        }
+        
+        if ($this->provider === 'session') {
+            return $this->sendViaSession($phone, $message);
+        }
+        
+        if (!$this->isApiConfigured()) {
+            return [
+                'success' => true,
+                'method' => 'web',
+                'whatsapp_link' => $this->generateLink($phone, $message),
+                'web_link' => $this->generateWebLink($phone, $message),
+                'message' => $message,
+                'phone' => $this->formatPhone($phone),
+                'note' => 'API not configured - Click the link to send via WhatsApp Web'
             ];
         }
         
@@ -297,6 +318,10 @@ class WhatsApp {
             ];
         }
         
+        if ($this->provider === 'session') {
+            return $this->getSessionStatus();
+        }
+        
         if (!$this->isApiConfigured()) {
             return [
                 'success' => false,
@@ -310,5 +335,248 @@ class WhatsApp {
             'gateway' => $this->getGatewayInfo(),
             'api_url' => $this->apiUrl ? substr($this->apiUrl, 0, 50) . '...' : null
         ];
+    }
+    
+    public function getSessionStatus(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/status');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error || $httpCode !== 200) {
+                return [
+                    'success' => false,
+                    'status' => 'service_unavailable',
+                    'error' => $error ?: 'Service not running',
+                    'provider' => 'session'
+                ];
+            }
+            
+            $data = json_decode($response, true);
+            return [
+                'success' => $data['status'] === 'connected',
+                'status' => $data['status'],
+                'hasQR' => $data['hasQR'] ?? false,
+                'info' => $data['info'] ?? null,
+                'provider' => 'session',
+                'gateway' => $this->getGatewayInfo()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'status' => 'error',
+                'error' => $e->getMessage(),
+                'provider' => 'session'
+            ];
+        }
+    }
+    
+    public function initializeSession(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/initialize');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error];
+            }
+            
+            return json_decode($response, true) ?? ['success' => false, 'error' => 'Invalid response'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSessionQR(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/qr');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error];
+            }
+            
+            return json_decode($response, true) ?? ['success' => false, 'error' => 'Invalid response'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function logoutSession(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/logout');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error];
+            }
+            
+            return json_decode($response, true) ?? ['success' => false, 'error' => 'Invalid response'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSessionGroups(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error || $httpCode !== 200) {
+                return ['success' => false, 'error' => $error ?: 'Failed to get groups', 'groups' => []];
+            }
+            
+            $data = json_decode($response, true);
+            return ['success' => true, 'groups' => $data['groups'] ?? []];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'groups' => []];
+        }
+    }
+    
+    public function sendViaSession(string $phone, string $message): array {
+        $formattedPhone = $this->formatPhone($phone);
+        
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                'phone' => $formattedPhone,
+                'message' => $message
+            ]));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return [
+                    'success' => false,
+                    'error' => $error,
+                    'method' => 'session',
+                    'provider' => 'session',
+                    'whatsapp_link' => $this->generateLink($phone, $message)
+                ];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if ($httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false)) {
+                return [
+                    'success' => true,
+                    'method' => 'session',
+                    'provider' => 'session',
+                    'messageId' => $data['messageId'] ?? null,
+                    'phone' => $formattedPhone,
+                    'message' => $message
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => $data['error'] ?? "HTTP $httpCode",
+                    'method' => 'session',
+                    'provider' => 'session',
+                    'http_code' => $httpCode,
+                    'whatsapp_link' => $this->generateLink($phone, $message)
+                ];
+            }
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'method' => 'session',
+                'provider' => 'session',
+                'whatsapp_link' => $this->generateLink($phone, $message)
+            ];
+        }
+    }
+    
+    public function sendToGroup(string $groupId, string $message): array {
+        if ($this->provider !== 'session') {
+            return ['success' => false, 'error' => 'Group messaging only available with session provider'];
+        }
+        
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send-group');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                'groupId' => $groupId,
+                'message' => $message
+            ]));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error, 'method' => 'session'];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if ($httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false)) {
+                return [
+                    'success' => true,
+                    'method' => 'session',
+                    'messageId' => $data['messageId'] ?? null,
+                    'groupId' => $groupId
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => $data['error'] ?? "HTTP $httpCode",
+                    'method' => 'session',
+                    'http_code' => $httpCode
+                ];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'method' => 'session'];
+        }
     }
 }
