@@ -11,6 +11,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - crm_network
 
   whatsapp:
     build:
@@ -21,6 +23,8 @@ services:
     volumes:
       - whatsapp_session:/app/.wwebjs_auth
       - whatsapp_secret:/app/.api_secret_dir
+    networks:
+      - crm_network
 
   php:
     build: .
@@ -58,6 +62,8 @@ services:
     volumes:
       - ./logs:/var/www/html/logs
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
+    networks:
+      - crm_network
 
   nginx:
     image: nginx:stable-alpine
@@ -70,7 +76,13 @@ services:
     volumes:
       - ./:/var/www/html:ro
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
-    
+    networks:
+      - crm_network
+
+networks:
+  crm_network:
+    driver: bridge
+
 volumes:
   db_data:
   whatsapp_session:
