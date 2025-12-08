@@ -12,9 +12,12 @@ app.use(cors({ origin: ['http://localhost:5000', 'http://127.0.0.1:5000'] }));
 app.use(bodyParser.json());
 
 const PORT = process.env.WA_PORT || 3001;
-const BIND_HOST = process.env.WA_HOST || '127.0.0.1';
+const BIND_HOST = process.env.WA_HOST || (process.env.DOCKER_ENV ? '0.0.0.0' : '127.0.0.1');
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
-const API_SECRET_FILE = path.join(__dirname, '.api_secret');
+const API_SECRET_DIR = path.join(__dirname, '.api_secret_dir');
+const API_SECRET_FILE = fs.existsSync(API_SECRET_DIR) && fs.statSync(API_SECRET_DIR).isDirectory() 
+    ? path.join(API_SECRET_DIR, 'secret') 
+    : path.join(__dirname, '.api_secret');
 
 let API_SECRET = process.env.WA_API_SECRET || '';
 if (!API_SECRET) {
@@ -22,8 +25,12 @@ if (!API_SECRET) {
         API_SECRET = fs.readFileSync(API_SECRET_FILE, 'utf8').trim();
     } else {
         API_SECRET = crypto.randomBytes(32).toString('hex');
-        fs.writeFileSync(API_SECRET_FILE, API_SECRET);
-        console.log('Generated API secret saved to .api_secret');
+        if (fs.existsSync(API_SECRET_DIR) && fs.statSync(API_SECRET_DIR).isDirectory()) {
+            fs.writeFileSync(path.join(API_SECRET_DIR, 'secret'), API_SECRET);
+        } else {
+            fs.writeFileSync(API_SECRET_FILE, API_SECRET);
+        }
+        console.log('Generated API secret saved');
     }
 }
 

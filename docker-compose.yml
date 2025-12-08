@@ -17,6 +17,22 @@ services:
       timeout: 5s
       retries: 5
 
+  whatsapp:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    container_name: isp_crm_whatsapp
+    restart: unless-stopped
+    volumes:
+      - whatsapp_session:/app/.wwebjs_auth
+      - whatsapp_secret:/app/.api_secret_dir
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   php:
     build: .
     container_name: isp_crm_php
@@ -24,6 +40,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      whatsapp:
+        condition: service_started
     environment:
       - PGHOST=db
       - PGPORT=5432
@@ -40,6 +58,7 @@ services:
       - ADVANTA_URL=${ADVANTA_URL:-}
       - WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-true}
       - WHATSAPP_DEFAULT_COUNTRY_CODE=${WHATSAPP_DEFAULT_COUNTRY_CODE:-254}
+      - WHATSAPP_SESSION_URL=http://whatsapp:3001
       - SMARTOLT_API_URL=${SMARTOLT_API_URL:-}
       - SMARTOLT_API_KEY=${SMARTOLT_API_KEY:-}
       - MPESA_ENV=${MPESA_ENV:-sandbox}
@@ -52,6 +71,7 @@ services:
       - APP_URL=${APP_URL:-}
     volumes:
       - ./logs:/var/www/html/logs
+      - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
 
   nginx:
     image: nginx:stable-alpine
@@ -67,3 +87,5 @@ services:
     
 volumes:
   db_data:
+  whatsapp_session:
+  whatsapp_secret:

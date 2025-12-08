@@ -42,9 +42,14 @@ class WhatsApp {
     }
     
     private function loadSessionSecretFromFile(): ?string {
-        $secretFile = __DIR__ . '/../whatsapp-service/.api_secret';
-        if (file_exists($secretFile)) {
-            return trim(file_get_contents($secretFile));
+        $paths = [
+            __DIR__ . '/../whatsapp-service/.api_secret_dir/secret',
+            __DIR__ . '/../whatsapp-service/.api_secret',
+        ];
+        foreach ($paths as $secretFile) {
+            if (file_exists($secretFile)) {
+                return trim(file_get_contents($secretFile));
+            }
         }
         return null;
     }
