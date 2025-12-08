@@ -31,9 +31,12 @@ $teams = $db->query("SELECT id, name FROM teams ORDER BY name")->fetchAll(PDO::F
 $categoryLabels = [
     'connectivity' => 'Connectivity Issue',
     'speed' => 'Speed Issue',
-    'billing' => 'Billing Problem',
-    'equipment' => 'Equipment Issue',
+    'installation' => 'New Installation',
+    'billing' => 'Billing Inquiry',
+    'equipment' => 'Equipment Problem',
+    'outage' => 'Service Outage',
     'service' => 'Service Quality',
+    'upgrade' => 'Plan Upgrade',
     'other' => 'Other'
 ];
 

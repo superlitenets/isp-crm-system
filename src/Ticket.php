@@ -526,11 +526,12 @@ class Ticket {
     public function getCategories(): array {
         return [
             'connectivity' => 'Connectivity Issue',
-            'slow_speed' => 'Slow Speed',
+            'speed' => 'Speed Issue',
             'installation' => 'New Installation',
             'billing' => 'Billing Inquiry',
             'equipment' => 'Equipment Problem',
             'outage' => 'Service Outage',
+            'service' => 'Service Quality',
             'upgrade' => 'Plan Upgrade',
             'other' => 'Other'
         ];
