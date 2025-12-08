@@ -386,13 +386,15 @@ try {
             }
             
             if ($device['device_type'] === 'hikvision') {
+                require_once __DIR__ . '/../src/BiometricDevice.php';
                 require_once __DIR__ . '/../src/HikvisionDevice.php';
+                $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
                 $hikDevice = new \App\HikvisionDevice(
                     $device['id'],
                     $device['ip_address'],
                     $device['port'] ?: 80,
                     $device['username'],
-                    $device['password_encrypted']
+                    $password
                 );
                 $startEnrollment = $input['start_enrollment'] ?? true;
                 $result = $hikDevice->addUserWithEnrollment((string)$employeeNo, $name, $cardNo, $startEnrollment);
@@ -424,13 +426,15 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
             }
             
+            require_once __DIR__ . '/../src/BiometricDevice.php';
             require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
             $hikDevice = new \App\HikvisionDevice(
                 $device['id'],
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password_encrypted']
+                $password
             );
             
             if ($enrollType === 'fingerprint') {
@@ -466,13 +470,15 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Employee sync only supported for Hikvision devices'], 400);
             }
             
+            require_once __DIR__ . '/../src/BiometricDevice.php';
             require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
             $hikDevice = new \App\HikvisionDevice(
                 $device['id'],
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password_encrypted']
+                $password
             );
             
             if (empty($employeeIds)) {
@@ -557,13 +563,15 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
             }
             
+            require_once __DIR__ . '/../src/BiometricDevice.php';
             require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
             $hikDevice = new \App\HikvisionDevice(
                 $device['id'],
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password_encrypted']
+                $password
             );
             
             $users = $hikDevice->getUsers();
@@ -610,13 +618,15 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
             }
             
+            require_once __DIR__ . '/../src/BiometricDevice.php';
             require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
             $hikDevice = new \App\HikvisionDevice(
                 $device['id'],
                 $device['ip_address'],
                 $device['port'] ?: 80,
                 $device['username'],
-                $device['password_encrypted']
+                $password
             );
             $result = $hikDevice->deleteUser((string)$employeeNo);
             jsonResponse($result, $result['success'] ? 200 : 400);
