@@ -340,16 +340,29 @@ class Ticket {
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
             'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.',
             'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}',
-            'wa_template_ticket_created' => "Hi {customer_name},\n\nYour support ticket #{ticket_number} has been created.\n\nSubject: {subject}\nStatus: {status}\n\nWe will contact you shortly.\n\nThank you!",
-            'wa_template_ticket_assigned' => "Hi {customer_name},\n\nTechnician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.\n\nThey will contact you soon.\n\nThank you!",
-            'wa_template_technician_assigned' => "New Ticket #{ticket_number} assigned to you.\n\nCustomer: {customer_name}\nPhone: {customer_phone}\nSubject: {subject}\nPriority: {priority}\nAddress: {customer_address}",
-            'wa_template_status_update' => "Hi {customer_name},\n\nThis is an update on your ticket #{ticket_number}.\n\nCurrent Status: {status}\n\nWe're working on resolving your issue. Thank you for your patience.",
-            'wa_template_resolved' => "Hi {customer_name},\n\nGreat news! Your ticket #{ticket_number} has been resolved.\n\nIf you have any further questions or issues, please don't hesitate to contact us.\n\nThank you for choosing our services!"
+        ];
+        
+        $waToSmsMapping = [
+            'wa_template_ticket_created' => 'sms_template_ticket_created',
+            'wa_template_ticket_assigned' => 'sms_template_ticket_assigned',
+            'wa_template_technician_assigned' => 'sms_template_technician_assigned',
+            'wa_template_status_update' => 'sms_template_ticket_updated',
+            'wa_template_resolved' => 'sms_template_ticket_resolved',
         ];
         
         $placeholders['{company_name}'] = $this->settings->get('company_name', 'ISP Support');
         
-        $template = $this->settings->get($templateKey, $defaults[$templateKey] ?? 'ISP Support - Ticket #{ticket_number} - {status}');
+        $template = $this->settings->get($templateKey, '');
+        
+        if (empty(trim($template)) && str_starts_with($templateKey, 'wa_template_')) {
+            $smsKey = $waToSmsMapping[$templateKey] ?? str_replace('wa_template_', 'sms_template_', $templateKey);
+            $template = $this->settings->get($smsKey, $defaults[$smsKey] ?? '');
+        }
+        
+        if (empty(trim($template))) {
+            $template = $defaults[$templateKey] ?? 'ISP Support - Ticket #{ticket_number} - {status}';
+        }
+        
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);
     }
 
