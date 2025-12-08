@@ -329,8 +329,8 @@ class Order {
     }
     
     private function sendTicketCreatedSMS(string $ticketNumber, array $order): void {
-        $template = $this->settings->get('sms_template_order_to_ticket', 
-            'Dear {customer_name}, your order #{order_number} has been scheduled for installation. Ticket #{ticket_number} has been created. Our technician will contact you shortly.');
+        $template = $this->settings->get('sms_template_order_accepted', 
+            'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.');
         
         $placeholders = [
             '{customer_name}' => $order['customer_name'] ?? 'Customer',

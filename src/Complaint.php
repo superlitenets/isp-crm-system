@@ -287,8 +287,8 @@ class Complaint {
     }
 
     private function sendTicketCreatedSMS(string $ticketNumber, array $complaint): void {
-        $template = $this->settings->get('sms_template_ticket_created', 
-            'Dear {customer_name}, your complaint has been converted to ticket #{ticket_number}. Our team will address it shortly. Thank you for your patience.');
+        $template = $this->settings->get('sms_template_complaint_approved', 
+            'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.');
         
         $placeholders = [
             '{customer_name}' => $complaint['customer_name'] ?? 'Customer',
