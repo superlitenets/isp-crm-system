@@ -1,5 +1,5 @@
 <?php
-$file = __DIR__ . '/downloads/isp-crm-docker.zip';
+$file = __DIR__ . '/isp-crm-complete.zip';
 
 if (!file_exists($file)) {
     http_response_code(404);
@@ -7,7 +7,7 @@ if (!file_exists($file)) {
 }
 
 header('Content-Type: application/zip');
-header('Content-Disposition: attachment; filename="isp-crm-docker.zip"');
+header('Content-Disposition: attachment; filename="isp-crm-complete.zip"');
 header('Content-Length: ' . filesize($file));
 header('Cache-Control: no-cache, must-revalidate');
 header('Pragma: public');
