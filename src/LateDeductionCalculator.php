@@ -316,4 +316,104 @@ class LateDeductionCalculator {
         $stmt->execute([$payrollId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
+    
+    public function getMonthlyLateArrivals(string $month, ?int $departmentId = null): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $sql = "
+            SELECT 
+                a.date,
+                a.clock_in,
+                a.late_minutes,
+                e.id as employee_id,
+                e.name as employee_name,
+                e.employee_id as employee_code,
+                d.name as department_name,
+                s.start_time as expected_time
+            FROM attendance a
+            JOIN employees e ON a.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN shifts s ON e.shift_id = s.id
+            WHERE a.date BETWEEN ? AND ? 
+              AND a.late_minutes > 0
+              AND e.employment_status = 'active'
+        ";
+        $params = [$startDate, $endDate];
+        
+        if ($departmentId) {
+            $sql .= " AND e.department_id = ?";
+            $params[] = $departmentId;
+        }
+        
+        $sql .= " ORDER BY a.date DESC, a.late_minutes DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $arrivals = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($arrivals as &$arrival) {
+            $rule = $this->getRuleForEmployee($arrival['employee_id']);
+            $arrival['deduction'] = $rule ? $this->calculateDeduction($arrival['late_minutes'], $rule) : 0;
+            $arrival['currency'] = $rule['currency'] ?? 'KES';
+        }
+        
+        return $arrivals;
+    }
+    
+    public function getMonthlyLateStats(string $month, ?int $departmentId = null): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $sql = "
+            SELECT 
+                COUNT(*) as total_late_days,
+                COALESCE(SUM(a.late_minutes), 0) as total_late_minutes,
+                COUNT(DISTINCT a.employee_id) as employees_affected
+            FROM attendance a
+            JOIN employees e ON a.employee_id = e.id
+            WHERE a.date BETWEEN ? AND ? 
+              AND a.late_minutes > 0
+              AND e.employment_status = 'active'
+        ";
+        $params = [$startDate, $endDate];
+        
+        if ($departmentId) {
+            $sql .= " AND e.department_id = ?";
+            $params[] = $departmentId;
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $stats = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $defaultRule = $this->db->query("SELECT currency FROM late_deduction_rules WHERE is_active = true LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
+        $stats['currency'] = $defaultRule['currency'] ?? 'KES';
+        
+        $empSql = "
+            SELECT DISTINCT a.employee_id
+            FROM attendance a
+            JOIN employees e ON a.employee_id = e.id
+            WHERE a.date BETWEEN ? AND ? 
+              AND a.late_minutes > 0
+              AND e.employment_status = 'active'
+        ";
+        $empParams = [$startDate, $endDate];
+        if ($departmentId) {
+            $empSql .= " AND e.department_id = ?";
+            $empParams[] = $departmentId;
+        }
+        $empStmt = $this->db->prepare($empSql);
+        $empStmt->execute($empParams);
+        $employees = $empStmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $totalDeductions = 0;
+        foreach ($employees as $empId) {
+            $deductions = $this->calculateMonthlyDeductions($empId, $month);
+            $totalDeductions += $deductions['total_deduction'];
+        }
+        $stats['total_deductions'] = $totalDeductions;
+        
+        return $stats;
+    }
 }
