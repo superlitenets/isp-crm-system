@@ -217,12 +217,17 @@ class Ticket {
         $customer = (new Customer())->find($ticket['customer_id']);
 
         if ($technician && $technician['phone'] && $customer) {
-            $result = $this->sms->notifyTechnician(
-                $technician['phone'],
-                $ticket['ticket_number'],
-                $customer['name'],
-                $ticket['subject']
-            );
+            $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', [
+                '{ticket_number}' => $ticket['ticket_number'],
+                '{customer_name}' => $customer['name'] ?? 'Customer',
+                '{customer_phone}' => $customer['phone'] ?? '',
+                '{customer_address}' => $customer['address'] ?? '',
+                '{subject}' => $ticket['subject'] ?? '',
+                '{category}' => $ticket['category'] ?? '',
+                '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
+                '{technician_name}' => $technician['name'] ?? 'Technician'
+            ]);
+            $result = $this->sms->send($technician['phone'], $message);
             $this->sms->logSMS($ticketId, $technician['phone'], 'technician', 'Ticket assignment notification', $result['success'] ? 'sent' : 'failed');
         }
     }
@@ -242,7 +247,8 @@ class Ticket {
             'sms_template_ticket_created' => 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.',
             'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
-            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.'
+            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.',
+            'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}'
         ];
         
         $template = $this->settings->get($templateKey, $defaults[$templateKey] ?? 'ISP Support - Ticket #{ticket_number} - {status}');
