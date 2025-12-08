@@ -183,8 +183,7 @@ class Ticket {
                     $technician = $ticket['assigned_to'] ? $this->getUser($ticket['assigned_to']) : null;
                     if ($customer && $customer['phone']) {
                         $statusMessage = $this->getStatusMessage($data['status']);
-                        $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
-                        $message = $this->buildSMSFromTemplate($templateKey, [
+                        $placeholders = [
                             '{ticket_number}' => $ticket['ticket_number'],
                             '{subject}' => $ticket['subject'] ?? '',
                             '{description}' => substr($ticket['description'] ?? '', 0, 100),
@@ -196,9 +195,23 @@ class Ticket {
                             '{customer_phone}' => $customer['phone'] ?? '',
                             '{technician_name}' => $technician['name'] ?? '',
                             '{technician_phone}' => $technician['phone'] ?? ''
-                        ]);
+                        ];
+                        
+                        $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
+                        $message = $this->buildSMSFromTemplate($templateKey, $placeholders);
                         $smsResult = $this->sms->send($customer['phone'], $message);
                         $this->sms->logSMS($id, $customer['phone'], 'customer', "Status update: {$data['status']}", $smsResult['success'] ? 'sent' : 'failed');
+                        
+                        $waTemplateKey = $data['status'] === 'resolved' ? 'wa_template_resolved' : 'wa_template_status_update';
+                        $waMessage = $this->buildSMSFromTemplate($waTemplateKey, $placeholders);
+                        try {
+                            $waResult = $this->whatsapp->send($customer['phone'], $waMessage);
+                            if ($waResult['success']) {
+                                $this->whatsapp->logMessage($id, null, null, $customer['phone'], 'customer', $waMessage, 'sent', 'status_update');
+                            }
+                        } catch (\Exception $e) {
+                            error_log("WhatsApp notification failed for ticket $id status update: " . $e->getMessage());
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -326,7 +339,12 @@ class Ticket {
             'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
             'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.',
-            'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}'
+            'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}',
+            'wa_template_ticket_created' => "Hi {customer_name},\n\nYour support ticket #{ticket_number} has been created.\n\nSubject: {subject}\nStatus: {status}\n\nWe will contact you shortly.\n\nThank you!",
+            'wa_template_ticket_assigned' => "Hi {customer_name},\n\nTechnician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.\n\nThey will contact you soon.\n\nThank you!",
+            'wa_template_technician_assigned' => "New Ticket #{ticket_number} assigned to you.\n\nCustomer: {customer_name}\nPhone: {customer_phone}\nSubject: {subject}\nPriority: {priority}\nAddress: {customer_address}",
+            'wa_template_status_update' => "Hi {customer_name},\n\nThis is an update on your ticket #{ticket_number}.\n\nCurrent Status: {status}\n\nWe're working on resolving your issue. Thank you for your patience.",
+            'wa_template_resolved' => "Hi {customer_name},\n\nGreat news! Your ticket #{ticket_number} has been resolved.\n\nIf you have any further questions or issues, please don't hesitate to contact us.\n\nThank you for choosing our services!"
         ];
         
         $placeholders['{company_name}'] = $this->settings->get('company_name', 'ISP Support');

@@ -1,0 +1,98 @@
+
+root@superlite:/home/superlite/isp# docker exec isp_crm_db psql -U crm -d isp_crm -c "SELECT setting_key, setting_value FROM company_settings WHERE setting_key LIKE 'wa_template%' OR setting_key LIKE 'sms_template%' ORDER BY setting_key;"
+          setting_key           |                                            setting_value
+--------------------------------+------------------------------------------------------------------------------------------------------
+ wa_template_complaint_approved | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Your complaint {complaint_number} has been approved and a support ticket will be created.\r         +
+                                | \r                                                                                                  +
+                                | Our team will contact you shortly to resolve the issue.\r                                           +
+                                | \r                                                                                                  +
+                                | Thank you!
+ wa_template_complaint_received | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | We have received your complaint (Ref: {complaint_number}).\r                                        +
+                                | \r                                                                                                  +
+                                | Category: {category}\r                                                                              +
+                                | \r                                                                                                  +
+                                | Our team will review and respond within 24 hours.\r                                                 +
+                                | \r                                                                                                  +
+                                | Thank you for your feedback.
+ wa_template_complaint_rejected | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Regarding your complaint {complaint_number}:\r                                                      +
+                                | \r                                                                                                  +
+                                | After careful review, we were unable to proceed with this complaint.\r                              +
+                                | \r                                                                                                  +
+                                | If you have any questions, please contact our support team.\r                                       +
+                                | \r                                                                                                  +
+                                | Thank you.
+ wa_template_complaint_review   | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Regarding your complaint {complaint_number}:\r                                                      +
+                                | \r                                                                                                  +
+                                | We are currently reviewing your issue and will update you soon.\r                                   +
+                                | \r                                                                                                  +
+                                | Thank you for your patience.
+ wa_template_need_info          | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Regarding ticket #{ticket_number}: {subject}\r                                                      +
+                                | \r                                                                                                  +
+                                | We need some additional information to proceed. Could you please provide more details?\r            +
+                                | \r                                                                                                  +
+                                | Thank you.
+ wa_template_order_confirmation | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Thank you for your order #{order_number}!\r                                                         +
+                                | \r                                                                                                  +
+                                | Package: {package_name}\r                                                                           +
+                                | Amount: KES {amount}\r                                                                              +
+                                | \r                                                                                                  +
+                                | We will contact you shortly to schedule installation.\r                                             +
+                                | \r                                                                                                  +
+                                | Thank you for choosing our services!
+ wa_template_order_installation | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | We're ready to install your service for order #{order_number}.\r                                    +
+                                | \r                                                                                                  +
+                                | Please let us know a convenient time for installation.\r                                            +
+                                | \r                                                                                                  +
+                                | Thank you!
+ wa_template_order_processing   | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Your order #{order_number} is being processed.\r                                                    +
+                                | \r                                                                                                  +
+                                | Our team will contact you to schedule the installation.\r                                           +
+                                | \r                                                                                                  +
+                                | Thank you!
+ wa_template_resolved           | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Great news! Your ticket #{ticket_number} has been resolved.\r                                       +
+                                | \r                                                                                                  +
+                                | If you have any further questions or issues, please don't hesitate to contact us.\r                 +
+                                | \r                                                                                                  +
+                                | Thank you for choosing our services!
+ wa_template_scheduled          | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Your service visit for ticket #{ticket_number} has been scheduled.\r                                +
+                                | \r                                                                                                  +
+                                | Please confirm if this time works for you.\r                                                        +
+                                | \r                                                                                                  +
+                                | Thank you.
+ wa_template_status_update      | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | This is an update on your ticket #{ticket_number}.\r                                                +
+                                | \r                                                                                                  +
+                                | Current Status: {status}\r                                                                          +
+                                | \r                                                                                                  +
+                                | We're working on resolving your issue. Thank you for your patience.
+ wa_template_technician_coming  | Hi {customer_name},\r                                                                               +
+                                | \r                                                                                                  +
+                                | Regarding ticket #{ticket_number}:\r                                                                +
+                                | \r                                                                                                  +
+                                | Our technician is on the way to your location. Please ensure someone is available to receive them.\r+
+                                | \r                                                                                                  +
+                                | Thank you.
+(12 rows)
+
+root@superlite:/home/superlite/isp#
