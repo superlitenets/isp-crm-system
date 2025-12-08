@@ -338,15 +338,11 @@ const app = {
     },
     
     async clockIn() {
-        const hasPermission = await this.requestLocationPermission('Clock In');
-        if (!hasPermission) return;
-        
-        this.showLocationProgress('Getting your GPS location...');
+        this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
-        this.hideLocationProgress();
         
         if (location.error || !location.latitude || !location.longitude) {
-            this.showLocationError(location.error || 'Could not get location');
+            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
             return;
         }
         
@@ -364,15 +360,11 @@ const app = {
     },
     
     async clockOut() {
-        const hasPermission = await this.requestLocationPermission('Clock Out');
-        if (!hasPermission) return;
-        
-        this.showLocationProgress('Getting your GPS location...');
+        this.showToast('Getting your location...', 'info');
         const location = await this.getLocation();
-        this.hideLocationProgress();
         
         if (location.error || !location.latitude || !location.longitude) {
-            this.showLocationError(location.error || 'Could not get location');
+            this.showToast('Location required! ' + (location.error || 'Please enable GPS and try again.'), 'danger');
             return;
         }
         
@@ -387,128 +379,6 @@ const app = {
         } else {
             this.showToast(result.message || result.error, 'warning');
         }
-    },
-    
-    async requestLocationPermission(action) {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                this.showLocationError('Your browser does not support GPS location');
-                resolve(false);
-                return;
-            }
-            
-            const existingModal = document.getElementById('location-permission-modal');
-            if (existingModal) existingModal.remove();
-            
-            const modal = document.createElement('div');
-            modal.id = 'location-permission-modal';
-            modal.className = 'location-modal-overlay';
-            modal.innerHTML = `
-                <div class="location-modal">
-                    <div class="location-modal-icon">
-                        <i class="bi bi-geo-alt-fill"></i>
-                    </div>
-                    <h5>Location Required for ${action}</h5>
-                    <p>Please ensure:</p>
-                    <ul class="location-checklist">
-                        <li><i class="bi bi-check-circle"></i> GPS/Location is turned ON</li>
-                        <li><i class="bi bi-check-circle"></i> Browser has location permission</li>
-                        <li><i class="bi bi-check-circle"></i> You're outdoors or near a window for better accuracy</li>
-                    </ul>
-                    <div class="location-modal-buttons">
-                        <button class="btn btn-outline-secondary" onclick="app.cancelLocationRequest()">Cancel</button>
-                        <button class="btn btn-primary" onclick="app.confirmLocationRequest()">
-                            <i class="bi bi-geo-alt"></i> Continue
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            this._locationResolve = resolve;
-        });
-    },
-    
-    confirmLocationRequest() {
-        const modal = document.getElementById('location-permission-modal');
-        if (modal) modal.remove();
-        if (this._locationResolve) {
-            this._locationResolve(true);
-            this._locationResolve = null;
-        }
-    },
-    
-    cancelLocationRequest() {
-        const modal = document.getElementById('location-permission-modal');
-        if (modal) modal.remove();
-        if (this._locationResolve) {
-            this._locationResolve(false);
-            this._locationResolve = null;
-        }
-    },
-    
-    showLocationProgress(message) {
-        const existingProgress = document.getElementById('location-progress-modal');
-        if (existingProgress) existingProgress.remove();
-        
-        const modal = document.createElement('div');
-        modal.id = 'location-progress-modal';
-        modal.className = 'location-modal-overlay';
-        modal.innerHTML = `
-            <div class="location-modal">
-                <div class="location-spinner">
-                    <div class="spinner-border text-primary" role="status"></div>
-                </div>
-                <h5>${message}</h5>
-                <p class="text-muted small">This may take a few seconds...</p>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    },
-    
-    hideLocationProgress() {
-        const modal = document.getElementById('location-progress-modal');
-        if (modal) modal.remove();
-    },
-    
-    showLocationError(error) {
-        const existingModal = document.getElementById('location-error-modal');
-        if (existingModal) existingModal.remove();
-        
-        let helpText = '';
-        if (error.includes('denied')) {
-            helpText = `
-                <p class="mt-2"><strong>How to fix:</strong></p>
-                <ol class="text-start small">
-                    <li>Open your phone Settings</li>
-                    <li>Go to Location/GPS settings</li>
-                    <li>Turn ON Location Services</li>
-                    <li>Also check browser permissions for this site</li>
-                </ol>
-            `;
-        } else if (error.includes('unavailable')) {
-            helpText = '<p class="small">Try moving outdoors or to an area with better GPS signal.</p>';
-        } else if (error.includes('timeout')) {
-            helpText = '<p class="small">Location took too long. Please try again in an open area.</p>';
-        }
-        
-        const modal = document.createElement('div');
-        modal.id = 'location-error-modal';
-        modal.className = 'location-modal-overlay';
-        modal.innerHTML = `
-            <div class="location-modal error">
-                <div class="location-modal-icon error">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-                <h5>Location Error</h5>
-                <p>${error}</p>
-                ${helpText}
-                <button class="btn btn-primary w-100" onclick="this.closest('.location-modal-overlay').remove()">
-                    OK
-                </button>
-            </div>
-        `;
-        document.body.appendChild(modal);
     },
     
     async loadTechnicianTickets(status = '') {

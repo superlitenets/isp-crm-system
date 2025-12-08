@@ -635,7 +635,7 @@ class MobileAPI {
         ];
         
         if ($employee) {
-            $workingDays = cal_days_in_month(CAL_GREGORIAN, (int)date('m'), (int)date('Y')) - 8;
+            $workingDays = (int)date('t') - 8;
             $stmt = $this->db->prepare("
                 SELECT 
                     COUNT(*) as present_days,
