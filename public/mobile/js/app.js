@@ -482,8 +482,8 @@ const app = {
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Resolution Notes</label>
-                            <textarea class="form-control" id="close-comment" rows="3" placeholder="What was done to resolve this ticket?"></textarea>
+                            <label class="form-label">Resolution Notes <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="close-comment" rows="3" placeholder="What was done to resolve this ticket?" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -505,9 +505,17 @@ const app = {
     },
     
     async submitCloseTicket(ticketId) {
+        const comment = document.getElementById('close-comment').value.trim();
+        
+        if (!comment) {
+            this.showToast('Resolution notes are required', 'warning');
+            document.getElementById('close-comment').focus();
+            return;
+        }
+        
         const data = {
             ticket_id: ticketId,
-            comment: document.getElementById('close-comment').value || ''
+            comment: comment
         };
         
         const result = await this.api('close-ticket', 'POST', data);
