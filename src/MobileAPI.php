@@ -660,6 +660,21 @@ class MobileAPI {
             $achievements[] = ['icon' => 'award', 'title' => '#1 Technician', 'color' => 'gold'];
         }
         
+        $commissionStats = [
+            'total_tickets' => 0,
+            'total_earnings' => 0,
+            'currency' => 'KES'
+        ];
+        
+        if ($employee) {
+            $ticketCommission = new \App\TicketCommission($this->db);
+            $commissionStats = $ticketCommission->getEmployeeCommissionStats($employee['id']);
+            
+            if ($commissionStats['total_earnings'] >= 5000) {
+                $achievements[] = ['icon' => 'cash', 'title' => 'Top Earner', 'color' => 'gold'];
+            }
+        }
+        
         return [
             'this_month' => $thisMonthStats,
             'resolution_rate' => $resolutionRate,
@@ -669,6 +684,7 @@ class MobileAPI {
             'total_technicians' => $totalTechnicians,
             'attendance_rate' => $attendanceRate,
             'attendance_stats' => $attendanceStats,
+            'commission' => $commissionStats,
             'achievements' => $achievements
         ];
     }

@@ -2148,7 +2148,7 @@ function resetTeamForm() {
 <?php
 $ticketCommission = new \App\TicketCommission($db);
 $selectedMonth = $_GET['month'] ?? date('Y-m');
-$selectedEmployeeId = isset($_GET['employee_id']) ? (int)$_GET['employee_id'] : null;
+$selectedEmployeeId = isset($_GET['employee_id']) && $_GET['employee_id'] !== '' ? (int)$_GET['employee_id'] : null;
 
 $currentUser = \App\Auth::getUser();
 $currentEmployee = $employee->getByUserId($currentUser['id']);
@@ -2161,10 +2161,14 @@ if (!$isAdminOrManager && $currentEmployee) {
 $allEmployeesList = $isAdminOrManager ? $employee->getAll() : [];
 $earningsData = [];
 $summaryData = null;
+$allEarningsData = [];
 
 if ($selectedEmployeeId) {
     $earningsData = $ticketCommission->getEmployeeEarnings($selectedEmployeeId, $selectedMonth);
     $summaryData = $ticketCommission->getEmployeeEarningsSummary($selectedEmployeeId, $selectedMonth);
+} elseif ($isAdminOrManager) {
+    $allEarningsData = $ticketCommission->getAllEarnings($selectedMonth);
+    $summaryData = $ticketCommission->getAllEarningsSummary($selectedMonth);
 }
 ?>
 
@@ -2291,6 +2295,63 @@ if ($selectedEmployeeId) {
                 <?php elseif ($selectedEmployeeId): ?>
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> No commission earnings found for the selected period.
+                </div>
+                <?php elseif (!empty($allEarningsData)): ?>
+                <h6 class="mb-3"><i class="bi bi-people"></i> All Employees Earnings for <?= date('F Y', strtotime($selectedMonth)) ?></h6>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Employee</th>
+                                <th>Ticket</th>
+                                <th>Category</th>
+                                <th>Customer</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allEarningsData as $earning): ?>
+                            <tr>
+                                <td><?= date('M d, Y', strtotime($earning['created_at'])) ?></td>
+                                <td><strong><?= htmlspecialchars($earning['employee_name']) ?></strong></td>
+                                <td>
+                                    <a href="?page=tickets&view=<?= $earning['ticket_id'] ?>">
+                                        #<?= htmlspecialchars($earning['ticket_number']) ?>
+                                    </a>
+                                    <br><small class="text-muted"><?= htmlspecialchars($earning['subject'] ?? '') ?></small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary"><?= htmlspecialchars($earning['category'] ?? $earning['ticket_category'] ?? '-') ?></span>
+                                </td>
+                                <td><?= htmlspecialchars($earning['customer_name'] ?? '-') ?></td>
+                                <td>
+                                    <?php if ($earning['team_id']): ?>
+                                    <span class="badge bg-info"><i class="bi bi-people"></i> <?= htmlspecialchars($earning['team_name'] ?? 'Team') ?></span>
+                                    <?php else: ?>
+                                    <span class="badge bg-success"><i class="bi bi-person"></i> Individual</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-success fw-bold">
+                                    <?= $earning['currency'] ?? 'KES' ?> <?= number_format($earning['earned_amount'], 2) ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $statusColors = ['pending' => 'warning', 'paid' => 'success', 'cancelled' => 'danger'];
+                                    $statusColor = $statusColors[$earning['status']] ?? 'secondary';
+                                    ?>
+                                    <span class="badge bg-<?= $statusColor ?>"><?= ucfirst($earning['status']) ?></span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php elseif ($isAdminOrManager): ?>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No commission earnings found for <?= date('F Y', strtotime($selectedMonth)) ?>. Select an employee to filter.
                 </div>
                 <?php else: ?>
                 <div class="alert alert-secondary">

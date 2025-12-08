@@ -384,6 +384,78 @@ class TicketCommission {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
+    public function getAllEarnings(string $month): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $stmt = $this->db->prepare("
+            SELECT te.*, t.ticket_number, t.subject, t.category as ticket_category,
+                   e.name as employee_name, tm.name as team_name, c.name as customer_name
+            FROM ticket_earnings te
+            JOIN tickets t ON te.ticket_id = t.id
+            JOIN employees e ON te.employee_id = e.id
+            LEFT JOIN teams tm ON te.team_id = tm.id
+            LEFT JOIN customers c ON t.customer_id = c.id
+            WHERE te.created_at BETWEEN ? AND ?
+            ORDER BY te.created_at DESC
+        ");
+        $stmt->execute([$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllEarningsSummary(string $month): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COALESCE(SUM(earned_amount), 0) as total_earnings,
+                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+                COUNT(CASE WHEN status IN ('paid', 'processed') THEN 1 END) as paid,
+                COUNT(DISTINCT employee_id) as employees_count,
+                COALESCE(MAX(currency), 'KES') as currency
+            FROM ticket_earnings
+            WHERE created_at BETWEEN ? AND ?
+              AND status != 'cancelled'
+        ");
+        $stmt->execute([$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$result || !$result['total_tickets']) {
+            return [
+                'total_tickets' => 0,
+                'total_earnings' => 0,
+                'pending' => 0,
+                'paid' => 0,
+                'employees_count' => 0,
+                'currency' => 'KES'
+            ];
+        }
+        
+        return $result;
+    }
+    
+    public function getEmployeeCommissionStats(int $employeeId): array {
+        $thisMonth = date('Y-m-01');
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COALESCE(SUM(earned_amount), 0) as total_earnings,
+                COALESCE(MAX(currency), 'KES') as currency
+            FROM ticket_earnings
+            WHERE employee_id = ? 
+              AND created_at >= ?
+              AND status != 'cancelled'
+        ");
+        $stmt->execute([$employeeId, $thisMonth]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return $result ?: ['total_tickets' => 0, 'total_earnings' => 0, 'currency' => 'KES'];
+    }
+    
     public function seedDefaultRates(): void {
         $defaultRates = [
             ['category' => 'installation', 'rate' => 200, 'description' => 'New customer installation'],
