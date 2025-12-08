@@ -1019,7 +1019,10 @@ function runMigrations(PDO $db): void {
         ['customers', 'created_by', 'ALTER TABLE customers ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
         ['tickets', 'created_by', 'ALTER TABLE tickets ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
         ['orders', 'created_by', 'ALTER TABLE orders ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
-        ['complaints', 'created_by', 'ALTER TABLE complaints ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL']
+        ['complaints', 'created_by', 'ALTER TABLE complaints ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['equipment', 'brand', 'ALTER TABLE equipment ADD COLUMN brand VARCHAR(100)'],
+        ['equipment', 'mac_address', 'ALTER TABLE equipment ADD COLUMN mac_address VARCHAR(50)'],
+        ['equipment', 'warranty_expiry', 'ALTER TABLE equipment ADD COLUMN warranty_expiry DATE']
     ];
     
     foreach ($columnMigrations as $migration) {
