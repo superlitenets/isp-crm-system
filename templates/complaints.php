@@ -274,34 +274,27 @@ $priorityColors = [
             <h5 class="mb-0"><i class="bi bi-whatsapp"></i> WhatsApp Notification</h5>
         </div>
         <div class="card-body">
-            <p class="small text-muted mb-3">Send complaint updates via WhatsApp Web:</p>
+            <p class="small text-muted mb-3">Send complaint updates via WhatsApp session:</p>
+            <div id="waComplaintStatus" class="alert alert-info d-none mb-3"></div>
             
             <div class="d-flex flex-wrap gap-2 mb-3">
-                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintReceivedMsg)) ?>" 
-                   target="_blank" class="btn btn-outline-success btn-sm"
-                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'received')">
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="sendComplaintWA('received', <?= htmlspecialchars(json_encode($complaintReceivedMsg)) ?>)">
                     <i class="bi bi-envelope-check"></i> Complaint Received
-                </a>
-                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintReviewMsg)) ?>" 
-                   target="_blank" class="btn btn-outline-info btn-sm"
-                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'review')">
+                </button>
+                <button type="button" class="btn btn-outline-info btn-sm" onclick="sendComplaintWA('review', <?= htmlspecialchars(json_encode($complaintReviewMsg)) ?>)">
                     <i class="bi bi-hourglass-split"></i> Under Review
-                </a>
-                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintApprovedMsg)) ?>" 
-                   target="_blank" class="btn btn-outline-primary btn-sm"
-                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'approved')">
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="sendComplaintWA('approved', <?= htmlspecialchars(json_encode($complaintApprovedMsg)) ?>)">
                     <i class="bi bi-check-circle"></i> Approved
-                </a>
-                <a href="<?= htmlspecialchars($waComplaint->generateWebLink($viewComplaint['customer_phone'], $complaintRejectedMsg)) ?>" 
-                   target="_blank" class="btn btn-outline-secondary btn-sm"
-                   onclick="logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'rejected')">
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="sendComplaintWA('rejected', <?= htmlspecialchars(json_encode($complaintRejectedMsg)) ?>)">
                     <i class="bi bi-x-circle"></i> Rejected
-                </a>
+                </button>
             </div>
             
             <div class="input-group input-group-sm">
                 <textarea class="form-control" id="customComplaintWaMessage" rows="2" placeholder="Type a custom message..."><?= "Hi {$viewComplaint['customer_name']},\n\nRegarding your complaint {$viewComplaint['complaint_number']}:\n\n" ?></textarea>
-                <button type="button" class="btn btn-success" onclick="sendComplaintWhatsApp()">
+                <button type="button" class="btn btn-success" onclick="sendComplaintWA('custom', document.getElementById('customComplaintWaMessage').value)">
                     <i class="bi bi-whatsapp"></i> Send
                 </button>
             </div>
@@ -309,20 +302,37 @@ $priorityColors = [
     </div>
     
     <script>
-    function sendComplaintWhatsApp() {
-        var message = document.getElementById('customComplaintWaMessage').value;
-        var phone = '<?= $waComplaint->formatPhone($viewComplaint['customer_phone']) ?>';
-        var url = 'https://web.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(message);
-        window.open(url, '_blank');
-        logComplaintWhatsApp(<?= $viewComplaint['id'] ?>, 'custom');
-    }
-    
-    function logComplaintWhatsApp(complaintId, messageType) {
-        fetch('?page=api&action=log_whatsapp', {
+    function sendComplaintWA(messageType, message) {
+        var statusDiv = document.getElementById('waComplaintStatus');
+        statusDiv.className = 'alert alert-info mb-3';
+        statusDiv.textContent = 'Sending WhatsApp message...';
+        statusDiv.classList.remove('d-none');
+        
+        fetch('?page=api&action=send_whatsapp', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({complaint_id: complaintId, message_type: messageType, phone: '<?= $waComplaint->formatPhone($viewComplaint['customer_phone']) ?>'})
-        }).catch(function(e) { console.log('WhatsApp log error:', e); });
+            body: JSON.stringify({
+                complaint_id: <?= $viewComplaint['id'] ?>,
+                phone: '<?= $viewComplaint['customer_phone'] ?>',
+                message: message,
+                message_type: messageType
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                statusDiv.className = 'alert alert-success mb-3';
+                statusDiv.textContent = 'WhatsApp message sent successfully!';
+            } else {
+                statusDiv.className = 'alert alert-danger mb-3';
+                statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            }
+            setTimeout(function() { statusDiv.classList.add('d-none'); }, 5000);
+        })
+        .catch(function(e) {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Error: ' + e.message;
+        });
     }
     </script>
     <?php endif; ?>

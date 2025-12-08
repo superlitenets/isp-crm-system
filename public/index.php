@@ -478,6 +478,50 @@ if ($page === 'api' && $action === 'log_whatsapp') {
     exit;
 }
 
+if ($page === 'api' && $action === 'send_whatsapp') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    $ticketId = $input['ticket_id'] ?? null;
+    $orderId = $input['order_id'] ?? null;
+    $complaintId = $input['complaint_id'] ?? null;
+    $messageType = $input['message_type'] ?? 'custom';
+    $phone = $input['phone'] ?? '';
+    $message = $input['message'] ?? '';
+    
+    if (empty($phone) || empty($message)) {
+        echo json_encode(['success' => false, 'error' => 'Phone and message are required']);
+        exit;
+    }
+    
+    try {
+        $whatsapp = new \App\WhatsApp();
+        $result = $whatsapp->send($phone, $message);
+        
+        if ($result['success']) {
+            $whatsapp->logMessage($ticketId, $orderId, $complaintId, $phone, 'customer', $message, 'sent', $messageType);
+            echo json_encode(['success' => true, 'message' => 'WhatsApp message sent']);
+        } else {
+            $whatsapp->logMessage($ticketId, $orderId, $complaintId, $phone, 'customer', $message, 'failed', $messageType, $result['error'] ?? 'Unknown error');
+            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to send']);
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'whatsapp_session') {
     ob_clean();
     header('Content-Type: application/json');
