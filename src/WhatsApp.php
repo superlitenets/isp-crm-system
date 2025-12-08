@@ -127,7 +127,10 @@ class WhatsApp {
     }
     
     public function send(string $phone, string $message): array {
+        error_log("WhatsApp::send called - enabled: " . ($this->enabled ? 'yes' : 'no') . ", provider: " . $this->provider . ", phone: " . $phone);
+        
         if (!$this->enabled) {
+            error_log("WhatsApp::send - WhatsApp is disabled");
             return [
                 'success' => false,
                 'error' => 'WhatsApp is disabled',
@@ -136,6 +139,7 @@ class WhatsApp {
         }
         
         if ($this->provider === 'web') {
+            error_log("WhatsApp::send - using web provider (links only)");
             return [
                 'success' => true,
                 'method' => 'web',
@@ -148,6 +152,7 @@ class WhatsApp {
         }
         
         if ($this->provider === 'session') {
+            error_log("WhatsApp::send - using session provider, calling sendViaSession");
             return $this->sendViaSession($phone, $message);
         }
         
