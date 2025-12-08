@@ -19,10 +19,12 @@ class ZKTecoDevice extends BiometricDevice {
     private const CMD_ACK_DATA = 2002;
     private const CMD_ACK_UNAUTH = 2005;
     private const CMD_USERTEMP_RRQ = 9;
+    private const CMD_USERTEMP_RRQ2 = 1504;
     private const CMD_ATTLOG_RRQ = 13;
     private const CMD_FREE_DATA = 1502;
     private const CMD_DATA_WRRQ = 1503;
-    private const CMD_DATA_RDY = 1504;
+    private const CMD_PREPARE_DATA = 1500;
+    private const CMD_DATA = 1501;
     
     private const USHRT_MAX = 65535;
     
@@ -138,7 +140,7 @@ class ZKTecoDevice extends BiometricDevice {
             
             $commandId = unpack('v', substr($response, 0, 2))[1];
             
-            if ($commandId == self::CMD_DATA_RDY) {
+            if ($commandId == self::CMD_PREPARE_DATA) {
                 $dataSize = unpack('V', substr($response, 8, 4))[1];
                 $data = $this->receiveRawData($dataSize);
                 
@@ -170,7 +172,7 @@ class ZKTecoDevice extends BiometricDevice {
         $this->disableDevice();
         
         try {
-            $command = $this->createHeader(self::CMD_USERTEMP_RRQ, chr(0x05), $this->sessionId, $this->replyId);
+            $command = $this->createHeader(self::CMD_USERTEMP_RRQ2, '', $this->sessionId, $this->replyId);
             
             if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
                 throw new \Exception('Failed to request user data');
@@ -178,28 +180,19 @@ class ZKTecoDevice extends BiometricDevice {
             
             $response = $this->receiveData();
             if ($response === false) {
-                $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
-                @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
-                $response = $this->receiveData();
-            }
-            
-            if ($response === false) {
                 throw new \Exception('No response for user request');
             }
             
             $commandId = unpack('v', substr($response, 0, 2))[1];
             
-            if ($commandId == self::CMD_DATA_RDY) {
+            if ($commandId == self::CMD_PREPARE_DATA) {
                 $dataSize = unpack('V', substr($response, 8, 4))[1];
                 $data = $this->receiveRawData($dataSize);
                 
                 if ($data && strlen($data) > 0) {
                     $users = $this->parseUserDataK40($data);
                     if (empty($users)) {
-                        $users = $this->parseUserData($data);
-                    }
-                    if (empty($users)) {
-                        $users = $this->parseUserDataNewFormat($data);
+                        $users = $this->parseUserData72Bytes($data);
                     }
                 }
             } elseif ($commandId == self::CMD_ACK_OK || $commandId == self::CMD_ACK_DATA) {
@@ -207,10 +200,7 @@ class ZKTecoDevice extends BiometricDevice {
                 if (strlen($data) > 0) {
                     $users = $this->parseUserDataK40($data);
                     if (empty($users)) {
-                        $users = $this->parseUserData($data);
-                    }
-                    if (empty($users)) {
-                        $users = $this->parseUserDataNewFormat($data);
+                        $users = $this->parseUserData72Bytes($data);
                     }
                 }
             }
@@ -226,12 +216,46 @@ class ZKTecoDevice extends BiometricDevice {
         return $users;
     }
     
+    private function parseUserData72Bytes(string $data): array {
+        $users = [];
+        $recordSize = 72;
+        $offset = 0;
+        $len = strlen($data);
+        
+        while ($offset + $recordSize <= $len) {
+            $record = substr($data, $offset, $recordSize);
+            
+            $userId = unpack('v', substr($record, 0, 2))[1];
+            $role = ord($record[2]);
+            $password = rtrim(substr($record, 3, 8), "\x00");
+            $name = rtrim(substr($record, 11, 24), "\x00");
+            $card = unpack('V', substr($record, 35, 4))[1];
+            $group = ord($record[39]);
+            
+            if ($userId > 0) {
+                $users[] = [
+                    'user_id' => $userId,
+                    'name' => mb_convert_encoding($name, 'UTF-8', 'auto') ?: "User $userId",
+                    'role' => $role,
+                    'password' => $password,
+                    'card_number' => $card > 0 ? $card : null,
+                    'group' => $group
+                ];
+            }
+            
+            $offset += $recordSize;
+        }
+        
+        return $users;
+    }
+    
     public function getUsersWithDebug(): array {
         $result = [
             'users' => [],
             'debug' => [
                 'connected' => false,
                 'command_sent' => false,
+                'command_used' => 'CMD_USERTEMP_RRQ2 (1504)',
                 'response_received' => false,
                 'response_command' => null,
                 'data_size' => 0,
@@ -252,7 +276,7 @@ class ZKTecoDevice extends BiometricDevice {
         $this->disableDevice();
         
         try {
-            $command = $this->createHeader(self::CMD_USERTEMP_RRQ, chr(0x05), $this->sessionId, $this->replyId);
+            $command = $this->createHeader(self::CMD_USERTEMP_RRQ2, '', $this->sessionId, $this->replyId);
             
             if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
                 $result['debug']['error'] = 'Failed to send command';
@@ -262,11 +286,6 @@ class ZKTecoDevice extends BiometricDevice {
             $result['debug']['command_sent'] = true;
             
             $response = $this->receiveData();
-            if ($response === false) {
-                $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(9), $this->sessionId, $this->replyId);
-                @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
-                $response = $this->receiveData();
-            }
             
             if ($response === false) {
                 $result['debug']['error'] = 'No response from device';
@@ -279,7 +298,7 @@ class ZKTecoDevice extends BiometricDevice {
             
             $data = null;
             
-            if ($commandId == self::CMD_DATA_RDY) {
+            if ($commandId == self::CMD_PREPARE_DATA) {
                 $dataSize = unpack('V', substr($response, 8, 4))[1];
                 $result['debug']['data_size'] = $dataSize;
                 $data = $this->receiveRawData($dataSize);
@@ -293,10 +312,7 @@ class ZKTecoDevice extends BiometricDevice {
                 
                 $result['users'] = $this->parseUserDataK40($data);
                 if (empty($result['users'])) {
-                    $result['users'] = $this->parseUserData($data);
-                }
-                if (empty($result['users'])) {
-                    $result['users'] = $this->parseUserDataNewFormat($data);
+                    $result['users'] = $this->parseUserData72Bytes($data);
                 }
             }
             
