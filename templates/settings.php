@@ -1285,44 +1285,6 @@ Thank you.`
 }
 </script>
 
-<div class="card mt-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="bi bi-info-circle"></i> How WhatsApp Web Integration Works</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <h6>For Customers:</h6>
-                <ol class="mb-3">
-                    <li>Open a ticket in the system</li>
-                    <li>Click the <span class="badge bg-success"><i class="bi bi-whatsapp"></i> WhatsApp</span> button</li>
-                    <li>WhatsApp Web opens with the customer's phone number</li>
-                    <li>Message is pre-filled with ticket information</li>
-                    <li>Click send in WhatsApp Web</li>
-                </ol>
-            </div>
-            <div class="col-md-6">
-                <h6>For Technicians:</h6>
-                <ol class="mb-3">
-                    <li>When a ticket is assigned, you can message the customer</li>
-                    <li>Click the WhatsApp button next to the customer's phone</li>
-                    <li>Send updates, ask questions, or share information</li>
-                    <li>All from WhatsApp Web - no API key required!</li>
-                </ol>
-            </div>
-        </div>
-        
-        <div class="alert alert-light border mb-0">
-            <strong>Note:</strong> WhatsApp Web integration requires:
-            <ul class="mb-0 mt-2">
-                <li>WhatsApp installed on your phone</li>
-                <li>WhatsApp Web linked to your phone (visit <a href="https://web.whatsapp.com" target="_blank">web.whatsapp.com</a>)</li>
-                <li>Customer phone numbers in international format (or system will auto-convert using country code)</li>
-            </ul>
-        </div>
-    </div>
-</div>
-
 <?php elseif ($subpage === 'templates'): ?>
 
 <?php if ($action === 'create_template' || $action === 'edit_template'): ?>
