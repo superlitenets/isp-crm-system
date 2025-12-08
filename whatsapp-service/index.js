@@ -3,15 +3,47 @@ const qrcode = require('qrcode');
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: ['http://localhost:5000', 'http://127.0.0.1:5000'] }));
 app.use(bodyParser.json());
 
 const PORT = process.env.WA_PORT || 3001;
+const BIND_HOST = process.env.WA_HOST || '127.0.0.1';
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
+const API_SECRET_FILE = path.join(__dirname, '.api_secret');
+
+let API_SECRET = process.env.WA_API_SECRET || '';
+if (!API_SECRET) {
+    if (fs.existsSync(API_SECRET_FILE)) {
+        API_SECRET = fs.readFileSync(API_SECRET_FILE, 'utf8').trim();
+    } else {
+        API_SECRET = crypto.randomBytes(32).toString('hex');
+        fs.writeFileSync(API_SECRET_FILE, API_SECRET);
+        console.log('Generated API secret saved to .api_secret');
+    }
+}
+
+function authMiddleware(req, res, next) {
+    const authHeader = req.headers['x-api-key'] || req.headers['authorization'];
+    const providedSecret = authHeader ? authHeader.replace('Bearer ', '') : null;
+    
+    if (!API_SECRET || providedSecret === API_SECRET) {
+        return next();
+    }
+    
+    const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'];
+    if (localIPs.includes(req.ip) || localIPs.includes(req.connection?.remoteAddress)) {
+        return next();
+    }
+    
+    return res.status(401).json({ error: 'Unauthorized' });
+}
+
+app.use(authMiddleware);
 
 let client = null;
 let qrCodeData = null;
@@ -235,6 +267,7 @@ if (fs.existsSync(SESSION_PATH)) {
     initializeClient();
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`WhatsApp service running on port ${PORT}`);
+app.listen(PORT, BIND_HOST, () => {
+    console.log(`WhatsApp service running on ${BIND_HOST}:${PORT}`);
+    console.log('API Secret:', API_SECRET ? 'Configured' : 'Not set (local-only access)');
 });

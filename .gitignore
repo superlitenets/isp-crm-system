@@ -25,3 +25,9 @@ logs/
 
 # Session files
 sessions/
+
+# Node.js
+node_modules/
+whatsapp-service/.wwebjs_auth/
+whatsapp-service/.wwebjs_cache/
+whatsapp-service/.api_secret
