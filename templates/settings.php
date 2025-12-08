@@ -456,6 +456,33 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
         <h5 class="mb-0"><i class="bi bi-chat-square-text"></i> SMS Notification Templates</h5>
     </div>
     <div class="card-body">
+        <div class="alert alert-light border mb-4">
+            <h6 class="mb-3"><i class="bi bi-info-circle"></i> Template Reference Guide</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>Template Name</th>
+                            <th>Triggered When</th>
+                            <th>Sent To</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>Ticket Created</code></td><td>New ticket is created</td><td>Customer</td></tr>
+                        <tr><td><code>Ticket Status Updated</code></td><td>Ticket status changes</td><td>Customer</td></tr>
+                        <tr><td><code>Ticket Resolved</code></td><td>Ticket marked as resolved</td><td>Customer</td></tr>
+                        <tr><td><code>Technician Assigned (to Customer)</code></td><td>Technician assigned to ticket</td><td>Customer</td></tr>
+                        <tr><td><code>New Ticket Assigned to Technician</code></td><td>Technician assigned to ticket</td><td>Technician</td></tr>
+                        <tr><td><code>Complaint Received</code></td><td>New complaint submitted</td><td>Customer</td></tr>
+                        <tr><td><code>Complaint Approved</code></td><td>Complaint converted to ticket</td><td>Customer</td></tr>
+                        <tr><td><code>Order Confirmation</code></td><td>New order placed</td><td>Customer</td></tr>
+                        <tr><td><code>Order Accepted</code></td><td>Order converted to installation ticket</td><td>Customer</td></tr>
+                        <tr><td><code>HR Notice</code></td><td>HR sends employee notification</td><td>Employee</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="save_sms_templates">
