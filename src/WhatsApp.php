@@ -16,7 +16,8 @@ class WhatsApp {
     public function __construct() {
         $settings = new Settings();
         $this->enabled = $settings->get('whatsapp_enabled', '1') === '1';
-        $this->defaultCountryCode = $settings->get('whatsapp_country_code', '254');
+        $countryCode = $settings->get('whatsapp_country_code', '254');
+        $this->defaultCountryCode = !empty($countryCode) ? $countryCode : '254';
         $this->provider = $settings->get('whatsapp_provider', 'web');
         $this->sessionServiceUrl = $settings->get('whatsapp_session_url', 'http://localhost:3001');
         $this->sessionApiSecret = $settings->get('whatsapp_session_secret', '') ?: $this->loadSessionSecretFromFile();
