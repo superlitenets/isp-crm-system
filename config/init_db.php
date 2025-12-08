@@ -210,14 +210,100 @@ function initializeDatabase(): void {
     CREATE TABLE IF NOT EXISTS whatsapp_logs (
         id SERIAL PRIMARY KEY,
         ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
-        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-        complaint_id INTEGER REFERENCES complaints(id) ON DELETE CASCADE,
+        order_id INTEGER,
+        complaint_id INTEGER,
         recipient_phone VARCHAR(20) NOT NULL,
         recipient_type VARCHAR(20) NOT NULL,
         message_type VARCHAR(50) DEFAULT 'custom',
         message TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS complaints (
+        id SERIAL PRIMARY KEY,
+        complaint_number VARCHAR(20) UNIQUE NOT NULL,
+        customer_name VARCHAR(100) NOT NULL,
+        customer_email VARCHAR(100),
+        customer_phone VARCHAR(20) NOT NULL,
+        customer_address TEXT,
+        subject VARCHAR(200) NOT NULL,
+        description TEXT NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        priority VARCHAR(20) DEFAULT 'medium',
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        converted_ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+        approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        approved_at TIMESTAMP,
+        rejection_reason TEXT,
+        source VARCHAR(20) DEFAULT 'web',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS service_packages (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        description TEXT,
+        speed VARCHAR(50) NOT NULL,
+        speed_unit VARCHAR(10) DEFAULT 'Mbps',
+        price DECIMAL(10, 2) NOT NULL,
+        currency VARCHAR(10) DEFAULT 'KES',
+        billing_cycle VARCHAR(20) DEFAULT 'monthly',
+        features JSONB DEFAULT '[]',
+        is_popular BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        display_order INTEGER DEFAULT 0,
+        badge_text VARCHAR(50),
+        badge_color VARCHAR(20),
+        icon VARCHAR(50) DEFAULT 'wifi',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS mpesa_transactions (
+        id SERIAL PRIMARY KEY,
+        transaction_type VARCHAR(20) NOT NULL,
+        merchant_request_id VARCHAR(100),
+        checkout_request_id VARCHAR(100),
+        result_code INTEGER,
+        result_desc TEXT,
+        mpesa_receipt_number VARCHAR(50),
+        transaction_date TIMESTAMP,
+        phone_number VARCHAR(20),
+        amount DECIMAL(12, 2),
+        account_reference VARCHAR(100),
+        transaction_desc TEXT,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        invoice_id INTEGER,
+        status VARCHAR(20) DEFAULT 'pending',
+        raw_callback JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        order_number VARCHAR(20) UNIQUE NOT NULL,
+        package_id INTEGER REFERENCES service_packages(id) ON DELETE SET NULL,
+        customer_name VARCHAR(100) NOT NULL,
+        customer_email VARCHAR(100),
+        customer_phone VARCHAR(20) NOT NULL,
+        customer_address TEXT,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        payment_status VARCHAR(20) DEFAULT 'pending',
+        payment_method VARCHAR(20),
+        mpesa_transaction_id INTEGER REFERENCES mpesa_transactions(id) ON DELETE SET NULL,
+        amount DECIMAL(12, 2),
+        order_status VARCHAR(20) DEFAULT 'new',
+        notes TEXT,
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        converted_ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+        source VARCHAR(20) DEFAULT 'web',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS biometric_devices (
@@ -285,27 +371,6 @@ function initializeDatabase(): void {
         amount DECIMAL(12, 2) NOT NULL,
         details JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS service_packages (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        slug VARCHAR(100) UNIQUE NOT NULL,
-        description TEXT,
-        speed VARCHAR(50) NOT NULL,
-        speed_unit VARCHAR(10) DEFAULT 'Mbps',
-        price DECIMAL(10, 2) NOT NULL,
-        currency VARCHAR(10) DEFAULT 'KES',
-        billing_cycle VARCHAR(20) DEFAULT 'monthly',
-        features JSONB DEFAULT '[]',
-        is_popular BOOLEAN DEFAULT FALSE,
-        is_active BOOLEAN DEFAULT TRUE,
-        display_order INTEGER DEFAULT 0,
-        badge_text VARCHAR(50),
-        badge_color VARCHAR(20),
-        icon VARCHAR(50) DEFAULT 'wifi',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_minutes INTEGER DEFAULT 0;
