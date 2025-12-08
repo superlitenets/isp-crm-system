@@ -512,6 +512,32 @@ if (isset($_GET['customer_id'])) {
                 <?php endforeach; ?>
             </div>
         </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-whatsapp text-success"></i> WhatsApp Log</h5>
+            </div>
+            <div class="card-body">
+                <?php
+                $waStmt = $db->prepare("SELECT * FROM whatsapp_logs WHERE ticket_id = ? ORDER BY sent_at DESC LIMIT 5");
+                $waStmt->execute([$ticketData['id']]);
+                $waLogs = $waStmt->fetchAll();
+                ?>
+                <?php if (empty($waLogs)): ?>
+                <p class="text-muted mb-0">No WhatsApp messages sent for this ticket</p>
+                <?php endif; ?>
+                <?php foreach ($waLogs as $log): ?>
+                <div class="mb-2 pb-2 border-bottom">
+                    <small class="text-muted"><?= date('M j, g:i A', strtotime($log['sent_at'])) ?></small><br>
+                    <span class="badge bg-<?= $log['status'] === 'sent' ? 'success' : ($log['status'] === 'opened' ? 'info' : 'danger') ?>"><?= ucfirst($log['status']) ?></span>
+                    <small><?= ucfirst($log['recipient_type'] ?? 'customer') ?>: <?= htmlspecialchars($log['recipient_phone']) ?></small>
+                    <?php if (!empty($log['message_type'])): ?>
+                    <br><small class="text-muted"><?= ucfirst(str_replace('_', ' ', $log['message_type'])) ?></small>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </div>
 </div>
 
