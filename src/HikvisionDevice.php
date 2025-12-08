@@ -380,10 +380,10 @@ XML;
         }
         
         if ($startEnrollment) {
-            $enrollResult = $this->startFaceEnrollment($employeeNo);
+            $enrollResult = $this->startFingerprintEnrollment($employeeNo);
             return [
                 'success' => true,
-                'message' => 'User registered. ' . ($enrollResult['success'] ? $enrollResult['message'] : 'Face enrollment not available.'),
+                'message' => 'User registered. ' . ($enrollResult['success'] ? $enrollResult['message'] : 'Fingerprint enrollment not available.'),
                 'enrollment_started' => $enrollResult['success'],
                 'user_added' => true
             ];
