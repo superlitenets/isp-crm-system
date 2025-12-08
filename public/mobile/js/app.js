@@ -482,18 +482,6 @@ const app = {
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Cable Used (meters)</label>
-                            <input type="number" class="form-control" id="close-cable-meters" min="0" step="0.5" placeholder="e.g., 25">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Router/Equipment Name</label>
-                            <input type="text" class="form-control" id="close-router-model" placeholder="e.g., TP-Link Archer C6">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Serial Number <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="close-router-serial" placeholder="Enter serial number" required>
-                        </div>
-                        <div class="mb-3">
                             <label class="form-label">Resolution Notes</label>
                             <textarea class="form-control" id="close-comment" rows="3" placeholder="What was done to resolve this ticket?"></textarea>
                         </div>
@@ -517,20 +505,8 @@ const app = {
     },
     
     async submitCloseTicket(ticketId) {
-        const serialInput = document.getElementById('close-router-serial');
-        const serialValue = serialInput.value.trim();
-        
-        if (!serialValue) {
-            this.showToast('Serial number is required', 'warning');
-            serialInput.focus();
-            return;
-        }
-        
         const data = {
             ticket_id: ticketId,
-            cable_meters: document.getElementById('close-cable-meters').value || null,
-            router_model: document.getElementById('close-router-model').value || null,
-            router_serial: serialValue,
             comment: document.getElementById('close-comment').value || ''
         };
         
