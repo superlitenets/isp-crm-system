@@ -39,6 +39,7 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Complaints Module**: Implements an approval workflow for public complaints before conversion to tickets.
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning capabilities.
 - **Reporting & Activity Logs**: Comprehensive reports for tickets, orders, complaints, and user performance, with detailed activity logging for key system actions.
+- **Ticket Commission System**: Auto-calculates employee earnings when tickets are resolved/closed. Supports configurable rates per ticket category, individual assignment, and team-based split (equal share among active members). Integrates with payroll processing.
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
