@@ -299,6 +299,63 @@ XML;
         return 0;
     }
     
+    public function userExists(string $employeeNo): bool {
+        $xml = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<UserInfoSearchCond>
+    <searchID>0</searchID>
+    <searchResultPosition>0</searchResultPosition>
+    <maxResults>1</maxResults>
+    <EmployeeNoList>
+        <employeeNo>{$employeeNo}</employeeNo>
+    </EmployeeNoList>
+</UserInfoSearchCond>
+XML;
+        
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $xml);
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            $totalMatches = $data['UserInfoSearch']['totalMatches'] ?? 0;
+            return $totalMatches > 0;
+        }
+        
+        return false;
+    }
+    
+    public function getUser(string $employeeNo): ?array {
+        $xml = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<UserInfoSearchCond>
+    <searchID>0</searchID>
+    <searchResultPosition>0</searchResultPosition>
+    <maxResults>1</maxResults>
+    <EmployeeNoList>
+        <employeeNo>{$employeeNo}</employeeNo>
+    </EmployeeNoList>
+</UserInfoSearchCond>
+XML;
+        
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Search?format=json', 'POST', $xml);
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            if (!empty($data['UserInfoSearch']['UserInfo'])) {
+                $userInfo = $data['UserInfoSearch']['UserInfo'][0];
+                return [
+                    'device_user_id' => $userInfo['employeeNo'] ?? '',
+                    'name' => $userInfo['name'] ?? '',
+                    'card_no' => $userInfo['numOfCard'] ?? 0,
+                    'has_fingerprint' => ($userInfo['numOfFP'] ?? 0) > 0,
+                    'has_face' => ($userInfo['numOfFace'] ?? 0) > 0,
+                    'raw' => $userInfo
+                ];
+            }
+        }
+        
+        return null;
+    }
+    
     public function getCapabilities(): array {
         $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/capabilities?format=json');
         
@@ -367,29 +424,50 @@ XML;
     }
     
     public function addUserWithEnrollment(string $employeeNo, string $name, ?string $cardNo = null, bool $startEnrollment = true): array {
-        $addResult = $this->addUser($employeeNo, $name, $cardNo);
+        $existingUser = $this->getUser($employeeNo);
+        $userExisted = $existingUser !== null;
         
-        if (!$addResult['success']) {
-            if (strpos($addResult['error'] ?? '', 'reEdit') !== false || strpos($addResult['error'] ?? '', 'exist') !== false) {
-                $addResult = $this->updateUser($employeeNo, $name, $cardNo);
+        if ($userExisted) {
+            $addResult = $this->updateUser($employeeNo, $name, $cardNo);
+            if (!$addResult['success']) {
+                $addResult = ['success' => true, 'message' => 'User already exists on device'];
             }
+        } else {
+            $addResult = $this->addUser($employeeNo, $name, $cardNo);
             
             if (!$addResult['success']) {
-                return $addResult;
+                $errorLower = strtolower($addResult['error'] ?? '');
+                if (strpos($errorLower, 'reedit') !== false || strpos($errorLower, 'exist') !== false || strpos($errorLower, 'duplicate') !== false) {
+                    $addResult = $this->updateUser($employeeNo, $name, $cardNo);
+                    $userExisted = true;
+                }
+                
+                if (!$addResult['success']) {
+                    return $addResult;
+                }
             }
         }
         
         if ($startEnrollment) {
             $enrollResult = $this->startFingerprintEnrollment($employeeNo);
+            $hasFingerprint = $existingUser ? $existingUser['has_fingerprint'] : false;
+            
             return [
                 'success' => true,
-                'message' => 'User registered. ' . ($enrollResult['success'] ? $enrollResult['message'] : 'Fingerprint enrollment not available.'),
+                'message' => ($userExisted ? 'User already exists. ' : 'User registered. ') . 
+                             ($enrollResult['success'] ? $enrollResult['message'] : 
+                              ($hasFingerprint ? 'Fingerprint already enrolled.' : 'Fingerprint enrollment not available.')),
                 'enrollment_started' => $enrollResult['success'],
-                'user_added' => true
+                'user_existed' => $userExisted,
+                'has_fingerprint' => $hasFingerprint
             ];
         }
         
-        return $addResult;
+        return [
+            'success' => true,
+            'message' => $userExisted ? 'User already exists on device' : 'User added successfully',
+            'user_existed' => $userExisted
+        ];
     }
     
     private function sendRequest(string $endpoint, string $method = 'GET', ?string $data = null, string $contentType = 'application/xml'): array {
