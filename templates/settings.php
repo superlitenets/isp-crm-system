@@ -48,7 +48,7 @@ if ($action === 'edit_template' && $id) {
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'templates' ? 'active' : '' ?>" href="?page=settings&subpage=templates">
-            <i class="bi bi-file-text"></i> Ticket Templates
+            <i class="bi bi-file-text"></i> Response Templates
         </a>
     </li>
     <li class="nav-item">
@@ -500,22 +500,22 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Ticket Created</label>
                                     <textarea class="form-control" name="sms_template_ticket_created" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_created', 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {status}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {status}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_address}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Ticket Status Updated</label>
                                     <textarea class="form-control" name="sms_template_ticket_updated" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_updated', 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {status}, {message}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {status}, {message}, {category}, {priority}, {customer_name}, {customer_phone}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Ticket Resolved</label>
                                     <textarea class="form-control" name="sms_template_ticket_resolved" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_resolved', 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {status}, {customer_name}, {customer_phone}, {technician_name}, {technician_phone}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Technician Assigned (to Customer)</label>
-                                    <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {technician_name}, {customer_name}</small>
+                                    <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {technician_name}, {technician_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -534,7 +534,7 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-12">
                                     <label class="form-label fw-bold">New Ticket Assigned to Technician</label>
                                     <textarea class="form-control" name="sms_template_technician_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {customer_name}, {customer_phone}, {customer_address}, {subject}, {category}, {priority}, {technician_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_address}, {customer_email}, {technician_name}, {technician_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -553,12 +553,12 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Complaint Received</label>
                                     <textarea class="form-control" name="sms_template_complaint_received" rows="3"><?= htmlspecialchars($settings->get('sms_template_complaint_received', 'Thank you for your feedback. Complaint #{complaint_number} received. Category: {category}. We will review and respond shortly.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {complaint_number}, {category}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {complaint_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_email}, {customer_location}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Complaint Approved → Ticket Created</label>
                                     <textarea class="form-control" name="sms_template_complaint_approved" rows="3"><?= htmlspecialchars($settings->get('sms_template_complaint_approved', 'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {complaint_number}, {ticket_number}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {complaint_number}, {ticket_number}, {subject}, {description}, {category}, {customer_name}, {customer_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -577,12 +577,12 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Order Confirmation</label>
                                     <textarea class="form-control" name="sms_template_order_confirmation" rows="3"><?= htmlspecialchars($settings->get('sms_template_order_confirmation', 'Thank you! Order #{order_number} received for {package_name}. Amount: KES {amount}. We will contact you to schedule installation.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {order_number}, {package_name}, {amount}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {order_number}, {package_name}, {amount}, {customer_name}, {customer_phone}, {customer_email}, {customer_address}, {salesperson_name}, {salesperson_phone}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Order Accepted</label>
                                     <textarea class="form-control" name="sms_template_order_accepted" rows="3"><?= htmlspecialchars($settings->get('sms_template_order_accepted', 'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {order_number}, {ticket_number}, {customer_name}</small>
+                                    <small class="text-muted">Placeholders: {order_number}, {ticket_number}, {package_name}, {amount}, {customer_name}, {customer_phone}, {customer_address}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -601,7 +601,7 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-12">
                                     <label class="form-label fw-bold">HR Notice</label>
                                     <textarea class="form-control" name="sms_template_hr_notice" rows="3"><?= htmlspecialchars($settings->get('sms_template_hr_notice', 'ISP HR Notice - {subject}: {message}')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {subject}, {message}, {employee_name}</small>
+                                    <small class="text-muted">Placeholders: {subject}, {message}, {employee_name}, {employee_phone}, {department}, {company_name}</small>
                                 </div>
                             </div>
                         </div>

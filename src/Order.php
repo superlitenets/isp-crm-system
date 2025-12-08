@@ -88,12 +88,32 @@ class Order {
         $template = $this->settings->get('sms_template_order_confirmation', 
             'Dear {customer_name}, your order #{order_number} has been received. Amount: KES {amount}. We will contact you shortly. Thank you!');
         
+        $salesperson = null;
+        if (!empty($data['salesperson_id'])) {
+            $stmt = $this->db->prepare("SELECT s.name, s.phone FROM salespersons s WHERE s.id = ?");
+            $stmt->execute([$data['salesperson_id']]);
+            $salesperson = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        $packageName = '';
+        if (!empty($data['package_id'])) {
+            $stmt = $this->db->prepare("SELECT name FROM service_packages WHERE id = ?");
+            $stmt->execute([$data['package_id']]);
+            $pkg = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $packageName = $pkg['name'] ?? '';
+        }
+        
         $placeholders = [
-            '{customer_name}' => $data['customer_name'] ?? 'Customer',
             '{order_number}' => $orderNumber,
+            '{package_name}' => $packageName,
             '{amount}' => number_format((float)($data['amount'] ?? 0)),
+            '{customer_name}' => $data['customer_name'] ?? 'Customer',
             '{customer_phone}' => $data['customer_phone'] ?? '',
-            '{customer_address}' => $data['customer_address'] ?? ''
+            '{customer_email}' => $data['customer_email'] ?? '',
+            '{customer_address}' => $data['customer_address'] ?? '',
+            '{salesperson_name}' => $salesperson['name'] ?? '',
+            '{salesperson_phone}' => $salesperson['phone'] ?? '',
+            '{company_name}' => $this->settings->get('company_name', 'ISP Support')
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
@@ -333,12 +353,14 @@ class Order {
             'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.');
         
         $placeholders = [
-            '{customer_name}' => $order['customer_name'] ?? 'Customer',
-            '{ticket_number}' => $ticketNumber,
             '{order_number}' => $order['order_number'] ?? '',
+            '{ticket_number}' => $ticketNumber,
             '{package_name}' => $order['package_name'] ?? 'Service Package',
+            '{amount}' => number_format((float)($order['amount'] ?? 0)),
+            '{customer_name}' => $order['customer_name'] ?? 'Customer',
             '{customer_phone}' => $order['customer_phone'] ?? '',
-            '{customer_address}' => $order['customer_address'] ?? ''
+            '{customer_address}' => $order['customer_address'] ?? '',
+            '{company_name}' => $this->settings->get('company_name', 'ISP Support')
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);

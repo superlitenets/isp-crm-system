@@ -66,11 +66,16 @@ class Complaint {
             'Dear {customer_name}, your complaint #{complaint_number} has been received. Category: {category}. Our team will review and respond within 24 hours.');
         
         $placeholders = [
-            '{customer_name}' => $data['customer_name'] ?? 'Customer',
             '{complaint_number}' => $complaintNumber,
-            '{category}' => ucfirst($data['category'] ?? 'General'),
             '{subject}' => $data['subject'] ?? '',
-            '{customer_phone}' => $data['customer_phone'] ?? ''
+            '{description}' => substr($data['description'] ?? '', 0, 100),
+            '{category}' => ucfirst($data['category'] ?? 'General'),
+            '{priority}' => ucfirst($data['priority'] ?? 'medium'),
+            '{customer_name}' => $data['customer_name'] ?? 'Customer',
+            '{customer_phone}' => $data['customer_phone'] ?? '',
+            '{customer_email}' => $data['customer_email'] ?? '',
+            '{customer_location}' => $data['customer_location'] ?? '',
+            '{company_name}' => $this->settings->get('company_name', 'ISP Support')
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
@@ -291,12 +296,14 @@ class Complaint {
             'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.');
         
         $placeholders = [
-            '{customer_name}' => $complaint['customer_name'] ?? 'Customer',
-            '{ticket_number}' => $ticketNumber,
             '{complaint_number}' => $complaint['complaint_number'] ?? '',
-            '{category}' => ucfirst($complaint['category'] ?? 'General'),
+            '{ticket_number}' => $ticketNumber,
             '{subject}' => $complaint['subject'] ?? '',
-            '{customer_phone}' => $complaint['customer_phone'] ?? ''
+            '{description}' => substr($complaint['description'] ?? '', 0, 100),
+            '{category}' => ucfirst($complaint['category'] ?? 'General'),
+            '{customer_name}' => $complaint['customer_name'] ?? 'Customer',
+            '{customer_phone}' => $complaint['customer_phone'] ?? '',
+            '{company_name}' => $this->settings->get('company_name', 'ISP Support')
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);

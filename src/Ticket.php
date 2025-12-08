@@ -69,9 +69,14 @@ class Ticket {
             $message = $this->buildSMSFromTemplate('sms_template_ticket_created', [
                 '{ticket_number}' => $ticketNumber,
                 '{subject}' => $data['subject'] ?? '',
+                '{description}' => substr($data['description'] ?? '', 0, 100),
                 '{status}' => 'Open',
+                '{category}' => ucfirst($data['category'] ?? ''),
+                '{priority}' => ucfirst($priority),
                 '{customer_name}' => $customer['name'] ?? 'Customer',
-                '{priority}' => ucfirst($priority)
+                '{customer_phone}' => $customer['phone'] ?? '',
+                '{customer_address}' => $customer['address'] ?? '',
+                '{customer_email}' => $customer['email'] ?? ''
             ]);
             $result = $this->sms->send($customer['phone'], $message);
             $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Ticket created notification', $result['success'] ? 'sent' : 'failed');
@@ -158,15 +163,22 @@ class Ticket {
             try {
                 if (isset($data['status']) && $data['status'] !== $ticket['status']) {
                     $customer = (new Customer())->find($ticket['customer_id']);
+                    $technician = $ticket['assigned_to'] ? $this->getUser($ticket['assigned_to']) : null;
                     if ($customer && $customer['phone']) {
                         $statusMessage = $this->getStatusMessage($data['status']);
                         $templateKey = $data['status'] === 'resolved' ? 'sms_template_ticket_resolved' : 'sms_template_ticket_updated';
                         $message = $this->buildSMSFromTemplate($templateKey, [
                             '{ticket_number}' => $ticket['ticket_number'],
+                            '{subject}' => $ticket['subject'] ?? '',
+                            '{description}' => substr($ticket['description'] ?? '', 0, 100),
                             '{status}' => ucfirst($data['status']),
                             '{message}' => $statusMessage,
+                            '{category}' => ucfirst($ticket['category'] ?? ''),
+                            '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
                             '{customer_name}' => $customer['name'] ?? 'Customer',
-                            '{subject}' => $ticket['subject'] ?? ''
+                            '{customer_phone}' => $customer['phone'] ?? '',
+                            '{technician_name}' => $technician['name'] ?? '',
+                            '{technician_phone}' => $technician['phone'] ?? ''
                         ]);
                         $smsResult = $this->sms->send($customer['phone'], $message);
                         $this->sms->logSMS($id, $customer['phone'], 'customer', "Status update: {$data['status']}", $smsResult['success'] ? 'sent' : 'failed');
@@ -219,16 +231,36 @@ class Ticket {
         if ($technician && $technician['phone'] && $customer) {
             $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', [
                 '{ticket_number}' => $ticket['ticket_number'],
+                '{subject}' => $ticket['subject'] ?? '',
+                '{description}' => substr($ticket['description'] ?? '', 0, 100),
+                '{category}' => ucfirst($ticket['category'] ?? ''),
+                '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
                 '{customer_name}' => $customer['name'] ?? 'Customer',
                 '{customer_phone}' => $customer['phone'] ?? '',
                 '{customer_address}' => $customer['address'] ?? '',
-                '{subject}' => $ticket['subject'] ?? '',
-                '{category}' => $ticket['category'] ?? '',
-                '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
-                '{technician_name}' => $technician['name'] ?? 'Technician'
+                '{customer_email}' => $customer['email'] ?? '',
+                '{technician_name}' => $technician['name'] ?? 'Technician',
+                '{technician_phone}' => $technician['phone'] ?? ''
             ]);
             $result = $this->sms->send($technician['phone'], $message);
             $this->sms->logSMS($ticketId, $technician['phone'], 'technician', 'Ticket assignment notification', $result['success'] ? 'sent' : 'failed');
+            
+            // Also notify customer that technician has been assigned
+            if ($customer['phone']) {
+                $customerMessage = $this->buildSMSFromTemplate('sms_template_ticket_assigned', [
+                    '{ticket_number}' => $ticket['ticket_number'],
+                    '{subject}' => $ticket['subject'] ?? '',
+                    '{description}' => substr($ticket['description'] ?? '', 0, 100),
+                    '{category}' => ucfirst($ticket['category'] ?? ''),
+                    '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
+                    '{customer_name}' => $customer['name'] ?? 'Customer',
+                    '{customer_phone}' => $customer['phone'] ?? '',
+                    '{technician_name}' => $technician['name'] ?? 'Technician',
+                    '{technician_phone}' => $technician['phone'] ?? ''
+                ]);
+                $customerResult = $this->sms->send($customer['phone'], $customerMessage);
+                $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Technician assignment notification', $customerResult['success'] ? 'sent' : 'failed');
+            }
         }
     }
 
@@ -247,9 +279,11 @@ class Ticket {
             'sms_template_ticket_created' => 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.',
             'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
-            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.',
-            'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}'
+            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.',
+            'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}'
         ];
+        
+        $placeholders['{company_name}'] = $this->settings->get('company_name', 'ISP Support');
         
         $template = $this->settings->get($templateKey, $defaults[$templateKey] ?? 'ISP Support - Ticket #{ticket_number} - {status}');
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);
