@@ -451,6 +451,173 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
     </div>
 </div>
 
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-chat-square-text"></i> SMS Notification Templates</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_sms_templates">
+            
+            <div class="accordion" id="smsTemplatesAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#ticketCustomerTemplates">
+                            <i class="bi bi-person-check me-2"></i> Ticket → Customer Notifications
+                        </button>
+                    </h2>
+                    <div id="ticketCustomerTemplates" class="accordion-collapse collapse show" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Ticket Created</label>
+                                    <textarea class="form-control" name="sms_template_ticket_created" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_created', 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {status}, {customer_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Ticket Status Updated</label>
+                                    <textarea class="form-control" name="sms_template_ticket_updated" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_updated', 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {status}, {message}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Ticket Resolved</label>
+                                    <textarea class="form-control" name="sms_template_ticket_resolved" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_resolved', 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {customer_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Technician Assigned (to Customer)</label>
+                                    <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {technician_name}, {customer_name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ticketTechTemplates">
+                            <i class="bi bi-tools me-2"></i> Ticket → Technician/Staff Notifications
+                        </button>
+                    </h2>
+                    <div id="ticketTechTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">New Ticket Assigned to Technician</label>
+                                    <textarea class="form-control" name="sms_template_technician_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {customer_name}, {customer_phone}, {customer_address}, {subject}, {category}, {priority}, {technician_name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#complaintTemplates">
+                            <i class="bi bi-exclamation-triangle me-2"></i> Complaint Notifications
+                        </button>
+                    </h2>
+                    <div id="complaintTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Complaint Received</label>
+                                    <textarea class="form-control" name="sms_template_complaint_received" rows="3"><?= htmlspecialchars($settings->get('sms_template_complaint_received', 'Thank you for your feedback. Complaint #{complaint_number} received. Category: {category}. We will review and respond shortly.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {complaint_number}, {category}, {customer_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Complaint Approved → Ticket Created</label>
+                                    <textarea class="form-control" name="sms_template_complaint_approved" rows="3"><?= htmlspecialchars($settings->get('sms_template_complaint_approved', 'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {complaint_number}, {ticket_number}, {customer_name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#orderTemplates">
+                            <i class="bi bi-cart-check me-2"></i> Order Notifications
+                        </button>
+                    </h2>
+                    <div id="orderTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Order Confirmation</label>
+                                    <textarea class="form-control" name="sms_template_order_confirmation" rows="3"><?= htmlspecialchars($settings->get('sms_template_order_confirmation', 'Thank you! Order #{order_number} received for {package_name}. Amount: KES {amount}. We will contact you to schedule installation.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {order_number}, {package_name}, {amount}, {customer_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Order Accepted</label>
+                                    <textarea class="form-control" name="sms_template_order_accepted" rows="3"><?= htmlspecialchars($settings->get('sms_template_order_accepted', 'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {order_number}, {ticket_number}, {customer_name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#hrTemplates">
+                            <i class="bi bi-people me-2"></i> HR / Employee Notifications
+                        </button>
+                    </h2>
+                    <div id="hrTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">HR Notice</label>
+                                    <textarea class="form-control" name="sms_template_hr_notice" rows="3"><?= htmlspecialchars($settings->get('sms_template_hr_notice', 'ISP HR Notice - {subject}: {message}')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {subject}, {message}, {employee_name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <button type="submit" class="btn btn-info text-white">
+                    <i class="bi bi-check-lg"></i> Save All Templates
+                </button>
+                <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetToDefaults()">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function resetToDefaults() {
+    if (!confirm('Are you sure you want to reset all templates to defaults?')) return;
+    
+    const defaults = {
+        'sms_template_ticket_created': 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.',
+        'sms_template_ticket_updated': 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
+        'sms_template_ticket_resolved': 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
+        'sms_template_ticket_assigned': 'ISP Support - Technician {technician_name} has been assigned to your ticket #{ticket_number}.',
+        'sms_template_technician_assigned': 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}',
+        'sms_template_complaint_received': 'Thank you for your feedback. Complaint #{complaint_number} received. Category: {category}. We will review and respond shortly.',
+        'sms_template_complaint_approved': 'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.',
+        'sms_template_order_confirmation': 'Thank you! Order #{order_number} received for {package_name}. Amount: KES {amount}. We will contact you to schedule installation.',
+        'sms_template_order_accepted': 'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.',
+        'sms_template_hr_notice': 'ISP HR Notice - {subject}: {message}'
+    };
+    
+    for (const [name, value] of Object.entries(defaults)) {
+        const field = document.querySelector(`textarea[name="${name}"]`);
+        if (field) field.value = value;
+    }
+}
+</script>
+
 <div class="modal fade" id="sendTestModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

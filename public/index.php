@@ -1113,6 +1113,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'save_sms_templates':
+                try {
+                    $templateKeys = [
+                        'sms_template_ticket_created',
+                        'sms_template_ticket_updated',
+                        'sms_template_ticket_resolved',
+                        'sms_template_ticket_assigned',
+                        'sms_template_technician_assigned',
+                        'sms_template_complaint_received',
+                        'sms_template_complaint_approved',
+                        'sms_template_order_confirmation',
+                        'sms_template_order_accepted',
+                        'sms_template_hr_notice'
+                    ];
+                    foreach ($templateKeys as $key) {
+                        if (isset($_POST[$key])) {
+                            $settings->set($key, $_POST[$key]);
+                        }
+                    }
+                    \App\Settings::clearCache();
+                    $message = 'SMS templates saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving SMS templates: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_whatsapp_settings':
                 try {
                     $whatsappData = $_POST;
