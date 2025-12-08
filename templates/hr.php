@@ -6,6 +6,9 @@ $subpage = $_GET['subpage'] ?? 'employees';
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
 $selectedMonth = $_GET['month'] ?? date('Y-m');
 
+$hrSettings = new \App\Settings();
+$currencySymbol = $hrSettings->get('currency_symbol', 'KES');
+
 if ($action === 'edit_employee' && $id) {
     $employeeData = $employee->find($id);
     if ($employeeData && $employeeData['user_id']) {
@@ -283,7 +286,7 @@ $allRoles = $roleManager->getAllRoles();
                     </tr>
                     <tr>
                         <th>Salary</th>
-                        <td><?= $employeeData['salary'] ? '$' . number_format($employeeData['salary'], 2) : 'N/A' ?></td>
+                        <td><?= $employeeData['salary'] ? $currencySymbol . ' ' . number_format($employeeData['salary'], 2) : 'N/A' ?></td>
                     </tr>
                 </table>
             </div>
@@ -1008,10 +1011,10 @@ function syncAllEmployeesToDevice(deviceId) {
                         <td>
                             <?= date('M j', strtotime($pay['pay_period_start'])) ?> - <?= date('M j, Y', strtotime($pay['pay_period_end'])) ?>
                         </td>
-                        <td>$<?= number_format($pay['base_salary'], 2) ?></td>
-                        <td class="text-success">+$<?= number_format($pay['bonuses'] + $pay['overtime_pay'], 2) ?></td>
-                        <td class="text-danger">-$<?= number_format($pay['deductions'] + $pay['tax'], 2) ?></td>
-                        <td><strong>$<?= number_format($pay['net_pay'], 2) ?></strong></td>
+                        <td><?= $currencySymbol ?> <?= number_format($pay['base_salary'], 2) ?></td>
+                        <td class="text-success">+<?= $currencySymbol ?> <?= number_format($pay['bonuses'] + $pay['overtime_pay'], 2) ?></td>
+                        <td class="text-danger">-<?= $currencySymbol ?> <?= number_format($pay['deductions'] + $pay['tax'], 2) ?></td>
+                        <td><strong><?= $currencySymbol ?> <?= number_format($pay['net_pay'], 2) ?></strong></td>
                         <td>
                             <span class="badge bg-<?= $pay['status'] === 'paid' ? 'success' : ($pay['status'] === 'pending' ? 'warning' : 'secondary') ?>">
                                 <?= ucfirst($pay['status']) ?>
@@ -1062,7 +1065,7 @@ function syncAllEmployeesToDevice(deviceId) {
                                 <option value="">Select Employee</option>
                                 <?php foreach ($allEmployees as $emp): ?>
                                 <option value="<?= $emp['id'] ?>" data-salary="<?= $emp['salary'] ?? 0 ?>">
-                                    <?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>) - $<?= number_format($emp['salary'] ?? 0, 2) ?>
+                                    <?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>) - <?= $currencySymbol ?> <?= number_format($emp['salary'] ?? 0, 2) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
