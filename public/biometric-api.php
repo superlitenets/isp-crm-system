@@ -351,6 +351,153 @@ try {
             jsonResponse(['success' => true, 'message' => 'Acknowledged']);
             break;
             
+        case 'register-user':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeNo = $input['employee_no'] ?? $input['employee_id'] ?? null;
+            $name = $input['name'] ?? null;
+            $cardNo = $input['card_no'] ?? null;
+            
+            if (!$deviceId || !$employeeNo || !$name) {
+                jsonResponse(['success' => false, 'error' => 'device_id, employee_no, and name are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
+            }
+            
+            if ($device['type'] === 'hikvision') {
+                require_once __DIR__ . '/../src/HikvisionDevice.php';
+                $hikDevice = new \App\HikvisionDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 80,
+                    $device['username'],
+                    $device['password']
+                );
+                $result = $hikDevice->addUser((string)$employeeNo, $name, $cardNo);
+            } else {
+                $result = ['success' => false, 'error' => 'User registration not supported for this device type'];
+            }
+            
+            jsonResponse($result, $result['success'] ? 200 : 400);
+            break;
+            
+        case 'sync-employees-to-device':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeIds = $input['employee_ids'] ?? [];
+            
+            if (!$deviceId) {
+                jsonResponse(['success' => false, 'error' => 'device_id is required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
+            }
+            
+            if ($device['type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Employee sync only supported for Hikvision devices'], 400);
+            }
+            
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $device['password']
+            );
+            
+            if (empty($employeeIds)) {
+                $empStmt = $db->query("SELECT id, name, biometric_id, card_number FROM employees WHERE status = 'active'");
+            } else {
+                $placeholders = implode(',', array_fill(0, count($employeeIds), '?'));
+                $empStmt = $db->prepare("SELECT id, name, biometric_id, card_number FROM employees WHERE id IN ($placeholders)");
+                $empStmt->execute($employeeIds);
+            }
+            
+            $employees = $empStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $results = [];
+            $successCount = 0;
+            $failCount = 0;
+            
+            foreach ($employees as $emp) {
+                $bioId = $emp['biometric_id'] ?: (string)$emp['id'];
+                $result = $hikDevice->addUser($bioId, $emp['name'], $emp['card_number']);
+                $results[] = [
+                    'employee_id' => $emp['id'],
+                    'name' => $emp['name'],
+                    'biometric_id' => $bioId,
+                    'success' => $result['success'],
+                    'message' => $result['message'] ?? $result['error'] ?? ''
+                ];
+                if ($result['success']) {
+                    $successCount++;
+                    if (empty($emp['biometric_id'])) {
+                        $updateStmt = $db->prepare("UPDATE employees SET biometric_id = ? WHERE id = ?");
+                        $updateStmt->execute([$bioId, $emp['id']]);
+                    }
+                } else {
+                    $failCount++;
+                }
+            }
+            
+            jsonResponse([
+                'success' => true,
+                'total' => count($employees),
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'results' => $results
+            ]);
+            break;
+            
+        case 'delete-device-user':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeNo = $input['employee_no'] ?? null;
+            
+            if (!$deviceId || !$employeeNo) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $device['password']
+            );
+            $result = $hikDevice->deleteUser((string)$employeeNo);
+            jsonResponse($result, $result['success'] ? 200 : 400);
+            break;
+            
         case 'hikvision-push':
             if ($method !== 'POST') {
                 jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);

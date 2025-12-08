@@ -175,7 +175,141 @@ XML;
         return $users;
     }
     
-    private function sendRequest(string $endpoint, string $method = 'GET', ?string $data = null): array {
+    public function addUser(string $employeeNo, string $name, ?string $cardNo = null): array {
+        $userInfo = [
+            'UserInfo' => [
+                'employeeNo' => $employeeNo,
+                'name' => $name,
+                'userType' => 'normal',
+                'Valid' => [
+                    'enable' => true,
+                    'beginTime' => date('Y-m-d\T00:00:00'),
+                    'endTime' => date('Y-m-d\T23:59:59', strtotime('+10 years'))
+                ],
+                'doorRight' => '1',
+                'RightPlan' => [
+                    ['doorNo' => 1, 'planTemplateNo' => '1']
+                ]
+            ]
+        ];
+        
+        if ($cardNo) {
+            $userInfo['UserInfo']['numOfCard'] = 1;
+            $userInfo['UserInfo']['CardList'] = [
+                ['cardNo' => $cardNo, 'cardType' => 'normalCard']
+            ];
+        }
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/UserInfo/Record?format=json',
+            'POST',
+            json_encode($userInfo),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            if (isset($data['statusCode']) && $data['statusCode'] == 1) {
+                return ['success' => true, 'message' => 'User added successfully'];
+            }
+            return ['success' => true, 'message' => 'User added', 'response' => $data];
+        }
+        
+        $error = 'Failed to add user';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $response['error'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function updateUser(string $employeeNo, string $name, ?string $cardNo = null): array {
+        $userInfo = [
+            'UserInfo' => [
+                'employeeNo' => $employeeNo,
+                'name' => $name
+            ]
+        ];
+        
+        if ($cardNo) {
+            $userInfo['UserInfo']['numOfCard'] = 1;
+            $userInfo['UserInfo']['CardList'] = [
+                ['cardNo' => $cardNo, 'cardType' => 'normalCard']
+            ];
+        }
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/UserInfo/Modify?format=json',
+            'PUT',
+            json_encode($userInfo),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'User updated successfully'];
+        }
+        
+        $error = 'Failed to update user';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function deleteUser(string $employeeNo): array {
+        $deleteData = [
+            'UserInfoDelCond' => [
+                'EmployeeNoList' => [
+                    ['employeeNo' => $employeeNo]
+                ]
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/UserInfo/Delete?format=json',
+            'PUT',
+            json_encode($deleteData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'User deleted successfully'];
+        }
+        
+        $error = 'Failed to delete user';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function getUserCount(): int {
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/Count?format=json');
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            return $data['UserInfoCount']['userNumber'] ?? 0;
+        }
+        
+        return 0;
+    }
+    
+    public function getCapabilities(): array {
+        $response = $this->sendRequest('/ISAPI/AccessControl/UserInfo/capabilities?format=json');
+        
+        if ($response['code'] === 200) {
+            return json_decode($response['body'], true) ?? [];
+        }
+        
+        return [];
+    }
+    
+    private function sendRequest(string $endpoint, string $method = 'GET', ?string $data = null, string $contentType = 'application/xml'): array {
         $url = "http://{$this->ip}:{$this->port}{$endpoint}";
         
         $ch = curl_init($url);
@@ -189,7 +323,7 @@ XML;
         if ($data) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: application/xml',
+                'Content-Type: ' . $contentType,
                 'Content-Length: ' . strlen($data)
             ]);
         }
