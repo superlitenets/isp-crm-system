@@ -89,7 +89,14 @@ class Ticket {
             if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
                 $waMessage = $message;
             }
-            $this->whatsapp->send($customer['phone'], $waMessage, $ticketId);
+            try {
+                $waResult = $this->whatsapp->send($customer['phone'], $waMessage);
+                if ($waResult['success']) {
+                    $this->whatsapp->logMessage($ticketId, null, null, $customer['phone'], 'customer', $waMessage, 'sent', 'ticket_created');
+                }
+            } catch (\Throwable $e) {
+                error_log("WhatsApp notification failed for ticket $ticketId: " . $e->getMessage());
+            }
         }
 
         if ($assignedTo) {
@@ -261,7 +268,14 @@ class Ticket {
             if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
                 $waMessage = $message;
             }
-            $this->whatsapp->send($technician['phone'], $waMessage, $ticketId);
+            try {
+                $waResult = $this->whatsapp->send($technician['phone'], $waMessage);
+                if ($waResult['success']) {
+                    $this->whatsapp->logMessage($ticketId, null, null, $technician['phone'], 'technician', $waMessage, 'sent', 'technician_assigned');
+                }
+            } catch (\Throwable $e) {
+                error_log("WhatsApp notification failed for technician on ticket $ticketId: " . $e->getMessage());
+            }
             
             if ($customer['phone']) {
                 $customerPlaceholders = [
@@ -284,7 +298,14 @@ class Ticket {
                 if (empty(trim(str_replace(array_keys($customerPlaceholders), '', $waCustomerMessage)))) {
                     $waCustomerMessage = $customerMessage;
                 }
-                $this->whatsapp->send($customer['phone'], $waCustomerMessage, $ticketId);
+                try {
+                    $waResult = $this->whatsapp->send($customer['phone'], $waCustomerMessage);
+                    if ($waResult['success']) {
+                        $this->whatsapp->logMessage($ticketId, null, null, $customer['phone'], 'customer', $waCustomerMessage, 'sent', 'ticket_assigned');
+                    }
+                } catch (\Throwable $e) {
+                    error_log("WhatsApp notification failed for customer on ticket $ticketId: " . $e->getMessage());
+                }
             }
         }
     }
