@@ -684,10 +684,11 @@ class Ticket {
             INSERT INTO teams (name, description, leader_id)
             VALUES (?, ?, ?)
         ");
+        $leaderId = isset($data['leader_id']) && $data['leader_id'] !== '' ? (int)$data['leader_id'] : null;
         $stmt->execute([
             $data['name'],
             $data['description'] ?? null,
-            $data['leader_id'] ?? null
+            $leaderId
         ]);
         return (int) $this->db->lastInsertId();
     }
