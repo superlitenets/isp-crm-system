@@ -101,13 +101,27 @@ class WhatsApp {
     }
     
     public function formatPhone(string $phone): string {
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        
+        if (str_starts_with($phone, '+')) {
+            $phone = substr($phone, 1);
+        }
+        
         $phone = preg_replace('/[^0-9]/', '', $phone);
         
         if (str_starts_with($phone, '0')) {
             $phone = $this->defaultCountryCode . substr($phone, 1);
         }
         
+        if (strlen($phone) === 9 && $this->defaultCountryCode === '254') {
+            $phone = '254' . $phone;
+        }
+        
         if (strlen($phone) < 10) {
+            $phone = $this->defaultCountryCode . $phone;
+        }
+        
+        if (!str_starts_with($phone, $this->defaultCountryCode) && strlen($phone) === 10 && str_starts_with($phone, '7')) {
             $phone = $this->defaultCountryCode . $phone;
         }
         
