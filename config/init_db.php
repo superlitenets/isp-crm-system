@@ -1051,6 +1051,32 @@ function runMigrations(PDO $db): void {
                 amount DECIMAL(12, 2) NOT NULL,
                 details JSONB,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'ticket_satisfaction_ratings' => "
+            CREATE TABLE IF NOT EXISTS ticket_satisfaction_ratings (
+                id SERIAL PRIMARY KEY,
+                ticket_id INTEGER UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+                rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                feedback TEXT,
+                rated_by_name VARCHAR(100),
+                rated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'ticket_escalations' => "
+            CREATE TABLE IF NOT EXISTS ticket_escalations (
+                id SERIAL PRIMARY KEY,
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+                escalated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                escalated_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                reason TEXT NOT NULL,
+                previous_priority VARCHAR(20),
+                new_priority VARCHAR(20),
+                previous_assigned_to INTEGER,
+                status VARCHAR(20) DEFAULT 'active',
+                resolved_at TIMESTAMP,
+                resolution_notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
@@ -1096,7 +1122,11 @@ function runMigrations(PDO $db): void {
         ['complaints', 'created_by', 'ALTER TABLE complaints ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
         ['equipment', 'brand', 'ALTER TABLE equipment ADD COLUMN brand VARCHAR(100)'],
         ['equipment', 'mac_address', 'ALTER TABLE equipment ADD COLUMN mac_address VARCHAR(50)'],
-        ['equipment', 'warranty_expiry', 'ALTER TABLE equipment ADD COLUMN warranty_expiry DATE']
+        ['equipment', 'warranty_expiry', 'ALTER TABLE equipment ADD COLUMN warranty_expiry DATE'],
+        ['tickets', 'is_escalated', 'ALTER TABLE tickets ADD COLUMN is_escalated BOOLEAN DEFAULT FALSE'],
+        ['tickets', 'escalation_count', 'ALTER TABLE tickets ADD COLUMN escalation_count INTEGER DEFAULT 0'],
+        ['tickets', 'satisfaction_rating', 'ALTER TABLE tickets ADD COLUMN satisfaction_rating INTEGER'],
+        ['tickets', 'closed_at', 'ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP']
     ];
     
     foreach ($columnMigrations as $migration) {

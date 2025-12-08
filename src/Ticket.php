@@ -523,6 +523,15 @@ class Ticket {
             $params[] = (int)$filters['user_id'];
         }
         
+        if (isset($filters['escalated']) && $filters['escalated'] !== '') {
+            $sql .= " AND t.is_escalated = ?";
+            $params[] = $filters['escalated'] === '1' || $filters['escalated'] === true;
+        }
+        
+        if (!empty($filters['sla_breached'])) {
+            $sql .= " AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE)";
+        }
+        
         $sql .= " ORDER BY 
             CASE t.priority 
                 WHEN 'critical' THEN 1 
@@ -780,5 +789,330 @@ class Ticket {
                 $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
             }
         }
+    }
+    
+    public function getTimeline(int $ticketId): array {
+        $timeline = [];
+        
+        $ticket = $this->find($ticketId);
+        if ($ticket) {
+            $timeline[] = [
+                'type' => 'created',
+                'icon' => 'plus-circle',
+                'color' => 'primary',
+                'title' => 'Ticket Created',
+                'description' => "Ticket #{$ticket['ticket_number']} was created",
+                'user' => $ticket['created_by_name'] ?? 'System',
+                'timestamp' => $ticket['created_at']
+            ];
+        }
+        
+        $comments = $this->getComments($ticketId);
+        foreach ($comments as $comment) {
+            $timeline[] = [
+                'type' => $comment['is_internal'] ? 'internal_note' : 'comment',
+                'icon' => $comment['is_internal'] ? 'lock' : 'chat-dots',
+                'color' => $comment['is_internal'] ? 'warning' : 'info',
+                'title' => $comment['is_internal'] ? 'Internal Note' : 'Comment Added',
+                'description' => substr($comment['comment'], 0, 200) . (strlen($comment['comment']) > 200 ? '...' : ''),
+                'user' => $comment['user_name'] ?? 'Unknown',
+                'timestamp' => $comment['created_at']
+            ];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT sl.*, u.name as user_name
+            FROM ticket_sla_logs sl
+            LEFT JOIN users u ON sl.created_by = u.id
+            WHERE sl.ticket_id = ?
+            ORDER BY sl.created_at ASC
+        ");
+        $stmt->execute([$ticketId]);
+        $slaLogs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($slaLogs as $log) {
+            $eventIcons = [
+                'sla_assigned' => 'clock',
+                'sla_response_breach' => 'exclamation-triangle',
+                'sla_resolution_breach' => 'exclamation-circle',
+                'first_response' => 'reply',
+                'resolved' => 'check-circle',
+                'paused' => 'pause-circle',
+                'resumed' => 'play-circle'
+            ];
+            $eventColors = [
+                'sla_assigned' => 'secondary',
+                'sla_response_breach' => 'danger',
+                'sla_resolution_breach' => 'danger',
+                'first_response' => 'success',
+                'resolved' => 'success',
+                'paused' => 'warning',
+                'resumed' => 'info'
+            ];
+            $timeline[] = [
+                'type' => 'sla_event',
+                'icon' => $eventIcons[$log['event_type']] ?? 'info-circle',
+                'color' => $eventColors[$log['event_type']] ?? 'secondary',
+                'title' => ucwords(str_replace('_', ' ', $log['event_type'])),
+                'description' => $log['notes'] ?? '',
+                'user' => $log['user_name'] ?? 'System',
+                'timestamp' => $log['created_at']
+            ];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT e.*, eb.name as escalated_by_name, et.name as escalated_to_name
+            FROM ticket_escalations e
+            LEFT JOIN users eb ON e.escalated_by = eb.id
+            LEFT JOIN users et ON e.escalated_to = et.id
+            WHERE e.ticket_id = ?
+            ORDER BY e.created_at ASC
+        ");
+        $stmt->execute([$ticketId]);
+        $escalations = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($escalations as $esc) {
+            $timeline[] = [
+                'type' => 'escalation',
+                'icon' => 'arrow-up-circle',
+                'color' => 'danger',
+                'title' => 'Ticket Escalated',
+                'description' => $esc['reason'] . ($esc['escalated_to_name'] ? " - Assigned to {$esc['escalated_to_name']}" : ''),
+                'user' => $esc['escalated_by_name'] ?? 'System',
+                'timestamp' => $esc['created_at']
+            ];
+        }
+        
+        usort($timeline, fn($a, $b) => strtotime($a['timestamp']) <=> strtotime($b['timestamp']));
+        
+        return $timeline;
+    }
+    
+    public function quickStatusChange(int $ticketId, string $newStatus, int $userId): bool {
+        $ticket = $this->find($ticketId);
+        if (!$ticket) return false;
+        
+        $oldStatus = $ticket['status'];
+        $updates = ['status' => $newStatus, 'updated_at' => date('Y-m-d H:i:s')];
+        
+        if ($newStatus === 'closed' && $oldStatus !== 'closed') {
+            $updates['closed_at'] = date('Y-m-d H:i:s');
+        }
+        if (in_array($newStatus, ['resolved', 'closed']) && !$ticket['resolved_at']) {
+            $updates['resolved_at'] = date('Y-m-d H:i:s');
+        }
+        
+        $fields = [];
+        $values = [];
+        foreach ($updates as $field => $value) {
+            $fields[] = "$field = ?";
+            $values[] = $value;
+        }
+        $values[] = $ticketId;
+        
+        $stmt = $this->db->prepare("UPDATE tickets SET " . implode(', ', $fields) . " WHERE id = ?");
+        $result = $stmt->execute($values);
+        
+        if ($result) {
+            $this->addComment($ticketId, $userId, "Status changed from {$oldStatus} to {$newStatus}", true);
+            $this->activityLog->log('status_change', 'ticket', $ticketId, $ticket['ticket_number'], 
+                "Status changed: {$oldStatus} -> {$newStatus}");
+            
+            if (in_array($newStatus, ['resolved', 'closed'])) {
+                $ticketCommission = new TicketCommission($this->db);
+                $ticketCommission->calculateForTicket($ticketId);
+            }
+        }
+        
+        return $result;
+    }
+    
+    public function escalate(int $ticketId, int $escalatedBy, array $data): bool {
+        $ticket = $this->find($ticketId);
+        if (!$ticket) return false;
+        
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO ticket_escalations (ticket_id, escalated_by, escalated_to, reason, 
+                    previous_priority, new_priority, previous_assigned_to)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $ticketId,
+                $escalatedBy,
+                $data['escalated_to'] ?? null,
+                $data['reason'],
+                $ticket['priority'],
+                $data['new_priority'] ?? $ticket['priority'],
+                $ticket['assigned_to']
+            ]);
+            
+            $updates = [
+                'is_escalated' => true,
+                'escalation_count' => ($ticket['escalation_count'] ?? 0) + 1,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            if (!empty($data['new_priority'])) {
+                $updates['priority'] = $data['new_priority'];
+            }
+            if (!empty($data['escalated_to'])) {
+                $updates['assigned_to'] = $data['escalated_to'];
+            }
+            
+            $fields = [];
+            $values = [];
+            foreach ($updates as $field => $value) {
+                $fields[] = "$field = ?";
+                $values[] = is_bool($value) ? ($value ? 'true' : 'false') : $value;
+            }
+            $values[] = $ticketId;
+            
+            $stmt = $this->db->prepare("UPDATE tickets SET " . implode(', ', $fields) . " WHERE id = ?");
+            $stmt->execute($values);
+            
+            $this->activityLog->log('escalate', 'ticket', $ticketId, $ticket['ticket_number'], 
+                "Ticket escalated: {$data['reason']}");
+            
+            if (!empty($data['escalated_to'])) {
+                $this->notifyAssignedTechnician($ticketId, (int)$data['escalated_to']);
+            }
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            error_log("Escalation error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    public function submitSatisfactionRating(int $ticketId, array $data): bool {
+        $ticket = $this->find($ticketId);
+        if (!$ticket) return false;
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO ticket_satisfaction_ratings (ticket_id, customer_id, rating, feedback, rated_by_name)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (ticket_id) DO UPDATE SET 
+                rating = EXCLUDED.rating, 
+                feedback = EXCLUDED.feedback,
+                rated_at = CURRENT_TIMESTAMP
+        ");
+        $result = $stmt->execute([
+            $ticketId,
+            $ticket['customer_id'],
+            (int)$data['rating'],
+            $data['feedback'] ?? null,
+            $data['rated_by_name'] ?? null
+        ]);
+        
+        if ($result) {
+            $stmt = $this->db->prepare("UPDATE tickets SET satisfaction_rating = ? WHERE id = ?");
+            $stmt->execute([(int)$data['rating'], $ticketId]);
+            
+            $this->activityLog->log('rating', 'ticket', $ticketId, $ticket['ticket_number'], 
+                "Customer rated ticket: {$data['rating']}/5 stars");
+        }
+        
+        return $result;
+    }
+    
+    public function getSatisfactionRating(int $ticketId): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM ticket_satisfaction_ratings WHERE ticket_id = ?");
+        $stmt->execute([$ticketId]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+    
+    public function getEscalations(int $ticketId): array {
+        $stmt = $this->db->prepare("
+            SELECT e.*, eb.name as escalated_by_name, et.name as escalated_to_name
+            FROM ticket_escalations e
+            LEFT JOIN users eb ON e.escalated_by = eb.id
+            LEFT JOIN users et ON e.escalated_to = et.id
+            WHERE e.ticket_id = ?
+            ORDER BY e.created_at DESC
+        ");
+        $stmt->execute([$ticketId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getDashboardStats(): array {
+        $thisMonth = date('Y-m-01');
+        $lastMonth = date('Y-m-01', strtotime('-1 month'));
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_tickets,
+                COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+                COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tickets,
+                COUNT(*) FILTER (WHERE status = 'resolved') as resolved_tickets,
+                COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
+                COUNT(*) FILTER (WHERE is_escalated = TRUE) as escalated_tickets,
+                COUNT(*) FILTER (WHERE sla_resolution_breached = TRUE) as sla_breached,
+                AVG(satisfaction_rating) FILTER (WHERE satisfaction_rating IS NOT NULL) as avg_satisfaction,
+                COUNT(*) FILTER (WHERE created_at >= ?) as this_month_tickets,
+                COUNT(*) FILTER (WHERE created_at >= ? AND created_at < ?) as last_month_tickets,
+                AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600) 
+                    FILTER (WHERE resolved_at IS NOT NULL AND created_at >= ?) as avg_resolution_hours
+            FROM tickets
+        ");
+        $stmt->execute([$thisMonth, $lastMonth, $thisMonth, $thisMonth]);
+        $stats = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->query("
+            SELECT category, COUNT(*) as count
+            FROM tickets
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY category
+            ORDER BY count DESC
+            LIMIT 5
+        ");
+        $stats['top_categories'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->query("
+            SELECT u.name, COUNT(t.id) as ticket_count,
+                   COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed')) as resolved_count
+            FROM users u
+            LEFT JOIN tickets t ON u.id = t.assigned_to AND t.created_at >= NOW() - INTERVAL '30 days'
+            WHERE u.role IN ('technician', 'admin')
+            GROUP BY u.id, u.name
+            HAVING COUNT(t.id) > 0
+            ORDER BY resolved_count DESC
+            LIMIT 5
+        ");
+        $stats['top_technicians'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        return $stats;
+    }
+    
+    public function getRecentActivity(int $limit = 10): array {
+        $stmt = $this->db->prepare("
+            SELECT t.id, t.ticket_number, t.subject, t.status, t.priority, 
+                   t.updated_at, t.created_at, c.name as customer_name,
+                   u.name as assigned_name
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN users u ON t.assigned_to = u.id
+            ORDER BY t.updated_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getOverdueTickets(): array {
+        $stmt = $this->db->query("
+            SELECT t.*, c.name as customer_name, c.phone as customer_phone,
+                   u.name as assigned_name
+            FROM tickets t
+            LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN users u ON t.assigned_to = u.id
+            WHERE t.status NOT IN ('resolved', 'closed')
+              AND (t.sla_resolution_breached = TRUE 
+                   OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))
+            ORDER BY t.sla_resolution_due ASC
+            LIMIT 20
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 }

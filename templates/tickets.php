@@ -132,8 +132,24 @@ if (isset($_GET['customer_id'])) {
 </div>
 
 <?php elseif ($action === 'view' && $ticketData): ?>
+<?php
+$timeline = $ticket->getTimeline($ticketData['id']);
+$satisfactionRating = $ticket->getSatisfactionRating($ticketData['id']);
+$escalations = $ticket->getEscalations($ticketData['id']);
+$isEscalated = $ticketData['is_escalated'] ?? false;
+?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-ticket"></i> Ticket <?= htmlspecialchars($ticketData['ticket_number']) ?></h2>
+    <div>
+        <h2 class="mb-1"><i class="bi bi-ticket"></i> Ticket <?= htmlspecialchars($ticketData['ticket_number']) ?></h2>
+        <?php if ($isEscalated): ?>
+        <span class="badge bg-danger"><i class="bi bi-arrow-up-circle"></i> Escalated</span>
+        <?php endif; ?>
+        <?php if ($satisfactionRating): ?>
+        <span class="badge bg-<?= $satisfactionRating['rating'] >= 4 ? 'success' : ($satisfactionRating['rating'] >= 3 ? 'warning' : 'danger') ?>">
+            <i class="bi bi-star-fill"></i> <?= $satisfactionRating['rating'] ?>/5 Rating
+        </span>
+        <?php endif; ?>
+    </div>
     <div>
         <a href="?page=tickets" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back
@@ -143,6 +159,94 @@ if (isset($_GET['customer_id'])) {
         </a>
     </div>
 </div>
+
+<?php if (!in_array($ticketData['status'], ['resolved', 'closed'])): ?>
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary bg-opacity-10">
+        <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <strong class="me-2 align-self-center">Change Status:</strong>
+            <?php 
+            $statusActions = [
+                'open' => ['icon' => 'folder2-open', 'color' => 'secondary'],
+                'in_progress' => ['icon' => 'play-circle', 'color' => 'info'],
+                'pending' => ['icon' => 'pause-circle', 'color' => 'warning'],
+                'resolved' => ['icon' => 'check-circle', 'color' => 'success'],
+                'closed' => ['icon' => 'x-circle', 'color' => 'dark']
+            ];
+            foreach ($statusActions as $status => $config): 
+                if ($status !== $ticketData['status']):
+            ?>
+            <form method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="quick_status_change">
+                <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+                <input type="hidden" name="new_status" value="<?= $status ?>">
+                <button type="submit" class="btn btn-sm btn-outline-<?= $config['color'] ?>">
+                    <i class="bi bi-<?= $config['icon'] ?>"></i> <?= ucwords(str_replace('_', ' ', $status)) ?>
+                </button>
+            </form>
+            <?php endif; endforeach; ?>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#escalateModal">
+                <i class="bi bi-arrow-up-circle"></i> Escalate Ticket
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (in_array($ticketData['status'], ['resolved', 'closed']) && !$satisfactionRating): ?>
+<div class="card mb-4 border-success">
+    <div class="card-header bg-success text-white">
+        <h6 class="mb-0"><i class="bi bi-star"></i> Customer Satisfaction Rating</h6>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-3">How satisfied was the customer with the resolution of this ticket?</p>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="submit_rating">
+            <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+            <div class="mb-3">
+                <div class="btn-group" role="group">
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                    <input type="radio" class="btn-check" name="rating" id="rating<?= $i ?>" value="<?= $i ?>" <?= $i === 5 ? 'checked' : '' ?>>
+                    <label class="btn btn-outline-warning" for="rating<?= $i ?>">
+                        <?= str_repeat('<i class="bi bi-star-fill"></i>', $i) ?>
+                    </label>
+                    <?php endfor; ?>
+                </div>
+            </div>
+            <div class="mb-3">
+                <textarea class="form-control" name="feedback" rows="2" placeholder="Customer feedback (optional)"></textarea>
+            </div>
+            <button type="submit" class="btn btn-success btn-sm">
+                <i class="bi bi-check-lg"></i> Submit Rating
+            </button>
+        </form>
+    </div>
+</div>
+<?php elseif ($satisfactionRating): ?>
+<div class="card mb-4 border-<?= $satisfactionRating['rating'] >= 4 ? 'success' : ($satisfactionRating['rating'] >= 3 ? 'warning' : 'danger') ?>">
+    <div class="card-header bg-<?= $satisfactionRating['rating'] >= 4 ? 'success' : ($satisfactionRating['rating'] >= 3 ? 'warning' : 'danger') ?> <?= $satisfactionRating['rating'] >= 4 ? 'text-white' : 'text-dark' ?>">
+        <h6 class="mb-0"><i class="bi bi-star-fill"></i> Customer Satisfaction: <?= $satisfactionRating['rating'] ?>/5</h6>
+    </div>
+    <div class="card-body">
+        <div class="mb-2">
+            <?php for ($i = 1; $i <= 5; $i++): ?>
+            <i class="bi bi-star<?= $i <= $satisfactionRating['rating'] ? '-fill text-warning' : '' ?> fs-4"></i>
+            <?php endfor; ?>
+        </div>
+        <?php if ($satisfactionRating['feedback']): ?>
+        <p class="mb-0"><strong>Feedback:</strong> <?= htmlspecialchars($satisfactionRating['feedback']) ?></p>
+        <?php endif; ?>
+        <small class="text-muted">Rated on <?= date('M j, Y g:i A', strtotime($satisfactionRating['rated_at'])) ?></small>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="row g-4">
     <div class="col-md-8">
@@ -586,7 +690,122 @@ if (isset($_GET['customer_id'])) {
     </div>
 </div>
 
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Activity Timeline</h5>
+                <span class="badge bg-secondary"><?= count($timeline) ?> events</span>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <?php if (empty($timeline)): ?>
+                <p class="text-muted">No activity recorded yet.</p>
+                <?php else: ?>
+                <div class="timeline">
+                    <?php foreach ($timeline as $event): ?>
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0 me-3">
+                            <div class="rounded-circle bg-<?= $event['color'] ?> bg-opacity-10 p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="bi bi-<?= $event['icon'] ?> text-<?= $event['color'] ?>"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong class="text-<?= $event['color'] ?>"><?= htmlspecialchars($event['title']) ?></strong>
+                                <small class="text-muted"><?= date('M j, g:i A', strtotime($event['timestamp'])) ?></small>
+                            </div>
+                            <p class="text-muted mb-0 small"><?= htmlspecialchars($event['description']) ?></p>
+                            <small class="text-muted">by <?= htmlspecialchars($event['user']) ?></small>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if (!empty($escalations)): ?>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-arrow-up-circle"></i> Escalation History (<?= count($escalations) ?>)</h5>
+            </div>
+            <div class="card-body">
+                <?php foreach ($escalations as $esc): ?>
+                <div class="border-start border-3 border-danger ps-3 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <strong>Escalated by <?= htmlspecialchars($esc['escalated_by_name'] ?? 'Unknown') ?></strong>
+                        <small class="text-muted"><?= date('M j, Y g:i A', strtotime($esc['created_at'])) ?></small>
+                    </div>
+                    <p class="mb-1"><?= htmlspecialchars($esc['reason']) ?></p>
+                    <?php if ($esc['escalated_to_name']): ?>
+                    <small class="text-muted">Assigned to: <?= htmlspecialchars($esc['escalated_to_name']) ?></small>
+                    <?php endif; ?>
+                    <?php if ($esc['new_priority'] && $esc['new_priority'] !== $esc['previous_priority']): ?>
+                    <br><small class="text-muted">Priority: <?= ucfirst($esc['previous_priority']) ?> → <?= ucfirst($esc['new_priority']) ?></small>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<div class="modal fade" id="escalateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="escalate_ticket">
+                <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-arrow-up-circle"></i> Escalate Ticket</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Escalation *</label>
+                        <textarea class="form-control" name="reason" rows="3" required placeholder="Explain why this ticket needs to be escalated..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Escalate To</label>
+                        <select class="form-select" name="escalated_to">
+                            <option value="">Select User (Optional)</option>
+                            <?php foreach ($users as $u): ?>
+                            <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?> (<?= ucfirst($u['role']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Change Priority To</label>
+                        <select class="form-select" name="new_priority">
+                            <option value="">Keep Current (<?= ucfirst($ticketData['priority']) ?>)</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-arrow-up-circle"></i> Escalate Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php else: ?>
+<?php 
+$dashboardStats = $ticket->getDashboardStats();
+$overdueTickets = $ticket->getOverdueTickets();
+$escalatedFilter = $_GET['escalated'] ?? '';
+?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-ticket"></i> Tickets</h2>
     <a href="?page=tickets&action=create" class="btn btn-primary">
@@ -594,11 +813,72 @@ if (isset($_GET['customer_id'])) {
     </a>
 </div>
 
+<div class="row g-3 mb-4">
+    <div class="col-md-2">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['open_tickets'] ?? 0 ?></h3>
+                <small>Open</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['in_progress_tickets'] ?? 0 ?></h3>
+                <small>In Progress</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['resolved_tickets'] ?? 0 ?></h3>
+                <small>Resolved</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['sla_breached'] ?? 0 ?></h3>
+                <small>SLA Breached</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-warning h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['escalated_tickets'] ?? 0 ?></h3>
+                <small>Escalated</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-secondary text-white h-100">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $dashboardStats['avg_satisfaction'] ? number_format($dashboardStats['avg_satisfaction'], 1) : '-' ?></h3>
+                <small><i class="bi bi-star-fill"></i> Avg Rating</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if (!empty($overdueTickets)): ?>
+<div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+    <div>
+        <strong><?= count($overdueTickets) ?> overdue ticket(s) require immediate attention!</strong>
+        <a href="?page=tickets&status=open&sla_breached=1" class="alert-link ms-2">View all</a>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
             <input type="hidden" name="page" value="tickets">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input type="text" class="form-control" name="search" placeholder="Search tickets..." value="<?= htmlspecialchars($search) ?>">
             </div>
             <div class="col-md-2">
@@ -617,7 +897,14 @@ if (isset($_GET['customer_id'])) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
+                <select class="form-select" name="escalated">
+                    <option value="">All Tickets</option>
+                    <option value="1" <?= $escalatedFilter === '1' ? 'selected' : '' ?>>Escalated Only</option>
+                    <option value="0" <?= $escalatedFilter === '0' ? 'selected' : '' ?>>Not Escalated</option>
+                </select>
+            </div>
+            <div class="col-md-3">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-search"></i> Filter
                 </button>
@@ -650,6 +937,8 @@ if (isset($_GET['customer_id'])) {
                     if ($statusFilter) $filters['status'] = $statusFilter;
                     if ($priorityFilter) $filters['priority'] = $priorityFilter;
                     if ($search) $filters['search'] = $search;
+                    if ($escalatedFilter !== '') $filters['escalated'] = $escalatedFilter;
+                    if (!empty($_GET['sla_breached'])) $filters['sla_breached'] = true;
                     if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $filters['user_id'] = $_SESSION['user_id'];
                     }
@@ -659,9 +948,20 @@ if (isset($_GET['customer_id'])) {
                         $slaStatus = $slaHelper->getSLAStatus($t);
                         $hasBreached = $t['sla_response_breached'] || $t['sla_resolution_breached'];
                         $isAtRisk = ($slaStatus['response']['status'] === 'at_risk' || $slaStatus['resolution']['status'] === 'at_risk');
+                        $ticketIsEscalated = $t['is_escalated'] ?? false;
                     ?>
                     <tr class="<?= $hasBreached ? 'table-danger' : ($isAtRisk ? 'table-warning' : '') ?>">
-                        <td><a href="?page=tickets&action=view&id=<?= $t['id'] ?>"><?= htmlspecialchars($t['ticket_number']) ?></a></td>
+                        <td>
+                            <a href="?page=tickets&action=view&id=<?= $t['id'] ?>"><?= htmlspecialchars($t['ticket_number']) ?></a>
+                            <?php if ($ticketIsEscalated): ?>
+                            <br><span class="badge bg-danger" title="Escalated"><i class="bi bi-arrow-up-circle"></i></span>
+                            <?php endif; ?>
+                            <?php if ($t['satisfaction_rating'] ?? null): ?>
+                            <span class="badge bg-<?= $t['satisfaction_rating'] >= 4 ? 'success' : ($t['satisfaction_rating'] >= 3 ? 'warning' : 'danger') ?>" title="Rating: <?= $t['satisfaction_rating'] ?>/5">
+                                <i class="bi bi-star-fill"></i> <?= $t['satisfaction_rating'] ?>
+                            </span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= htmlspecialchars($t['customer_name'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars(substr($t['subject'], 0, 30)) ?><?= strlen($t['subject']) > 30 ? '...' : '' ?></td>
                         <td><span class="badge badge-priority-<?= $t['priority'] ?>"><?= ucfirst($t['priority']) ?></span></td>

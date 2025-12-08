@@ -984,6 +984,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+            
+            case 'quick_status_change':
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                $newStatus = $_POST['new_status'] ?? '';
+                if ($ticketId && $newStatus) {
+                    try {
+                        $result = $ticket->quickStatusChange($ticketId, $newStatus, $currentUser['id']);
+                        if ($result) {
+                            $message = 'Status changed to ' . ucwords(str_replace('_', ' ', $newStatus)) . ' successfully!';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to change status.';
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+            
+            case 'escalate_ticket':
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                $reason = trim($_POST['reason'] ?? '');
+                if ($ticketId && $reason) {
+                    try {
+                        $result = $ticket->escalate($ticketId, $currentUser['id'], [
+                            'reason' => $reason,
+                            'escalated_to' => !empty($_POST['escalated_to']) ? (int)$_POST['escalated_to'] : null,
+                            'new_priority' => $_POST['new_priority'] ?? null
+                        ]);
+                        if ($result) {
+                            $message = 'Ticket escalated successfully! Assigned technician has been notified.';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to escalate ticket.';
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                } else {
+                    $message = 'Please provide a reason for escalation.';
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'submit_rating':
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                $rating = (int)($_POST['rating'] ?? 0);
+                if ($ticketId && $rating >= 1 && $rating <= 5) {
+                    try {
+                        $result = $ticket->submitSatisfactionRating($ticketId, [
+                            'rating' => $rating,
+                            'feedback' => $_POST['feedback'] ?? null,
+                            'rated_by_name' => $currentUser['name'] ?? null
+                        ]);
+                        if ($result) {
+                            $message = 'Customer satisfaction rating submitted successfully!';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to submit rating.';
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                } else {
+                    $message = 'Please select a valid rating (1-5 stars).';
+                    $messageType = 'danger';
+                }
+                break;
                 
             case 'create_employee':
                 $name = trim($_POST['name'] ?? '');
