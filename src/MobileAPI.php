@@ -734,15 +734,16 @@ class MobileAPI {
         ];
     }
     
-    public function searchCustomers(string $query, int $limit = 10): array {
+    public function searchCustomers(string $query, int $limit = 30): array {
+        $searchTerm = '%' . $query . '%';
         $stmt = $this->db->prepare("
-            SELECT id, name, phone, address, email
+            SELECT id, name, phone, address, email, status
             FROM customers 
-            WHERE name ILIKE ? OR phone ILIKE ?
+            WHERE name ILIKE ? OR phone ILIKE ? OR address ILIKE ? OR email ILIKE ?
             ORDER BY name
             LIMIT ?
         ");
-        $stmt->execute(['%' . $query . '%', '%' . $query . '%', $limit]);
+        $stmt->execute([$searchTerm, $searchTerm, $searchTerm, $searchTerm, $limit]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
@@ -1063,5 +1064,75 @@ class MobileAPI {
             'summary' => $summary,
             'earnings' => $earnings
         ];
+    }
+    
+    public function getCustomerDetail(int $customerId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT c.*, sp.name as package_name, sp.speed as package_speed
+            FROM customers c
+            LEFT JOIN service_packages sp ON c.package_id = sp.id
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$customerId]);
+        $customer = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$customer) {
+            return null;
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT id, subject, status, priority, created_at
+            FROM tickets
+            WHERE customer_id = ?
+            ORDER BY created_at DESC
+            LIMIT 5
+        ");
+        $stmt->execute([$customerId]);
+        $customer['recent_tickets'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->prepare("
+            SELECT e.id, e.name, e.serial_number, e.brand, e.model, e.mac_address
+            FROM equipment e
+            JOIN equipment_assignments ea ON e.id = ea.equipment_id
+            WHERE ea.customer_id = ? AND ea.status = 'assigned'
+        ");
+        $stmt->execute([$customerId]);
+        $customer['equipment'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        return $customer;
+    }
+    
+    public function getUserNotifications(int $userId, int $limit = 50): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT id, user_id, type, title, message, reference_id, is_read, created_at
+                FROM user_notifications
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$userId, $limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+    
+    public function markNotificationRead(int $notificationId, int $userId): bool {
+        try {
+            $stmt = $this->db->prepare("UPDATE user_notifications SET is_read = TRUE WHERE id = ? AND user_id = ?");
+            return $stmt->execute([$notificationId, $userId]);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+    
+    public function markAllNotificationsRead(int $userId): bool {
+        try {
+            $stmt = $this->db->prepare("UPDATE user_notifications SET is_read = TRUE WHERE user_id = ?");
+            return $stmt->execute([$userId]);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }

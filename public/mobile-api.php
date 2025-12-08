@@ -585,6 +585,62 @@ try {
             }
             break;
             
+        case 'search-customers':
+            requireAuth();
+            $query = $_GET['q'] ?? '';
+            if (strlen($query) < 2) {
+                echo json_encode(['success' => true, 'data' => []]);
+                break;
+            }
+            $customers = $api->searchCustomers($query);
+            echo json_encode(['success' => true, 'data' => $customers]);
+            break;
+            
+        case 'customer-detail':
+            requireAuth();
+            $customerId = (int) ($_GET['id'] ?? 0);
+            if (!$customerId) {
+                echo json_encode(['success' => false, 'error' => 'Customer ID required']);
+                break;
+            }
+            $customer = $api->getCustomerDetail($customerId);
+            if ($customer) {
+                echo json_encode(['success' => true, 'data' => $customer]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Customer not found']);
+            }
+            break;
+            
+        case 'notifications':
+            requireAuth();
+            $notifications = $api->getUserNotifications($user['id']);
+            echo json_encode(['success' => true, 'data' => $notifications]);
+            break;
+            
+        case 'mark-notification-read':
+            requireAuth();
+            $notificationId = (int) ($input['notification_id'] ?? 0);
+            $api->markNotificationRead($notificationId, $user['id']);
+            echo json_encode(['success' => true]);
+            break;
+            
+        case 'mark-all-notifications-read':
+            requireAuth();
+            $api->markAllNotificationsRead($user['id']);
+            echo json_encode(['success' => true]);
+            break;
+            
+        case 'attendance-history':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if ($employee) {
+                $history = $api->getRecentAttendance($employee['id'], 30);
+                echo json_encode(['success' => true, 'data' => $history]);
+            } else {
+                echo json_encode(['success' => true, 'data' => []]);
+            }
+            break;
+            
         default:
             echo json_encode(['success' => false, 'error' => 'Unknown action']);
     }

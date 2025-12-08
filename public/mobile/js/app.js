@@ -5,12 +5,20 @@ const app = {
     employee: null,
     currentScreen: 'login',
     screenHistory: [],
+    darkMode: false,
+    notifications: [],
+    refreshing: false,
     
     init() {
         this.token = localStorage.getItem('mobile_token');
         const userData = localStorage.getItem('mobile_user');
         if (userData) {
             this.user = JSON.parse(userData);
+        }
+        
+        this.darkMode = localStorage.getItem('dark_mode') === 'true';
+        if (this.darkMode) {
+            document.body.classList.add('dark-mode');
         }
         
         if (this.token && this.user) {
@@ -30,10 +38,67 @@ const app = {
         this.updateClock();
         setInterval(() => this.updateClock(), 1000);
         
+        this.initPullToRefresh();
+        this.initCustomerSearch();
+        
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW registered'))
                 .catch(err => console.log('SW registration failed:', err));
+        }
+    },
+    
+    initPullToRefresh() {
+        let startY = 0;
+        let pulling = false;
+        
+        document.addEventListener('touchstart', (e) => {
+            if (window.scrollY === 0) {
+                startY = e.touches[0].clientY;
+                pulling = true;
+            }
+        }, { passive: true });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!pulling || this.refreshing) return;
+            const currentY = e.touches[0].clientY;
+            const diff = currentY - startY;
+            if (diff > 60) {
+                document.getElementById('ptr-indicator').classList.add('active');
+            }
+        }, { passive: true });
+        
+        document.addEventListener('touchend', async () => {
+            const indicator = document.getElementById('ptr-indicator');
+            if (indicator.classList.contains('active') && !this.refreshing) {
+                this.refreshing = true;
+                await this.refreshCurrentScreen();
+                indicator.classList.remove('active');
+                this.refreshing = false;
+            }
+            pulling = false;
+        });
+    },
+    
+    async refreshCurrentScreen() {
+        if (this.currentScreen === 'salesperson-screen') {
+            await this.loadSalespersonDashboard();
+        } else if (this.currentScreen === 'technician-screen') {
+            await this.loadTechnicianDashboard();
+        }
+        this.showToast('Refreshed', 'success');
+    },
+    
+    initCustomerSearch() {
+        const searchInput = document.getElementById('customer-search-input');
+        if (searchInput) {
+            let debounceTimer;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    this.searchCustomers(e.target.value);
+                }, 300);
+            });
         }
     },
     
@@ -1188,6 +1253,319 @@ const app = {
         } else {
             this.showToast(result.error || 'Failed to add comment', 'danger');
         }
+    },
+    
+    toggleDarkMode() {
+        this.darkMode = !this.darkMode;
+        localStorage.setItem('dark_mode', this.darkMode);
+        document.body.classList.toggle('dark-mode', this.darkMode);
+        this.showProfile();
+    },
+    
+    showProfile() {
+        this.showScreen('profile-screen');
+        const isTech = !this.salesperson;
+        const container = document.getElementById('profile-content');
+        
+        container.innerHTML = `
+            <div class="profile-header ${isTech ? 'tech' : ''}">
+                <div class="profile-avatar">
+                    <i class="bi bi-person-fill"></i>
+                </div>
+                <div class="profile-name">${this.user?.name || 'User'}</div>
+                <div class="profile-role">${this.user?.role || (isTech ? 'Technician' : 'Salesperson')}</div>
+            </div>
+            
+            <div class="settings-list">
+                <div class="settings-item" onclick="app.toggleDarkMode()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-moon-stars settings-icon"></i>
+                        <span class="settings-item-text">Dark Mode</span>
+                    </div>
+                    <label class="dark-mode-toggle">
+                        <input type="checkbox" ${this.darkMode ? 'checked' : ''} onchange="app.toggleDarkMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="settings-item" onclick="app.showNotifications()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-bell settings-icon"></i>
+                        <span class="settings-item-text">Notifications</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+                ${isTech ? `
+                <div class="settings-item" onclick="app.showTechEquipment()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-box-seam settings-icon"></i>
+                        <span class="settings-item-text">My Equipment</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+                ` : ''}
+                <div class="settings-item" onclick="app.showAttendanceHistory()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-calendar-check settings-icon"></i>
+                        <span class="settings-item-text">Attendance History</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+            </div>
+            
+            <div class="settings-list">
+                <div class="settings-item" onclick="app.logout()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-box-arrow-right settings-icon text-danger"></i>
+                        <span class="settings-item-text text-danger">Logout</span>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-center text-muted small mt-3">ISP CRM Mobile v2.0</p>
+        `;
+    },
+    
+    async showNotifications() {
+        this.showScreen('notifications-screen');
+        const container = document.getElementById('notifications-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>';
+        
+        const result = await this.api('notifications');
+        if (result.success && result.data && result.data.length > 0) {
+            this.notifications = result.data;
+            container.innerHTML = result.data.map(n => `
+                <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="app.handleNotification(${n.id}, '${n.type}', ${n.reference_id || 'null'})">
+                    <div class="notification-icon ${n.type}">
+                        <i class="bi bi-${this.getNotificationIcon(n.type)}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">${n.title}</div>
+                        <div class="notification-message">${n.message}</div>
+                        <div class="notification-time">${this.formatTimeAgo(n.created_at)}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-bell-slash"></i><p>No notifications</p></div>';
+        }
+    },
+    
+    getNotificationIcon(type) {
+        const icons = {
+            'ticket': 'ticket',
+            'order': 'bag-check',
+            'alert': 'exclamation-triangle',
+            'info': 'info-circle'
+        };
+        return icons[type] || 'bell';
+    },
+    
+    formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    },
+    
+    async handleNotification(id, type, refId) {
+        await this.api('mark-notification-read', 'POST', { notification_id: id });
+        if (type === 'ticket' && refId) {
+            this.showTicketDetail(refId);
+        }
+    },
+    
+    async markAllNotificationsRead() {
+        await this.api('mark-all-notifications-read', 'POST');
+        this.showToast('All marked as read', 'success');
+        this.showNotifications();
+    },
+    
+    showCustomerSearch() {
+        this.showScreen('customer-search-screen');
+        document.getElementById('customer-search-input').value = '';
+        document.getElementById('customer-results-list').innerHTML = `
+            <div class="customer-empty">
+                <i class="bi bi-search"></i>
+                <p>Search for customers by name, phone, or address</p>
+            </div>
+        `;
+        setTimeout(() => document.getElementById('customer-search-input').focus(), 100);
+    },
+    
+    async searchCustomers(query) {
+        const container = document.getElementById('customer-results-list');
+        if (!query || query.length < 2) {
+            container.innerHTML = `
+                <div class="customer-empty">
+                    <i class="bi bi-search"></i>
+                    <p>Enter at least 2 characters to search</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('search-customers&q=' + encodeURIComponent(query));
+        if (result.success && result.data && result.data.length > 0) {
+            container.innerHTML = result.data.map(c => `
+                <div class="list-item" onclick="app.showCustomerDetail(${c.id})">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${c.name}</h6>
+                            <p class="list-item-subtitle">${c.phone || 'No phone'}</p>
+                        </div>
+                        ${c.onu_status ? `<span class="onu-status ${c.onu_status}">${c.onu_status}</span>` : ''}
+                    </div>
+                    ${c.address ? `<div class="list-item-meta"><span><i class="bi bi-geo-alt"></i> ${c.address}</span></div>` : ''}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-person-x"></i><p>No customers found</p></div>';
+        }
+    },
+    
+    async showCustomerDetail(customerId) {
+        this.showScreen('customer-detail-screen');
+        const container = document.getElementById('customer-detail-content');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('customer-detail&id=' + customerId);
+        if (result.success) {
+            const c = result.data;
+            container.innerHTML = `
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-person"></i> ${c.name}</h6>
+                    ${c.phone ? `<p class="mb-1"><i class="bi bi-telephone"></i> ${c.phone}</p>` : ''}
+                    ${c.email ? `<p class="mb-1"><i class="bi bi-envelope"></i> ${c.email}</p>` : ''}
+                    ${c.address ? `<p class="mb-1"><i class="bi bi-geo-alt"></i> ${c.address}</p>` : ''}
+                    ${c.onu_status ? `
+                    <div class="mt-2">
+                        <span class="onu-status ${c.onu_status}">
+                            <i class="bi bi-${c.onu_status === 'online' ? 'wifi' : 'wifi-off'}"></i> 
+                            ONU ${c.onu_status}
+                        </span>
+                    </div>` : ''}
+                    
+                    <div class="customer-actions">
+                        ${c.phone ? `
+                        <a href="tel:${c.phone}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-telephone"></i> Call
+                        </a>
+                        <a href="https://wa.me/${c.phone.replace(/[^0-9]/g, '')}" class="btn btn-outline-success btn-sm" target="_blank">
+                            <i class="bi bi-whatsapp"></i> WhatsApp
+                        </a>` : ''}
+                        ${c.address ? `
+                        <button class="btn btn-outline-info btn-sm" onclick="app.navigateToCustomer('${encodeURIComponent(c.address)}')">
+                            <i class="bi bi-geo-alt"></i> Navigate
+                        </button>` : ''}
+                    </div>
+                </div>
+                
+                ${c.package_name ? `
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-wifi"></i> Service Package</h6>
+                    <p class="mb-1"><strong>${c.package_name}</strong></p>
+                    <p class="mb-0 text-muted small">${c.package_speed || ''}</p>
+                </div>` : ''}
+                
+                ${c.recent_tickets && c.recent_tickets.length > 0 ? `
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-ticket"></i> Recent Tickets</h6>
+                    ${c.recent_tickets.map(t => `
+                        <div class="list-item mb-2" onclick="app.showTicketDetailAny(${t.id})" style="box-shadow: none; padding: 0.5rem;">
+                            <div class="d-flex justify-content-between">
+                                <span class="small">${t.subject}</span>
+                                <span class="badge ${this.getStatusBadge(t.status)}">${t.status}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+                
+                ${c.equipment && c.equipment.length > 0 ? `
+                <div class="ticket-detail-card">
+                    <h6><i class="bi bi-box-seam"></i> Equipment</h6>
+                    ${c.equipment.map(eq => `
+                        <div class="equipment-item p-2 mb-2 bg-light rounded">
+                            <strong>${eq.name}</strong>
+                            <div class="small text-muted">${eq.brand || ''} ${eq.model || ''}</div>
+                            ${eq.serial_number ? `<div class="small"><i class="bi bi-upc"></i> ${eq.serial_number}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+                
+                <button class="btn btn-success w-100" onclick="app.createTicketForCustomer(${c.id}, '${c.name}')">
+                    <i class="bi bi-plus-circle"></i> Create Ticket for Customer
+                </button>
+            `;
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Customer not found</p></div>';
+        }
+    },
+    
+    navigateToCustomer(address) {
+        const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
+        window.open(url, '_blank');
+    },
+    
+    createTicketForCustomer(customerId, customerName) {
+        this.showScreen('new-ticket-screen');
+        document.getElementById('ticket-customer-id').value = customerId;
+        document.getElementById('ticket-customer-search').value = customerName;
+    },
+    
+    async showAttendanceHistory() {
+        const result = await this.api('attendance-history');
+        if (!result.success) {
+            this.showToast('Failed to load attendance', 'danger');
+            return;
+        }
+        
+        const modalHtml = `
+            <div class="modal-overlay" id="attendance-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5><i class="bi bi-calendar-check"></i> Attendance History</h5>
+                        <button class="btn-close" onclick="document.getElementById('attendance-modal').remove()"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                        ${result.data && result.data.length > 0 ? result.data.map(a => `
+                            <div class="summary-row">
+                                <span>${new Date(a.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                <span>
+                                    ${a.clock_in ? `<span class="text-success">${a.clock_in.substring(0,5)}</span>` : '-'}
+                                    ${a.clock_out ? ` - <span class="text-danger">${a.clock_out.substring(0,5)}</span>` : ''}
+                                    ${a.hours_worked ? ` (${a.hours_worked}h)` : ''}
+                                </span>
+                            </div>
+                        `).join('') : '<p class="text-center text-muted">No attendance records</p>'}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+    
+    getSLABadge(ticket) {
+        if (!ticket.sla_policy_id) return '';
+        
+        if (ticket.sla_resolution_breached || ticket.sla_response_breached) {
+            return '<span class="sla-badge breached"><i class="bi bi-x-circle"></i> Breached</span>';
+        }
+        
+        if (ticket.sla_status === 'at_risk') {
+            return '<span class="sla-badge at-risk"><i class="bi bi-exclamation-triangle"></i> At Risk</span>';
+        }
+        
+        return '<span class="sla-badge on-track"><i class="bi bi-check-circle"></i> On Track</span>';
     }
 };
 

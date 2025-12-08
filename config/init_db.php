@@ -1077,6 +1077,17 @@ function runMigrations(PDO $db): void {
                 resolved_at TIMESTAMP,
                 resolution_notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'user_notifications' => "
+            CREATE TABLE IF NOT EXISTS user_notifications (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                type VARCHAR(50) NOT NULL DEFAULT 'info',
+                title VARCHAR(255) NOT NULL,
+                message TEXT,
+                reference_id INTEGER,
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
