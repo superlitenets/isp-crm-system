@@ -259,7 +259,10 @@ try {
                 break;
             }
             
-            $result = $api->clockIn($employee['id']);
+            $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
+            $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
+            
+            $result = $api->clockIn($employee['id'], $latitude, $longitude);
             echo json_encode($result);
             break;
             
@@ -271,7 +274,10 @@ try {
                 break;
             }
             
-            $result = $api->clockOut($employee['id']);
+            $latitude = isset($input['latitude']) && is_numeric($input['latitude']) ? (float)$input['latitude'] : null;
+            $longitude = isset($input['longitude']) && is_numeric($input['longitude']) ? (float)$input['longitude'] : null;
+            
+            $result = $api->clockOut($employee['id'], $latitude, $longitude);
             echo json_encode($result);
             break;
             

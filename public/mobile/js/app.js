@@ -301,10 +301,61 @@ const app = {
         }
     },
     
+    async getLocation() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve({ latitude: null, longitude: null, error: 'Geolocation not supported' });
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        error: null
+                    });
+                },
+                (error) => {
+                    let errorMsg = 'Location unavailable';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = 'Location permission denied';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = 'Location unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = 'Location request timed out';
+                            break;
+                    }
+                    resolve({ latitude: null, longitude: null, error: errorMsg });
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        });
+    },
+    
     async clockIn() {
-        const result = await this.api('clock-in', 'POST');
+        this.showToast('Getting your location...', 'info');
+        const location = await this.getLocation();
+        
+        if (location.error) {
+            this.showToast('Warning: ' + location.error + '. Clocking in without location.', 'warning');
+        }
+        
+        const result = await this.api('clock-in', 'POST', {
+            latitude: location.latitude,
+            longitude: location.longitude
+        });
+        
         if (result.success) {
-            this.showToast(result.message, 'success');
+            let msg = result.message;
+            if (result.location_captured) {
+                msg += ' (Location captured)';
+            }
+            this.showToast(msg, 'success');
             this.loadAttendanceStatus();
         } else {
             this.showToast(result.message || result.error, 'warning');
@@ -312,9 +363,24 @@ const app = {
     },
     
     async clockOut() {
-        const result = await this.api('clock-out', 'POST');
+        this.showToast('Getting your location...', 'info');
+        const location = await this.getLocation();
+        
+        if (location.error) {
+            this.showToast('Warning: ' + location.error + '. Clocking out without location.', 'warning');
+        }
+        
+        const result = await this.api('clock-out', 'POST', {
+            latitude: location.latitude,
+            longitude: location.longitude
+        });
+        
         if (result.success) {
-            this.showToast(result.message, 'success');
+            let msg = result.message;
+            if (result.location_captured) {
+                msg += ' (Location captured)';
+            }
+            this.showToast(msg, 'success');
             this.loadAttendanceStatus();
         } else {
             this.showToast(result.message || result.error, 'warning');

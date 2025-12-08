@@ -379,7 +379,7 @@ class MobileAPI {
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
-    public function clockIn(int $employeeId): array {
+    public function clockIn(int $employeeId, ?float $latitude = null, ?float $longitude = null): array {
         $today = date('Y-m-d');
         $now = date('H:i:s');
         
@@ -394,16 +394,25 @@ class MobileAPI {
         }
         
         $stmt = $this->db->prepare("
-            INSERT INTO attendance (employee_id, date, clock_in, status, source)
-            VALUES (?, ?, ?, 'present', 'mobile')
-            ON CONFLICT (employee_id, date) DO UPDATE SET clock_in = ?, source = 'mobile'
+            INSERT INTO attendance (employee_id, date, clock_in, clock_in_latitude, clock_in_longitude, status, source)
+            VALUES (?, ?, ?, ?, ?, 'present', 'mobile')
+            ON CONFLICT (employee_id, date) DO UPDATE SET 
+                clock_in = EXCLUDED.clock_in, 
+                clock_in_latitude = EXCLUDED.clock_in_latitude,
+                clock_in_longitude = EXCLUDED.clock_in_longitude,
+                source = 'mobile'
         ");
-        $stmt->execute([$employeeId, $today, $now, $now]);
+        $stmt->execute([$employeeId, $today, $now, $latitude, $longitude]);
         
-        return ['success' => true, 'message' => 'Clocked in at ' . $now, 'time' => $now];
+        $locationInfo = '';
+        if ($latitude && $longitude) {
+            $locationInfo = " (Location: {$latitude}, {$longitude})";
+        }
+        
+        return ['success' => true, 'message' => 'Clocked in at ' . $now . $locationInfo, 'time' => $now, 'location_captured' => ($latitude !== null)];
     }
     
-    public function clockOut(int $employeeId): array {
+    public function clockOut(int $employeeId, ?float $latitude = null, ?float $longitude = null): array {
         $today = date('Y-m-d');
         $now = date('H:i:s');
         
@@ -424,12 +433,17 @@ class MobileAPI {
         $hoursWorked = round(($clockOut - $clockIn) / 3600, 2);
         
         $stmt = $this->db->prepare("
-            UPDATE attendance SET clock_out = ?, hours_worked = ?, updated_at = NOW()
+            UPDATE attendance SET 
+                clock_out = ?, 
+                clock_out_latitude = ?,
+                clock_out_longitude = ?,
+                hours_worked = ?, 
+                updated_at = NOW()
             WHERE employee_id = ? AND date = ?
         ");
-        $stmt->execute([$now, $hoursWorked, $employeeId, $today]);
+        $stmt->execute([$now, $latitude, $longitude, $hoursWorked, $employeeId, $today]);
         
-        return ['success' => true, 'message' => 'Clocked out at ' . $now, 'time' => $now, 'hours_worked' => $hoursWorked];
+        return ['success' => true, 'message' => 'Clocked out at ' . $now, 'time' => $now, 'hours_worked' => $hoursWorked, 'location_captured' => ($latitude !== null)];
     }
     
     public function getTodayAttendance(int $employeeId): ?array {
