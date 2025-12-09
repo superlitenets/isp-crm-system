@@ -294,6 +294,32 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
     exit;
 }
 
+if ($page === 'api' && $action === 'branch_employees') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $branchId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if (!$branchId) {
+        echo json_encode(['employees' => []]);
+        exit;
+    }
+    
+    try {
+        $branchModel = new \App\Branch();
+        $branchEmployees = $branchModel->getEmployees($branchId);
+        $employeeIds = array_column($branchEmployees, 'id');
+        echo json_encode(['employees' => $employeeIds]);
+    } catch (Throwable $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'smartolt_stats') {
     ob_clean();
     header('Content-Type: application/json');
@@ -3485,6 +3511,11 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-gear"></i> Settings
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'branches' ? 'active' : '' ?>" href="?page=branches">
+                    <i class="bi bi-building"></i> Branches
+                </a>
+            </li>
             <?php endif; ?>
         </ul>
         <div class="mt-auto">
@@ -3590,6 +3621,13 @@ $csrfToken = \App\Auth::generateToken();
                 } else {
                     $smsGateway = getSMSGateway();
                     include __DIR__ . '/../templates/settings.php';
+                }
+                break;
+            case 'branches':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/branches.php';
                 }
                 break;
             default:
