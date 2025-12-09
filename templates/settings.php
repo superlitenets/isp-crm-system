@@ -1038,7 +1038,7 @@ function resetToDefaults() {
                                     </thead>
                                     <tbody>
                                         <?php
-                                        $deptStmt = $dbConn->query("SELECT id, name FROM departments WHERE is_active = true ORDER BY name");
+                                        $deptStmt = $dbConn->query("SELECT id, name FROM departments ORDER BY name");
                                         $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
                                         foreach ($departments as $dept):
                                         ?>
