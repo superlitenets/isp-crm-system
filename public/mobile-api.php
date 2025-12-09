@@ -299,6 +299,138 @@ try {
             echo json_encode(['success' => true, 'data' => $history]);
             break;
             
+        case 'leave-balance':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            $leaveService = new \App\Leave($db);
+            $balance = $leaveService->getEmployeeBalance($employee['id']);
+            echo json_encode(['success' => true, 'data' => $balance]);
+            break;
+            
+        case 'leave-types':
+            requireAuth();
+            $leaveService = new \App\Leave($db);
+            $types = $leaveService->getLeaveTypes();
+            echo json_encode(['success' => true, 'data' => $types]);
+            break;
+            
+        case 'leave-requests':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            $leaveService = new \App\Leave($db);
+            $requests = $leaveService->getEmployeeRequests($employee['id']);
+            echo json_encode(['success' => true, 'data' => $requests]);
+            break;
+            
+        case 'submit-leave-request':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            if (empty($input['leave_type_id']) || empty($input['start_date']) || empty($input['end_date'])) {
+                echo json_encode(['success' => false, 'error' => 'Leave type, start date, and end date are required']);
+                break;
+            }
+            
+            $leaveService = new \App\Leave($db);
+            try {
+                $requestId = $leaveService->createRequest([
+                    'employee_id' => $employee['id'],
+                    'leave_type_id' => (int)$input['leave_type_id'],
+                    'start_date' => $input['start_date'],
+                    'end_date' => $input['end_date'],
+                    'is_half_day' => !empty($input['is_half_day']),
+                    'half_day_type' => $input['half_day_type'] ?? null,
+                    'reason' => $input['reason'] ?? null
+                ]);
+                echo json_encode(['success' => true, 'request_id' => $requestId, 'message' => 'Leave request submitted successfully']);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+            
+        case 'cancel-leave-request':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            if (empty($input['request_id'])) {
+                echo json_encode(['success' => false, 'error' => 'Request ID is required']);
+                break;
+            }
+            
+            $leaveService = new \App\Leave($db);
+            try {
+                $request = $leaveService->getRequest((int)$input['request_id']);
+                if (!$request || $request['employee_id'] != $employee['id']) {
+                    echo json_encode(['success' => false, 'error' => 'Request not found or not authorized']);
+                    break;
+                }
+                $leaveService->cancel((int)$input['request_id']);
+                echo json_encode(['success' => true, 'message' => 'Leave request cancelled']);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+            
+        case 'salary-advances':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            $advanceService = new \App\SalaryAdvance($db);
+            $advances = $advanceService->getByEmployee($employee['id']);
+            $outstanding = $advanceService->getEmployeeTotalOutstanding($employee['id']);
+            echo json_encode(['success' => true, 'data' => $advances, 'total_outstanding' => $outstanding]);
+            break;
+            
+        case 'request-advance':
+            requireAuth();
+            $employee = $api->getEmployeeByUserId($user['id']);
+            if (!$employee) {
+                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                break;
+            }
+            
+            if (empty($input['amount']) || $input['amount'] <= 0) {
+                echo json_encode(['success' => false, 'error' => 'Valid amount is required']);
+                break;
+            }
+            
+            $advanceService = new \App\SalaryAdvance($db);
+            try {
+                $advanceId = $advanceService->create([
+                    'employee_id' => $employee['id'],
+                    'amount' => (float)$input['amount'],
+                    'reason' => $input['reason'] ?? null,
+                    'repayment_type' => $input['repayment_type'] ?? 'monthly',
+                    'repayment_installments' => $input['repayment_installments'] ?? 1
+                ]);
+                echo json_encode(['success' => true, 'advance_id' => $advanceId, 'message' => 'Advance request submitted for approval']);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+            
         case 'salesperson-performance':
             requireAuth();
             $salesperson = $api->getSalespersonByUserId($user['id']);

@@ -789,6 +789,16 @@ function syncAllEmployeesToDevice(deviceId) {
             <i class="bi bi-ticket-perforated"></i> Commissions
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'advances' ? 'active' : '' ?>" href="?page=hr&subpage=advances">
+            <i class="bi bi-cash-coin"></i> Advances
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'leave' ? 'active' : '' ?>" href="?page=hr&subpage=leave">
+            <i class="bi bi-calendar-check"></i> Leave
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'departments'): ?>
@@ -1166,6 +1176,12 @@ function syncAllEmployeesToDevice(deviceId) {
                                 <input class="form-check-input" type="checkbox" name="include_ticket_commissions" id="includeTicketCommissions" value="1" checked>
                                 <label class="form-check-label" for="includeTicketCommissions">
                                     <i class="bi bi-ticket-perforated text-success"></i> Include ticket commissions automatically
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_advance_deductions" id="includeAdvanceDeductions" value="1" checked>
+                                <label class="form-check-label" for="includeAdvanceDeductions">
+                                    <i class="bi bi-cash-coin text-danger"></i> Include salary advance deductions automatically
                                 </label>
                             </div>
                             <div id="lateDeductionPreview" class="alert alert-info mt-2 d-none">
@@ -2445,6 +2461,708 @@ if ($selectedEmployeeId) {
         </div>
     </div>
 </div>
+
+<?php elseif ($subpage === 'advances'): ?>
+<?php
+$salaryAdvance = new \App\SalaryAdvance();
+$advanceStats = $salaryAdvance->getStatistics();
+$advanceFilter = $_GET['status'] ?? '';
+$advances = $salaryAdvance->getAll(['status' => $advanceFilter]);
+?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-warning mb-0">Pending</h6>
+                        <h3 class="mb-0"><?= $advanceStats['pending_count'] ?? 0 ?></h3>
+                    </div>
+                    <div class="text-warning fs-1"><i class="bi bi-clock"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary bg-opacity-10 border-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-primary mb-0">Active</h6>
+                        <h3 class="mb-0"><?= $advanceStats['active_count'] ?? 0 ?></h3>
+                    </div>
+                    <div class="text-primary fs-1"><i class="bi bi-cash-coin"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-success mb-0">Completed</h6>
+                        <h3 class="mb-0"><?= $advanceStats['completed_count'] ?? 0 ?></h3>
+                    </div>
+                    <div class="text-success fs-1"><i class="bi bi-check-circle"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger bg-opacity-10 border-danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-danger mb-0">Outstanding</h6>
+                        <h3 class="mb-0"><?= $currencySymbol ?> <?= number_format($advanceStats['total_balance'] ?? 0) ?></h3>
+                    </div>
+                    <div class="text-danger fs-1"><i class="bi bi-wallet2"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <form method="GET" class="d-flex gap-2">
+                    <input type="hidden" name="page" value="hr">
+                    <input type="hidden" name="subpage" value="advances">
+                    <select class="form-select" name="status">
+                        <option value="">All Status</option>
+                        <option value="pending" <?= $advanceFilter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="approved" <?= $advanceFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="disbursed" <?= $advanceFilter === 'disbursed' ? 'selected' : '' ?>>Disbursed</option>
+                        <option value="repaying" <?= $advanceFilter === 'repaying' ? 'selected' : '' ?>>Repaying</option>
+                        <option value="completed" <?= $advanceFilter === 'completed' ? 'selected' : '' ?>>Completed</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-filter"></i> Filter</button>
+                </form>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newAdvanceModal">
+                    <i class="bi bi-plus-circle"></i> New Advance
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Amount</th>
+                        <th>Repayment</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($advances as $adv): ?>
+                    <tr>
+                        <td><?= date('M d, Y', strtotime($adv['created_at'])) ?></td>
+                        <td>
+                            <strong><?= htmlspecialchars($adv['employee_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($adv['employee_code']) ?></small>
+                        </td>
+                        <td class="fw-bold"><?= $currencySymbol ?> <?= number_format($adv['amount'], 2) ?></td>
+                        <td>
+                            <?= $currencySymbol ?> <?= number_format($adv['repayment_amount'] ?? 0, 2) ?>/<?= ucfirst($adv['repayment_type']) ?>
+                            <br><small class="text-muted"><?= $adv['repayment_installments'] ?> installment(s)</small>
+                        </td>
+                        <td>
+                            <span class="text-<?= ($adv['balance'] ?? 0) > 0 ? 'danger' : 'success' ?>">
+                                <?= $currencySymbol ?> <?= number_format($adv['balance'] ?? 0, 2) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php
+                            $statusColors = ['pending' => 'warning', 'approved' => 'info', 'disbursed' => 'primary', 'repaying' => 'secondary', 'completed' => 'success', 'rejected' => 'danger', 'cancelled' => 'dark'];
+                            ?>
+                            <span class="badge bg-<?= $statusColors[$adv['status']] ?? 'secondary' ?>">
+                                <?= ucfirst($adv['status']) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if ($adv['status'] === 'pending'): ?>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="approve_advance">
+                                <input type="hidden" name="id" value="<?= $adv['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-success" title="Approve"><i class="bi bi-check"></i></button>
+                            </form>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="reject_advance">
+                                <input type="hidden" name="id" value="<?= $adv['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Reject"><i class="bi bi-x"></i></button>
+                            </form>
+                            <?php elseif ($adv['status'] === 'approved'): ?>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="disburse_advance">
+                                <input type="hidden" name="id" value="<?= $adv['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-primary" title="Disburse"><i class="bi bi-cash"></i> Disburse</button>
+                            </form>
+                            <?php elseif (in_array($adv['status'], ['disbursed', 'repaying'])): ?>
+                            <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal" 
+                                data-advance-id="<?= $adv['id'] ?>" data-balance="<?= $adv['balance'] ?>" data-installment="<?= $adv['repayment_amount'] ?>">
+                                <i class="bi bi-plus"></i> Payment
+                            </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($advances)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-4">No salary advances found</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newAdvanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_advance">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-cash-coin"></i> New Salary Advance</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Employee *</label>
+                        <select class="form-select" name="employee_id" required>
+                            <option value="">Select Employee</option>
+                            <?php foreach ($allEmployees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount *</label>
+                        <input type="number" step="0.01" class="form-control" name="amount" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Repayment Type</label>
+                            <select class="form-select" name="repayment_type">
+                                <option value="monthly">Monthly</option>
+                                <option value="bi-weekly">Bi-Weekly</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Installments</label>
+                            <input type="number" class="form-control" name="repayment_installments" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" name="reason" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Advance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="record_advance_payment">
+                <input type="hidden" name="advance_id" id="paymentAdvanceId">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Record Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Amount *</label>
+                        <input type="number" step="0.01" class="form-control" name="amount" id="paymentAmount" required>
+                        <small class="text-muted">Balance: <span id="paymentBalance"></span></small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Type</label>
+                        <select class="form-select" name="payment_type">
+                            <option value="payroll_deduction">Payroll Deduction</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Date</label>
+                        <input type="date" class="form-control" name="payment_date" value="<?= date('Y-m-d') ?>">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reference Number</label>
+                        <input type="text" class="form-control" name="reference_number">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('recordPaymentModal')?.addEventListener('show.bs.modal', function(event) {
+    const btn = event.relatedTarget;
+    document.getElementById('paymentAdvanceId').value = btn.dataset.advanceId;
+    document.getElementById('paymentAmount').value = btn.dataset.installment;
+    document.getElementById('paymentBalance').textContent = '<?= $currencySymbol ?> ' + parseFloat(btn.dataset.balance).toFixed(2);
+});
+</script>
+
+<?php elseif ($subpage === 'leave'): ?>
+<?php
+$leaveService = new \App\Leave();
+$leaveStats = $leaveService->getStatistics();
+$leaveTypes = $leaveService->getAllLeaveTypes();
+$leaveFilter = $_GET['status'] ?? '';
+$leaveRequests = $leaveService->getRequests(['status' => $leaveFilter]);
+$leaveTab = $_GET['tab'] ?? 'requests';
+?>
+
+<ul class="nav nav-pills mb-4">
+    <li class="nav-item">
+        <a class="nav-link <?= $leaveTab === 'requests' ? 'active' : '' ?>" href="?page=hr&subpage=leave&tab=requests">
+            <i class="bi bi-list-check"></i> Requests
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $leaveTab === 'types' ? 'active' : '' ?>" href="?page=hr&subpage=leave&tab=types">
+            <i class="bi bi-tags"></i> Leave Types
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $leaveTab === 'holidays' ? 'active' : '' ?>" href="?page=hr&subpage=leave&tab=holidays">
+            <i class="bi bi-calendar-event"></i> Holidays
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $leaveTab === 'balances' ? 'active' : '' ?>" href="?page=hr&subpage=leave&tab=balances">
+            <i class="bi bi-pie-chart"></i> Balances
+        </a>
+    </li>
+</ul>
+
+<?php if ($leaveTab === 'requests'): ?>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $leaveStats['pending_requests'] ?? 0 ?></h3>
+                <small class="text-warning">Pending</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $leaveStats['approved_requests'] ?? 0 ?></h3>
+                <small class="text-success">Approved</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger bg-opacity-10 border-danger">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= $leaveStats['rejected_requests'] ?? 0 ?></h3>
+                <small class="text-danger">Rejected</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary bg-opacity-10 border-primary">
+            <div class="card-body text-center">
+                <h3 class="mb-0"><?= number_format($leaveStats['total_days_taken'] ?? 0, 1) ?></h3>
+                <small class="text-primary">Days Taken (<?= date('Y') ?>)</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <form method="GET" class="d-flex gap-2">
+                    <input type="hidden" name="page" value="hr">
+                    <input type="hidden" name="subpage" value="leave">
+                    <input type="hidden" name="tab" value="requests">
+                    <select class="form-select" name="status">
+                        <option value="">All Status</option>
+                        <option value="pending" <?= $leaveFilter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="approved" <?= $leaveFilter === 'approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="rejected" <?= $leaveFilter === 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-filter"></i> Filter</button>
+                </form>
+            </div>
+            <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newLeaveRequestModal">
+                    <i class="bi bi-plus-circle"></i> New Request
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <th>Leave Type</th>
+                        <th>Period</th>
+                        <th>Days</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($leaveRequests as $req): ?>
+                    <tr>
+                        <td>
+                            <strong><?= htmlspecialchars($req['employee_name']) ?></strong>
+                            <br><small class="text-muted"><?= htmlspecialchars($req['employee_code']) ?></small>
+                        </td>
+                        <td><span class="badge bg-secondary"><?= htmlspecialchars($req['leave_type_name']) ?></span></td>
+                        <td>
+                            <?= date('M d', strtotime($req['start_date'])) ?> - <?= date('M d, Y', strtotime($req['end_date'])) ?>
+                        </td>
+                        <td><?= number_format($req['total_days'], 1) ?></td>
+                        <td><small><?= htmlspecialchars(substr($req['reason'] ?? '', 0, 50)) ?><?= strlen($req['reason'] ?? '') > 50 ? '...' : '' ?></small></td>
+                        <td>
+                            <?php
+                            $statusColors = ['pending' => 'warning', 'approved' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'];
+                            ?>
+                            <span class="badge bg-<?= $statusColors[$req['status']] ?? 'secondary' ?>">
+                                <?= ucfirst($req['status']) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if ($req['status'] === 'pending'): ?>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="approve_leave">
+                                <input type="hidden" name="id" value="<?= $req['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-success" title="Approve"><i class="bi bi-check"></i></button>
+                            </form>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="reject_leave">
+                                <input type="hidden" name="id" value="<?= $req['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Reject"><i class="bi bi-x"></i></button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($leaveRequests)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-4">No leave requests found</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newLeaveRequestModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_leave_request">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> New Leave Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Employee *</label>
+                        <select class="form-select" name="employee_id" required>
+                            <option value="">Select Employee</option>
+                            <?php foreach ($allEmployees as $emp): ?>
+                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?> (<?= $emp['employee_id'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Leave Type *</label>
+                        <select class="form-select" name="leave_type_id" required>
+                            <option value="">Select Type</option>
+                            <?php foreach ($leaveTypes as $lt): ?>
+                            <option value="<?= $lt['id'] ?>"><?= htmlspecialchars($lt['name']) ?> (<?= $lt['days_per_year'] ?> days/year)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Start Date *</label>
+                            <input type="date" class="form-control" name="start_date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">End Date *</label>
+                            <input type="date" class="form-control" name="end_date" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_half_day" id="isHalfDay">
+                        <label class="form-check-label" for="isHalfDay">Half Day</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" name="reason" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($leaveTab === 'types'): ?>
+
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-tags"></i> Leave Types</h6>
+        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#newLeaveTypeModal">
+            <i class="bi bi-plus"></i> Add Type
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Days/Year</th>
+                        <th>Accrual</th>
+                        <th>Paid</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($leaveTypes as $lt): ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($lt['name']) ?></strong></td>
+                        <td><code><?= htmlspecialchars($lt['code']) ?></code></td>
+                        <td><?= number_format($lt['days_per_year'], 1) ?></td>
+                        <td><?= ucfirst($lt['accrual_type']) ?></td>
+                        <td><?= $lt['is_paid'] ? '<i class="bi bi-check-circle text-success"></i>' : '<i class="bi bi-x-circle text-danger"></i>' ?></td>
+                        <td><?= $lt['is_active'] ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newLeaveTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="create_leave_type">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> New Leave Type</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Code *</label>
+                            <input type="text" class="form-control" name="code" required placeholder="e.g., ANNUAL">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Days Per Year</label>
+                            <input type="number" step="0.5" class="form-control" name="days_per_year" value="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Accrual Type</label>
+                            <select class="form-select" name="accrual_type">
+                                <option value="monthly">Monthly (Trickle)</option>
+                                <option value="annual">Annual (Upfront)</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Max Carryover Days</label>
+                            <input type="number" step="0.5" class="form-control" name="max_carryover_days" value="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="is_paid" id="isPaid" checked>
+                                <label class="form-check-label" for="isPaid">Paid Leave</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="is_active" id="isActive" checked>
+                                <label class="form-check-label" for="isActive">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Type</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($leaveTab === 'holidays'): ?>
+<?php $holidays = $leaveService->getPublicHolidays(); ?>
+
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-calendar-event"></i> Public Holidays (<?= date('Y') ?>)</h6>
+        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addHolidayModal">
+            <i class="bi bi-plus"></i> Add Holiday
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <?php foreach ($holidays as $h): ?>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="mb-1"><?= htmlspecialchars($h['name']) ?></h6>
+                        <p class="mb-0 text-muted"><?= date('l, M d, Y', strtotime($h['date'])) ?></p>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <?php if (empty($holidays)): ?>
+            <div class="col-12 text-center text-muted py-4">
+                <i class="bi bi-calendar-x" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0">No holidays configured for <?= date('Y') ?></p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addHolidayModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="add_holiday">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Holiday</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Date *</label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Holiday Name *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($leaveTab === 'balances'): ?>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h6 class="mb-0"><i class="bi bi-pie-chart"></i> Employee Leave Balances (<?= date('Y') ?>)</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Employee</th>
+                        <?php foreach ($leaveTypes as $lt): ?>
+                        <th class="text-center"><?= htmlspecialchars($lt['code']) ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allEmployees as $emp): ?>
+                    <?php $balances = $leaveService->getEmployeeBalance($emp['id']); ?>
+                    <tr>
+                        <td><strong><?= htmlspecialchars($emp['name']) ?></strong></td>
+                        <?php foreach ($leaveTypes as $lt): ?>
+                        <?php 
+                        $bal = array_filter($balances, fn($b) => $b['leave_type_id'] == $lt['id']);
+                        $bal = reset($bal);
+                        ?>
+                        <td class="text-center">
+                            <?php if ($bal): ?>
+                            <span class="badge bg-<?= ($bal['available_days'] ?? 0) > 0 ? 'success' : 'secondary' ?>">
+                                <?= number_format($bal['available_days'] ?? 0, 1) ?>
+                            </span>
+                            <?php else: ?>
+                            <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php endforeach; ?>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php endif; ?>
 
 <?php else: ?>
 

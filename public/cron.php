@@ -41,8 +41,12 @@ try {
             syncAttendanceFromDevices($db);
             break;
             
+        case 'leave_accrual':
+            runLeaveAccrual($db);
+            break;
+            
         default:
-            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule', 'sync_attendance']]);
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule', 'sync_attendance', 'leave_accrual']]);
     }
 } catch (Throwable $e) {
     http_response_code(500);
@@ -384,4 +388,23 @@ function syncAttendanceFromDevices(\PDO $db): void {
         'total_synced' => $totalSynced,
         'devices' => $results
     ]);
+}
+
+function runLeaveAccrual(\PDO $db): void {
+    try {
+        $leaveService = new \App\Leave($db);
+        $result = $leaveService->runMonthlyAccrual();
+        
+        echo json_encode([
+            'success' => true,
+            'processed' => $result['processed'],
+            'errors' => $result['errors'],
+            'month' => date('F Y')
+        ]);
+    } catch (\Throwable $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
 }

@@ -55,6 +55,20 @@ The system features a clean, responsive design. The public-facing landing page i
   - Teams can be linked to branches
   - Branch-specific daily summary reports sent to WhatsApp groups via cron job
   - Settings UI for branch CRUD and employee assignment
+- **Salary Advance System (Dec 2025)**: Employee salary advance management:
+  - Request, approve, reject, and disburse salary advances
+  - Flexible repayment schedules (weekly, bi-weekly, monthly)
+  - Track repayments and outstanding balances
+  - Automatic integration with payroll as deductions
+  - Mobile API for employees to request advances
+- **Leave Management System (Dec 2025)**: Comprehensive leave tracking:
+  - Multiple leave types (Annual, Sick, Unpaid, Maternity, Paternity, Compassionate)
+  - 21 days annual leave with monthly accrual (trickle-down: 1.75 days/month)
+  - Leave request and approval workflow
+  - Balance tracking with carryover support
+  - Public holidays calendar
+  - Mobile API for leave requests from PWA
+  - Cron job for monthly leave accrual
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.

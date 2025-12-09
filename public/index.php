@@ -1269,10 +1269,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $ticketCommission->applyToPayroll($payrollId, (int)$_POST['employee_id'], $payPeriodMonth);
                             $additions[] = 'ticket commissions';
                         }
+                        
+                        if (!empty($_POST['include_advance_deductions'])) {
+                            $salaryAdvance = new \App\SalaryAdvance($payrollDb);
+                            $activeAdvances = $salaryAdvance->getEmployeeActiveAdvances((int)$_POST['employee_id']);
+                            foreach ($activeAdvances as $advance) {
+                                if (in_array($advance['status'], ['disbursed', 'repaying']) && $advance['balance'] > 0) {
+                                    $deductionAmount = min($advance['repayment_amount'], $advance['balance']);
+                                    $salaryAdvance->recordPayment($advance['id'], [
+                                        'amount' => $deductionAmount,
+                                        'payment_type' => 'payroll_deduction',
+                                        'payment_date' => date('Y-m-d'),
+                                        'payroll_id' => $payrollId,
+                                        'recorded_by' => $currentUser['id']
+                                    ]);
+                                }
+                            }
+                            $additions[] = 'advance deductions';
+                        }
                     }
                     
                     if (!empty($additions)) {
-                        $message = 'Payroll record created with ' . implode(' and ', $additions) . ' applied!';
+                        $message = 'Payroll record created with ' . implode(', ', $additions) . ' applied!';
                     } else {
                         $message = 'Payroll record created successfully!';
                     }
@@ -1351,6 +1369,142 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $message = 'Error deleting performance review: ' . $e->getMessage();
                         $messageType = 'danger';
                     }
+                }
+                break;
+
+            case 'create_advance':
+                try {
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $salaryAdvance->create($_POST);
+                    $message = 'Salary advance request created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating advance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'approve_advance':
+                try {
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $salaryAdvance->approve((int)$_POST['id'], $currentUser['id']);
+                    $message = 'Salary advance approved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error approving advance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'reject_advance':
+                try {
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $salaryAdvance->reject((int)$_POST['id'], $currentUser['id'], $_POST['notes'] ?? null);
+                    $message = 'Salary advance rejected.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error rejecting advance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'disburse_advance':
+                try {
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $salaryAdvance->disburse((int)$_POST['id']);
+                    $message = 'Salary advance disbursed successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error disbursing advance: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'record_advance_payment':
+                try {
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $salaryAdvance->recordPayment((int)$_POST['advance_id'], [
+                        'amount' => $_POST['amount'],
+                        'payment_type' => $_POST['payment_type'] ?? 'payroll_deduction',
+                        'payment_date' => $_POST['payment_date'] ?? date('Y-m-d'),
+                        'reference_number' => $_POST['reference_number'] ?? null,
+                        'recorded_by' => $currentUser['id']
+                    ]);
+                    $message = 'Payment recorded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error recording payment: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_leave_request':
+                try {
+                    $leaveService = new \App\Leave(Database::getConnection());
+                    $leaveService->createRequest($_POST);
+                    $message = 'Leave request submitted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error submitting leave request: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'approve_leave':
+                try {
+                    $leaveService = new \App\Leave(Database::getConnection());
+                    $leaveService->approve((int)$_POST['id'], $currentUser['id']);
+                    $message = 'Leave request approved!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error approving leave: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'reject_leave':
+                try {
+                    $leaveService = new \App\Leave(Database::getConnection());
+                    $leaveService->reject((int)$_POST['id'], $currentUser['id'], $_POST['rejection_reason'] ?? null);
+                    $message = 'Leave request rejected.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error rejecting leave: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_leave_type':
+                try {
+                    $leaveService = new \App\Leave(Database::getConnection());
+                    $leaveService->createLeaveType($_POST);
+                    $message = 'Leave type created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating leave type: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_holiday':
+                try {
+                    $leaveService = new \App\Leave(Database::getConnection());
+                    $leaveService->addPublicHoliday($_POST['date'], $_POST['name'], $_POST['branch_id'] ?? null);
+                    $message = 'Holiday added successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error adding holiday: ' . $e->getMessage();
+                    $messageType = 'danger';
                 }
                 break;
 
