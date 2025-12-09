@@ -675,6 +675,89 @@ XML;
         ];
     }
     
+    public function configureHttpCallback(string $callbackUrl): array {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>
+<HttpHostNotification version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <id>1</id>
+    <url>' . htmlspecialchars($callbackUrl) . '</url>
+    <protocolType>HTTP</protocolType>
+    <parameterFormatType>JSON</parameterFormatType>
+    <addressingFormatType>ipaddress</addressingFormatType>
+    <httpAuthenticationMethod>none</httpAuthenticationMethod>
+</HttpHostNotification>';
+        
+        $response = $this->sendRequest(
+            '/ISAPI/Event/notification/httpHosts/1',
+            'PUT',
+            $xml,
+            "application/xml; charset='UTF-8'"
+        );
+        
+        if ($response['code'] === 200) {
+            $triggerResult = $this->configureEventTrigger();
+            return [
+                'success' => true,
+                'message' => 'HTTP callback configured. ' . ($triggerResult['success'] ? 'Event trigger enabled.' : ''),
+                'callback_url' => $callbackUrl
+            ];
+        }
+        
+        $error = 'Failed to configure HTTP callback';
+        if ($response['body']) {
+            $xml = @simplexml_load_string($response['body']);
+            if ($xml) {
+                $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
+            }
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    private function configureEventTrigger(): array {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>
+<EventTrigger version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <id>ACS-1</id>
+    <eventType>AccessControllerEvent</eventType>
+    <eventDescription>Access Control Event</eventDescription>
+    <inputIOPortID>1</inputIOPortID>
+    <EventTriggerNotificationList>
+        <EventTriggerNotification>
+            <id>1</id>
+            <notificationMethod>httpHostNotification</notificationMethod>
+            <notificationRecurrence>recurring</notificationRecurrence>
+            <httpHostID>1</httpHostID>
+        </EventTriggerNotification>
+    </EventTriggerNotificationList>
+</EventTrigger>';
+        
+        $response = $this->sendRequest(
+            '/ISAPI/Event/triggers/ACS-1',
+            'PUT',
+            $xml,
+            "application/xml; charset='UTF-8'"
+        );
+        
+        return ['success' => $response['code'] === 200];
+    }
+    
+    public function getCallbackStatus(): array {
+        $response = $this->sendRequest('/ISAPI/Event/notification/httpHosts/1');
+        
+        if ($response['code'] === 200 && $response['body']) {
+            $xml = @simplexml_load_string($response['body']);
+            if ($xml) {
+                return [
+                    'success' => true,
+                    'configured' => true,
+                    'url' => (string)($xml->url ?? ''),
+                    'protocol' => (string)($xml->protocolType ?? '')
+                ];
+            }
+        }
+        
+        return ['success' => true, 'configured' => false];
+    }
+    
     private function sendRequest(string $endpoint, string $method = 'GET', ?string $data = null, string $contentType = 'application/xml'): array {
         $url = "http://{$this->ip}:{$this->port}{$endpoint}";
         

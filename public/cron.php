@@ -37,8 +37,12 @@ try {
             checkAndSendScheduledSummaries($db, $settings);
             break;
             
+        case 'sync_attendance':
+            syncAttendanceFromDevices($db);
+            break;
+            
         default:
-            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule']]);
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule', 'sync_attendance']]);
     }
 } catch (Throwable $e) {
     http_response_code(500);
@@ -297,4 +301,78 @@ function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void
             'evening_hour' => $eveningHour
         ]);
     }
+}
+
+function syncAttendanceFromDevices(\PDO $db): void {
+    require_once __DIR__ . '/../src/BiometricDevice.php';
+    require_once __DIR__ . '/../src/HikvisionDevice.php';
+    require_once __DIR__ . '/../src/ZKTecoDevice.php';
+    require_once __DIR__ . '/../src/AttendanceProcessor.php';
+    
+    $stmt = $db->query("SELECT * FROM biometric_devices WHERE is_active = true");
+    $devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    
+    $results = [];
+    $processor = new \App\AttendanceProcessor($db);
+    
+    $since = date('Y-m-d H:i:s', strtotime('-1 hour'));
+    
+    foreach ($devices as $deviceRow) {
+        $deviceResult = ['device' => $deviceRow['name'], 'synced' => 0, 'errors' => []];
+        
+        try {
+            $device = null;
+            if (strtolower($deviceRow['device_type']) === 'hikvision') {
+                $device = new \App\HikvisionDevice(
+                    (int)$deviceRow['id'],
+                    $deviceRow['ip_address'],
+                    (int)($deviceRow['port'] ?: 80),
+                    $deviceRow['username'],
+                    $deviceRow['password']
+                );
+            } elseif (strtolower($deviceRow['device_type']) === 'zkteco') {
+                $device = new \App\ZKTecoDevice(
+                    (int)$deviceRow['id'],
+                    $deviceRow['ip_address'],
+                    (int)($deviceRow['port'] ?: 4370),
+                    $deviceRow['username'],
+                    $deviceRow['password']
+                );
+            }
+            
+            if (!$device) {
+                $deviceResult['errors'][] = 'Unknown device type: ' . $deviceRow['device_type'];
+                $results[] = $deviceResult;
+                continue;
+            }
+            
+            $attendance = $device->getAttendance($since);
+            
+            foreach ($attendance as $record) {
+                $processResult = $processor->processBiometricEvent(
+                    (int)$deviceRow['id'],
+                    (string)$record['device_user_id'],
+                    $record['log_time'],
+                    $record['direction'] ?? 'unknown'
+                );
+                
+                if ($processResult['success'] ?? false) {
+                    $deviceResult['synced']++;
+                }
+            }
+            
+        } catch (\Throwable $e) {
+            $deviceResult['errors'][] = $e->getMessage();
+        }
+        
+        $results[] = $deviceResult;
+    }
+    
+    $totalSynced = array_sum(array_column($results, 'synced'));
+    
+    echo json_encode([
+        'success' => true,
+        'total_synced' => $totalSynced,
+        'devices' => $results
+    ]);
 }
