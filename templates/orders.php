@@ -1,7 +1,12 @@
 <?php
 $orderModel = new \App\Order();
-$salespersonModel = new \App\Salesperson($db);
-$activeSalespersons = $salespersonModel->getActive();
+try {
+    $salespersonModel = new \App\Salesperson($db);
+    $activeSalespersons = $salespersonModel->getActive();
+} catch (\Throwable $e) {
+    $activeSalespersons = [];
+    error_log("Salesperson model error: " . $e->getMessage());
+}
 $action = $_GET['action'] ?? 'list';
 $orderId = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $order = $orderId ? $orderModel->getById($orderId) : null;
@@ -472,7 +477,12 @@ function fillCustomerDetails() {
         if (!\App\Auth::can('orders.view_all') && !\App\Auth::isAdmin()) {
             $orderFilters['user_id'] = $_SESSION['user_id'];
         }
-        $orders = $orderModel->getAll($orderFilters);
+        try {
+            $orders = $orderModel->getAll($orderFilters);
+        } catch (\Throwable $e) {
+            $orders = [];
+            error_log("Order list error: " . $e->getMessage());
+        }
         ?>
         <?php if (empty($orders)): ?>
         <div class="text-center py-5 text-muted">
