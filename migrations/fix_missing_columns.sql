@@ -98,4 +98,44 @@ INSERT INTO branches (name, code, is_active)
 SELECT 'Head Office', 'HQ', true 
 WHERE NOT EXISTS (SELECT 1 FROM branches LIMIT 1);
 
+-- Ticket satisfaction ratings table
+CREATE TABLE IF NOT EXISTS ticket_satisfaction_ratings (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    feedback TEXT,
+    rated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    rated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(ticket_id)
+);
+
+-- Ticket escalations table
+CREATE TABLE IF NOT EXISTS ticket_escalations (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    escalated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    escalated_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    reason TEXT,
+    previous_priority VARCHAR(50),
+    new_priority VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ticket timeline/activity log table
+CREATE TABLE IF NOT EXISTS ticket_timeline (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    description TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_ticket_satisfaction_ticket ON ticket_satisfaction_ratings(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_escalations_ticket ON ticket_escalations(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_timeline_ticket ON ticket_timeline(ticket_id);
+
 SELECT 'Migration completed successfully!' as status;

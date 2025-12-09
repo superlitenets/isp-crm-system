@@ -147,9 +147,24 @@ if (isset($_GET['customer_id'])) {
 
 <?php elseif ($action === 'view' && $ticketData): ?>
 <?php
-$timeline = $ticket->getTimeline($ticketData['id']);
-$satisfactionRating = $ticket->getSatisfactionRating($ticketData['id']);
-$escalations = $ticket->getEscalations($ticketData['id']);
+try {
+    $timeline = $ticket->getTimeline($ticketData['id']);
+} catch (\Throwable $e) {
+    $timeline = [];
+    error_log("Timeline error: " . $e->getMessage());
+}
+try {
+    $satisfactionRating = $ticket->getSatisfactionRating($ticketData['id']);
+} catch (\Throwable $e) {
+    $satisfactionRating = null;
+    error_log("Satisfaction rating error: " . $e->getMessage());
+}
+try {
+    $escalations = $ticket->getEscalations($ticketData['id']);
+} catch (\Throwable $e) {
+    $escalations = [];
+    error_log("Escalations error: " . $e->getMessage());
+}
 $isEscalated = $ticketData['is_escalated'] ?? false;
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
