@@ -1920,7 +1920,7 @@ $defaultCommission = $salespersonModel->getDefaultCommission();
 <?php
 $ticketManager = new \App\Ticket();
 $allTeams = $ticketManager->getAllTeams();
-$allEmployees = (new \App\Employee($dbConn))->getAll();
+$allEmployees = (new \App\Employee($db))->getAll();
 
 $editTeam = null;
 $teamMembers = [];

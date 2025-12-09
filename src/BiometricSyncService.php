@@ -466,4 +466,10 @@ class BiometricSyncService {
         $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
+    
+    public function getLastSyncTime(): ?string {
+        $stmt = $this->db->query("SELECT MAX(last_sync_at) as last_sync FROM biometric_devices WHERE is_active = TRUE");
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result['last_sync'] ?? null;
+    }
 }
