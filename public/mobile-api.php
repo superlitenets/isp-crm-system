@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('Africa/Nairobi');
+
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('X-Content-Type-Options: nosniff');
