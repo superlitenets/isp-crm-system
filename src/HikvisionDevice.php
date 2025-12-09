@@ -49,28 +49,30 @@ class HikvisionDevice extends BiometricDevice {
     public function getAttendance(?string $since = null, ?string $until = null): array {
         $attendance = [];
         
-        $startTime = $since ? date('Y-m-d\TH:i:s\Z', strtotime($since)) : date('Y-m-d\T00:00:00\Z');
-        $endTime = $until ? date('Y-m-d\TH:i:s\Z', strtotime($until)) : date('Y-m-d\T23:59:59\Z');
+        $startTime = $since ? date('Y-m-d\TH:i:s', strtotime($since)) : date('Y-m-d\T00:00:00');
+        $endTime = $until ? date('Y-m-d\TH:i:s', strtotime($until)) : date('Y-m-d\T23:59:59');
         
         $searchPosition = 0;
-        $maxResults = 30;
+        $maxResults = 50;
         $hasMore = true;
         
         while ($hasMore) {
-            $xml = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<AcsEventCond>
-    <searchID>0</searchID>
-    <searchResultPosition>{$searchPosition}</searchResultPosition>
-    <maxResults>{$maxResults}</maxResults>
-    <major>5</major>
-    <minor>75</minor>
-    <startTime>{$startTime}</startTime>
-    <endTime>{$endTime}</endTime>
-</AcsEventCond>
-XML;
+            $json = json_encode([
+                'AcsEventCond' => [
+                    'searchID' => '0',
+                    'searchResultPosition' => $searchPosition,
+                    'maxResults' => $maxResults,
+                    'startTime' => $startTime,
+                    'endTime' => $endTime
+                ]
+            ]);
             
-            $response = $this->sendRequest('/ISAPI/AccessControl/AcsEvent?format=json', 'POST', $xml);
+            error_log("Hikvision getAttendance request: " . $json);
+            
+            $response = $this->sendRequest('/ISAPI/AccessControl/AcsEvent?format=json', 'POST', $json, 'application/json');
+            
+            error_log("Hikvision getAttendance response code: " . $response['code']);
+            error_log("Hikvision getAttendance response body: " . substr($response['body'] ?? '', 0, 1000));
             
             if ($response['code'] !== 200) {
                 $this->setError('Failed to get attendance: ' . ($response['error'] ?? 'HTTP ' . $response['code']));
