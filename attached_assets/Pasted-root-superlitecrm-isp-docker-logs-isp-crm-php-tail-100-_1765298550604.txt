@@ -1,0 +1,102 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 100 | grep -i "error\|biometric\|exception"
+                                                "doorNo":       1,
+                                                "planTemplateNo":
+NOTICE: PHP message: Biometric API Error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "biometric_id" does not exist
+LINE 1: SELECT id, name, biometric_id FROM employees
+                         ^
+172.18.0.5 -  09/Dec/2025:16:37:39 +0000 "GET /biometric-api.php" 500
+172.18.0.5 -  09/Dec/2025:16:37:41 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:37:43 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:37:45 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:37:48 +0000 "GET /index.php" 200
+NOTICE: PHP message: Hikvision getUsers response code: 200
+NOTICE: PHP message: Hikvision getUsers response body: {
+        "UserInfoSearch":       {
+                "searchID":     "0",
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 3,
+                "totalMatches": 3,
+                "UserInfo":     [{
+                                "employeeNo":   "SFL009",
+                                "name": "Carol",
+                                "userType":     "normal",
+                                "closeDelayEnabled":    false,
+                                "Valid":        {
+                                        "enable":       true,
+                                        "timeType":     "UTC",
+                                        "beginTime":    "1970-01-01T08:00:00+08:00",
+                                        "endTime":      "2037-12-31T23:59:59+08:00"
+                                },
+                                "password":     "",
+                                "doorRight":    "1",
+                                "RightPlan":    [{
+                                                "doorNo":       1,
+                                                "planTemplateNo":
+172.18.0.5 -  09/Dec/2025:16:37:51 +0000 "GET /index.php" 200
+NOTICE: PHP message: Hikvision getUsers response code: 200
+NOTICE: PHP message: Hikvision getUsers response body: {
+        "UserInfoSearch":       {
+                "searchID":     "0",
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 3,
+                "totalMatches": 3,
+                "UserInfo":     [{
+                                "employeeNo":   "SFL009",
+                                "name": "Carol",
+                                "userType":     "normal",
+                                "closeDelayEnabled":    false,
+                                "Valid":        {
+                                        "enable":       true,
+                                        "timeType":     "UTC",
+                                        "beginTime":    "1970-01-01T08:00:00+08:00",
+                                        "endTime":      "2037-12-31T23:59:59+08:00"
+                                },
+                                "password":     "",
+                                "doorRight":    "1",
+                                "RightPlan":    [{
+                                                "doorNo":       1,
+                                                "planTemplateNo":
+172.18.0.5 -  09/Dec/2025:16:37:55 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:38:01 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:38:04 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:38:07 +0000 "GET /index.php" 200
+NOTICE: PHP message: Biometric API Access: action=sync-employees-to-device, auth=yes, ip=102.205.239.250
+NOTICE: PHP message: Biometric API Error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "biometric_id" does not exist
+LINE 1: SELECT id, name, biometric_id, card_number FROM employees WH...
+                         ^
+172.18.0.5 -  09/Dec/2025:16:38:12 +0000 "POST /biometric-api.php" 500
+NOTICE: PHP message: Biometric API Access: action=start-enrollment, auth=yes, ip=102.205.239.250
+172.18.0.5 -  09/Dec/2025:16:38:18 +0000 "POST /biometric-api.php" 400
+NOTICE: PHP message: Biometric API Access: action=start-enrollment, auth=yes, ip=102.205.239.250
+172.18.0.5 -  09/Dec/2025:16:38:21 +0000 "POST /biometric-api.php" 400
+NOTICE: PHP message: Biometric API Access: action=delete-device-user, auth=yes, ip=102.205.239.250
+172.18.0.5 -  09/Dec/2025:16:38:28 +0000 "POST /biometric-api.php" 200
+NOTICE: PHP message: Biometric API Access: action=fetch-device-users, auth=yes, ip=102.205.239.250
+NOTICE: PHP message: Hikvision getUsers response code: 200
+NOTICE: PHP message: Hikvision getUsers response body: {
+        "UserInfoSearch":       {
+                "searchID":     "0",
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 2,
+                "totalMatches": 2,
+                "UserInfo":     [{
+                                "employeeNo":   "SFL009",
+                                "name": "Carol",
+                                "userType":     "normal",
+                                "closeDelayEnabled":    false,
+                                "Valid":        {
+                                        "enable":       true,
+                                        "timeType":     "UTC",
+                                        "beginTime":    "1970-01-01T08:00:00+08:00",
+                                        "endTime":      "2037-12-31T23:59:59+08:00"
+                                },
+                                "password":     "",
+                                "doorRight":    "1",
+                                "RightPlan":    [{
+                                                "doorNo":       1,
+                                                "planTemplateNo":
+NOTICE: PHP message: Biometric API Error: SQLSTATE[42703]: Undefined column: 7 ERROR:  column "biometric_id" does not exist
+LINE 1: SELECT id, name, biometric_id FROM employees
+                         ^
+172.18.0.5 -  09/Dec/2025:16:38:32 +0000 "GET /biometric-api.php" 500
+root@superlitecrm:~/isp#
