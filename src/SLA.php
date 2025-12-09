@@ -60,9 +60,9 @@ class SLA {
             (int)$data['resolution_time_hours'],
             !empty($data['escalation_time_hours']) ? (int)$data['escalation_time_hours'] : null,
             !empty($data['escalation_to']) ? (int)$data['escalation_to'] : null,
-            isset($data['notify_on_breach']) ? (bool)$data['notify_on_breach'] : true,
-            isset($data['is_active']) ? (bool)$data['is_active'] : true,
-            isset($data['is_default']) ? (bool)$data['is_default'] : false
+            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? true : false,
+            !empty($data['is_active']) && $data['is_active'] !== '0' ? true : false,
+            !empty($data['is_default']) && $data['is_default'] !== '0' ? true : false
         ]);
         
         return (int)$this->db->lastInsertId();
@@ -87,9 +87,9 @@ class SLA {
             (int)$data['resolution_time_hours'],
             !empty($data['escalation_time_hours']) ? (int)$data['escalation_time_hours'] : null,
             !empty($data['escalation_to']) ? (int)$data['escalation_to'] : null,
-            isset($data['notify_on_breach']) ? (bool)$data['notify_on_breach'] : true,
-            isset($data['is_active']) ? (bool)$data['is_active'] : true,
-            isset($data['is_default']) ? (bool)$data['is_default'] : false,
+            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? true : false,
+            !empty($data['is_active']) && $data['is_active'] !== '0' ? true : false,
+            !empty($data['is_default']) && $data['is_default'] !== '0' ? true : false,
             $id
         ]);
     }
