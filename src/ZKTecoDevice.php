@@ -252,8 +252,14 @@ class ZKTecoDevice extends BiometricDevice {
                 
                 if ($data) {
                     $result['debug']['raw_data_length'] = strlen($data);
-                    $result['debug']['raw_data_hex'] = substr(bin2hex($data), 0, 200);
+                    $result['debug']['raw_data_hex'] = substr(bin2hex($data), 0, 500);
+                    $result['debug']['possible_record_sizes'] = [
+                        '72_records' => intdiv(strlen($data), 72),
+                        '28_records' => intdiv(strlen($data), 28),
+                        '29_records' => intdiv(strlen($data), 29)
+                    ];
                     $result['users'] = $this->parseUserData($data);
+                    $result['debug']['parsed_users_count'] = count($result['users']);
                 }
             } elseif ($commandId == self::CMD_ACK_OK || $commandId == self::CMD_ACK_DATA) {
                 $data = substr($response, 8);
@@ -451,28 +457,72 @@ class ZKTecoDevice extends BiometricDevice {
     
     private function parseUserData(string $data): array {
         $users = [];
-        $recordSize = 72;
+        $dataLen = strlen($data);
+        
+        if ($dataLen === 0) {
+            return $users;
+        }
+        
+        $recordSizes = [72, 28, 29];
+        
+        foreach ($recordSizes as $recordSize) {
+            if ($dataLen % $recordSize === 0 || $dataLen >= $recordSize) {
+                $parsedUsers = $this->tryParseUsers($data, $recordSize);
+                if (!empty($parsedUsers)) {
+                    return $parsedUsers;
+                }
+            }
+        }
+        
+        return $this->tryParseUsers($data, 72);
+    }
+    
+    private function tryParseUsers(string $data, int $recordSize): array {
+        $users = [];
         $records = str_split($data, $recordSize);
         
         foreach ($records as $record) {
             if (strlen($record) < $recordSize) continue;
             
-            $uid = unpack('v', substr($record, 0, 2))[1];
-            $role = ord($record[2]);
-            $password = trim(substr($record, 3, 8), "\x00");
-            $name = trim(substr($record, 11, 24), "\x00");
-            $cardNo = unpack('V', substr($record, 35, 4))[1];
-            $userId = trim(substr($record, 48, 9), "\x00");
+            $user = null;
             
-            if (empty($name) && empty($userId)) continue;
+            if ($recordSize === 72) {
+                $uid = unpack('v', substr($record, 0, 2))[1];
+                $role = ord($record[2]);
+                $password = trim(substr($record, 3, 8), "\x00");
+                $name = trim(substr($record, 11, 24), "\x00");
+                $cardNo = unpack('V', substr($record, 35, 4))[1];
+                $userId = trim(substr($record, 48, 9), "\x00");
+                
+                if (!empty($name) || !empty($userId)) {
+                    $user = [
+                        'uid' => $uid,
+                        'device_user_id' => $userId ?: (string)$uid,
+                        'name' => $name ?: 'User ' . $uid,
+                        'role' => $role,
+                        'card_no' => $cardNo
+                    ];
+                }
+            } elseif ($recordSize === 28 || $recordSize === 29) {
+                $uid = unpack('v', substr($record, 0, 2))[1];
+                $role = ord($record[2]);
+                $password = trim(substr($record, 3, 8), "\x00");
+                $name = trim(substr($record, 11, $recordSize === 28 ? 17 : 18), "\x00");
+                
+                if (!empty($name) || $uid > 0) {
+                    $user = [
+                        'uid' => $uid,
+                        'device_user_id' => (string)$uid,
+                        'name' => $name ?: 'User ' . $uid,
+                        'role' => $role,
+                        'card_no' => 0
+                    ];
+                }
+            }
             
-            $users[] = [
-                'uid' => $uid,
-                'device_user_id' => $userId ?: (string)$uid,
-                'name' => $name ?: 'User ' . $uid,
-                'role' => $role,
-                'card_no' => $cardNo
-            ];
+            if ($user) {
+                $users[] = $user;
+            }
         }
         
         return $users;
