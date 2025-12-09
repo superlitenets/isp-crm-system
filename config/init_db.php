@@ -411,6 +411,24 @@ function initializeDatabase(): void {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS teams (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        leader_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS team_members (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+        employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(team_id, employee_id)
+    );
+
     CREATE TABLE IF NOT EXISTS ticket_earnings (
         id SERIAL PRIMARY KEY,
         ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
