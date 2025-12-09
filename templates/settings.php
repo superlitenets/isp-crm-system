@@ -3450,21 +3450,13 @@ $mpesaConfig = $mpesa->getConfig();
                         For production, use environment variables (MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_PASSKEY, MPESA_SHORTCODE) instead of storing credentials here.
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Environment</label>
-                            <select class="form-select" name="mpesa_environment">
-                                <option value="sandbox" <?= ($mpesaConfig['mpesa_environment'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox (Testing)</option>
-                                <option value="production" <?= ($mpesaConfig['mpesa_environment'] ?? '') === 'production' ? 'selected' : '' ?>>Production (Live)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Business Shortcode (Paybill/Till)</label>
-                            <input type="text" class="form-control" name="mpesa_shortcode" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '174379') ?>"
-                                   placeholder="174379">
-                            <div class="form-text">Use 174379 for sandbox testing</div>
-                        </div>
+                    <input type="hidden" name="mpesa_environment" value="production">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Business Shortcode (Paybill/Till) *</label>
+                        <input type="text" class="form-control" name="mpesa_shortcode" 
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>"
+                               placeholder="Your Paybill or Till Number" required>
                     </div>
                     
                     <div class="row">
@@ -3483,11 +3475,11 @@ $mpesaConfig = $mpesa->getConfig();
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Passkey</label>
+                        <label class="form-label">Passkey *</label>
                         <input type="text" class="form-control" name="mpesa_passkey" 
-                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919') ?>"
-                               placeholder="Lipa na M-Pesa Passkey">
-                        <div class="form-text">Sandbox passkey is pre-filled. Get production passkey from Safaricom after going live.</div>
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>"
+                               placeholder="Lipa na M-Pesa Passkey" required>
+                        <div class="form-text">Get your passkey from Safaricom after going live on Daraja</div>
                     </div>
                 </div>
             </div>
@@ -3573,19 +3565,6 @@ $mpesaConfig = $mpesa->getConfig();
             </div>
         </div>
         
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-bug"></i> Test Credentials</h5>
-            </div>
-            <div class="card-body small">
-                <p class="text-muted mb-2">Sandbox test values:</p>
-                <ul class="mb-0">
-                    <li>Shortcode: <code>174379</code></li>
-                    <li>Phone: <code>254708374149</code></li>
-                    <li>Passkey: <code>bfb279...1ed2c919</code> (pre-filled)</li>
-                </ul>
-            </div>
-        </div>
     </div>
 </div>
 
