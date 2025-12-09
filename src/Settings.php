@@ -336,7 +336,10 @@ class Settings {
             'whatsapp_ultramsg_token',
             'whatsapp_custom_url',
             'whatsapp_custom_api_key',
-            'whatsapp_summary_groups'
+            'whatsapp_summary_groups',
+            'whatsapp_daily_summary_groups',
+            'daily_summary_morning_hour',
+            'daily_summary_evening_hour'
         ];
         
         $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '1');

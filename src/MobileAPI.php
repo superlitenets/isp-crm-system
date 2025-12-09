@@ -638,24 +638,39 @@ class MobileAPI {
             $stmt->execute([$employeeId]);
             $emp = $stmt->fetch(\PDO::FETCH_ASSOC);
             
-            // Check for configured WhatsApp groups (from settings)
             $settings = new Settings();
-            $groupNumbers = $settings->get('whatsapp_summary_groups', '');
             
+            // Check for WhatsApp group IDs (from session provider)
+            $groupsJson = $settings->get('whatsapp_daily_summary_groups', '[]');
+            $groups = json_decode($groupsJson, true) ?: [];
+            
+            foreach ($groups as $group) {
+                $groupId = $group['id'] ?? $group;
+                if (!empty($groupId) && str_contains($groupId, '@g.us')) {
+                    $whatsapp->sendToGroup($groupId, $message);
+                }
+            }
+            
+            // Fallback: phone numbers
+            $groupNumbers = $settings->get('whatsapp_summary_groups', '');
             if (!empty($groupNumbers)) {
-                $groups = array_filter(array_map('trim', explode(',', $groupNumbers)));
-                foreach ($groups as $groupNumber) {
-                    if (!empty($groupNumber)) {
-                        $whatsapp->send($groupNumber, $message);
+                $phones = array_filter(array_map('trim', explode(',', $groupNumbers)));
+                foreach ($phones as $phone) {
+                    if (!empty($phone) && !str_contains($phone, '@g.us')) {
+                        $whatsapp->send($phone, $message);
                     }
                 }
             }
             
-            // Also check department-specific groups
+            // Department-specific groups
             if ($emp && $emp['department_id']) {
                 $deptGroup = $settings->get('whatsapp_group_dept_' . $emp['department_id'], '');
                 if (!empty($deptGroup)) {
-                    $whatsapp->send($deptGroup, $message);
+                    if (str_contains($deptGroup, '@g.us')) {
+                        $whatsapp->sendToGroup($deptGroup, $message);
+                    } else {
+                        $whatsapp->send($deptGroup, $message);
+                    }
                 }
             }
         } catch (\Exception $e) {

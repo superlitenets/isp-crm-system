@@ -794,17 +794,78 @@ function resetToDefaults() {
                     <h6 class="mb-0"><i class="bi bi-clock-history"></i> Daily Summary Notifications</h6>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Configure WhatsApp groups to receive daily work summaries when employees clock out.</p>
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle"></i> <strong>Summary Notifications:</strong><br>
+                        • <strong>On Clock Out:</strong> Each employee receives their personal summary directly via WhatsApp<br>
+                        • <strong>Scheduled Team Summary:</strong> Team summaries sent to selected groups at 7 AM and 6 PM daily
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Morning Summary Time</label>
+                            <select class="form-select" name="daily_summary_morning_hour">
+                                <?php for ($h = 5; $h <= 10; $h++): ?>
+                                <option value="<?= $h ?>" <?= $settings->get('daily_summary_morning_hour', '7') == $h ? 'selected' : '' ?>><?= sprintf('%02d:00', $h) ?> (<?= date('h:i A', strtotime("$h:00")) ?>)</option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Evening Summary Time</label>
+                            <select class="form-select" name="daily_summary_evening_hour">
+                                <?php for ($h = 16; $h <= 20; $h++): ?>
+                                <option value="<?= $h ?>" <?= $settings->get('daily_summary_evening_hour', '18') == $h ? 'selected' : '' ?>><?= sprintf('%02d:00', $h) ?> (<?= date('h:i A', strtotime("$h:00")) ?>)</option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Cron Setup (Run every 5 mins)</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm bg-light" readonly 
+                                       value="*/5 * * * * curl -s '<?= (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'your-domain.com') ?>/cron.php?action=check_schedule&secret=<?= htmlspecialchars($settings->get('cron_secret', 'isp-crm-cron-2024')) ?>'">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(this.previousElementSibling.value); alert('Copied!')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-3">
+                    
                     <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Select WhatsApp Groups for Team Summary</label>
+                            <div id="waSummaryGroupsContainer" class="border rounded p-2 bg-light" style="min-height: 100px;">
+                                <span class="text-muted small">Click "Fetch Groups" to load available WhatsApp groups</span>
+                            </div>
+                            <input type="hidden" name="whatsapp_daily_summary_groups" id="waDailySummaryGroups" 
+                                   value="<?= htmlspecialchars($settings->get('whatsapp_daily_summary_groups', '[]')) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-success" onclick="fetchSummaryGroups()">
+                                    <i class="bi bi-people"></i> Fetch Groups
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="testDailySummary()">
+                                    <i class="bi bi-send"></i> Send Test Summary Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mt-2">
                         <div class="col-md-12">
-                            <label class="form-label">Summary Groups (Phone Numbers)</label>
+                            <label class="form-label">Fallback: Phone Numbers (if groups not available)</label>
                             <input type="text" class="form-control" name="whatsapp_summary_groups" 
                                    value="<?= htmlspecialchars($settings->get('whatsapp_summary_groups', '')) ?>" 
                                    placeholder="254712345678, 254798765432">
-                            <small class="text-muted">Comma-separated WhatsApp group IDs or phone numbers that receive all employee daily summaries</small>
+                            <small class="text-muted">Comma-separated phone numbers to receive summaries if WhatsApp groups don't work</small>
                         </div>
                     </div>
-                    <div class="row g-3 mt-2">
+                    
+                    <hr class="my-3">
+                    
+                    <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label">Department-Specific Groups</label>
                             <div class="table-responsive">
@@ -812,7 +873,8 @@ function resetToDefaults() {
                                     <thead class="table-light">
                                         <tr>
                                             <th>Department</th>
-                                            <th>WhatsApp Group Number</th>
+                                            <th>WhatsApp Group ID or Phone</th>
+                                            <th style="width: 120px;">Select Group</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -824,20 +886,42 @@ function resetToDefaults() {
                                         <tr>
                                             <td><?= htmlspecialchars($dept['name']) ?></td>
                                             <td>
-                                                <input type="text" class="form-control form-control-sm" 
+                                                <input type="text" class="form-control form-control-sm dept-group-input" 
                                                        name="whatsapp_group_dept_<?= $dept['id'] ?>" 
+                                                       id="deptGroup<?= $dept['id'] ?>"
                                                        value="<?= htmlspecialchars($settings->get('whatsapp_group_dept_' . $dept['id'], '')) ?>" 
-                                                       placeholder="254712345678">
+                                                       placeholder="Group ID or phone number">
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="selectGroupFor('deptGroup<?= $dept['id'] ?>')">
+                                                    <i class="bi bi-list"></i> Select
+                                                </button>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
                                         <?php if (empty($departments)): ?>
-                                        <tr><td colspan="2" class="text-center text-muted">No departments configured</td></tr>
+                                        <tr><td colspan="3" class="text-center text-muted">No departments configured</td></tr>
                                         <?php endif; ?>
                                     </tbody>
                                 </table>
                             </div>
-                            <small class="text-muted">Department employees' summaries will also be sent to their department's WhatsApp group</small>
+                            <small class="text-muted">Department employees' clock-out summaries will be sent to their department's group</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="groupSelectModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Select WhatsApp Group</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="groupSelectList" class="list-group">
+                                <span class="text-muted">Loading groups...</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1148,6 +1232,139 @@ function testWhatsAppGateway() {
         alert('WhatsApp gateway test - Coming soon! For now, save settings and try sending a message from a ticket.');
     }
 }
+
+let cachedGroups = [];
+let targetInputId = null;
+
+function fetchSummaryGroups() {
+    const container = document.getElementById('waSummaryGroupsContainer');
+    container.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Loading groups...</span>';
+    
+    fetch(waApiBase + 'groups')
+        .then(r => r.json())
+        .then(data => {
+            cachedGroups = data.groups || [];
+            if (cachedGroups.length > 0) {
+                renderSummaryGroupCheckboxes();
+            } else {
+                container.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> No groups found. Make sure WhatsApp is connected.</span>';
+            }
+        })
+        .catch(err => {
+            container.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Failed to load groups: ' + err.message + '</span>';
+        });
+}
+
+function renderSummaryGroupCheckboxes() {
+    const container = document.getElementById('waSummaryGroupsContainer');
+    const savedGroups = JSON.parse(document.getElementById('waDailySummaryGroups').value || '[]');
+    const savedIds = savedGroups.map(g => g.id || g);
+    
+    let html = '<div class="row g-2">';
+    cachedGroups.forEach(g => {
+        const checked = savedIds.includes(g.id) ? 'checked' : '';
+        html += `
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input class="form-check-input summary-group-check" type="checkbox" value="${g.id}" id="grp_${g.id.replace(/[^a-z0-9]/gi, '')}" ${checked} onchange="updateSummaryGroups()">
+                    <label class="form-check-label small" for="grp_${g.id.replace(/[^a-z0-9]/gi, '')}">
+                        <strong>${g.name}</strong> <small class="text-muted">(${g.participantsCount || '?'} members)</small>
+                    </label>
+                </div>
+            </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function updateSummaryGroups() {
+    const checkboxes = document.querySelectorAll('.summary-group-check:checked');
+    const selectedGroups = [];
+    checkboxes.forEach(cb => {
+        const group = cachedGroups.find(g => g.id === cb.value);
+        if (group) {
+            selectedGroups.push({ id: group.id, name: group.name });
+        }
+    });
+    document.getElementById('waDailySummaryGroups').value = JSON.stringify(selectedGroups);
+}
+
+function selectGroupFor(inputId) {
+    targetInputId = inputId;
+    const listContainer = document.getElementById('groupSelectList');
+    
+    if (cachedGroups.length === 0) {
+        listContainer.innerHTML = '<span class="text-muted">Loading groups...</span>';
+        fetch(waApiBase + 'groups')
+            .then(r => r.json())
+            .then(data => {
+                cachedGroups = data.groups || [];
+                renderGroupSelectList();
+            })
+            .catch(err => {
+                listContainer.innerHTML = '<span class="text-danger">Failed to load groups</span>';
+            });
+    } else {
+        renderGroupSelectList();
+    }
+    
+    new bootstrap.Modal(document.getElementById('groupSelectModal')).show();
+}
+
+function renderGroupSelectList() {
+    const listContainer = document.getElementById('groupSelectList');
+    if (cachedGroups.length === 0) {
+        listContainer.innerHTML = '<span class="text-warning">No groups found. Connect WhatsApp first.</span>';
+        return;
+    }
+    
+    let html = '';
+    cachedGroups.forEach(g => {
+        html += `<button type="button" class="list-group-item list-group-item-action" onclick="selectGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')">
+            <strong>${g.name}</strong> <small class="text-muted">(${g.participantsCount || '?'} members)</small>
+        </button>`;
+    });
+    listContainer.innerHTML = html;
+}
+
+function selectGroup(groupId, groupName) {
+    if (targetInputId) {
+        document.getElementById(targetInputId).value = groupId;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('groupSelectModal')).hide();
+}
+
+function testDailySummary() {
+    if (!confirm('Send a test daily summary to all configured groups now?')) return;
+    
+    fetch('cron.php?action=daily_summary&secret=<?= htmlspecialchars($settings->get("cron_secret", "isp-crm-cron-2024")) ?>')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Test summary sent! Groups: ' + data.groups_sent + ', Employees: ' + data.employees_count + ', Tickets: ' + data.tickets_count);
+            } else {
+                alert('Failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const savedGroups = document.getElementById('waDailySummaryGroups')?.value;
+    if (savedGroups && savedGroups !== '[]') {
+        const groups = JSON.parse(savedGroups);
+        if (groups.length > 0) {
+            const container = document.getElementById('waSummaryGroupsContainer');
+            let html = '<div class="mb-2"><small class="text-success"><i class="bi bi-check-circle"></i> ' + groups.length + ' group(s) selected</small></div>';
+            html += '<ul class="list-unstyled small mb-0">';
+            groups.forEach(g => {
+                html += '<li><i class="bi bi-people-fill text-primary"></i> ' + (g.name || g.id) + '</li>';
+            });
+            html += '</ul><div class="mt-2"><small class="text-muted">Click "Fetch Groups" to modify selection</small></div>';
+            container.innerHTML = html;
+        }
+    }
+});
 </script>
 
 <div class="card mt-4 border-success">
