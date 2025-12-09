@@ -477,10 +477,10 @@ try {
             }
             
             $result = $api->addTicketCommentAny($ticketId, $user['id'], $userRole, $comment);
-            if ($result) {
+            if ($result['success']) {
                 echo json_encode(['success' => true]);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Not authorized to comment on this ticket']);
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to add comment']);
             }
             break;
             

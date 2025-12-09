@@ -510,8 +510,31 @@ class MobileAPI {
         if (!$employee) {
             return false;
         }
+        
+        // Check mobile app attendance first
         $attendance = $this->getTodayAttendance($employee['id']);
-        return $attendance && $attendance['clock_in'] && !$attendance['clock_out'];
+        if ($attendance && $attendance['clock_in'] && !$attendance['clock_out']) {
+            return true;
+        }
+        
+        // Check biometric attendance logs for today
+        $today = date('Y-m-d');
+        $stmt = $this->db->prepare("
+            SELECT log_type, log_time 
+            FROM biometric_attendance_logs 
+            WHERE employee_id = ? AND DATE(log_time) = ?
+            ORDER BY log_time DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$employee['id'], $today]);
+        $lastBiometricLog = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        // If last biometric log is a clock-in (not clock-out), user is clocked in
+        if ($lastBiometricLog && in_array(strtolower($lastBiometricLog['log_type']), ['clock_in', 'checkin', 'in', '0', 'i'])) {
+            return true;
+        }
+        
+        return false;
     }
     
     public function getAssignedEquipment(int $userId): array {
@@ -999,13 +1022,18 @@ class MobileAPI {
         return ['success' => $result];
     }
     
-    public function addTicketCommentAny(int $ticketId, int $userId, string $userRole, string $comment): bool {
+    public function addTicketCommentAny(int $ticketId, int $userId, string $userRole, string $comment): array {
+        if (!$this->isClockedIn($userId)) {
+            return ['success' => false, 'error' => 'You must clock in before working on tickets'];
+        }
+        
         if (!$this->canAccessTicket($ticketId, $userId, $userRole)) {
-            return false;
+            return ['success' => false, 'error' => 'You do not have permission to access this ticket'];
         }
         
         $stmt = $this->db->prepare("INSERT INTO ticket_comments (ticket_id, user_id, comment) VALUES (?, ?, ?)");
-        return $stmt->execute([$ticketId, $userId, $comment]);
+        $result = $stmt->execute([$ticketId, $userId, $comment]);
+        return ['success' => $result];
     }
     
     public function getEmployeeTeams(int $userId): array {
