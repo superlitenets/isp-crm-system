@@ -80,7 +80,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         FROM employees e
         LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = '$today'
         LEFT JOIN departments d ON e.department_id = d.id
-        WHERE e.status = 'active'
+        WHERE e.employment_status = 'active'
         ORDER BY d.name, e.name
     ");
     $employees = $stmt->fetchAll(\PDO::FETCH_ASSOC);
