@@ -960,6 +960,20 @@ const app = {
                     </div>
                 </div>
                 
+                ${p.commission ? `
+                <div class="performance-summary mt-3">
+                    <h6 class="mb-2"><i class="bi bi-cash-coin"></i> Commission Earnings</h6>
+                    <div class="summary-row">
+                        <span>Tickets Completed</span>
+                        <span class="text-success">${p.commission.total_tickets || 0}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total Earnings</span>
+                        <span class="text-success fw-bold">${p.commission.currency || 'KES'} ${this.formatNumber(p.commission.total_earnings || 0)}</span>
+                    </div>
+                </div>
+                ` : ''}
+                
                 ${p.attendance_stats ? `
                 <div class="performance-summary mt-3">
                     <h6 class="mb-2"><i class="bi bi-clock"></i> Attendance This Month</h6>
