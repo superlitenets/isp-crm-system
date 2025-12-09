@@ -1100,6 +1100,53 @@ const app = {
         }
     },
     
+    myTicketsFilter: '',
+    
+    async showMyTickets() {
+        this.showScreen('my-tickets-screen');
+        this.myTicketsFilter = '';
+        this.loadMyTicketsList();
+    },
+    
+    async loadMyTicketsList() {
+        const container = document.getElementById('my-tickets-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('technician-tickets' + (this.myTicketsFilter ? '&status=' + this.myTicketsFilter : ''));
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(ticket => `
+                <div class="list-item" onclick="app.showTicketDetail(${ticket.id})">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${ticket.subject}</h6>
+                            <p class="list-item-subtitle">${ticket.ticket_number} - ${ticket.customer_name || 'Unknown'}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(ticket.status)} badge-status">
+                            ${ticket.status.replace('_', ' ')}
+                        </span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
+                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                        ${parseFloat(ticket.earnings) > 0 
+                            ? `<span class="text-success"><i class="bi bi-cash-coin"></i> KES ${this.formatNumber(ticket.earnings)} earned</span>` 
+                            : (parseFloat(ticket.commission_rate) > 0 
+                                ? `<span class="text-warning"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.commission_rate)}</span>` 
+                                : '')}
+                    </div>
+                    ${ticket.customer_phone ? `<div class="list-item-meta"><span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span></div>` : ''}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-ticket"></i><p>No tickets found</p><p class="text-muted small">You have no assigned tickets</p></div>';
+        }
+    },
+    
+    filterMyTickets(status) {
+        this.myTicketsFilter = status;
+        this.loadMyTicketsList();
+    },
+    
     async showAvailableTickets() {
         this.showScreen('available-tickets-screen');
         this.loadAvailableTickets();

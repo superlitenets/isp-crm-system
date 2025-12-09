@@ -167,19 +167,48 @@
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
-                <a href="javascript:void(0)" class="nav-item" onclick="app.showMyTeams(); app.setActiveNav(this); return false;">
-                    <i class="bi bi-people"></i>
-                    <span>Teams</span>
+                <a href="javascript:void(0)" class="nav-item" onclick="app.showMyTickets(); app.setActiveNav(this); return false;">
+                    <i class="bi bi-ticket-perforated"></i>
+                    <span>My Tickets</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this); return false;">
                     <i class="bi bi-inbox"></i>
                     <span>Available</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="app.showMyTeams(); app.setActiveNav(this); return false;">
+                    <i class="bi bi-people"></i>
+                    <span>Teams</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="app.showProfile(); app.setActiveNav(this); return false;">
                     <i class="bi bi-person-circle"></i>
                     <span>Profile</span>
                 </a>
             </nav>
+        </div>
+
+        <div id="my-tickets-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">My Tickets</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.loadMyTicketsList()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div class="section-header">
+                    <select class="form-select form-select-sm" style="width: auto;" onchange="app.filterMyTickets(this.value)">
+                        <option value="">All Tickets</option>
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+                <div id="my-tickets-list" class="list-container"></div>
+            </div>
         </div>
 
         <div id="my-teams-screen" class="screen">
