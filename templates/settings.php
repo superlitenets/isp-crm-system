@@ -5416,12 +5416,71 @@ if ($action === 'edit_branch' && $id) {
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">WhatsApp Group ID</label>
-                        <input type="text" class="form-control" name="whatsapp_group" 
-                               placeholder="e.g., 120363375205813440@g.us"
-                               value="<?= htmlspecialchars($editBranch['whatsapp_group'] ?? '') ?>">
+                        <label class="form-label">WhatsApp Group</label>
+                        <div class="input-group">
+                            <select class="form-select" name="whatsapp_group" id="branchWhatsAppGroup">
+                                <option value="">Select a group...</option>
+                                <?php if (!empty($editBranch['whatsapp_group'])): ?>
+                                <option value="<?= htmlspecialchars($editBranch['whatsapp_group']) ?>" selected>
+                                    <?= htmlspecialchars($editBranch['whatsapp_group']) ?>
+                                </option>
+                                <?php endif; ?>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary" id="refreshGroupsBtn" title="Refresh groups">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
                         <small class="text-muted">Daily summaries will be sent to this group</small>
+                        <div id="groupsLoadingMsg" class="text-muted small mt-1" style="display:none;">
+                            <span class="spinner-border spinner-border-sm"></span> Loading groups...
+                        </div>
+                        <div id="groupsErrorMsg" class="text-danger small mt-1" style="display:none;"></div>
                     </div>
+                    <script>
+                    (function() {
+                        const select = document.getElementById('branchWhatsAppGroup');
+                        const refreshBtn = document.getElementById('refreshGroupsBtn');
+                        const loadingMsg = document.getElementById('groupsLoadingMsg');
+                        const errorMsg = document.getElementById('groupsErrorMsg');
+                        const currentValue = '<?= htmlspecialchars($editBranch['whatsapp_group'] ?? '') ?>';
+                        
+                        function loadGroups() {
+                            loadingMsg.style.display = 'block';
+                            errorMsg.style.display = 'none';
+                            
+                            fetch('?page=api&action=whatsapp_session&op=groups')
+                                .then(r => r.json())
+                                .then(data => {
+                                    loadingMsg.style.display = 'none';
+                                    if (data.success && data.groups) {
+                                        select.innerHTML = '<option value="">Select a group...</option>';
+                                        data.groups.forEach(g => {
+                                            const opt = document.createElement('option');
+                                            opt.value = g.id;
+                                            opt.textContent = g.name + ' (' + (g.participantsCount || '?') + ' members)';
+                                            if (g.id === currentValue) opt.selected = true;
+                                            select.appendChild(opt);
+                                        });
+                                        if (data.groups.length === 0) {
+                                            errorMsg.textContent = 'No groups found. Make sure WhatsApp is connected.';
+                                            errorMsg.style.display = 'block';
+                                        }
+                                    } else {
+                                        errorMsg.textContent = data.error || 'Failed to load groups';
+                                        errorMsg.style.display = 'block';
+                                    }
+                                })
+                                .catch(err => {
+                                    loadingMsg.style.display = 'none';
+                                    errorMsg.textContent = 'Connection error: ' + err.message;
+                                    errorMsg.style.display = 'block';
+                                });
+                        }
+                        
+                        refreshBtn.addEventListener('click', loadGroups);
+                        loadGroups();
+                    })();
+                    </script>
                     
                     <div class="mb-3">
                         <div class="form-check form-switch">

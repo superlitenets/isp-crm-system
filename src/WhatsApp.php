@@ -102,6 +102,42 @@ class WhatsApp {
         ];
     }
     
+    public function fetchGroups(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error, 'groups' => []];
+            }
+            
+            if ($httpCode !== 200) {
+                return ['success' => false, 'error' => "HTTP $httpCode", 'groups' => []];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if (!$data || !isset($data['groups'])) {
+                return ['success' => false, 'error' => 'Invalid response', 'groups' => []];
+            }
+            
+            return [
+                'success' => true,
+                'groups' => $data['groups']
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'groups' => []];
+        }
+    }
+    
     public function formatPhone(string $phone): string {
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         
