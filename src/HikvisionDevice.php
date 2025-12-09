@@ -418,7 +418,33 @@ XML;
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
-        $fpData = [
+        // Step 1: Start fingerprint capture on device using CaptureFingerPrint
+        $captureData = [
+            'CaptureFingerPrintCond' => [
+                'employeeNo' => $employeeNo,
+                'enableCardReader' => [1],
+                'fingerPrintID' => $fingerNo
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            'POST',
+            json_encode($captureData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint enrollment started. Please place finger on the device scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Try alternative endpoint for older firmware
+        $altData = [
             'FingerPrintCfg' => [
                 'employeeNo' => $employeeNo,
                 'fingerPrintID' => $fingerNo,
@@ -426,15 +452,20 @@ XML;
             ]
         ];
         
-        $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/Capture?format=json',
-            'PUT',
-            json_encode($fpData),
+        $altResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'POST',
+            json_encode($altData),
             'application/json'
         );
         
-        if ($response['code'] === 200) {
-            return ['success' => true, 'message' => 'Fingerprint enrollment started on device. Employee should place finger on scanner.'];
+        if ($altResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint enrollment initiated. Please place finger on the device scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
         }
         
         $error = 'Failed to start fingerprint enrollment';
@@ -444,6 +475,56 @@ XML;
         }
         
         return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    public function checkFingerprintProgress(): array {
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrintProgress?format=json',
+            'GET'
+        );
+        
+        if ($response['code'] === 200 && $response['body']) {
+            $data = json_decode($response['body'], true);
+            $status = $data['FingerPrintProgress']['totalStatus'] ?? null;
+            
+            return [
+                'success' => true,
+                'completed' => $status === 1,
+                'status' => $status,
+                'progress' => $data['FingerPrintProgress'] ?? []
+            ];
+        }
+        
+        return ['success' => false, 'error' => 'Could not get fingerprint progress'];
+    }
+    
+    public function downloadFingerprint(string $employeeNo, int $fingerNo = 1): array {
+        $downloadData = [
+            'FingerPrintDownloadCond' => [
+                'employeeNo' => $employeeNo,
+                'enableCardReader' => [1],
+                'fingerPrintID' => $fingerNo
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrintDownload?format=json',
+            'POST',
+            json_encode($downloadData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'Fingerprint saved to device'];
+        }
+        
+        $error = 'Failed to save fingerprint';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error];
     }
     
     public function addUserWithEnrollment(string $employeeNo, string $name, ?string $cardNo = null, bool $startEnrollment = true): array {
