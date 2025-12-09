@@ -418,73 +418,10 @@ XML;
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
-        // First check if fingerprint enrollment is supported
-        $capCheck = $this->sendRequest('/ISAPI/AccessControl/FingerPrintCfg/capabilities?format=json', 'GET');
-        $supportsFingerprint = false;
-        
-        if ($capCheck['code'] === 200 && $capCheck['body']) {
-            $capData = json_decode($capCheck['body'], true);
-            $supportsFingerprint = isset($capData['FingerPrintCfg']) || isset($capData['fingerPrintCfg']);
-        }
-        
-        if (!$supportsFingerprint) {
-            // Try XML capabilities check
-            $xmlCapCheck = $this->sendRequest('/ISAPI/AccessControl/FingerPrintCfg/capabilities', 'GET');
-            if ($xmlCapCheck['code'] === 200) {
-                $supportsFingerprint = true;
-            }
-        }
-        
-        // Try all possible enrollment methods
         $methods = [];
         
-        // Method 1: JSON format with proper structure
-        $jsonData = json_encode([
-            'FingerPrintCfg' => [
-                'employeeNo' => (string)$employeeNo,
-                'enableCardReader' => [1],
-                'fingerPrintID' => $fingerNo,
-                'deleteFingerPrint' => false
-            ]
-        ]);
-        
-        $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
-            'PUT',
-            $jsonData,
-            'application/json'
-        );
-        $methods['json_put'] = $response['code'];
-        
-        if ($response['code'] === 200) {
-            return [
-                'success' => true, 
-                'message' => 'Fingerprint enrollment started. Please place finger on the device scanner 3 times.',
-                'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
-            ];
-        }
-        
-        // Method 2: POST instead of PUT
-        $postResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
-            'POST',
-            $jsonData,
-            'application/json'
-        );
-        $methods['json_post'] = $postResponse['code'];
-        
-        if ($postResponse['code'] === 200) {
-            return [
-                'success' => true, 
-                'message' => 'Fingerprint enrollment started. Please place finger on the device scanner.',
-                'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
-            ];
-        }
-        
-        // Method 3: Try FingerPrintDownload endpoint (for devices that use this)
-        $downloadData = json_encode([
+        // Method 1: CaptureFingerPrint with PUT (correct endpoint per ISAPI docs)
+        $captureData = json_encode([
             'FingerPrintCfg' => [
                 'employeeNo' => (string)$employeeNo,
                 'enableCardReader' => [1],
@@ -492,30 +429,90 @@ XML;
             ]
         ]);
         
-        $downloadResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrintDownload?format=json',
-            'POST',
-            $downloadData,
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
+            'PUT',
+            $captureData,
             'application/json'
         );
-        $methods['download'] = $downloadResponse['code'];
+        $methods['capture_put'] = $response['code'];
         
-        if ($downloadResponse['code'] === 200) {
+        if ($response['code'] === 200) {
             return [
                 'success' => true, 
-                'message' => 'Fingerprint enrollment initiated. Please place finger on the scanner.',
+                'message' => 'Fingerprint capture started. Please place finger on the scanner 3 times.',
                 'employee_no' => $employeeNo,
                 'finger_id' => $fingerNo
             ];
         }
         
-        // If all methods fail, provide helpful guidance
+        // Method 2: CaptureFingerPrint with POST
+        $postResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
+            'POST',
+            $captureData,
+            'application/json'
+        );
+        $methods['capture_post'] = $postResponse['code'];
+        
+        if ($postResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint capture started. Please place finger on the scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Method 3: Try with ?format=json query param
+        $formatResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            'PUT',
+            $captureData,
+            'application/json'
+        );
+        $methods['capture_format'] = $formatResponse['code'];
+        
+        if ($formatResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint capture initiated. Please place finger on the scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Method 4: Try SetUp endpoint as fallback
+        $setupResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'PUT',
+            $captureData,
+            'application/json'
+        );
+        $methods['setup'] = $setupResponse['code'];
+        
+        if ($setupResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint enrollment started. Please place finger on the scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Parse error from last response
+        $error = 'Fingerprint enrollment failed';
+        $lastResponse = $response['body'] ?: $postResponse['body'] ?: $formatResponse['body'] ?: $setupResponse['body'];
+        if ($lastResponse) {
+            $data = json_decode($lastResponse, true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
         return [
             'success' => false, 
-            'error' => 'Remote fingerprint enrollment not supported. Please enroll fingerprints directly on the device: Menu > User > Select user > Add Fingerprint.',
-            'device_note' => 'The DS-K1T904AMF is a face terminal. For fingerprints, use the device touchscreen.',
-            'supports_fingerprint_api' => $supportsFingerprint,
-            'methods_tried' => $methods
+            'error' => $error,
+            'methods_tried' => $methods,
+            'hint' => 'If remote enrollment fails, enroll fingerprints on device: Menu > User > Select user > Add Fingerprint'
         ];
     }
     
