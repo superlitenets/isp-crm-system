@@ -746,22 +746,28 @@ if ($page === 'order') {
                 ]);
                 
                 $order = $orderModel->getById($orderId);
-                $orderNumber = $order['order_number'];
+                $orderNumber = $order['order_number'] ?? '';
                 $orderSuccess = true;
                 
+                // M-Pesa payment - separate try-catch so order success shows even if M-Pesa fails
                 if ($paymentMethod === 'mpesa' && $amount > 0) {
-                    $mpesa = new \App\Mpesa();
-                    if ($mpesa->isConfigured()) {
-                        $result = $mpesa->stkPush($customerPhone, $amount, $orderNumber, 'Order Payment');
-                        if ($result['success']) {
-                            $paymentInitiated = true;
-                            if (!empty($result['transaction_id'])) {
-                                $orderModel->updatePaymentStatus($orderId, 'pending', $result['transaction_id']);
+                    try {
+                        $mpesa = new \App\Mpesa();
+                        if ($mpesa->isConfigured()) {
+                            $result = $mpesa->stkPush($customerPhone, $amount, $orderNumber, 'Order Payment');
+                            if ($result['success']) {
+                                $paymentInitiated = true;
+                                if (!empty($result['transaction_id'])) {
+                                    $orderModel->updatePaymentStatus($orderId, 'pending', $result['transaction_id']);
+                                }
                             }
                         }
+                    } catch (\Exception $mpesaError) {
+                        error_log("M-Pesa STK push error: " . $mpesaError->getMessage());
+                        // Order still successful, just payment initiation failed
                     }
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $error = 'An error occurred. Please try again.';
                 error_log("Order creation error: " . $e->getMessage());
             }

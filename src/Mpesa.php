@@ -26,7 +26,7 @@ class Mpesa {
         $this->consumerSecret = $_ENV['MPESA_CONSUMER_SECRET'] ?? $this->getConfigValue('mpesa_consumer_secret') ?? '';
         $this->shortcode = $_ENV['MPESA_SHORTCODE'] ?? $this->getConfigValue('mpesa_shortcode') ?? '174379';
         $this->passkey = $_ENV['MPESA_PASSKEY'] ?? $this->getConfigValue('mpesa_passkey') ?? 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-        $this->isSandbox = ($_ENV['MPESA_ENVIRONMENT'] ?? $this->getConfigValue('mpesa_environment') ?? 'sandbox') === 'sandbox';
+        $this->isSandbox = ($_ENV['MPESA_ENV'] ?? $_ENV['MPESA_ENVIRONMENT'] ?? $this->getConfigValue('mpesa_environment') ?? 'sandbox') === 'sandbox';
         
         $this->baseUrl = $this->isSandbox 
             ? 'https://sandbox.safaricom.co.ke' 
