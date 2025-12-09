@@ -335,7 +335,8 @@ class Settings {
             'whatsapp_ultramsg_instance',
             'whatsapp_ultramsg_token',
             'whatsapp_custom_url',
-            'whatsapp_custom_api_key'
+            'whatsapp_custom_api_key',
+            'whatsapp_summary_groups'
         ];
         
         $this->set('whatsapp_enabled', $data['whatsapp_enabled'] ?? '1');
@@ -347,6 +348,14 @@ class Settings {
                 $this->set($field, $data[$field], $type);
             }
         }
+        
+        // Save department-specific WhatsApp groups
+        foreach ($data as $key => $value) {
+            if (str_starts_with($key, 'whatsapp_group_dept_')) {
+                $this->set($key, $value, 'text');
+            }
+        }
+        
         return true;
     }
 

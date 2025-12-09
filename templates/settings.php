@@ -789,6 +789,60 @@ function resetToDefaults() {
                 </div>
             </div>
             
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="bi bi-clock-history"></i> Daily Summary Notifications</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Configure WhatsApp groups to receive daily work summaries when employees clock out.</p>
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Summary Groups (Phone Numbers)</label>
+                            <input type="text" class="form-control" name="whatsapp_summary_groups" 
+                                   value="<?= htmlspecialchars($settings->get('whatsapp_summary_groups', '')) ?>" 
+                                   placeholder="254712345678, 254798765432">
+                            <small class="text-muted">Comma-separated WhatsApp group IDs or phone numbers that receive all employee daily summaries</small>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <label class="form-label">Department-Specific Groups</label>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>WhatsApp Group Number</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $deptStmt = $dbConn->query("SELECT id, name FROM departments WHERE is_active = true ORDER BY name");
+                                        $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
+                                        foreach ($departments as $dept):
+                                        ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($dept['name']) ?></td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm" 
+                                                       name="whatsapp_group_dept_<?= $dept['id'] ?>" 
+                                                       value="<?= htmlspecialchars($settings->get('whatsapp_group_dept_' . $dept['id'], '')) ?>" 
+                                                       placeholder="254712345678">
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($departments)): ?>
+                                        <tr><td colspan="2" class="text-center text-muted">No departments configured</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <small class="text-muted">Department employees' summaries will also be sent to their department's WhatsApp group</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div id="waProviderSession" class="provider-config mt-4" style="display: none;">
                 <div class="alert alert-warning mb-3">
                     <i class="bi bi-exclamation-triangle"></i> <strong>WhatsApp Web Session</strong> - Sends messages automatically via your WhatsApp account. Scan QR code to connect. <em>Best for local/self-hosted deployments.</em>
