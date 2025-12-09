@@ -127,13 +127,14 @@ class RealTimeAttendanceProcessor {
         return $result;
     }
     
-    public function processBiometricEvent(int $deviceId, string $deviceUserId, string $logTime, string $direction = 'unknown'): array {
+    public function processBiometricEvent(int $deviceId, string $deviceUserId, string $logTime, string $direction = 'unknown', string $verificationType = 'unknown'): array {
         $result = [
             'success' => false,
             'message' => '',
             'employee_id' => null,
             'device_id' => $deviceId,
             'device_user_id' => $deviceUserId,
+            'verification_type' => $verificationType,
             'processed' => false
         ];
         

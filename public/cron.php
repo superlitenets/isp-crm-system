@@ -307,13 +307,13 @@ function syncAttendanceFromDevices(\PDO $db): void {
     require_once __DIR__ . '/../src/BiometricDevice.php';
     require_once __DIR__ . '/../src/HikvisionDevice.php';
     require_once __DIR__ . '/../src/ZKTecoDevice.php';
-    require_once __DIR__ . '/../src/AttendanceProcessor.php';
+    require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
     
     $stmt = $db->query("SELECT * FROM biometric_devices WHERE is_active = true");
     $devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
     
     $results = [];
-    $processor = new \App\AttendanceProcessor($db);
+    $processor = new \App\RealTimeAttendanceProcessor($db);
     
     $since = date('Y-m-d H:i:s', strtotime('-1 hour'));
     
@@ -353,13 +353,17 @@ function syncAttendanceFromDevices(\PDO $db): void {
                     (int)$deviceRow['id'],
                     (string)$record['device_user_id'],
                     $record['log_time'],
-                    $record['direction'] ?? 'unknown'
+                    $record['direction'] ?? 'unknown',
+                    $record['verification_type'] ?? 'unknown'
                 );
                 
                 if ($processResult['success'] ?? false) {
                     $deviceResult['synced']++;
                 }
             }
+            
+            $deviceResult['records_found'] = count($attendance);
+            $deviceResult['verification_types'] = array_unique(array_column($attendance, 'verification_type'));
             
         } catch (\Throwable $e) {
             $deviceResult['errors'][] = $e->getMessage();
