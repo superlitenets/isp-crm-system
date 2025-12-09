@@ -420,100 +420,142 @@ XML;
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
         $methods = [];
         
-        // Method 1: CaptureFingerPrint with PUT (correct endpoint per ISAPI docs)
-        $captureData = json_encode([
-            'FingerPrintCfg' => [
-                'employeeNo' => (string)$employeeNo,
-                'enableCardReader' => [1],
-                'fingerPrintID' => $fingerNo
-            ]
-        ]);
+        // Method 1: XML format with CaptureFingerPrintCfg (correct format per ISAPI docs)
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
+<CaptureFingerPrintCfg>
+    <dataType>fingerData</dataType>
+</CaptureFingerPrintCfg>';
         
         $response = $this->sendRequest(
             '/ISAPI/AccessControl/CaptureFingerPrint',
-            'PUT',
-            $captureData,
-            'application/json'
-        );
-        $methods['capture_put'] = $response['code'];
-        
-        if ($response['code'] === 200) {
-            return [
-                'success' => true, 
-                'message' => 'Fingerprint capture started. Please place finger on the scanner 3 times.',
-                'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
-            ];
-        }
-        
-        // Method 2: CaptureFingerPrint with POST
-        $postResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint',
             'POST',
-            $captureData,
-            'application/json'
+            $xmlData,
+            'application/xml'
         );
-        $methods['capture_post'] = $postResponse['code'];
+        $methods['xml_post'] = $response['code'];
         
-        if ($postResponse['code'] === 200) {
+        if ($response['code'] === 200 && $response['body']) {
+            // Parse the fingerprint data from response
+            $xml = @simplexml_load_string($response['body']);
+            $fingerData = null;
+            if ($xml && isset($xml->fingerData)) {
+                $fingerData = (string)$xml->fingerData;
+            }
+            
+            if ($fingerData) {
+                // Save fingerprint to employee
+                $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
+                if ($saveResult['success']) {
+                    return [
+                        'success' => true,
+                        'message' => 'Fingerprint captured and saved successfully.',
+                        'employee_no' => $employeeNo,
+                        'finger_id' => $fingerNo
+                    ];
+                }
+                return $saveResult;
+            }
+            
             return [
                 'success' => true, 
-                'message' => 'Fingerprint capture started. Please place finger on the scanner.',
+                'message' => 'Fingerprint capture started. Place finger on scanner now.',
                 'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
+                'finger_id' => $fingerNo,
+                'needs_manual_save' => true
             ];
         }
         
-        // Method 3: Try with ?format=json query param
-        $formatResponse = $this->sendRequest(
+        // Method 2: JSON format
+        $jsonData = json_encode([
+            'CaptureFingerPrintCfg' => [
+                'dataType' => 'fingerData'
+            ]
+        ]);
+        
+        $jsonResponse = $this->sendRequest(
             '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
-            'PUT',
-            $captureData,
+            'POST',
+            $jsonData,
             'application/json'
         );
-        $methods['capture_format'] = $formatResponse['code'];
+        $methods['json_post'] = $jsonResponse['code'];
         
-        if ($formatResponse['code'] === 200) {
+        if ($jsonResponse['code'] === 200 && $jsonResponse['body']) {
+            $data = json_decode($jsonResponse['body'], true);
+            $fingerData = $data['CaptureFingerPrintCfg']['fingerData'] ?? $data['fingerData'] ?? null;
+            
+            if ($fingerData) {
+                $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
+                if ($saveResult['success']) {
+                    return [
+                        'success' => true,
+                        'message' => 'Fingerprint captured and saved successfully.',
+                        'employee_no' => $employeeNo,
+                        'finger_id' => $fingerNo
+                    ];
+                }
+                return $saveResult;
+            }
+            
             return [
                 'success' => true, 
-                'message' => 'Fingerprint capture initiated. Please place finger on the scanner.',
+                'message' => 'Fingerprint capture initiated. Place finger on scanner.',
                 'employee_no' => $employeeNo,
                 'finger_id' => $fingerNo
             ];
         }
         
-        // Method 4: Try SetUp endpoint as fallback
-        $setupResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
-            'PUT',
-            $captureData,
-            'application/json'
-        );
-        $methods['setup'] = $setupResponse['code'];
-        
-        if ($setupResponse['code'] === 200) {
-            return [
-                'success' => true, 
-                'message' => 'Fingerprint enrollment started. Please place finger on the scanner.',
-                'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
-            ];
-        }
-        
-        // Parse error from last response
+        // Parse error from response
         $error = 'Fingerprint enrollment failed';
-        $lastResponse = $response['body'] ?: $postResponse['body'] ?: $formatResponse['body'] ?: $setupResponse['body'];
-        if ($lastResponse) {
-            $data = json_decode($lastResponse, true);
-            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        $errorBody = $response['body'] ?: $jsonResponse['body'];
+        if ($errorBody) {
+            if (strpos($errorBody, '<') === 0) {
+                $xml = @simplexml_load_string($errorBody);
+                if ($xml) {
+                    $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
+                }
+            } else {
+                $data = json_decode($errorBody, true);
+                $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+            }
         }
         
         return [
             'success' => false, 
             'error' => $error,
             'methods_tried' => $methods,
-            'hint' => 'If remote enrollment fails, enroll fingerprints on device: Menu > User > Select user > Add Fingerprint'
+            'hint' => 'If remote capture fails, enroll fingerprints directly on the device touchscreen.'
         ];
+    }
+    
+    private function saveFingerprintToEmployee(string $employeeNo, string $fingerData, int $fingerNo): array {
+        $payload = json_encode([
+            'FingerPrintCfg' => [
+                'employeeNo' => (string)$employeeNo,
+                'fingerPrintID' => $fingerNo,
+                'fingerData' => $fingerData,
+                'fingerType' => 'normalFP'
+            ]
+        ]);
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'PUT',
+            $payload,
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'Fingerprint saved to employee'];
+        }
+        
+        $error = 'Failed to save fingerprint to employee';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error];
     }
     
     public function checkFingerprintProgress(): array {
