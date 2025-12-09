@@ -6,31 +6,46 @@ date_default_timezone_set('Africa/Nairobi');
 
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? '';
-$secret = $_GET['secret'] ?? '';
+// Global error handler to ensure JSON output
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
 
-$settings = new \App\Settings();
-$cronSecret = $settings->get('cron_secret', 'isp-crm-cron-2024');
+try {
+    $action = $_GET['action'] ?? '';
+    $secret = $_GET['secret'] ?? '';
 
-if ($secret !== $cronSecret) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
+    $settings = new \App\Settings();
+    $cronSecret = $settings->get('cron_secret', 'isp-crm-cron-2024');
 
-$db = Database::getConnection();
+    if ($secret !== $cronSecret) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Unauthorized']);
+        exit;
+    }
 
-switch ($action) {
-    case 'daily_summary':
-        sendDailySummaryToGroups($db, $settings);
-        break;
-        
-    case 'check_schedule':
-        checkAndSendScheduledSummaries($db, $settings);
-        break;
-        
-    default:
-        echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule']]);
+    $db = Database::getConnection();
+
+    switch ($action) {
+        case 'daily_summary':
+            sendDailySummaryToGroups($db, $settings);
+            break;
+            
+        case 'check_schedule':
+            checkAndSendScheduledSummaries($db, $settings);
+            break;
+            
+        default:
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule']]);
+    }
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage(),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine()
+    ]);
 }
 
 function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
