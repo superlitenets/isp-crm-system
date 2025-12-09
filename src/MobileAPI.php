@@ -353,7 +353,11 @@ class MobileAPI {
         return $stmt->execute([$ticketId, $userId, $comment]);
     }
     
-    public function closeTicketWithDetails(int $ticketId, int $userId, array $closureDetails, string $userRole = 'technician'): bool {
+    public function closeTicketWithDetails(int $ticketId, int $userId, array $closureDetails, string $userRole = 'technician'): array {
+        if (!$this->isClockedIn($userId)) {
+            return ['success' => false, 'error' => 'You must clock in before working on tickets'];
+        }
+        
         if ($userRole === 'admin' || $userRole === 'manager') {
             $stmt = $this->db->prepare("SELECT id FROM tickets WHERE id = ?");
             $stmt->execute([$ticketId]);
@@ -363,7 +367,7 @@ class MobileAPI {
         }
         
         if (!$stmt->fetch()) {
-            return false;
+            return ['success' => false, 'error' => 'Ticket not found or not assigned to you'];
         }
         
         $stmt = $this->db->prepare("
@@ -394,7 +398,7 @@ class MobileAPI {
             $stmt->execute([$ticketId, $userId, $comment]);
         }
         
-        return $result;
+        return ['success' => $result];
     }
     
     public function getAvailableEquipmentForTicket(int $ticketId): array {

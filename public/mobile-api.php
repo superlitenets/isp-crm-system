@@ -222,7 +222,11 @@ try {
             }
             
             $result = $api->updateTicketStatus($ticketId, $user['id'], $status, $comment);
-            echo json_encode(['success' => $result]);
+            if ($result['success']) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to update ticket']);
+            }
             break;
             
         case 'add-comment':
@@ -504,10 +508,10 @@ try {
             ];
             
             $result = $api->closeTicketWithDetails($ticketId, $user['id'], $closureDetails, $userRole);
-            if ($result) {
+            if ($result['success']) {
                 echo json_encode(['success' => true, 'message' => 'Ticket closed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to close ticket. You may not have permission.']);
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to close ticket']);
             }
             break;
             
