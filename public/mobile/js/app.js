@@ -538,7 +538,11 @@ const app = {
             this.showToast('Status updated', 'success');
             this.showTicketDetail(ticketId);
         } else {
-            this.showToast(result.error || 'Failed to update', 'danger');
+            if (this.isClockInError(result.error)) {
+                this.showClockInPrompt();
+            } else {
+                this.showToast(result.error || 'Failed to update', 'danger');
+            }
         }
     },
     
@@ -596,7 +600,12 @@ const app = {
             this.loadTechnicianDashboard();
             this.goBack();
         } else {
-            this.showToast(result.error || 'Failed to close ticket', 'danger');
+            this.hideCloseTicketModal();
+            if (this.isClockInError(result.error)) {
+                this.showClockInPrompt();
+            } else {
+                this.showToast(result.error || 'Failed to close ticket', 'danger');
+            }
         }
     },
     
@@ -734,6 +743,42 @@ const app = {
         toast.className = 'toast bg-' + type + ' text-white';
         const bsToast = new bootstrap.Toast(toast);
         bsToast.show();
+    },
+    
+    showClockInPrompt() {
+        const existingModal = document.getElementById('clock-in-prompt-modal');
+        if (existingModal) existingModal.remove();
+        
+        const modalHtml = `
+            <div class="modal-overlay" id="clock-in-prompt-modal" style="z-index: 9999;">
+                <div class="modal-content" style="max-width: 320px;">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5><i class="bi bi-clock-history"></i> Clock In Required</h5>
+                        <button class="btn-close" onclick="document.getElementById('clock-in-prompt-modal').remove()"></button>
+                    </div>
+                    <div class="modal-body text-center p-4">
+                        <div class="mb-3">
+                            <i class="bi bi-person-badge" style="font-size: 3rem; color: #f0ad4e;"></i>
+                        </div>
+                        <h6 class="mb-3">You must clock in before working on tickets</h6>
+                        <p class="text-muted small mb-4">Please record your attendance first to start claiming and updating tickets.</p>
+                        <button class="btn btn-success btn-lg w-100" onclick="document.getElementById('clock-in-prompt-modal').remove(); app.showAttendance();">
+                            <i class="bi bi-box-arrow-in-right"></i> Go to Attendance
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="document.getElementById('clock-in-prompt-modal').remove();">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    },
+    
+    isClockInError(errorMsg) {
+        if (!errorMsg) return false;
+        const clockInPhrases = ['clock in', 'clocked in', 'must clock'];
+        return clockInPhrases.some(phrase => errorMsg.toLowerCase().includes(phrase));
     },
     
     updateClock() {
@@ -1086,7 +1131,11 @@ const app = {
             this.loadAvailableTickets();
             this.loadTechnicianDashboard();
         } else {
-            this.showToast(result.error || 'Failed to claim ticket', 'danger');
+            if (this.isClockInError(result.error)) {
+                this.showClockInPrompt();
+            } else {
+                this.showToast(result.error || 'Failed to claim ticket', 'danger');
+            }
         }
     },
     
@@ -1316,7 +1365,11 @@ const app = {
             this.showToast('Status updated', 'success');
             this.showTicketDetailAny(ticketId);
         } else {
-            this.showToast(result.error || 'Failed to update', 'danger');
+            if (this.isClockInError(result.error)) {
+                this.showClockInPrompt();
+            } else {
+                this.showToast(result.error || 'Failed to update', 'danger');
+            }
         }
     },
     
