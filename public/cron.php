@@ -149,7 +149,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     }
     
     // Department groups
-    $deptStmt = $db->query("SELECT id FROM departments WHERE is_active = true");
+    $deptStmt = $db->query("SELECT id FROM departments");
     $departments = $deptStmt->fetchAll(\PDO::FETCH_COLUMN);
     
     foreach ($departments as $deptId) {
