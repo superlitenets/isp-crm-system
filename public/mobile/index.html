@@ -163,19 +163,19 @@
             </div>
 
             <nav class="bottom-nav bg-success">
-                <a href="#" class="nav-item active" onclick="app.loadTechnicianDashboard(); app.setActiveNav(this);">
+                <a href="javascript:void(0)" class="nav-item active" onclick="app.loadTechnicianDashboard(); app.setActiveNav(this); return false;">
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showMyTeams(); app.setActiveNav(this);">
+                <a href="javascript:void(0)" class="nav-item" onclick="app.showMyTeams(); app.setActiveNav(this); return false;">
                     <i class="bi bi-people"></i>
                     <span>Teams</span>
                 </a>
-                <a href="#" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this);">
+                <a href="javascript:void(0)" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this); return false;">
                     <i class="bi bi-inbox"></i>
                     <span>Available</span>
                 </a>
-                <a href="javascript:void(0)" class="nav-item" onclick="event.preventDefault(); app.showProfile(); app.setActiveNav(this);">
+                <a href="javascript:void(0)" class="nav-item" onclick="app.showProfile(); app.setActiveNav(this); return false;">
                     <i class="bi bi-person-circle"></i>
                     <span>Profile</span>
                 </a>
