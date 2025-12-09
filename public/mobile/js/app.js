@@ -325,7 +325,11 @@ const app = {
                     <div class="list-item-meta">
                         <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
                         <span><i class="bi bi-folder"></i> ${ticket.category}</span>
-                        ${parseFloat(ticket.earnings) > 0 ? `<span class="text-success"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.earnings)}</span>` : ''}
+                        ${parseFloat(ticket.earnings) > 0 
+                            ? `<span class="text-success"><i class="bi bi-cash-coin"></i> KES ${this.formatNumber(ticket.earnings)} earned</span>` 
+                            : (parseFloat(ticket.commission_rate) > 0 
+                                ? `<span class="text-warning"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.commission_rate)}</span>` 
+                                : '')}
                     </div>
                 </div>
             `).join('');
@@ -1210,7 +1214,11 @@ const app = {
                     <div class="list-item-meta">
                         <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
                         <span><i class="bi bi-folder"></i> ${ticket.category}</span>
-                        ${parseFloat(ticket.earnings) > 0 ? `<span class="text-success"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.earnings)}</span>` : ''}
+                        ${parseFloat(ticket.earnings) > 0 
+                            ? `<span class="text-success"><i class="bi bi-cash-coin"></i> KES ${this.formatNumber(ticket.earnings)} earned</span>` 
+                            : (parseFloat(ticket.commission_rate) > 0 
+                                ? `<span class="text-warning"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.commission_rate)}</span>` 
+                                : '')}
                     </div>
                     <div class="list-item-meta">
                         ${ticket.assigned_to_name ? `<span><i class="bi bi-person"></i> ${ticket.assigned_to_name}</span>` : '<span class="text-warning"><i class="bi bi-person-x"></i> Unassigned</span>'}

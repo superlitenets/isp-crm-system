@@ -201,9 +201,11 @@ class MobileAPI {
     
     public function getTechnicianTickets(int $userId, string $status = '', int $limit = 50): array {
         $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
-                       COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings
+                       COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings,
+                       COALESCE(tcr.rate, 0) as commission_rate
                 FROM tickets t
                 LEFT JOIN customers c ON t.customer_id = c.id
+                LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
                 WHERE t.assigned_to = ?";
         $params = [$userId];
         
@@ -1084,10 +1086,12 @@ class MobileAPI {
         $sql = "
             SELECT t.*, c.name as customer_name, c.phone as customer_phone,
                    u.name as assigned_to_name,
-                   COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings
+                   COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings,
+                   COALESCE(tcr.rate, 0) as commission_rate
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
             WHERE t.team_id = ?
         ";
         $params = [$teamId];
