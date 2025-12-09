@@ -214,7 +214,7 @@ class Order {
         }
         
         if (!empty($filters['user_id'])) {
-            $where[] = "(o.salesperson_id = ? OR o.created_by = ?)";
+            $where[] = "(o.created_by = ? OR o.salesperson_id IN (SELECT id FROM salespersons WHERE user_id = ?))";
             $params[] = (int)$filters['user_id'];
             $params[] = (int)$filters['user_id'];
         }
