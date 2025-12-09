@@ -1,6 +1,8 @@
 <?php
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../src/autoload.php';
+require_once __DIR__ . '/../src/Settings.php';
+require_once __DIR__ . '/../src/WhatsApp.php';
 
 date_default_timezone_set('Africa/Nairobi');
 
