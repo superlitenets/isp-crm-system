@@ -418,20 +418,21 @@ XML;
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
-        // Method 1: Use FingerPrint/SetUp endpoint (recommended for DS-K1T904AMF)
-        $setupData = [
-            'FingerPrintCfg' => [
-                'employeeNo' => $employeeNo,
-                'enableCardReader' => [1],
-                'fingerPrintID' => $fingerNo
-            ]
-        ];
+        // Method 1: Use XML format for FingerPrint/SetUp endpoint
+        $xmlSetup = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<FingerPrintCfg>
+    <employeeNo>{$employeeNo}</employeeNo>
+    <enableCardReader>1</enableCardReader>
+    <fingerPrintID>{$fingerNo}</fingerPrintID>
+</FingerPrintCfg>
+XML;
         
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            '/ISAPI/AccessControl/FingerPrint/SetUp',
             'POST',
-            json_encode($setupData),
-            'application/json'
+            $xmlSetup,
+            'application/xml'
         );
         
         if ($response['code'] === 200) {
@@ -443,22 +444,22 @@ XML;
             ];
         }
         
-        // Method 2: Try CaptureFingerPrint endpoint
-        $captureData = [
-            'CaptureFingerPrintCfg' => [
-                'fingerPrintID' => $fingerNo
-            ]
-        ];
+        // Method 2: Try CaptureFingerPrint with XML
+        $xmlCapture = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<CaptureFingerPrintCond>
+    <fingerPrintID>{$fingerNo}</fingerPrintID>
+</CaptureFingerPrintCond>
+XML;
         
         $captureResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            '/ISAPI/AccessControl/CaptureFingerPrint',
             'POST',
-            json_encode($captureData),
-            'application/json'
+            $xmlCapture,
+            'application/xml'
         );
         
         if ($captureResponse['code'] === 200) {
-            // If capture started, we need to download the fingerprint to the employee
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Please place finger on the scanner.',
@@ -468,15 +469,23 @@ XML;
             ];
         }
         
-        // Method 3: Try PUT method
-        $putResponse = $this->sendRequest(
+        // Method 3: Try JSON format as fallback
+        $jsonData = json_encode([
+            'FingerPrintCfg' => [
+                'employeeNo' => $employeeNo,
+                'enableCardReader' => [1],
+                'fingerPrintID' => $fingerNo
+            ]
+        ]);
+        
+        $jsonResponse = $this->sendRequest(
             '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
-            'PUT',
-            json_encode($setupData),
+            'POST',
+            $jsonData,
             'application/json'
         );
         
-        if ($putResponse['code'] === 200) {
+        if ($jsonResponse['code'] === 200) {
             return [
                 'success' => true, 
                 'message' => 'Fingerprint enrollment initiated. Please place finger on the device scanner.',
@@ -485,16 +494,26 @@ XML;
             ];
         }
         
+        // Parse error from response
         $error = 'Failed to start fingerprint enrollment';
         if ($response['body']) {
-            $data = json_decode($response['body'], true);
-            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+            if (strpos($response['body'], '<') === 0) {
+                // Parse XML error
+                $xml = @simplexml_load_string($response['body']);
+                if ($xml) {
+                    $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
+                }
+            } else {
+                $data = json_decode($response['body'], true);
+                $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+            }
         }
         
         return ['success' => false, 'error' => $error, 'code' => $response['code'], 'debug' => [
-            'setup_code' => $response['code'],
-            'capture_code' => $captureResponse['code'] ?? null,
-            'put_code' => $putResponse['code'] ?? null
+            'xml_setup_code' => $response['code'],
+            'xml_capture_code' => $captureResponse['code'] ?? null,
+            'json_code' => $jsonResponse['code'] ?? null,
+            'response_body' => substr($response['body'] ?? '', 0, 500)
         ]];
     }
     
