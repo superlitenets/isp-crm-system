@@ -253,7 +253,11 @@ class MobileAPI {
         return $ticket ?: null;
     }
     
-    public function updateTicketStatus(int $ticketId, int $userId, string $status, ?string $comment = null): bool {
+    public function updateTicketStatus(int $ticketId, int $userId, string $status, ?string $comment = null): array {
+        if (!$this->isClockedIn($userId)) {
+            return ['success' => false, 'error' => 'You must clock in before working on tickets'];
+        }
+        
         $stmt = $this->db->prepare("
             SELECT t.*, c.phone as customer_phone, c.name as customer_name, t.ticket_number
             FROM tickets t
@@ -264,7 +268,7 @@ class MobileAPI {
         $ticket = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if (!$ticket) {
-            return false;
+            return ['success' => false, 'error' => 'Ticket not found or not assigned to you'];
         }
         
         $stmt = $this->db->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
@@ -284,7 +288,7 @@ class MobileAPI {
             $this->sendStatusNotification($ticket, $status);
         }
         
-        return $result;
+        return ['success' => $result];
     }
     
     private function sendStatusNotification(array $ticket, string $status): void {
@@ -493,6 +497,15 @@ class MobileAPI {
         $stmt = $this->db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
         $stmt->execute([$employeeId, date('Y-m-d')]);
         return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function isClockedIn(int $userId): bool {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return false;
+        }
+        $attendance = $this->getTodayAttendance($employee['id']);
+        return $attendance && $attendance['clock_in'] && !$attendance['clock_out'];
     }
     
     public function getAssignedEquipment(int $userId): array {
@@ -835,13 +848,21 @@ class MobileAPI {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function claimTicket(int $ticketId, int $userId): bool {
+    public function claimTicket(int $ticketId, int $userId): array {
+        if (!$this->isClockedIn($userId)) {
+            return ['success' => false, 'error' => 'You must clock in before claiming tickets'];
+        }
+        
         $stmt = $this->db->prepare("
             UPDATE tickets SET assigned_to = ?, updated_at = NOW() 
             WHERE id = ? AND assigned_to IS NULL AND status NOT IN ('resolved', 'closed')
         ");
         $stmt->execute([$userId, $ticketId]);
-        return $stmt->rowCount() > 0;
+        
+        if ($stmt->rowCount() > 0) {
+            return ['success' => true];
+        }
+        return ['success' => false, 'error' => 'Ticket not available or already claimed'];
     }
     
     public function getTicketEquipment(int $ticketId): array {
@@ -934,9 +955,13 @@ class MobileAPI {
         return $ticket ?: null;
     }
     
-    public function updateTicketStatusAny(int $ticketId, int $userId, string $userRole, string $status, ?string $comment = null): bool {
+    public function updateTicketStatusAny(int $ticketId, int $userId, string $userRole, string $status, ?string $comment = null): array {
+        if (!$this->isClockedIn($userId)) {
+            return ['success' => false, 'error' => 'You must clock in before working on tickets'];
+        }
+        
         if (!$this->canModifyTicket($ticketId, $userId, $userRole)) {
-            return false;
+            return ['success' => false, 'error' => 'You do not have permission to modify this ticket'];
         }
         
         $stmt = $this->db->prepare("
@@ -965,7 +990,7 @@ class MobileAPI {
             $this->sendStatusNotification($ticket, $status);
         }
         
-        return $result;
+        return ['success' => $result];
     }
     
     public function addTicketCommentAny(int $ticketId, int $userId, string $userRole, string $comment): bool {

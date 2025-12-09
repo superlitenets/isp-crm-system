@@ -388,10 +388,10 @@ try {
             }
             
             $result = $api->claimTicket($ticketId, $user['id']);
-            if ($result) {
+            if ($result['success']) {
                 echo json_encode(['success' => true, 'message' => 'Ticket claimed successfully']);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to claim ticket. It may already be assigned.']);
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to claim ticket']);
             }
             break;
             
@@ -448,10 +448,10 @@ try {
             }
             
             $result = $api->updateTicketStatusAny($ticketId, $user['id'], $userRole, $status, $comment);
-            if ($result) {
+            if ($result['success']) {
                 echo json_encode(['success' => true]);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Not authorized to update this ticket']);
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to update ticket']);
             }
             break;
             
