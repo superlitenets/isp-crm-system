@@ -727,7 +727,7 @@ if ($page === 'order') {
         $notes = trim($_POST['notes'] ?? '');
         $paymentMethod = $_POST['payment_method'] ?? 'later';
         $amount = floatval($_POST['amount'] ?? 0);
-        $pkgId = isset($_POST['package_id']) ? (int)$_POST['package_id'] : null;
+        $pkgId = !empty($_POST['package_id']) ? (int)$_POST['package_id'] : null;
         
         if (empty($customerName) || empty($customerPhone) || empty($customerAddress)) {
             $error = 'Please fill in all required fields.';
