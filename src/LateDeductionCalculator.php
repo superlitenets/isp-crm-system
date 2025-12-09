@@ -321,6 +321,10 @@ class LateDeductionCalculator {
         $startDate = date('Y-m-01', strtotime($month));
         $endDate = date('Y-m-t', strtotime($month));
         
+        // Get default rule for expected time
+        $defaultRule = $this->db->query("SELECT work_start_time FROM late_rules WHERE is_active = true AND is_default = true LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
+        $expectedTime = $defaultRule['work_start_time'] ?? '08:00:00';
+        
         $sql = "
             SELECT 
                 a.date,
@@ -329,12 +333,10 @@ class LateDeductionCalculator {
                 e.id as employee_id,
                 e.name as employee_name,
                 e.employee_id as employee_code,
-                d.name as department_name,
-                s.start_time as expected_time
+                d.name as department_name
             FROM attendance a
             JOIN employees e ON a.employee_id = e.id
             LEFT JOIN departments d ON e.department_id = d.id
-            LEFT JOIN shifts s ON e.shift_id = s.id
             WHERE a.date BETWEEN ? AND ? 
               AND a.late_minutes > 0
               AND e.employment_status = 'active'
@@ -356,6 +358,7 @@ class LateDeductionCalculator {
             $rule = $this->getRuleForEmployee($arrival['employee_id']);
             $arrival['deduction'] = $rule ? $this->calculateDeduction($arrival['late_minutes'], $rule) : 0;
             $arrival['currency'] = $rule['currency'] ?? 'KES';
+            $arrival['expected_time'] = $rule['work_start_time'] ?? $expectedTime;
         }
         
         return $arrivals;
