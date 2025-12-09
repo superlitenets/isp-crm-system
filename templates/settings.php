@@ -789,6 +789,165 @@ function resetToDefaults() {
                 </div>
             </div>
             
+            <!-- Provider-specific configuration - shows immediately after selecting provider -->
+            <div id="waProviderSession" class="provider-config mt-4 border rounded p-3 bg-light" style="display: none;">
+                <h6 class="text-success mb-3"><i class="bi bi-whatsapp"></i> WhatsApp Web Session Configuration</h6>
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle"></i> <strong>WhatsApp Web Session</strong> - Sends messages automatically via your WhatsApp account. Scan QR code to connect.
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Session Service URL</label>
+                        <input type="url" class="form-control" name="whatsapp_session_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_session_url', 'http://localhost:3001')) ?>" 
+                               placeholder="http://localhost:3001">
+                        <small class="text-muted">URL of the WhatsApp session service (e.g., http://localhost:3001)</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Session API Secret</label>
+                        <input type="password" class="form-control" name="whatsapp_session_secret" id="waSessionSecret"
+                               value="<?= htmlspecialchars($settings->get('whatsapp_session_secret', '')) ?>" 
+                               placeholder="Enter the API secret from WhatsApp service">
+                        <small class="text-muted">Required to authenticate with the WhatsApp session service</small>
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Session Status</label>
+                        <div id="waSessionStatus" class="border rounded p-3 bg-white">
+                            <span class="text-muted">Click "Check Status" to view connection status</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <button type="button" class="btn btn-primary" onclick="checkSessionStatus()">
+                        <i class="bi bi-arrow-repeat"></i> Check Status
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="initializeSession()">
+                        <i class="bi bi-play-fill"></i> Start Session
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="logoutSession()">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="loadGroups()">
+                        <i class="bi bi-people"></i> Load Groups
+                    </button>
+                </div>
+                <div id="waQRContainer" class="text-center mb-3" style="display: none;">
+                    <h6 class="mb-2">Scan this QR Code with WhatsApp</h6>
+                    <img id="waQRCode" src="" alt="QR Code" style="max-width: 300px;">
+                    <p class="text-muted small mt-2">Open WhatsApp on your phone > Menu > Linked Devices > Link a Device</p>
+                </div>
+                <div id="waGroupsList" class="mb-3" style="display: none;">
+                    <h6 class="mb-2">Your WhatsApp Groups</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Group Name</th>
+                                    <th>Members</th>
+                                    <th>Test</th>
+                                </tr>
+                            </thead>
+                            <tbody id="waGroupsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderMeta" class="provider-config mt-4 border rounded p-3 bg-light" style="display: none;">
+                <h6 class="text-primary mb-3"><i class="bi bi-facebook"></i> Meta WhatsApp Business API</h6>
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> Requires Facebook Business account and WhatsApp Business API access.
+                    <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" class="alert-link">Setup Guide</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Access Token</label>
+                        <input type="password" class="form-control" name="whatsapp_meta_token" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_meta_token', '')) ?>" 
+                               placeholder="Your Meta access token">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Phone Number ID</label>
+                        <input type="text" class="form-control" name="whatsapp_phone_number_id" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_phone_number_id', '')) ?>" 
+                               placeholder="Phone number ID from Meta">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Business ID</label>
+                        <input type="text" class="form-control" name="whatsapp_business_id" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_business_id', '')) ?>" 
+                               placeholder="WhatsApp Business Account ID">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderWaha" class="provider-config mt-4 border rounded p-3 bg-light" style="display: none;">
+                <h6 class="text-info mb-3"><i class="bi bi-server"></i> WAHA (Self-Hosted)</h6>
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> Self-hosted WhatsApp API. 
+                    <a href="https://waha.devlike.pro/" target="_blank" class="alert-link">Learn More</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">WAHA Server URL</label>
+                        <input type="url" class="form-control" name="whatsapp_waha_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_url', '')) ?>" 
+                               placeholder="http://localhost:3000">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Key (Optional)</label>
+                        <input type="password" class="form-control" name="whatsapp_waha_api_key" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_api_key', '')) ?>" 
+                               placeholder="WAHA API key if configured">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderUltramsg" class="provider-config mt-4 border rounded p-3 bg-light" style="display: none;">
+                <h6 class="text-warning mb-3"><i class="bi bi-cloud"></i> UltraMsg API</h6>
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> Cloud WhatsApp API service.
+                    <a href="https://ultramsg.com/" target="_blank" class="alert-link">Get API Key</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Instance ID</label>
+                        <input type="text" class="form-control" name="whatsapp_ultramsg_instance" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_instance', '')) ?>" 
+                               placeholder="instance12345">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Token</label>
+                        <input type="password" class="form-control" name="whatsapp_ultramsg_token" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_token', '')) ?>" 
+                               placeholder="Your UltraMsg token">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="waProviderCustom" class="provider-config mt-4 border rounded p-3 bg-light" style="display: none;">
+                <h6 class="text-secondary mb-3"><i class="bi bi-code-slash"></i> Custom API Gateway</h6>
+                <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle"></i> For other WhatsApp gateways. Must accept POST with JSON body: <code>{"phone": "...", "message": "..."}</code>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">API URL</label>
+                        <input type="url" class="form-control" name="whatsapp_custom_url" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_url', '')) ?>" 
+                               placeholder="https://api.example.com/whatsapp/send">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">API Key / Bearer Token</label>
+                        <input type="password" class="form-control" name="whatsapp_custom_api_key" 
+                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_api_key', '')) ?>" 
+                               placeholder="Authorization token">
+                    </div>
+                </div>
+            </div>
+            
             <div class="card mt-4 border-info">
                 <div class="card-header bg-info text-white">
                     <h6 class="mb-0"><i class="bi bi-clock-history"></i> Daily Summary Notifications</h6>
@@ -923,159 +1082,6 @@ function resetToDefaults() {
                                 <span class="text-muted">Loading groups...</span>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waProviderSession" class="provider-config mt-4" style="display: none;">
-                <div class="alert alert-warning mb-3">
-                    <i class="bi bi-exclamation-triangle"></i> <strong>WhatsApp Web Session</strong> - Sends messages automatically via your WhatsApp account. Scan QR code to connect. <em>Best for local/self-hosted deployments.</em>
-                </div>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Session Service URL</label>
-                        <input type="url" class="form-control" name="whatsapp_session_url" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_session_url', 'http://localhost:3001')) ?>" 
-                               placeholder="http://localhost:3001">
-                        <small class="text-muted">URL of the WhatsApp session service</small>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Session API Secret</label>
-                        <input type="password" class="form-control" name="whatsapp_session_secret" id="waSessionSecret"
-                               value="<?= htmlspecialchars($settings->get('whatsapp_session_secret', '')) ?>" 
-                               placeholder="Enter the API secret from WhatsApp service">
-                        <small class="text-muted">Required to authenticate with the WhatsApp session service</small>
-                    </div>
-                </div>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-12">
-                        <label class="form-label">Session Status</label>
-                        <div id="waSessionStatus" class="border rounded p-3 bg-light">
-                            <span class="text-muted">Click "Check Status" to view</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-flex gap-2 flex-wrap mb-3">
-                    <button type="button" class="btn btn-primary" onclick="checkSessionStatus()">
-                        <i class="bi bi-arrow-repeat"></i> Check Status
-                    </button>
-                    <button type="button" class="btn btn-success" onclick="initializeSession()">
-                        <i class="bi bi-play-fill"></i> Start Session
-                    </button>
-                    <button type="button" class="btn btn-outline-danger" onclick="logoutSession()">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </button>
-                    <button type="button" class="btn btn-outline-info" onclick="loadGroups()">
-                        <i class="bi bi-people"></i> Load Groups
-                    </button>
-                </div>
-                <div id="waQRContainer" class="text-center mb-3" style="display: none;">
-                    <h6 class="mb-2">Scan this QR Code with WhatsApp</h6>
-                    <img id="waQRCode" src="" alt="QR Code" style="max-width: 300px;">
-                    <p class="text-muted small mt-2">Open WhatsApp on your phone > Menu > Linked Devices > Link a Device</p>
-                </div>
-                <div id="waGroupsList" class="mb-3" style="display: none;">
-                    <h6 class="mb-2">Your WhatsApp Groups</h6>
-                    <div id="waGroupsTable" class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Group Name</th>
-                                    <th>Members</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="waGroupsBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waProviderMeta" class="provider-config mt-4" style="display: none;">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> <strong>Meta WhatsApp Business API</strong> - Requires Facebook Business account and WhatsApp Business API access.
-                    <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" class="alert-link">Setup Guide</a>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Access Token</label>
-                        <input type="password" class="form-control" name="whatsapp_meta_token" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_meta_token', '')) ?>" 
-                               placeholder="Your Meta access token">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Phone Number ID</label>
-                        <input type="text" class="form-control" name="whatsapp_phone_number_id" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_phone_number_id', '')) ?>" 
-                               placeholder="Phone number ID from Meta">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Business ID</label>
-                        <input type="text" class="form-control" name="whatsapp_business_id" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_business_id', '')) ?>" 
-                               placeholder="WhatsApp Business Account ID">
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waProviderWaha" class="provider-config mt-4" style="display: none;">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> <strong>WAHA (WhatsApp HTTP API)</strong> - Self-hosted WhatsApp API. 
-                    <a href="https://waha.devlike.pro/" target="_blank" class="alert-link">Learn More</a>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">WAHA Server URL</label>
-                        <input type="url" class="form-control" name="whatsapp_waha_url" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_url', '')) ?>" 
-                               placeholder="http://localhost:3000">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">API Key (Optional)</label>
-                        <input type="password" class="form-control" name="whatsapp_waha_api_key" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_waha_api_key', '')) ?>" 
-                               placeholder="WAHA API key if configured">
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waProviderUltramsg" class="provider-config mt-4" style="display: none;">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> <strong>UltraMsg</strong> - Cloud WhatsApp API service.
-                    <a href="https://ultramsg.com/" target="_blank" class="alert-link">Get API Key</a>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Instance ID</label>
-                        <input type="text" class="form-control" name="whatsapp_ultramsg_instance" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_instance', '')) ?>" 
-                               placeholder="instance12345">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">API Token</label>
-                        <input type="password" class="form-control" name="whatsapp_ultramsg_token" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_ultramsg_token', '')) ?>" 
-                               placeholder="Your UltraMsg token">
-                    </div>
-                </div>
-            </div>
-            
-            <div id="waProviderCustom" class="provider-config mt-4" style="display: none;">
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle"></i> <strong>Custom API</strong> - For other WhatsApp gateways. Must accept POST with JSON body: <code>{"phone": "...", "message": "..."}</code>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">API URL</label>
-                        <input type="url" class="form-control" name="whatsapp_custom_url" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_url', '')) ?>" 
-                               placeholder="https://api.example.com/whatsapp/send">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">API Key / Bearer Token</label>
-                        <input type="password" class="form-control" name="whatsapp_custom_api_key" 
-                               value="<?= htmlspecialchars($settings->get('whatsapp_custom_api_key', '')) ?>" 
-                               placeholder="Authorization token">
                     </div>
                 </div>
             </div>
