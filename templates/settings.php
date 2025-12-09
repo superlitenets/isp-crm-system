@@ -3573,21 +3573,6 @@ $mpesaConfig = $mpesa->getConfig();
             </div>
         </div>
         
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-book"></i> Quick Guide</h5>
-            </div>
-            <div class="card-body small">
-                <ol class="mb-0">
-                    <li class="mb-2">Register at <a href="https://developer.safaricom.co.ke/" target="_blank">Daraja Portal</a></li>
-                    <li class="mb-2">Create a new app and select "Lipa na M-Pesa Sandbox"</li>
-                    <li class="mb-2">Copy Consumer Key and Secret here</li>
-                    <li class="mb-2">Test with sandbox phone: <code>254708374149</code></li>
-                    <li class="mb-2">For production, apply for "Go Live" on Daraja</li>
-                </ol>
-            </div>
-        </div>
-        
         <div class="card">
             <div class="card-header bg-white">
                 <h5 class="mb-0"><i class="bi bi-bug"></i> Test Credentials</h5>
