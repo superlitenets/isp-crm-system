@@ -3,7 +3,7 @@
 namespace App;
 
 class WhatsApp {
-    private bool $enabled = false;
+    private bool $enabled = true; // Always enabled
     private string $defaultCountryCode = '';
     private string $provider = 'web';
     private ?string $apiUrl = null;
@@ -15,7 +15,8 @@ class WhatsApp {
     
     public function __construct() {
         $settings = new Settings();
-        $this->enabled = $settings->get('whatsapp_enabled', '1') === '1';
+        // WhatsApp is always enabled - ignore database setting
+        $this->enabled = true;
         $countryCode = $settings->get('whatsapp_country_code', '254');
         $this->defaultCountryCode = !empty($countryCode) ? $countryCode : '254';
         $this->provider = $settings->get('whatsapp_provider', 'web');
