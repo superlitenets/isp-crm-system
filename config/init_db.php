@@ -527,6 +527,19 @@ function initializeDatabase(): void {
     try {
         $db->exec($sql);
         
+        $checkRoles = $db->query("SELECT COUNT(*) FROM roles")->fetchColumn();
+        if ($checkRoles == 0) {
+            $db->exec("
+                INSERT INTO roles (name, display_name, description, is_system) VALUES
+                ('admin', 'Administrator', 'Full system access', TRUE),
+                ('manager', 'Manager', 'Management access', TRUE),
+                ('technician', 'Technician', 'Field technician access', TRUE),
+                ('support', 'Support Staff', 'Customer support access', TRUE),
+                ('hr', 'HR Manager', 'Human resources access', TRUE),
+                ('sales', 'Salesperson', 'Sales and marketing access', TRUE)
+            ");
+        }
+        
         $checkUsers = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
         if ($checkUsers == 0) {
             $adminPass = password_hash('admin123', PASSWORD_DEFAULT);
