@@ -1379,9 +1379,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'save_whatsapp_settings':
                 try {
                     $whatsappData = $_POST;
-                    if (!isset($whatsappData['whatsapp_enabled'])) {
-                        $whatsappData['whatsapp_enabled'] = '0';
-                    }
+                    // Always keep WhatsApp enabled - ignore checkbox state
+                    $whatsappData['whatsapp_enabled'] = '1';
                     $settings->saveWhatsAppSettings($whatsappData);
                     \App\Settings::clearCache();
                     $message = 'WhatsApp settings saved successfully!';

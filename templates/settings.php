@@ -251,10 +251,9 @@ if ($action === 'edit_template' && $id) {
                         <input class="form-check-input" type="checkbox" name="sms_enabled" id="smsEnabled" value="1" <?= $companyInfo['sms_enabled'] === '1' ? 'checked' : '' ?>>
                         <label class="form-check-label" for="smsEnabled">Enable SMS Notifications</label>
                     </div>
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" name="whatsapp_enabled" id="whatsappEnabled" value="1" <?= ($companyInfo['whatsapp_enabled'] ?? '1') === '1' ? 'checked' : '' ?>>
-                        <label class="form-check-label" for="whatsappEnabled">Enable WhatsApp Messaging</label>
-                        <small class="text-muted d-block">Opens WhatsApp Web for quick messaging</small>
+                    <div class="mb-3">
+                        <span class="badge bg-success"><i class="bi bi-whatsapp"></i> WhatsApp Enabled</span>
+                        <small class="text-muted d-block">WhatsApp messaging is always enabled. Configure settings in the WhatsApp tab.</small>
                     </div>
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" name="email_notifications" id="emailNotifications" value="1" <?= $companyInfo['email_notifications'] === '1' ? 'checked' : '' ?>>
