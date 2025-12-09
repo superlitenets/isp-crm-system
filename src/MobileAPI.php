@@ -815,9 +815,11 @@ class MobileAPI {
     
     public function getAvailableTickets(int $limit = 50): array {
         $stmt = $this->db->prepare("
-            SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+            SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
+                   COALESCE(tcr.rate, 0) as commission_rate
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
+            LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
             WHERE t.assigned_to IS NULL AND t.status NOT IN ('resolved', 'closed')
             ORDER BY 
                 CASE t.priority 

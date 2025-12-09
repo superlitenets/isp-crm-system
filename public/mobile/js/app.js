@@ -1060,6 +1060,7 @@ const app = {
                     <div class="list-item-meta">
                         <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
                         <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                        ${parseFloat(ticket.commission_rate) > 0 ? `<span class="text-success"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.commission_rate)}</span>` : ''}
                     </div>
                     ${ticket.customer_phone ? `<div class="list-item-meta"><span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span></div>` : ''}
                     ${ticket.customer_address ? `<div class="list-item-meta"><span><i class="bi bi-geo-alt"></i> ${ticket.customer_address}</span></div>` : ''}
