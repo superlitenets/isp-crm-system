@@ -418,22 +418,43 @@ XML;
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
-        // Method 1: Use XML format for FingerPrint/SetUp endpoint
-        $xmlSetup = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<FingerPrintCfg>
-    <employeeNo>{$employeeNo}</employeeNo>
-    <enableCardReader>1</enableCardReader>
-    <fingerPrintID>{$fingerNo}</fingerPrintID>
-</FingerPrintCfg>
-XML;
+        // First check if fingerprint enrollment is supported
+        $capCheck = $this->sendRequest('/ISAPI/AccessControl/FingerPrintCfg/capabilities?format=json', 'GET');
+        $supportsFingerprint = false;
+        
+        if ($capCheck['code'] === 200 && $capCheck['body']) {
+            $capData = json_decode($capCheck['body'], true);
+            $supportsFingerprint = isset($capData['FingerPrintCfg']) || isset($capData['fingerPrintCfg']);
+        }
+        
+        if (!$supportsFingerprint) {
+            // Try XML capabilities check
+            $xmlCapCheck = $this->sendRequest('/ISAPI/AccessControl/FingerPrintCfg/capabilities', 'GET');
+            if ($xmlCapCheck['code'] === 200) {
+                $supportsFingerprint = true;
+            }
+        }
+        
+        // Try all possible enrollment methods
+        $methods = [];
+        
+        // Method 1: JSON format with proper structure
+        $jsonData = json_encode([
+            'FingerPrintCfg' => [
+                'employeeNo' => (string)$employeeNo,
+                'enableCardReader' => [1],
+                'fingerPrintID' => $fingerNo,
+                'deleteFingerPrint' => false
+            ]
+        ]);
         
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FingerPrint/SetUp',
-            'POST',
-            $xmlSetup,
-            'application/xml'
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'PUT',
+            $jsonData,
+            'application/json'
         );
+        $methods['json_put'] = $response['code'];
         
         if ($response['code'] === 200) {
             return [
@@ -444,77 +465,58 @@ XML;
             ];
         }
         
-        // Method 2: Try CaptureFingerPrint with XML
-        $xmlCapture = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<CaptureFingerPrintCond>
-    <fingerPrintID>{$fingerNo}</fingerPrintID>
-</CaptureFingerPrintCond>
-XML;
-        
-        $captureResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint',
-            'POST',
-            $xmlCapture,
-            'application/xml'
-        );
-        
-        if ($captureResponse['code'] === 200) {
-            return [
-                'success' => true, 
-                'message' => 'Fingerprint capture started. Please place finger on the scanner.',
-                'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo,
-                'needs_download' => true
-            ];
-        }
-        
-        // Method 3: Try JSON format as fallback
-        $jsonData = json_encode([
-            'FingerPrintCfg' => [
-                'employeeNo' => $employeeNo,
-                'enableCardReader' => [1],
-                'fingerPrintID' => $fingerNo
-            ]
-        ]);
-        
-        $jsonResponse = $this->sendRequest(
+        // Method 2: POST instead of PUT
+        $postResponse = $this->sendRequest(
             '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
             'POST',
             $jsonData,
             'application/json'
         );
+        $methods['json_post'] = $postResponse['code'];
         
-        if ($jsonResponse['code'] === 200) {
+        if ($postResponse['code'] === 200) {
             return [
                 'success' => true, 
-                'message' => 'Fingerprint enrollment initiated. Please place finger on the device scanner.',
+                'message' => 'Fingerprint enrollment started. Please place finger on the device scanner.',
                 'employee_no' => $employeeNo,
                 'finger_id' => $fingerNo
             ];
         }
         
-        // Parse error from response
-        $error = 'Failed to start fingerprint enrollment';
-        if ($response['body']) {
-            if (strpos($response['body'], '<') === 0) {
-                // Parse XML error
-                $xml = @simplexml_load_string($response['body']);
-                if ($xml) {
-                    $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
-                }
-            } else {
-                $data = json_decode($response['body'], true);
-                $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
-            }
+        // Method 3: Try FingerPrintDownload endpoint (for devices that use this)
+        $downloadData = json_encode([
+            'FingerPrintCfg' => [
+                'employeeNo' => (string)$employeeNo,
+                'enableCardReader' => [1],
+                'fingerPrintID' => $fingerNo
+            ]
+        ]);
+        
+        $downloadResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrintDownload?format=json',
+            'POST',
+            $downloadData,
+            'application/json'
+        );
+        $methods['download'] = $downloadResponse['code'];
+        
+        if ($downloadResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint enrollment initiated. Please place finger on the scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
         }
         
-        return ['success' => false, 'error' => $error, 'code' => $response['code'], 'debug' => [
-            'xml_setup_code' => $response['code'],
-            'xml_capture_code' => $captureResponse['code'] ?? null,
-            'json_code' => $jsonResponse['code'] ?? null,
-            'response_body' => substr($response['body'] ?? '', 0, 500)
-        ]];
+        // If all methods fail, provide helpful guidance
+        return [
+            'success' => false, 
+            'error' => 'Remote fingerprint enrollment not supported. Please enroll fingerprints directly on the device: Menu > User > Select user > Add Fingerprint.',
+            'device_note' => 'The DS-K1T904AMF is a face terminal. For fingerprints, use the device touchscreen.',
+            'supports_fingerprint_api' => $supportsFingerprint,
+            'methods_tried' => $methods
+        ];
     }
     
     public function checkFingerprintProgress(): array {
