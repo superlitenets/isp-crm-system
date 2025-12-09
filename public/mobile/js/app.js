@@ -1084,6 +1084,78 @@ const app = {
         }
     },
     
+    currentTeamId: null,
+    
+    async showMyTeams() {
+        this.showScreen('my-teams-screen');
+        this.loadMyTeams();
+    },
+    
+    async loadMyTeams() {
+        const container = document.getElementById('my-teams-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('my-teams');
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(team => `
+                <div class="list-item" onclick="app.showTeamTickets(${team.id}, '${this.escapeHtml(team.name)}')">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title"><i class="bi bi-people-fill text-success"></i> ${team.name}</h6>
+                            <p class="list-item-subtitle">${team.description || 'Team'}</p>
+                        </div>
+                        <span class="badge bg-secondary">${team.member_count || 0} members</span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span><i class="bi bi-arrow-right-circle"></i> View team tickets</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-people"></i><p>No teams</p><p class="text-muted small">You are not a member of any team</p></div>';
+        }
+    },
+    
+    async showTeamTickets(teamId, teamName) {
+        this.currentTeamId = teamId;
+        document.getElementById('team-tickets-title').textContent = teamName + ' Tickets';
+        this.showScreen('team-tickets-screen');
+        this.loadTeamTickets(teamId);
+    },
+    
+    async loadTeamTickets(teamId) {
+        const container = document.getElementById('team-tickets-list');
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-success"></div></div>';
+        
+        const result = await this.api('team-tickets&team_id=' + teamId);
+        if (result.success && result.data.length > 0) {
+            container.innerHTML = result.data.map(ticket => `
+                <div class="list-item" onclick="app.showTicketDetailAny(${ticket.id})">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${ticket.subject}</h6>
+                            <p class="list-item-subtitle">${ticket.ticket_number} - ${ticket.customer_name || 'Unknown'}</p>
+                        </div>
+                        <span class="badge ${this.getStatusBadge(ticket.status)}">${ticket.status.replace('_', ' ')}</span>
+                    </div>
+                    <div class="list-item-meta">
+                        <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
+                        <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                        ${ticket.assigned_to_name ? `<span><i class="bi bi-person"></i> ${ticket.assigned_to_name}</span>` : '<span class="text-warning"><i class="bi bi-person-x"></i> Unassigned</span>'}
+                    </div>
+                    ${ticket.customer_phone ? `<div class="list-item-meta"><span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span></div>` : ''}
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-ticket"></i><p>No team tickets</p><p class="text-muted small">No tickets assigned to this team</p></div>';
+        }
+    },
+    
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    },
+    
     async showTechEquipment() {
         this.showScreen('tech-equipment-screen');
         const container = document.getElementById('tech-equipment-list');

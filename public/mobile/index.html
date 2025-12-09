@@ -167,19 +167,53 @@
                     <i class="bi bi-house"></i>
                     <span>Home</span>
                 </a>
+                <a href="#" class="nav-item" onclick="app.showMyTeams(); app.setActiveNav(this);">
+                    <i class="bi bi-people"></i>
+                    <span>Teams</span>
+                </a>
                 <a href="#" class="nav-item" onclick="app.showAvailableTickets(); app.setActiveNav(this);">
                     <i class="bi bi-inbox"></i>
                     <span>Available</span>
-                </a>
-                <a href="#" class="nav-item" onclick="app.showTechPerformance(); app.setActiveNav(this);">
-                    <i class="bi bi-bar-chart"></i>
-                    <span>Stats</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="event.preventDefault(); app.showProfile(); app.setActiveNav(this);">
                     <i class="bi bi-person-circle"></i>
                     <span>Profile</span>
                 </a>
             </nav>
+        </div>
+
+        <div id="my-teams-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">My Teams</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.loadMyTeams()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="my-teams-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="team-tickets-screen" class="screen">
+            <nav class="navbar navbar-dark bg-success fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0" id="team-tickets-title">Team Tickets</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.loadTeamTickets(app.currentTeamId)">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="team-tickets-list" class="list-container"></div>
+            </div>
         </div>
 
         <div id="available-tickets-screen" class="screen">
