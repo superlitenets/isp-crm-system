@@ -1,0 +1,64 @@
+root@superlite:/home/superlite/isp# -- 1. Create tables if not exists
+CREATE TABLE IF NOT EXISTS ticket_commission_rates (
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(50) NOT NULL UNIQUE,
+    rate DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'KES',
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ticket_earnings (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+    team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+    category VARCHAR(50) NOT NULL,
+    full_rate DECIMAL(12, 2) NOT NULL,
+    earned_amount DECIMAL(12, 2) NOT NULL,
+    share_count INTEGER DEFAULT 1,
+    currency VARCHAR(10) DEFAULT 'KES',
+    status VARCHAR(20) DEFAULT 'pending',
+    payroll_id INTEGER REFERENCES payroll(id) ON DELETE SET NULL,
+ON CONFLICT (category) DO UPDATE SET rate = EXCLUDED.rate, is_active = true;
+--: command not found
+bash: syntax error near unexpected token `('
+id: ‘SERIAL’: no such user
+id: ‘PRIMARY’: no such user
+id: ‘KEY,’: no such user
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+description: command not found
+is_active: command not found
+created_at: command not found
+updated_at: command not found
+bash: syntax error near unexpected token `)'
+bash: syntax error near unexpected token `('
+id: ‘SERIAL’: no such user
+id: ‘PRIMARY’: no such user
+id: ‘KEY,’: no such user
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+share_count: command not found
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+created_at: command not found
+bash: syntax error near unexpected token `)'
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `('
+bash: syntax error near unexpected token `,'
+bash: syntax error near unexpected token `,'
+bash: syntax error near unexpected token `,'
+bash: syntax error near unexpected token `,'
+bash: syntax error near unexpected token `,'
+upgrade,: command not found
+bash: syntax error near unexpected token `('
+root@superlite:/home/superlite/isp#
