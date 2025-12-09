@@ -1,0 +1,53 @@
+
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 50 | grep -i "attendance\|punch\|log"
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 1,
+                "totalMatches": 1,
+                "UserInfo":     [{
+                                "employeeNo":   "1",
+                                "name": "Martin Muriu",
+                                "userType":     "normal",
+                                "closeDelayEnabled":    false,
+                                "Valid":        {
+                                        "enable":       true,
+                                        "timeType":     "local",
+                                        "beginTime":    "2025-12-09T00:00:00",
+                                        "endTime":      "2035-12-09T23:59:59"
+                                },
+                                "password":     "",
+                                "doorRight":    "1",
+                                "RightPlan":    [{
+                                                "doorNo":       1,
+                                                "planTemplateNo":       "1"
+
+172.18.0.5 -  09/Dec/2025:16:48:44 +0000 "POST /biometric-api.php" 200
+172.18.0.5 -  09/Dec/2025:16:48:53 +0000 "GET /index.php" 200
+172.18.0.5 -  09/Dec/2025:16:48:56 +0000 "GET /index.php" 200
+NOTICE: PHP message: Biometric API Access: action=sync-employees-to-device, auth=yes, ip=102.205.239.250
+NOTICE: PHP message: Hikvision getUser(1) response code: 200
+NOTICE: PHP message: Hikvision getUser(1) response body: {
+        "UserInfoSearch":       {
+                "searchID":     "0",
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 1,
+                "totalMatches": 1,
+                "UserInfo":     [{
+                                "employeeNo":   "1",
+                                "name": "Martin Muriu",
+                                "userType":     "normal",
+                                "closeDelayEnabled":    false,
+                                "Valid":        {
+                                        "enable":       true,
+                                        "timeType":     "local",
+                                        "beginTime":    "2025-12-09T00:00:00",
+                                        "endTime":      "2035-12-09T23:59:59"
+                                },
+                                "password":     "",
+                                "doorRight":    "1",
+                                "RightPlan":    [{
+                                                "doorNo":       1,
+                                                "planTemplateNo":       "1"
+
+172.18.0.5 -  09/Dec/2025:16:49:00 +0000 "POST /biometric-api.php" 200
+172.18.0.5 -  09/Dec/2025:16:49:08 +0000 "GET /index.php" 200
+root@superlitecrm:~/isp#
