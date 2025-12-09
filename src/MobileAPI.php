@@ -592,10 +592,13 @@ class MobileAPI {
             $message .= "A deduction of {$currency} " . number_format($deduction) . " will be applied to your salary. ";
             $message .= "Please ensure to clock in on time. - ISP HR";
             
-            // Send SMS using SMSGateway
-            $smsGateway = new SMSGateway();
-            if ($smsGateway->isEnabled()) {
-                $smsGateway->send($employee['phone'], $message);
+            // Send WhatsApp notification
+            $whatsapp = new WhatsApp();
+            if ($whatsapp->isEnabled()) {
+                $result = $whatsapp->send($employee['phone'], $message);
+                if ($result['success']) {
+                    $whatsapp->logMessage(null, $employeeId, null, $employee['phone'], 'employee', $message, 'sent', 'late_deduction');
+                }
             }
             
             // Store notification in database for mobile app
