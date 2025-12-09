@@ -322,13 +322,18 @@ function syncAttendanceFromDevices(\PDO $db): void {
         
         try {
             $device = null;
+            $password = null;
+            if (!empty($deviceRow['password_encrypted'])) {
+                $password = \App\BiometricDevice::decryptPassword($deviceRow['password_encrypted']);
+            }
+            
             if (strtolower($deviceRow['device_type']) === 'hikvision') {
                 $device = new \App\HikvisionDevice(
                     (int)$deviceRow['id'],
                     $deviceRow['ip_address'],
                     (int)($deviceRow['port'] ?: 80),
                     $deviceRow['username'],
-                    $deviceRow['password']
+                    $password
                 );
             } elseif (strtolower($deviceRow['device_type']) === 'zkteco') {
                 $device = new \App\ZKTecoDevice(
@@ -336,7 +341,7 @@ function syncAttendanceFromDevices(\PDO $db): void {
                     $deviceRow['ip_address'],
                     (int)($deviceRow['port'] ?: 4370),
                     $deviceRow['username'],
-                    $deviceRow['password']
+                    $password
                 );
             }
             
