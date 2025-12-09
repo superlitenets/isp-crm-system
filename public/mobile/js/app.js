@@ -325,12 +325,17 @@ const app = {
                     <div class="list-item-meta">
                         <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
                         <span><i class="bi bi-folder"></i> ${ticket.category}</span>
+                        ${parseFloat(ticket.earnings) > 0 ? `<span class="text-success"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.earnings)}</span>` : ''}
                     </div>
                 </div>
             `).join('');
         } else {
             container.innerHTML = '<div class="empty-state"><i class="bi bi-ticket"></i><p>No tickets assigned</p></div>';
         }
+    },
+    
+    formatNumber(num) {
+        return parseFloat(num || 0).toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     },
     
     renderAttendanceStatus(attendance) {
@@ -1141,9 +1146,12 @@ const app = {
                     <div class="list-item-meta">
                         <span class="priority-${ticket.priority}"><i class="bi bi-flag"></i> ${ticket.priority}</span>
                         <span><i class="bi bi-folder"></i> ${ticket.category}</span>
-                        ${ticket.assigned_to_name ? `<span><i class="bi bi-person"></i> ${ticket.assigned_to_name}</span>` : '<span class="text-warning"><i class="bi bi-person-x"></i> Unassigned</span>'}
+                        ${parseFloat(ticket.earnings) > 0 ? `<span class="text-success"><i class="bi bi-cash"></i> KES ${this.formatNumber(ticket.earnings)}</span>` : ''}
                     </div>
-                    ${ticket.customer_phone ? `<div class="list-item-meta"><span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span></div>` : ''}
+                    <div class="list-item-meta">
+                        ${ticket.assigned_to_name ? `<span><i class="bi bi-person"></i> ${ticket.assigned_to_name}</span>` : '<span class="text-warning"><i class="bi bi-person-x"></i> Unassigned</span>'}
+                        ${ticket.customer_phone ? `<span><i class="bi bi-telephone"></i> ${ticket.customer_phone}</span>` : ''}
+                    </div>
                 </div>
             `).join('');
         } else {

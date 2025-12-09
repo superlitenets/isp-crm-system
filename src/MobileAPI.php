@@ -200,7 +200,8 @@ class MobileAPI {
     }
     
     public function getTechnicianTickets(int $userId, string $status = '', int $limit = 50): array {
-        $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+        $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
+                       COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings
                 FROM tickets t
                 LEFT JOIN customers c ON t.customer_id = c.id
                 WHERE t.assigned_to = ?";
@@ -1051,7 +1052,8 @@ class MobileAPI {
         
         $sql = "
             SELECT t.*, c.name as customer_name, c.phone as customer_phone,
-                   u.name as assigned_to_name
+                   u.name as assigned_to_name,
+                   COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
