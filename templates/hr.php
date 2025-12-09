@@ -343,15 +343,23 @@ $allRoles = $roleManager->getAllRoles();
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-2 flex-wrap mb-2">
                     <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
-                        <i class="bi bi-upload"></i> Register to Device
+                        <i class="bi bi-upload"></i> Register Name
                     </button>
-                    <button type="button" class="btn btn-outline-info" onclick="viewDeviceUsers()">
+                    <button type="button" class="btn btn-success" onclick="startEnrollment('fingerprint')">
+                        <i class="bi bi-fingerprint"></i> Enroll Fingerprint
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="startEnrollment('face')">
+                        <i class="bi bi-person-bounding-box"></i> Enroll Face
+                    </button>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="viewDeviceUsers()">
                         <i class="bi bi-people"></i> View Device Users
                     </button>
-                    <button type="button" class="btn btn-outline-danger" onclick="removeFromBiometric(<?= $employeeData['id'] ?>)">
-                        <i class="bi bi-trash"></i> Remove from Device
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeFromBiometric(<?= $employeeData['id'] ?>)">
+                        <i class="bi bi-trash"></i> Remove
                     </button>
                 </div>
                 <?php else: ?>
@@ -394,6 +402,42 @@ function syncEmployeeToBiometric(employeeId) {
     .catch(e => {
         statusDiv.className = 'alert alert-danger mb-3';
         statusDiv.textContent = 'Error: ' + e.message;
+    });
+}
+
+function startEnrollment(type) {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+    var typeName = type === 'fingerprint' ? 'Fingerprint' : 'Face';
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting ' + typeName + ' enrollment... Please ask the employee to ' + 
+        (type === 'fingerprint' ? 'place their finger on the device scanner.' : 'look at the device camera.');
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=start-enrollment', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            employee_no: bioId,
+            type: type
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.className = 'alert alert-success mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + (data.message || typeName + ' enrollment started successfully!');
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Failed: ' + (data.error || 'Unknown error');
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + e.message;
     });
 }
 
