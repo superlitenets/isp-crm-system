@@ -779,6 +779,21 @@ const app = {
         document.body.insertAdjacentHTML('beforeend', modalHtml);
     },
     
+    showAttendance() {
+        // Navigate to Profile screen where clock-in button is located
+        this.showProfile();
+        // Scroll to the attendance section after a brief delay
+        setTimeout(() => {
+            const clockInBtn = document.getElementById('btn-clock-in');
+            if (clockInBtn) {
+                clockInBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Highlight the button briefly
+                clockInBtn.classList.add('btn-pulse');
+                setTimeout(() => clockInBtn.classList.remove('btn-pulse'), 2000);
+            }
+        }, 300);
+    },
+    
     isClockInError(errorMsg) {
         if (!errorMsg) return false;
         const clockInPhrases = ['clock in', 'clocked in', 'must clock'];

@@ -1318,3 +1318,14 @@ body.dark-mode .nav-tabs-mobile .tab-item {
     opacity: 0.5;
     margin-bottom: 0.5rem;
 }
+
+/* Button Pulse Animation for Clock-in highlight */
+@keyframes btnPulse {
+    0% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(25, 135, 84, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); }
+}
+
+.btn-pulse {
+    animation: btnPulse 1s ease-out infinite;
+}
