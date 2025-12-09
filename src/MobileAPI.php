@@ -517,21 +517,25 @@ class MobileAPI {
             return true;
         }
         
-        // Check biometric attendance logs for today
-        $today = date('Y-m-d');
-        $stmt = $this->db->prepare("
-            SELECT log_type, log_time 
-            FROM biometric_attendance_logs 
-            WHERE employee_id = ? AND DATE(log_time) = ?
-            ORDER BY log_time DESC
-            LIMIT 1
-        ");
-        $stmt->execute([$employee['id'], $today]);
-        $lastBiometricLog = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        // If last biometric log is a clock-in (not clock-out), user is clocked in
-        if ($lastBiometricLog && in_array(strtolower($lastBiometricLog['log_type']), ['clock_in', 'checkin', 'in', '0', 'i'])) {
-            return true;
+        // Check biometric attendance logs for today (if table exists)
+        try {
+            $today = date('Y-m-d');
+            $stmt = $this->db->prepare("
+                SELECT log_type, log_time 
+                FROM biometric_attendance_logs 
+                WHERE employee_id = ? AND DATE(log_time) = ?
+                ORDER BY log_time DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$employee['id'], $today]);
+            $lastBiometricLog = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // If last biometric log is a clock-in (not clock-out), user is clocked in
+            if ($lastBiometricLog && in_array(strtolower($lastBiometricLog['log_type']), ['clock_in', 'checkin', 'in', '0', 'i'])) {
+                return true;
+            }
+        } catch (\PDOException $e) {
+            // Table may not exist on production - ignore and continue
         }
         
         return false;
