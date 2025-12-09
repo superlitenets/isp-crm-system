@@ -197,6 +197,52 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         }
     }
     
+    // Branch-specific summaries
+    $branchClass = new \App\Branch();
+    $branchesWithGroups = $branchClass->getBranchesWithWhatsAppGroups();
+    
+    foreach ($branchesWithGroups as $branch) {
+        $branchData = $branchClass->getBranchSummaryData($branch['id'], $today);
+        $branchEmployees = $branchData['employees'];
+        $branchTickets = $branchData['tickets'];
+        
+        $branchMessage = "*📊 " . strtoupper($branch['name']) . " DAILY SUMMARY*\n";
+        $branchMessage .= "Date: " . date('l, M j, Y') . "\n";
+        $branchMessage .= "Time: " . date('h:i A') . " (" . ($summaryType === 'morning' ? 'Morning Report' : 'Evening Report') . ")\n\n";
+        
+        $branchMessage .= "*👥 ATTENDANCE*\n";
+        $branchPresent = array_filter($branchEmployees, fn($e) => !empty($e['clock_in']));
+        $branchAbsent = array_filter($branchEmployees, fn($e) => empty($e['clock_in']));
+        $branchLate = array_filter($branchEmployees, fn($e) => ($e['late_minutes'] ?? 0) > 0);
+        
+        $branchMessage .= "Present: " . count($branchPresent) . " | Absent: " . count($branchAbsent) . " | Late: " . count($branchLate) . "\n";
+        
+        if ($summaryType === 'evening') {
+            $branchTotalHours = array_sum(array_column($branchEmployees, 'hours_worked'));
+            $branchMessage .= "Total Hours: " . round($branchTotalHours, 1) . " hrs\n";
+        }
+        
+        $branchMessage .= "\n*🎫 TICKETS*\n";
+        $branchNew = array_filter($branchTickets, fn($t) => $t['status'] === 'open');
+        $branchInProgress = array_filter($branchTickets, fn($t) => $t['status'] === 'in_progress');
+        $branchResolved = array_filter($branchTickets, fn($t) => in_array($t['status'], ['resolved', 'closed']));
+        
+        $branchMessage .= "New: " . count($branchNew) . " | In Progress: " . count($branchInProgress) . " | Resolved: " . count($branchResolved) . "\n";
+        
+        $branchMessage .= "\n_" . ($branch['code'] ?? $branch['name']) . " - " . ($settings->get('company_name', 'Your ISP')) . "_";
+        
+        if ($provider === 'session') {
+            $result = $whatsapp->sendToGroup($branch['whatsapp_group'], $branchMessage);
+            $results['branch_' . $branch['id']] = $result;
+            if (!$result['success']) {
+                $errors[] = "Branch {$branch['name']}: " . ($result['error'] ?? 'Unknown error');
+            }
+        } else {
+            $results['branch_' . $branch['id']] = ['success' => false, 'error' => 'Session provider required for branch groups'];
+            $errors[] = "Branch {$branch['name']}: WhatsApp Session provider required for group messaging";
+        }
+    }
+    
     $successCount = count(array_filter($results, fn($r) => $r['success'] ?? false));
     
     echo json_encode([
@@ -207,6 +253,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         'groups_sent' => count($results),
         'success_count' => $successCount,
         'provider' => $provider,
+        'branches_with_groups' => count($branchesWithGroups),
         'errors' => $errors,
         'results' => $results
     ]);

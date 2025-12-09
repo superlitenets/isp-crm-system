@@ -116,6 +116,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-router"></i> Device Monitoring
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'branches' ? 'active' : '' ?>" href="?page=settings&subpage=branches">
+            <i class="bi bi-diagram-3"></i> Branches
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -5256,6 +5261,244 @@ $categories = $ticketModel->getCategories();
         </div>
     </div>
     <?php endif; ?>
+</div>
+
+<?php elseif ($subpage === 'branches'): ?>
+<?php
+$branchClass = new \App\Branch();
+$branches = $branchClass->getAll();
+$allEmployees = (new \App\Employee($dbConn))->getEmployees();
+$users = $dbConn->query("SELECT id, name FROM users WHERE role IN ('admin', 'manager') ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
+
+$editBranch = null;
+$branchEmployees = [];
+if ($action === 'edit_branch' && $id) {
+    $editBranch = $branchClass->get($id);
+    $branchEmployees = $branchClass->getEmployees($id);
+}
+?>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Branches</h5>
+                <a href="?page=settings&subpage=branches&action=add_branch" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Add Branch
+                </a>
+            </div>
+            <div class="card-body">
+                <?php if (empty($branches)): ?>
+                <div class="alert alert-info">No branches configured yet. Add your first branch.</div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Code</th>
+                                <th>Manager</th>
+                                <th>Employees</th>
+                                <th>Teams</th>
+                                <th>WhatsApp Group</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($branches as $branch): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($branch['name']) ?></strong>
+                                    <?php if ($branch['address']): ?>
+                                    <br><small class="text-muted"><?= htmlspecialchars($branch['address']) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td><span class="badge bg-secondary"><?= htmlspecialchars($branch['code'] ?? '-') ?></span></td>
+                                <td><?= htmlspecialchars($branch['manager_name'] ?? '-') ?></td>
+                                <td><span class="badge bg-info"><?= $branch['employee_count'] ?? 0 ?></span></td>
+                                <td><span class="badge bg-secondary"><?= $branch['team_count'] ?? 0 ?></span></td>
+                                <td>
+                                    <?php if ($branch['whatsapp_group']): ?>
+                                    <span class="badge bg-success"><i class="bi bi-whatsapp"></i> Configured</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-warning">Not Set</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($branch['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-danger">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=branches&action=edit_branch&id=<?= $branch['id'] ?>" 
+                                       class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="?page=settings&subpage=branches&action=manage_employees&id=<?= $branch['id'] ?>" 
+                                       class="btn btn-sm btn-outline-info" title="Manage Employees">
+                                        <i class="bi bi-people"></i>
+                                    </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this branch?')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_branch">
+                                        <input type="hidden" name="branch_id" value="<?= $branch['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <?php if ($action === 'add_branch' || $action === 'edit_branch'): ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><?= $editBranch ? 'Edit Branch' : 'Add New Branch' ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editBranch ? 'update_branch' : 'create_branch' ?>">
+                    <?php if ($editBranch): ?>
+                    <input type="hidden" name="branch_id" value="<?= $editBranch['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Branch Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required
+                               value="<?= htmlspecialchars($editBranch['name'] ?? '') ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Branch Code</label>
+                        <input type="text" class="form-control" name="code" placeholder="e.g., HQ, NBI, MSA"
+                               value="<?= htmlspecialchars($editBranch['code'] ?? '') ?>">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="address" rows="2"><?= htmlspecialchars($editBranch['address'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" class="form-control" name="phone"
+                                   value="<?= htmlspecialchars($editBranch['phone'] ?? '') ?>">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email"
+                                   value="<?= htmlspecialchars($editBranch['email'] ?? '') ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Manager</label>
+                        <select class="form-select" name="manager_id">
+                            <option value="">Select Manager</option>
+                            <?php foreach ($users as $user): ?>
+                            <option value="<?= $user['id'] ?>" <?= ($editBranch && $editBranch['manager_id'] == $user['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($user['name']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">WhatsApp Group ID</label>
+                        <input type="text" class="form-control" name="whatsapp_group" 
+                               placeholder="e.g., 120363375205813440@g.us"
+                               value="<?= htmlspecialchars($editBranch['whatsapp_group'] ?? '') ?>">
+                        <small class="text-muted">Daily summaries will be sent to this group</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="branch_is_active"
+                                   <?= (!$editBranch || $editBranch['is_active']) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="branch_is_active">Active</label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editBranch ? 'Update' : 'Create' ?> Branch
+                        </button>
+                        <a href="?page=settings&subpage=branches" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <?php elseif ($action === 'manage_employees' && $id): ?>
+        <?php $branch = $branchClass->get($id); $branchEmployees = $branchClass->getEmployees($id); ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Employees - <?= htmlspecialchars($branch['name']) ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="update_branch_employees">
+                    <input type="hidden" name="branch_id" value="<?= $id ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Select Employees</label>
+                        <?php 
+                        $assignedIds = array_column($branchEmployees, 'id');
+                        foreach ($allEmployees as $emp): 
+                        ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="employee_ids[]" 
+                                   value="<?= $emp['id'] ?>" id="emp_<?= $emp['id'] ?>"
+                                   <?= in_array($emp['id'], $assignedIds) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="emp_<?= $emp['id'] ?>">
+                                <?= htmlspecialchars($emp['name']) ?>
+                                <small class="text-muted">(<?= htmlspecialchars($emp['department_name'] ?? 'No Dept') ?>)</small>
+                            </label>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Update Employees
+                        </button>
+                        <a href="?page=settings&subpage=branches" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <?php else: ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Branches</h5>
+            </div>
+            <div class="card-body">
+                <p>Branches allow you to organize your ISP operations across multiple locations.</p>
+                <ul class="mb-0">
+                    <li>Assign employees to branches</li>
+                    <li>Link tickets to specific branches</li>
+                    <li>Send daily summaries to branch WhatsApp groups</li>
+                    <li>Track performance per branch</li>
+                </ul>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php endif; ?>

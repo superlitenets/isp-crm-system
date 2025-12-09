@@ -47,6 +47,14 @@ The system features a clean, responsive design. The public-facing landing page i
   - Statistics dashboard cards (open, in-progress, resolved, SLA breached, escalated, avg satisfaction)
   - Ticket escalation feature with reason, reassignment, priority change, and notifications
   - Advanced filters for escalated tickets and SLA breached tickets
+- **Multi-Branch Support (Dec 2025)**: Organize operations across multiple physical locations:
+  - Branch management with code, address, phone, email, manager assignment
+  - Each branch can have its own WhatsApp group for daily summaries
+  - Employees can be attached/detached to branches (many-to-many relationship)
+  - Tickets can be assigned to specific branches
+  - Teams can be linked to branches
+  - Branch-specific daily summary reports sent to WhatsApp groups via cron job
+  - Settings UI for branch CRUD and employee assignment
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.

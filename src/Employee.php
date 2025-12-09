@@ -779,4 +779,68 @@ class Employee {
         ");
         return $stmt->fetch();
     }
+
+    public function getBranches(int $employeeId): array {
+        $stmt = $this->db->prepare("
+            SELECT b.*, eb.is_primary, eb.assigned_at
+            FROM branches b
+            JOIN employee_branches eb ON b.id = eb.branch_id
+            WHERE eb.employee_id = ?
+            ORDER BY eb.is_primary DESC, b.name
+        ");
+        $stmt->execute([$employeeId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function attachToBranch(int $employeeId, int $branchId, bool $isPrimary = false, ?int $assignedBy = null): bool {
+        $stmt = $this->db->prepare("
+            INSERT INTO employee_branches (employee_id, branch_id, is_primary, assigned_by)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (employee_id, branch_id) DO UPDATE SET
+                is_primary = EXCLUDED.is_primary,
+                assigned_at = CURRENT_TIMESTAMP
+        ");
+        return $stmt->execute([$employeeId, $branchId, $isPrimary ? 1 : 0, $assignedBy]);
+    }
+
+    public function detachFromBranch(int $employeeId, int $branchId): bool {
+        $stmt = $this->db->prepare("DELETE FROM employee_branches WHERE employee_id = ? AND branch_id = ?");
+        return $stmt->execute([$employeeId, $branchId]);
+    }
+
+    public function setPrimaryBranch(int $employeeId, int $branchId): bool {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("UPDATE employee_branches SET is_primary = false WHERE employee_id = ?");
+            $stmt->execute([$employeeId]);
+            
+            $stmt = $this->db->prepare("UPDATE employee_branches SET is_primary = true WHERE employee_id = ? AND branch_id = ?");
+            $stmt->execute([$employeeId, $branchId]);
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return false;
+        }
+    }
+
+    public function updateBranches(int $employeeId, array $branchIds, ?int $primaryBranchId = null, ?int $assignedBy = null): bool {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("DELETE FROM employee_branches WHERE employee_id = ?");
+            $stmt->execute([$employeeId]);
+            
+            foreach ($branchIds as $branchId) {
+                $isPrimary = ($primaryBranchId && $branchId == $primaryBranchId);
+                $this->attachToBranch($employeeId, $branchId, $isPrimary, $assignedBy);
+            }
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return false;
+        }
+    }
 }

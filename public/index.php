@@ -1424,6 +1424,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_branch':
+                try {
+                    $branchClass = new \App\Branch();
+                    $branchClass->create([
+                        'name' => $_POST['name'],
+                        'code' => $_POST['code'] ?? null,
+                        'address' => $_POST['address'] ?? null,
+                        'phone' => $_POST['phone'] ?? null,
+                        'email' => $_POST['email'] ?? null,
+                        'whatsapp_group' => $_POST['whatsapp_group'] ?? null,
+                        'manager_id' => $_POST['manager_id'] ?: null,
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Branch created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating branch: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_branch':
+                try {
+                    $branchClass = new \App\Branch();
+                    $branchClass->update((int)$_POST['branch_id'], [
+                        'name' => $_POST['name'],
+                        'code' => $_POST['code'] ?? null,
+                        'address' => $_POST['address'] ?? null,
+                        'phone' => $_POST['phone'] ?? null,
+                        'email' => $_POST['email'] ?? null,
+                        'whatsapp_group' => $_POST['whatsapp_group'] ?? null,
+                        'manager_id' => $_POST['manager_id'] ?: null,
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Branch updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating branch: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_branch':
+                try {
+                    $branchClass = new \App\Branch();
+                    $branchClass->delete((int)$_POST['branch_id']);
+                    $message = 'Branch deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting branch: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_branch_employees':
+                try {
+                    $branchClass = new \App\Branch();
+                    $branchId = (int)$_POST['branch_id'];
+                    $employeeIds = $_POST['employee_ids'] ?? [];
+                    
+                    $db->beginTransaction();
+                    $db->prepare("DELETE FROM employee_branches WHERE branch_id = ?")->execute([$branchId]);
+                    foreach ($employeeIds as $empId) {
+                        $branchClass->attachEmployee($branchId, (int)$empId, false, $_SESSION['user_id'] ?? null);
+                    }
+                    $db->commit();
+                    
+                    $message = 'Branch employees updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $db->rollBack();
+                    $message = 'Error updating branch employees: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_package':
                 $name = trim($_POST['name'] ?? '');
                 $speed = trim($_POST['speed'] ?? '');

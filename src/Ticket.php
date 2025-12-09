@@ -34,14 +34,15 @@ class Ticket {
         
         $assignedTo = !empty($data['assigned_to']) ? (int)$data['assigned_to'] : null;
         $teamId = !empty($data['team_id']) ? (int)$data['team_id'] : null;
+        $branchId = !empty($data['branch_id']) ? (int)$data['branch_id'] : null;
         $priority = $data['priority'] ?? 'medium';
         $createdBy = $data['created_by'] ?? ($_SESSION['user_id'] ?? null);
         
         $slaData = $this->getSLA()->calculateSLAForTicket($priority);
         
         $stmt = $this->db->prepare("
-            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (ticket_number, customer_id, assigned_to, team_id, branch_id, subject, description, category, priority, status, sla_policy_id, sla_response_due, sla_resolution_due, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -49,6 +50,7 @@ class Ticket {
             $data['customer_id'],
             $assignedTo,
             $teamId,
+            $branchId,
             $data['subject'],
             $data['description'],
             $data['category'],
@@ -154,7 +156,7 @@ class Ticket {
         $fields = [];
         $values = [];
         
-        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to', 'team_id'] as $field) {
+        foreach (['subject', 'description', 'category', 'priority', 'status', 'assigned_to', 'team_id', 'branch_id'] as $field) {
             if (isset($data[$field])) {
                 $fields[] = "$field = ?";
                 $values[] = $data[$field] === '' ? null : $data[$field];
