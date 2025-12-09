@@ -531,7 +531,136 @@ class MobileAPI {
         ");
         $stmt->execute([$now, $hoursWorked, $employeeId, $today]);
         
+        // Send daily ticket summary via WhatsApp
+        $this->sendDailyTicketSummary($employeeId, $hoursWorked);
+        
         return ['success' => true, 'message' => 'Clocked out at ' . date('h:i A'), 'time' => $now, 'hours_worked' => $hoursWorked];
+    }
+    
+    private function sendDailyTicketSummary(int $employeeId, float $hoursWorked): void {
+        try {
+            // Get employee and user info
+            $stmt = $this->db->prepare("SELECT e.*, u.id as user_id, u.name as user_name FROM employees e LEFT JOIN users u ON e.user_id = u.id WHERE e.id = ?");
+            $stmt->execute([$employeeId]);
+            $employee = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$employee || !$employee['user_id']) {
+                return;
+            }
+            
+            $userId = $employee['user_id'];
+            $today = date('Y-m-d');
+            
+            // Get tickets resolved/closed today
+            $stmt = $this->db->prepare("
+                SELECT t.ticket_number, t.subject, t.status, c.name as customer_name
+                FROM tickets t
+                LEFT JOIN customers c ON t.customer_id = c.id
+                WHERE t.assigned_to = ? 
+                  AND DATE(t.updated_at) = ?
+                  AND t.status IN ('resolved', 'closed')
+                ORDER BY t.updated_at DESC
+            ");
+            $stmt->execute([$userId, $today]);
+            $completedTickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Get pending/in-progress tickets
+            $stmt = $this->db->prepare("
+                SELECT t.ticket_number, t.subject, t.status, t.priority, c.name as customer_name
+                FROM tickets t
+                LEFT JOIN customers c ON t.customer_id = c.id
+                WHERE t.assigned_to = ? 
+                  AND t.status IN ('open', 'in_progress', 'on_hold')
+                ORDER BY 
+                    CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+                    t.created_at ASC
+            ");
+            $stmt->execute([$userId]);
+            $pendingTickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Build summary message
+            $message = "*DAILY WORK SUMMARY*\n";
+            $message .= "Employee: {$employee['name']}\n";
+            $message .= "Date: " . date('D, M j, Y') . "\n";
+            $message .= "Hours Worked: {$hoursWorked} hrs\n\n";
+            
+            // Completed work
+            $message .= "*COMPLETED TODAY (" . count($completedTickets) . ")*\n";
+            if (count($completedTickets) > 0) {
+                foreach ($completedTickets as $ticket) {
+                    $message .= "- #{$ticket['ticket_number']}: {$ticket['subject']}\n";
+                    $message .= "  Customer: {$ticket['customer_name']}\n";
+                }
+            } else {
+                $message .= "- No tickets completed today\n";
+            }
+            
+            // Pending work
+            $message .= "\n*PENDING WORK (" . count($pendingTickets) . ")*\n";
+            if (count($pendingTickets) > 0) {
+                foreach ($pendingTickets as $ticket) {
+                    $statusIcon = match($ticket['status']) {
+                        'in_progress' => '🔄',
+                        'on_hold' => '⏸️',
+                        default => '📋'
+                    };
+                    $priorityFlag = in_array($ticket['priority'], ['critical', 'high']) ? '🔴' : '';
+                    $message .= "{$statusIcon} #{$ticket['ticket_number']}: {$ticket['subject']} {$priorityFlag}\n";
+                    $message .= "  Status: " . ucfirst(str_replace('_', ' ', $ticket['status'])) . " | {$ticket['customer_name']}\n";
+                }
+            } else {
+                $message .= "- No pending tickets\n";
+            }
+            
+            $message .= "\n_Sent via ISP CRM_";
+            
+            // Send to employee
+            $whatsapp = new WhatsApp();
+            if ($whatsapp->isEnabled() && $employee['phone']) {
+                $result = $whatsapp->send($employee['phone'], $message);
+                if ($result['success']) {
+                    $whatsapp->logMessage(null, $employeeId, null, $employee['phone'], 'employee', $message, 'sent', 'daily_summary');
+                }
+            }
+            
+            // Send to configured groups
+            $this->sendSummaryToGroups($employeeId, $message, $whatsapp);
+            
+        } catch (\Exception $e) {
+            error_log("Daily summary failed: " . $e->getMessage());
+        }
+    }
+    
+    private function sendSummaryToGroups(int $employeeId, string $message, WhatsApp $whatsapp): void {
+        try {
+            // Get employee's department
+            $stmt = $this->db->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmt->execute([$employeeId]);
+            $emp = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Check for configured WhatsApp groups (from settings)
+            $settings = new Settings();
+            $groupNumbers = $settings->get('whatsapp_summary_groups', '');
+            
+            if (!empty($groupNumbers)) {
+                $groups = array_filter(array_map('trim', explode(',', $groupNumbers)));
+                foreach ($groups as $groupNumber) {
+                    if (!empty($groupNumber)) {
+                        $whatsapp->send($groupNumber, $message);
+                    }
+                }
+            }
+            
+            // Also check department-specific groups
+            if ($emp && $emp['department_id']) {
+                $deptGroup = $settings->get('whatsapp_group_dept_' . $emp['department_id'], '');
+                if (!empty($deptGroup)) {
+                    $whatsapp->send($deptGroup, $message);
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("Group summary send failed: " . $e->getMessage());
+        }
     }
     
     public function getTodayAttendance(int $employeeId): ?array {
