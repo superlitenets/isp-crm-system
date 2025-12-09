@@ -956,7 +956,12 @@ $escalatedFilter = $_GET['escalated'] ?? '';
                     if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $filters['user_id'] = $_SESSION['user_id'];
                     }
-                    $tickets = $ticket->getAll($filters);
+                    try {
+                        $tickets = $ticket->getAll($filters);
+                    } catch (\Throwable $e) {
+                        $tickets = [];
+                        error_log("Ticket list error: " . $e->getMessage());
+                    }
                     $slaHelper = new \App\SLA();
                     foreach ($tickets as $t):
                         $slaStatus = $slaHelper->getSLAStatus($t);
