@@ -53,8 +53,19 @@ try {
 function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     $whatsapp = new \App\WhatsApp();
     
+    // Debug: Check what the settings return
+    $whatsappEnabledSetting = $settings->get('whatsapp_enabled', 'NOT_SET');
+    
     if (!$whatsapp->isEnabled()) {
-        echo json_encode(['success' => false, 'error' => 'WhatsApp disabled']);
+        echo json_encode([
+            'success' => false, 
+            'error' => 'WhatsApp disabled',
+            'debug' => [
+                'whatsapp_enabled_setting' => $whatsappEnabledSetting,
+                'expected' => '1',
+                'check' => $whatsappEnabledSetting === '1' ? 'pass' : 'fail'
+            ]
+        ]);
         return;
     }
     
