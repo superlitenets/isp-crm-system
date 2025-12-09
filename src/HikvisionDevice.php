@@ -59,9 +59,11 @@ class HikvisionDevice extends BiometricDevice {
         while ($hasMore) {
             $json = json_encode([
                 'AcsEventCond' => [
-                    'searchID' => '0',
+                    'searchID' => (string)time(),
                     'searchResultPosition' => $searchPosition,
                     'maxResults' => $maxResults,
+                    'major' => 0,
+                    'minor' => 0,
                     'startTime' => $startTime,
                     'endTime' => $endTime
                 ]
