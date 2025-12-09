@@ -387,7 +387,7 @@ class LateDeductionCalculator {
         $stmt->execute($params);
         $stats = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        $defaultRule = $this->db->query("SELECT currency FROM late_deduction_rules WHERE is_active = true LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
+        $defaultRule = $this->db->query("SELECT currency FROM late_rules WHERE is_active = true LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
         $stats['currency'] = $defaultRule['currency'] ?? 'KES';
         
         $empSql = "
