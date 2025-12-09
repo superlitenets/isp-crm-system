@@ -420,30 +420,29 @@ XML;
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
         $methods = [];
         
-        // Method 1: XML format with CaptureFingerPrintCfg (correct format per ISAPI docs)
+        // Method 1: XML with proper namespace and version (correct ISAPI format)
         $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
-<CaptureFingerPrintCfg>
-    <dataType>fingerData</dataType>
-</CaptureFingerPrintCfg>';
+<CaptureFingerPrint version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
+    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
+</CaptureFingerPrint>';
         
         $response = $this->sendRequest(
             '/ISAPI/AccessControl/CaptureFingerPrint',
             'POST',
             $xmlData,
-            'application/xml'
+            "application/xml; charset='UTF-8'"
         );
-        $methods['xml_post'] = $response['code'];
+        $methods['xml_v1'] = $response['code'];
         
         if ($response['code'] === 200 && $response['body']) {
-            // Parse the fingerprint data from response
             $xml = @simplexml_load_string($response['body']);
             $fingerData = null;
-            if ($xml && isset($xml->fingerData)) {
-                $fingerData = (string)$xml->fingerData;
+            if ($xml) {
+                $fingerData = (string)($xml->fingerData ?? '');
             }
             
             if ($fingerData) {
-                // Save fingerprint to employee
                 $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
                 if ($saveResult['success']) {
                     return [
@@ -460,41 +459,37 @@ XML;
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Place finger on scanner now.',
                 'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo,
-                'needs_manual_save' => true
+                'finger_id' => $fingerNo
             ];
         }
         
-        // Method 2: JSON format
-        $jsonData = json_encode([
-            'CaptureFingerPrintCfg' => [
-                'dataType' => 'fingerData'
-            ]
-        ]);
+        // Method 2: Try FingerPrintCapture element name
+        $xmlData2 = '<?xml version="1.0" encoding="UTF-8"?>
+<FingerPrintCapture version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
+    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
+</FingerPrintCapture>';
         
-        $jsonResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+        $response2 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
             'POST',
-            $jsonData,
-            'application/json'
+            $xmlData2,
+            "application/xml; charset='UTF-8'"
         );
-        $methods['json_post'] = $jsonResponse['code'];
+        $methods['xml_v2'] = $response2['code'];
         
-        if ($jsonResponse['code'] === 200 && $jsonResponse['body']) {
-            $data = json_decode($jsonResponse['body'], true);
-            $fingerData = $data['CaptureFingerPrintCfg']['fingerData'] ?? $data['fingerData'] ?? null;
+        if ($response2['code'] === 200 && $response2['body']) {
+            $xml = @simplexml_load_string($response2['body']);
+            $fingerData = $xml ? (string)($xml->fingerData ?? '') : null;
             
             if ($fingerData) {
                 $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
-                if ($saveResult['success']) {
-                    return [
-                        'success' => true,
-                        'message' => 'Fingerprint captured and saved successfully.',
-                        'employee_no' => $employeeNo,
-                        'finger_id' => $fingerNo
-                    ];
-                }
-                return $saveResult;
+                return $saveResult['success'] ? [
+                    'success' => true,
+                    'message' => 'Fingerprint captured and saved.',
+                    'employee_no' => $employeeNo,
+                    'finger_id' => $fingerNo
+                ] : $saveResult;
             }
             
             return [
@@ -505,9 +500,34 @@ XML;
             ];
         }
         
-        // Parse error from response
+        // Method 3: JSON format as fallback
+        $jsonData = json_encode([
+            'CaptureFingerPrint' => [
+                'employeeNo' => (string)$employeeNo,
+                'fingerPrintID' => $fingerNo
+            ]
+        ]);
+        
+        $jsonResponse = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            'POST',
+            $jsonData,
+            'application/json'
+        );
+        $methods['json'] = $jsonResponse['code'];
+        
+        if ($jsonResponse['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint capture started. Place finger on scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Parse error
         $error = 'Fingerprint enrollment failed';
-        $errorBody = $response['body'] ?: $jsonResponse['body'];
+        $errorBody = $response['body'] ?: $response2['body'] ?: $jsonResponse['body'];
         if ($errorBody) {
             if (strpos($errorBody, '<') === 0) {
                 $xml = @simplexml_load_string($errorBody);
@@ -524,7 +544,7 @@ XML;
             'success' => false, 
             'error' => $error,
             'methods_tried' => $methods,
-            'hint' => 'If remote capture fails, enroll fingerprints directly on the device touchscreen.'
+            'hint' => 'Enroll fingerprints on device: Menu > User > Select user > Add Fingerprint'
         ];
     }
     
