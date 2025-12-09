@@ -1329,3 +1329,88 @@ body.dark-mode .nav-tabs-mobile .tab-item {
 .btn-pulse {
     animation: btnPulse 1s ease-out infinite;
 }
+
+/* Late Deduction Modal */
+.late-deduction-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.late-deduction-modal.show {
+    opacity: 1;
+}
+
+.late-deduction-content {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin: 1rem;
+    max-width: 320px;
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.late-deduction-modal.show .late-deduction-content {
+    transform: scale(1);
+}
+
+body.dark-mode .late-deduction-content {
+    background: #1e1e1e;
+    color: white;
+}
+
+.late-deduction-content .late-icon {
+    font-size: 3rem;
+    color: #dc3545;
+    margin-bottom: 1rem;
+}
+
+.late-deduction-content h4 {
+    color: #dc3545;
+    margin-bottom: 0.5rem;
+}
+
+.late-deduction-content .late-time {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+body.dark-mode .late-deduction-content .late-time {
+    color: #aaa;
+}
+
+.late-deduction-content .deduction-amount {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.late-deduction-content .deduction-amount .currency {
+    font-size: 1rem;
+    opacity: 0.8;
+    margin-right: 0.25rem;
+}
+
+.late-deduction-content .deduction-amount .amount {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.late-deduction-content .deduction-note {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 1.5rem;
+}

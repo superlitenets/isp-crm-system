@@ -415,11 +415,40 @@ const app = {
         const result = await this.api('clock-in', 'POST', {});
         
         if (result.success) {
-            this.showToast(result.message, 'success');
+            if (result.is_late && result.late_deduction > 0) {
+                this.showLateDeductionAlert(result.late_minutes, result.late_deduction);
+            } else {
+                this.showToast(result.message, 'success');
+            }
             this.loadAttendanceStatus();
         } else {
             this.showToast(result.message || result.error, 'warning');
         }
+    },
+    
+    showLateDeductionAlert(lateMinutes, deduction) {
+        const modal = document.createElement('div');
+        modal.className = 'late-deduction-modal';
+        modal.innerHTML = `
+            <div class="late-deduction-content">
+                <div class="late-icon">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <h4>Late Clock-in</h4>
+                <p class="late-time">You are <strong>${lateMinutes} minutes</strong> late</p>
+                <div class="deduction-amount">
+                    <span class="currency">KES</span>
+                    <span class="amount">${deduction.toLocaleString()}</span>
+                </div>
+                <p class="deduction-note">This amount will be deducted from your salary</p>
+                <button class="btn btn-primary w-100" onclick="this.closest('.late-deduction-modal').remove()">
+                    I Understand
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        setTimeout(() => modal.classList.add('show'), 10);
     },
     
     async clockOut() {

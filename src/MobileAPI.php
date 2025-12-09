@@ -487,12 +487,18 @@ class MobileAPI {
         
         $message = 'Clocked in at ' . date('h:i A') . $lateMessage;
         
+        // Send SMS notification if late
+        if ($lateMinutes > 0 && $lateDeduction > 0) {
+            $this->sendLateDeductionNotification($employeeId, $lateMinutes, $lateDeduction, $rule['currency'] ?? 'KES');
+        }
+        
         return [
             'success' => true, 
             'message' => $message, 
             'time' => $now,
             'late_minutes' => $lateMinutes,
-            'late_deduction' => $lateDeduction
+            'late_deduction' => $lateDeduction,
+            'is_late' => $lateMinutes > 0
         ];
     }
     
@@ -568,6 +574,62 @@ class MobileAPI {
         }
         
         return false;
+    }
+    
+    private function sendLateDeductionNotification(int $employeeId, int $lateMinutes, float $deduction, string $currency): void {
+        try {
+            // Get employee details
+            $stmt = $this->db->prepare("SELECT e.name, e.phone, u.email FROM employees e LEFT JOIN users u ON e.user_id = u.id WHERE e.id = ?");
+            $stmt->execute([$employeeId]);
+            $employee = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$employee || !$employee['phone']) {
+                return;
+            }
+            
+            // Format message
+            $message = "Hi {$employee['name']}, you clocked in {$lateMinutes} minutes late today. ";
+            $message .= "A deduction of {$currency} " . number_format($deduction) . " will be applied to your salary. ";
+            $message .= "Please ensure to clock in on time. - ISP HR";
+            
+            // Send SMS using SMSGateway
+            $smsGateway = new SMSGateway();
+            if ($smsGateway->isEnabled()) {
+                $smsGateway->send($employee['phone'], $message);
+            }
+            
+            // Store notification in database for mobile app
+            $this->storeNotification(
+                $employeeId,
+                'late_deduction',
+                'Late Clock-in Deduction',
+                "You arrived {$lateMinutes} mins late. Deduction: {$currency} " . number_format($deduction),
+                ['late_minutes' => $lateMinutes, 'deduction' => $deduction, 'currency' => $currency]
+            );
+        } catch (\Exception $e) {
+            error_log("Late notification failed: " . $e->getMessage());
+        }
+    }
+    
+    private function storeNotification(int $employeeId, string $type, string $title, string $message, array $data = []): void {
+        try {
+            // Get user_id from employee
+            $stmt = $this->db->prepare("SELECT user_id FROM employees WHERE id = ?");
+            $stmt->execute([$employeeId]);
+            $emp = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$emp || !$emp['user_id']) {
+                return;
+            }
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO mobile_notifications (user_id, type, title, message, data, is_read, created_at)
+                VALUES (?, ?, ?, ?, ?, false, NOW())
+            ");
+            $stmt->execute([$emp['user_id'], $type, $title, $message, json_encode($data)]);
+        } catch (\Exception $e) {
+            // Table may not exist - ignore
+        }
     }
     
     public function getAssignedEquipment(int $userId): array {
