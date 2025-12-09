@@ -1,0 +1,1769 @@
+
+root@superlitecrm:~/isp# docker exec -it isp_crm_php php -r "
+require '/var/www/html/config/database.php';
+require '/var/www/html/src/BiometricDevice.php';
+require '/var/www/html/src/HikvisionDevice.php';
+\$db = Database::getConnection();
+\$stmt = \$db->query(\"SELECT * FROM biometric_devices WHERE is_active = true LIMIT 1\");
+\$d = \$stmt->fetch(PDO::FETCH_ASSOC);
+\$pwd = \App\BiometricDevice::decryptPassword(\$d['password_encrypted']);
+\$device = new \App\HikvisionDevice((int)\$d['id'], \$d['ip_address'], (int)\$d['port'], \$d['username'], \$pwd);
+\$events = \$device->getAttendance('2025-12-01 00:00:00', '2025-12-09 23:59:59');
+echo 'Found ' . count(\$events) . \" events\n\";
+print_r(\$events);
+"
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300787","searchResultPosition":0,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300787",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        38,
+                                "time": "2025-12-09T12:03:25+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     1,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "3",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     207,
+                                "userType":     "normal",
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        38,
+                                "time": "2025-12-09T12:03:48+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "card
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":10,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        38,
+                                "time": "2025-12-09T19:48:20+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     1,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "1",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     291,
+                                "userType":     "normal",
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        38,
+                                "time": "2025-12-09T20:01:59+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "card
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":20,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        38,
+                                "time": "2025-12-09T20:14:50+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     1,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "1",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     323,
+                                "userType":     "normal",
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        2,
+                                "minor":        1024,
+                                "time": "2025-12-08T14:10:45+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "ca
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":30,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        2,
+                                "minor":        39,
+                                "time": "2025-12-08T15:32:33+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     160,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        2,
+                                "minor":        1031,
+                                "time": "2025-12-08T15:32:36+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":40,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        2,
+                                "minor":        1031,
+                                "time": "2025-12-08T18:57:54+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     170,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-08T19:11:32+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":50,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        2,
+                                "minor":        1031,
+                                "time": "2025-12-08T21:01:06+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     180,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        2,
+                                "minor":        39,
+                                "time": "2025-12-08T21:08:10+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300788","searchResultPosition":60,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300788",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        2,
+                                "minor":        1024,
+                                "time": "2025-12-08T21:16:09+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     190,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        3,
+                                "minor":        80,
+                                "time": "2025-12-08T21:19:56+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":70,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-08T21:34:15+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     200,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-08T21:34:20+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":80,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        3,
+                                "minor":        80,
+                                "time": "2025-12-09T12:10:53+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     212,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        3,
+                                "minor":        81,
+                                "time": "2025-12-09T12:13:40+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":90,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-09T12:26:43+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     227,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-09T12:26:48+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":100,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        9,
+                                "time": "2025-12-09T12:59:11+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "2060676872",
+                                "cardType":     1,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     237,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        9,
+                                "time": "2025-12-09T13:20:28+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "3396836360",
+
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":110,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        9,
+                                "time": "2025-12-09T14:35:36+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "3414800392",
+                                "cardType":     1,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     247,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        9,
+                                "time": "2025-12-09T14:35:45+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "1441227784",
+
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300789","searchResultPosition":120,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300789",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        3,
+                                "minor":        113,
+                                "time": "2025-12-09T15:33:01+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "10.78.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     257,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        3,
+                                "minor":        112,
+                                "time": "2025-12-09T15:36:14+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "10.78.0.0",
+                                "cardNo":       "",
+                                "cardTyp
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300790","searchResultPosition":130,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300790",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        3,
+                                "minor":        112,
+                                "time": "2025-12-09T15:46:01+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "10.78.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       0,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     267,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        3,
+                                "minor":        113,
+                                "time": "2025-12-09T15:46:01+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "10.78.0.0",
+                                "cardNo":       "",
+                                "cardTyp
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300790","searchResultPosition":140,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300790",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        49,
+                                "time": "2025-12-09T19:16:49+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 1,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     279,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        3,
+                                "minor":        122,
+                                "time": "2025-12-09T19:21:46+08:00",
+                                "netUser":      "admin",
+                                "remoteHostAddr":       "10.78.0.0",
+                                "cardNo":       "",
+                                "cardT
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300790","searchResultPosition":150,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300790",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        21,
+                                "time": "2025-12-09T19:48:20+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     290,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        22,
+                                "time": "2025-12-09T19:48:25+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300790","searchResultPosition":160,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300790",
+                "responseStatusStrg":   "MORE",
+                "numOfMatches": 10,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        22,
+                                "time": "2025-12-09T20:02:09+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     303,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        21,
+                                "time": "2025-12-09T20:02:13+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+Hikvision getAttendance request: {"AcsEventCond":{"searchID":"1765300790","searchResultPosition":170,"maxResults":50,"major":0,"minor":0,"startTime":"2025-12-01T00:00:00","endTime":"2025-12-09T23:59:59"}}
+Hikvision getAttendance response code: 200
+Hikvision getAttendance response body: {
+        "AcsEvent":     {
+                "searchID":     "1765300790",
+                "responseStatusStrg":   "OK",
+                "numOfMatches": 4,
+                "totalMatches": 174,
+                "InfoList":     [{
+                                "major":        5,
+                                "minor":        21,
+                                "time": "2025-12-09T20:14:40+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+                                "whiteListNo":  0,
+                                "reportChannel":        0,
+                                "cardReaderKind":       0,
+                                "cardReaderNo": 0,
+                                "doorNo":       1,
+                                "verifyNo":     0,
+                                "alarmInNo":    0,
+                                "alarmOutNo":   0,
+                                "caseSensorNo": 0,
+                                "RS485No":      0,
+                                "multiCardGroupNo":     0,
+                                "accessChannel":        0,
+                                "deviceNo":     0,
+                                "distractControlNo":    0,
+                                "employeeNoString":     "",
+                                "localControllerID":    0,
+                                "InternetAccess":       0,
+                                "type": 0,
+                                "MACAddr":      "",
+                                "swipeCardType":        0,
+                                "serialNo":     319,
+                                "attendanceStatus":     "undefined",
+                                "statusValue":  0
+                        }, {
+                                "major":        5,
+                                "minor":        22,
+                                "time": "2025-12-09T20:14:45+08:00",
+                                "netUser":      "",
+                                "remoteHostAddr":       "0.0.0.0",
+                                "cardNo":       "",
+                                "cardType":     0,
+
+Found 21 events
+Array
+(
+    [0] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:03:25
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:03:25+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 207
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [1] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:03:48
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:03:48+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 210
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [2] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:20:56
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:20:56+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 215
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [3] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:21:13
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:21:13+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 218
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [4] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:21:15
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:21:15+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 219
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [5] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:21:27
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:21:27+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 222
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [6] => Array
+        (
+            [device_user_id] => 3
+            [log_time] => 2025-12-09 04:21:31
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T12:21:31+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 3
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 223
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [7] => Array
+        (
+            [device_user_id] => SFL009
+            [log_time] => 2025-12-09 11:16:16
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T19:16:16+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => SFL009
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 273
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [8] => Array
+        (
+            [device_user_id] => SFL009
+            [log_time] => 2025-12-09 11:16:26
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T19:16:26+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => SFL009
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 276
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [9] => Array
+        (
+            [device_user_id] => SFL009
+            [log_time] => 2025-12-09 11:38:59
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T19:38:59+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => SFL009
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 286
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [10] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 11:48:20
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T19:48:20+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 291
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [11] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:01:59
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:01:59+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 298
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [12] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:02:04
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:02:04+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 301
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [13] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:02:13
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:02:13+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 305
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [14] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:08:11
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:08:11+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 308
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [15] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:11:10
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:11:10+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 311
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [16] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:11:12
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:11:12+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 312
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [17] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:13:27
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:13:27+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 316
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [18] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:13:29
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:13:29+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 317
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [19] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:14:40
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:14:40+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 320
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+    [20] => Array
+        (
+            [device_user_id] => 1
+            [log_time] => 2025-12-09 12:14:50
+            [direction] => in
+            [verification_type] => unknown
+            [raw_data] => Array
+                (
+                    [major] => 5
+                    [minor] => 38
+                    [time] => 2025-12-09T20:14:50+08:00
+                    [netUser] =>
+                    [remoteHostAddr] => 0.0.0.0
+                    [cardNo] =>
+                    [cardType] => 1
+                    [whiteListNo] => 0
+                    [reportChannel] => 0
+                    [cardReaderKind] => 0
+                    [cardReaderNo] => 1
+                    [doorNo] => 1
+                    [verifyNo] => 0
+                    [alarmInNo] => 0
+                    [alarmOutNo] => 0
+                    [caseSensorNo] => 0
+                    [RS485No] => 0
+                    [multiCardGroupNo] => 0
+                    [accessChannel] => 0
+                    [deviceNo] => 0
+                    [distractControlNo] => 0
+                    [employeeNoString] => 1
+                    [localControllerID] => 0
+                    [InternetAccess] => 0
+                    [type] => 0
+                    [MACAddr] =>
+                    [swipeCardType] => 0
+                    [serialNo] => 323
+                    [userType] => normal
+                    [attendanceStatus] => undefined
+                    [statusValue] => 0
+                )
+
+        )
+
+)
+root@superlitecrm:~/isp#
