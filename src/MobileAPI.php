@@ -439,32 +439,61 @@ class MobileAPI {
     public function clockIn(int $employeeId, ?float $latitude = null, ?float $longitude = null): array {
         $today = date('Y-m-d');
         $now = date('H:i:s');
-        $cutoffTime = '08:30:00';
-        
-        if ($now > $cutoffTime) {
-            return ['success' => false, 'message' => 'Clock in is only allowed until 8:30 AM. Current time: ' . date('h:i A')];
-        }
         
         $stmt = $this->db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
         $stmt->execute([$employeeId, $today]);
         $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        if ($existing) {
-            if ($existing['clock_in']) {
-                return ['success' => false, 'message' => 'Already clocked in today at ' . $existing['clock_in']];
-            }
+        if ($existing && $existing['clock_in']) {
+            return ['success' => false, 'message' => 'Already clocked in today at ' . $existing['clock_in']];
         }
         
-        $stmt = $this->db->prepare("
-            INSERT INTO attendance (employee_id, date, clock_in, status, source)
-            VALUES (?, ?, ?, 'present', 'mobile')
+        // Calculate late minutes using the late deduction rules
+        $lateMinutes = 0;
+        $lateDeduction = 0;
+        $lateMessage = '';
+        
+        try {
+            $lateCalculator = new LateDeductionCalculator($this->db);
+            $lateMinutes = $lateCalculator->calculateLateMinutes($employeeId, $now);
+            
+            if ($lateMinutes > 0) {
+                $rule = $lateCalculator->getRuleForEmployee($employeeId);
+                if ($rule) {
+                    $lateDeduction = $lateCalculator->calculateDeduction($lateMinutes, $rule);
+                    $currency = $rule['currency'] ?? 'KES';
+                    $lateMessage = " (Late by {$lateMinutes} mins - {$currency} {$lateDeduction} deduction)";
+                }
+            }
+        } catch (\Exception $e) {
+            // Late calculation failed - continue without it
+        }
+        
+        // Build the SQL with location data if provided
+        $sql = "
+            INSERT INTO attendance (employee_id, date, clock_in, late_minutes, status, source, clock_in_latitude, clock_in_longitude)
+            VALUES (?, ?, ?, ?, 'present', 'mobile', ?, ?)
             ON CONFLICT (employee_id, date) DO UPDATE SET 
                 clock_in = EXCLUDED.clock_in, 
-                source = 'mobile'
-        ");
-        $stmt->execute([$employeeId, $today, $now]);
+                late_minutes = EXCLUDED.late_minutes,
+                clock_in_latitude = EXCLUDED.clock_in_latitude,
+                clock_in_longitude = EXCLUDED.clock_in_longitude,
+                source = 'mobile',
+                updated_at = NOW()
+        ";
         
-        return ['success' => true, 'message' => 'Clocked in at ' . date('h:i A'), 'time' => $now];
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$employeeId, $today, $now, $lateMinutes, $latitude, $longitude]);
+        
+        $message = 'Clocked in at ' . date('h:i A') . $lateMessage;
+        
+        return [
+            'success' => true, 
+            'message' => $message, 
+            'time' => $now,
+            'late_minutes' => $lateMinutes,
+            'late_deduction' => $lateDeduction
+        ];
     }
     
     public function clockOut(int $employeeId): array {
