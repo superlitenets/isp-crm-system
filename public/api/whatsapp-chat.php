@@ -105,7 +105,11 @@ try {
                             'type' => $msg['type'] ?? 'text',
                             'fromMe' => $msg['fromMe'] ?? false,
                             'timestamp' => $msg['timestamp'],
-                            'senderName' => $msg['senderName'] ?? null
+                            'senderName' => $msg['senderName'] ?? null,
+                            'hasMedia' => $msg['hasMedia'] ?? false,
+                            'mediaData' => $msg['mediaData'] ?? null,
+                            'mimetype' => $msg['mimetype'] ?? null,
+                            'filename' => $msg['filename'] ?? null
                         ];
                     }, $result['messages']);
                     

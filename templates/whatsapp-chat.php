@@ -239,6 +239,49 @@ $isConnected = ($sessionStatus['status'] ?? '') === 'connected';
         color: #53bdeb;
     }
     
+    .wa-media {
+        margin-bottom: 8px;
+    }
+    
+    .wa-media-img {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: block;
+    }
+    
+    .wa-media-video {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 8px;
+    }
+    
+    .wa-media-audio {
+        width: 100%;
+        max-width: 250px;
+    }
+    
+    .wa-media-file {
+        margin-bottom: 8px;
+    }
+    
+    .wa-media-placeholder {
+        background: rgba(0,0,0,0.05);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    .wa-media-placeholder i {
+        font-size: 1.5rem;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
     .wa-input-area {
         background: #f0f2f5;
         padding: 12px 20px;
@@ -581,7 +624,8 @@ function renderMessages(messages) {
     container.innerHTML = messages.map(msg => `
         <div class="wa-message ${msg.fromMe ? 'outgoing' : 'incoming'}">
             <div class="wa-bubble">
-                <div class="wa-msg-text">${escapeHtml(msg.body || '')}</div>
+                ${renderMediaContent(msg)}
+                ${msg.body ? `<div class="wa-msg-text">${escapeHtml(msg.body)}</div>` : ''}
                 <div class="wa-msg-time">
                     ${formatMessageTime(msg.timestamp)}
                     ${msg.fromMe ? '<i class="bi bi-check2-all wa-msg-status"></i>' : ''}
@@ -591,6 +635,37 @@ function renderMessages(messages) {
     `).join('');
     
     container.scrollTop = container.scrollHeight;
+}
+
+function renderMediaContent(msg) {
+    if (!msg.hasMedia && !msg.mediaData) {
+        if (msg.type === 'image' || msg.type === 'video' || msg.type === 'audio' || msg.type === 'document' || msg.type === 'sticker') {
+            return `<div class="wa-media-placeholder"><i class="bi bi-${getMediaIcon(msg.type)}"></i> ${msg.type}</div>`;
+        }
+        return '';
+    }
+    
+    if (msg.mediaData && msg.mimetype) {
+        const dataUrl = `data:${msg.mimetype};base64,${msg.mediaData}`;
+        
+        if (msg.mimetype.startsWith('image/')) {
+            return `<div class="wa-media"><img src="${dataUrl}" class="wa-media-img" onclick="window.open(this.src, '_blank')" alt="Image"></div>`;
+        } else if (msg.mimetype.startsWith('video/')) {
+            return `<div class="wa-media"><video src="${dataUrl}" class="wa-media-video" controls></video></div>`;
+        } else if (msg.mimetype.startsWith('audio/')) {
+            return `<div class="wa-media"><audio src="${dataUrl}" controls class="wa-media-audio"></audio></div>`;
+        } else {
+            const filename = msg.filename || 'Document';
+            return `<div class="wa-media-file"><a href="${dataUrl}" download="${filename}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark"></i> ${escapeHtml(filename)}</a></div>`;
+        }
+    }
+    
+    return '';
+}
+
+function getMediaIcon(type) {
+    const icons = { image: 'image', video: 'camera-video', audio: 'mic', document: 'file-earmark', sticker: 'emoji-smile' };
+    return icons[type] || 'file-earmark';
 }
 
 async function sendMessage() {
@@ -631,7 +706,8 @@ function appendMessage(msg) {
     div.className = `wa-message ${msg.fromMe ? 'outgoing' : 'incoming'}`;
     div.innerHTML = `
         <div class="wa-bubble">
-            <div class="wa-msg-text">${escapeHtml(msg.body || '')}</div>
+            ${renderMediaContent(msg)}
+            ${msg.body ? `<div class="wa-msg-text">${escapeHtml(msg.body)}</div>` : ''}
             <div class="wa-msg-time">
                 ${formatMessageTime(msg.timestamp)}
                 ${msg.fromMe ? '<i class="bi bi-check2 wa-msg-status"></i>' : ''}

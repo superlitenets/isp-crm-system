@@ -707,12 +707,16 @@ class WhatsApp {
     /**
      * Get chat messages from WhatsApp service
      */
-    public function getChatMessages(string $chatId, int $limit = 50): array {
+    public function getChatMessages(string $chatId, int $limit = 50, bool $includeMedia = true): array {
         try {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/messages?limit=' . $limit);
+            $url = $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/messages?limit=' . $limit;
+            if ($includeMedia) {
+                $url .= '&includeMedia=true';
+            }
+            curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Longer timeout for media download
             curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
             $response = curl_exec($ch);

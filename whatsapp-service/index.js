@@ -143,8 +143,26 @@ function initializeClient() {
                 messageId: msg.id._serialized,
                 isGroup: msg.from.endsWith('@g.us'),
                 senderName: msg._data?.notifyName || null,
-                hasMedia: msg.hasMedia
+                hasMedia: msg.hasMedia,
+                mediaData: null,
+                mimetype: null,
+                filename: null
             };
+            
+            // Download media if present
+            if (msg.hasMedia) {
+                try {
+                    const media = await msg.downloadMedia();
+                    if (media) {
+                        messageData.mediaData = media.data; // base64
+                        messageData.mimetype = media.mimetype;
+                        messageData.filename = media.filename || null;
+                        console.log('Media downloaded:', media.mimetype, media.filename || 'no filename');
+                    }
+                } catch (mediaErr) {
+                    console.error('Failed to download media:', mediaErr.message);
+                }
+            }
             
             // Store in messages array for polling
             recentMessages.push(messageData);
@@ -396,7 +414,7 @@ app.get('/chats', async (req, res) => {
 // Get chat history for a specific chat
 app.get('/chat/:chatId/messages', async (req, res) => {
     const { chatId } = req.params;
-    const { limit = 50 } = req.query;
+    const { limit = 50, includeMedia = 'false' } = req.query;
     
     if (connectionStatus !== 'connected') {
         return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
@@ -406,14 +424,35 @@ app.get('/chat/:chatId/messages', async (req, res) => {
         const chat = await client.getChatById(chatId);
         const messages = await chat.fetchMessages({ limit: parseInt(limit) });
         
-        const messageList = messages.map(msg => ({
-            id: msg.id._serialized,
-            body: msg.body,
-            type: msg.type,
-            fromMe: msg.fromMe,
-            timestamp: msg.timestamp,
-            senderName: msg._data?.notifyName,
-            hasMedia: msg.hasMedia
+        const messageList = await Promise.all(messages.map(async msg => {
+            const msgData = {
+                id: msg.id._serialized,
+                body: msg.body,
+                type: msg.type,
+                fromMe: msg.fromMe,
+                timestamp: msg.timestamp,
+                senderName: msg._data?.notifyName,
+                hasMedia: msg.hasMedia,
+                mediaData: null,
+                mimetype: null,
+                filename: null
+            };
+            
+            // Download media if requested and message has media
+            if (includeMedia === 'true' && msg.hasMedia) {
+                try {
+                    const media = await msg.downloadMedia();
+                    if (media) {
+                        msgData.mediaData = media.data;
+                        msgData.mimetype = media.mimetype;
+                        msgData.filename = media.filename || null;
+                    }
+                } catch (e) {
+                    console.error('Failed to download media for message:', e.message);
+                }
+            }
+            
+            return msgData;
         }));
         
         res.json({ messages: messageList, chatId });
