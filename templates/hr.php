@@ -1546,7 +1546,36 @@ $lateReportDept = $_GET['late_dept'] ?? '';
 $lateArrivals = $lateCalculator->getMonthlyLateArrivals($lateReportMonth, $lateReportDept ?: null);
 $lateStats = $lateCalculator->getMonthlyLateStats($lateReportMonth, $lateReportDept ?: null);
 $lastSync = $biometricService->getLastSyncTime();
+$latePenaltiesEnabled = $settings->get('late_penalties_enabled', '1') === '1';
 ?>
+
+<!-- Global Late Penalty Toggle -->
+<div class="card mb-4 border-warning">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h5 class="mb-1"><i class="bi bi-toggle-on text-warning"></i> Late Arrival Penalties</h5>
+                <p class="text-muted mb-0">When disabled, no late penalties will be calculated or applied to attendance records.</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <form method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="toggle_late_penalties">
+                    <input type="hidden" name="enabled" value="<?= $latePenaltiesEnabled ? '0' : '1' ?>">
+                    <?php if ($latePenaltiesEnabled): ?>
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Disable late penalties? No new penalties will be calculated.')">
+                        <i class="bi bi-toggle-on"></i> Enabled - Click to Disable
+                    </button>
+                    <?php else: ?>
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-toggle-off"></i> Disabled - Click to Enable
+                    </button>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4 mb-4">
     <div class="col-md-3">
@@ -1643,12 +1672,13 @@ $lastSync = $biometricService->getLastSyncTime();
                         <th>Actual</th>
                         <th>Late By</th>
                         <th>Deduction</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($lateArrivals)): ?>
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
                             <p class="mb-0 mt-2">No late arrivals for this period</p>
                         </td>
@@ -1677,6 +1707,25 @@ $lastSync = $biometricService->getLastSyncTime();
                             <?php else: ?>
                             <span class="text-muted">-</span>
                             <?php endif; ?>
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                    data-bs-toggle="modal" data-bs-target="#editPenaltyModal"
+                                    data-attendance-id="<?= $late['id'] ?>"
+                                    data-employee="<?= htmlspecialchars($late['employee_name']) ?>"
+                                    data-date="<?= $late['date'] ?>"
+                                    data-minutes="<?= $late['late_minutes'] ?>"
+                                    data-deduction="<?= $late['deduction'] ?? 0 ?>">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Remove late penalty for this record?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="remove_late_penalty">
+                                <input type="hidden" name="attendance_id" value="<?= $late['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove Penalty">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -1739,6 +1788,71 @@ $lastSync = $biometricService->getLastSyncTime();
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Edit Penalty Modal -->
+<div class="modal fade" id="editPenaltyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Late Penalty</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="update_late_penalty">
+                    <input type="hidden" name="attendance_id" id="editPenaltyAttendanceId">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Employee</label>
+                        <input type="text" class="form-control" id="editPenaltyEmployee" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="text" class="form-control" id="editPenaltyDate" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Late Minutes</label>
+                        <input type="number" class="form-control" name="late_minutes" id="editPenaltyMinutes" min="0">
+                        <small class="text-muted">Set to 0 to mark as on time</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Deduction Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">KES</span>
+                            <input type="number" class="form-control" name="deduction" id="editPenaltyDeduction" min="0" step="0.01">
+                        </div>
+                        <small class="text-muted">Set to 0 to remove penalty</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Adjustment</label>
+                        <textarea class="form-control" name="adjustment_reason" rows="2" placeholder="Optional: explain why the penalty is being adjusted"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editModal = document.getElementById('editPenaltyModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            document.getElementById('editPenaltyAttendanceId').value = button.dataset.attendanceId;
+            document.getElementById('editPenaltyEmployee').value = button.dataset.employee;
+            document.getElementById('editPenaltyDate').value = button.dataset.date;
+            document.getElementById('editPenaltyMinutes').value = button.dataset.minutes;
+            document.getElementById('editPenaltyDeduction').value = button.dataset.deduction;
+        });
+    }
+});
+</script>
 
 <?php elseif ($subpage === 'salespeople'): ?>
 <?php

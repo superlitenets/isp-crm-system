@@ -6,6 +6,7 @@ require_once __DIR__ . '/LateDeductionCalculator.php';
 require_once __DIR__ . '/SMSGateway.php';
 require_once __DIR__ . '/TemplateEngine.php';
 require_once __DIR__ . '/Employee.php';
+require_once __DIR__ . '/Settings.php';
 
 class RealTimeAttendanceProcessor {
     private \PDO $db;
@@ -42,13 +43,17 @@ class RealTimeAttendanceProcessor {
             return $result;
         }
         
+        // Check if late penalties are globally enabled
+        $settings = new \App\Settings();
+        $latePenaltiesEnabled = $settings->get('late_penalties_enabled', '1') === '1';
+        
         $rule = $this->lateCalculator->getRuleForEmployee($employeeId);
         
         $lateMinutes = 0;
         $deduction = 0;
         $isLate = false;
         
-        if ($rule) {
+        if ($rule && $latePenaltiesEnabled) {
             $lateMinutes = $this->lateCalculator->calculateLateMinutes($employeeId, $clockInTime);
             
             if ($lateMinutes > 0) {
