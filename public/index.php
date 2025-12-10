@@ -4024,7 +4024,11 @@ $csrfToken = \App\Auth::generateToken();
             if (btn) btn.disabled = true;
             
             try {
-                const response = await fetch('?page=api&action=clock_in', { method: 'POST' });
+                const response = await fetch('?page=api&action=clock_in', { 
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' }
+                });
                 const result = await response.json();
                 
                 if (result.success) {
@@ -4058,7 +4062,11 @@ $csrfToken = \App\Auth::generateToken();
             if (btn) btn.disabled = true;
             
             try {
-                const response = await fetch('?page=api&action=clock_out', { method: 'POST' });
+                const response = await fetch('?page=api&action=clock_out', { 
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' }
+                });
                 const result = await response.json();
                 
                 if (result.success) {
