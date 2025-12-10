@@ -93,11 +93,13 @@ class RealTimeAttendanceProcessor {
             'message' => ''
         ];
         
-        // Check minimum clock out time (5:00 PM)
-        $minClockOutHour = 17; // 5 PM in 24-hour format
+        // Check minimum clock out time (configurable, default 5:00 PM)
+        $settings = new \App\Settings();
+        $minClockOutHour = (int)$settings->get('min_clock_out_hour', '17');
         $clockOutHour = (int)date('H', strtotime($clockOutTime));
         if ($clockOutHour < $minClockOutHour) {
-            $result['message'] = 'Clock out is only allowed after 5:00 PM';
+            $minTimeFormatted = date('g:i A', strtotime("$minClockOutHour:00"));
+            $result['message'] = "Clock out is only allowed after $minTimeFormatted";
             return $result;
         }
         

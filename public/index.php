@@ -704,11 +704,13 @@ if ($page === 'api' && $action === 'clock_out') {
         exit;
     }
     
-    // Check minimum clock out time (5:00 PM)
-    $minClockOutHour = 17; // 5 PM in 24-hour format
+    // Check minimum clock out time (configurable, default 5:00 PM)
+    $settingsObj = new \App\Settings();
+    $minClockOutHour = (int)$settingsObj->get('min_clock_out_hour', '17');
     $currentHour = (int)date('H');
     if ($currentHour < $minClockOutHour) {
-        echo json_encode(['success' => false, 'error' => 'Clock out is only allowed after 5:00 PM']);
+        $minTimeFormatted = date('g:i A', strtotime("$minClockOutHour:00"));
+        echo json_encode(['success' => false, 'error' => "Clock out is only allowed after $minTimeFormatted"]);
         exit;
     }
     

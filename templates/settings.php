@@ -980,6 +980,15 @@ function resetToDefaults() {
                                 <?php endfor; ?>
                             </select>
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Minimum Clock Out Time</label>
+                            <select class="form-select" name="min_clock_out_hour">
+                                <?php for ($h = 14; $h <= 20; $h++): ?>
+                                <option value="<?= $h ?>" <?= $settings->get('min_clock_out_hour', '17') == $h ? 'selected' : '' ?>><?= sprintf('%02d:00', $h) ?> (<?= date('h:i A', strtotime("$h:00")) ?>)</option>
+                                <?php endfor; ?>
+                            </select>
+                            <small class="text-muted">Employees cannot clock out before this time</small>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Cron Setup (Run every 5 mins)</label>
                             <div class="input-group">
