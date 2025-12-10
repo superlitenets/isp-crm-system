@@ -66,6 +66,9 @@ services:
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
     networks:
       - crm_network
+      - host_access
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   nginx:
     image: nginx:stable-alpine
@@ -86,6 +89,10 @@ services:
 networks:
   crm_network:
     driver: bridge
+  host_access:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 volumes:
   db_data:
