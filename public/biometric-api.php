@@ -112,7 +112,7 @@ function isSessionAuthenticated(): bool {
 }
 
 $publicActions = ['health'];
-$sessionActions = ['fetch-device-users', 'sync-employees-to-device', 'register-user', 'delete-device-user', 'start-enrollment', 'link-device-user'];
+$sessionActions = ['fetch-device-users', 'sync-employees-to-device', 'register-user', 'delete-device-user', 'start-enrollment', 'capture-fingerprint', 'get-fingerprints', 'delete-fingerprint', 'link-device-user'];
 $requiresAuth = !in_array($action, $publicActions);
 
 if ($requiresAuth) {
@@ -406,13 +406,14 @@ try {
             break;
             
         case 'start-enrollment':
+        case 'capture-fingerprint':
             if ($method !== 'POST') {
                 jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
             }
             
             $deviceId = $input['device_id'] ?? null;
             $employeeNo = $input['employee_no'] ?? null;
-            $enrollType = $input['type'] ?? 'face';
+            $fingerId = $input['finger_id'] ?? 1;
             
             if (!$deviceId || !$employeeNo) {
                 jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
@@ -437,11 +438,81 @@ try {
                 $password
             );
             
-            if ($enrollType === 'fingerprint') {
-                $result = $hikDevice->startFingerprintEnrollment((string)$employeeNo);
-            } else {
-                $result = $hikDevice->startFaceEnrollment((string)$employeeNo);
+            // Use the new captureFingerprint method for remote enrollment
+            $result = $hikDevice->captureFingerprint((string)$employeeNo, (int)$fingerId);
+            
+            jsonResponse($result, $result['success'] ? 200 : 400);
+            break;
+            
+        case 'get-fingerprints':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
             }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeNo = $input['employee_no'] ?? null;
+            
+            if (!$deviceId || !$employeeNo) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $password
+            );
+            
+            $result = $hikDevice->getFingerprints((string)$employeeNo);
+            
+            jsonResponse($result, $result['success'] ? 200 : 400);
+            break;
+            
+        case 'delete-fingerprint':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $employeeNo = $input['employee_no'] ?? null;
+            $fingerId = $input['finger_id'] ?? null;
+            
+            if (!$deviceId || !$employeeNo) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'hikvision') {
+                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/HikvisionDevice.php';
+            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+            $hikDevice = new \App\HikvisionDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 80,
+                $device['username'],
+                $password
+            );
+            
+            $result = $hikDevice->deleteFingerprint((string)$employeeNo, $fingerId);
             
             jsonResponse($result, $result['success'] ? 200 : 400);
             break;

@@ -347,11 +347,11 @@ $allRoles = $roleManager->getAllRoles();
                     <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
                         <i class="bi bi-upload"></i> Register Name
                     </button>
-                    <button type="button" class="btn btn-success" onclick="startEnrollment('fingerprint')">
+                    <button type="button" class="btn btn-success" onclick="startFingerprintCapture()">
                         <i class="bi bi-fingerprint"></i> Enroll Fingerprint
                     </button>
-                    <button type="button" class="btn btn-info" onclick="startEnrollment('face')">
-                        <i class="bi bi-person-bounding-box"></i> Enroll Face
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="checkFingerprints()">
+                        <i class="bi bi-search"></i> Check Enrolled
                     </button>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -405,34 +405,86 @@ function syncEmployeeToBiometric(employeeId) {
     });
 }
 
-function startEnrollment(type) {
+function startFingerprintCapture() {
     var deviceId = document.getElementById('biometricDeviceSelect').value;
     var statusDiv = document.getElementById('biometricSyncStatus');
     var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
-    var typeName = type === 'fingerprint' ? 'Fingerprint' : 'Face';
     
     statusDiv.className = 'alert alert-info mb-3';
-    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting ' + typeName + ' enrollment... Please ask the employee to ' + 
-        (type === 'fingerprint' ? 'place their finger on the device scanner.' : 'look at the device camera.');
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> <strong>Fingerprint Capture Started!</strong><br>' +
+        'Please ask the employee to place their finger on the device scanner now.<br>' +
+        '<small class="text-muted">The device will capture and save the fingerprint automatically.</small>';
     statusDiv.classList.remove('d-none');
     
-    fetch('/biometric-api.php?action=start-enrollment', {
+    fetch('/biometric-api.php?action=capture-fingerprint', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             device_id: parseInt(deviceId),
             employee_no: bioId,
-            type: type
+            finger_id: 1
         })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             statusDiv.className = 'alert alert-success mb-3';
-            statusDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + (data.message || typeName + ' enrollment started successfully!');
+            statusDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + (data.message || 'Fingerprint capture initiated!');
+            if (data.hint) {
+                statusDiv.innerHTML += '<br><small class="text-muted">' + data.hint + '</small>';
+            }
         } else {
             statusDiv.className = 'alert alert-danger mb-3';
             statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Failed: ' + (data.error || 'Unknown error');
+            if (data.hint) {
+                statusDiv.innerHTML += '<br><small class="text-muted">' + data.hint + '</small>';
+            }
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + e.message;
+    });
+}
+
+function checkFingerprints() {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking enrolled fingerprints...';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=get-fingerprints', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            employee_no: bioId
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            var count = data.count || 0;
+            if (count > 0) {
+                statusDiv.className = 'alert alert-success mb-3';
+                statusDiv.innerHTML = '<i class="bi bi-fingerprint"></i> <strong>' + count + ' fingerprint(s) enrolled</strong>';
+                if (data.fingerprints && data.fingerprints.length > 0) {
+                    statusDiv.innerHTML += '<ul class="mb-0 mt-2">';
+                    data.fingerprints.forEach(function(fp) {
+                        statusDiv.innerHTML += '<li>Finger #' + fp.finger_id + ' (' + fp.finger_type + ')</li>';
+                    });
+                    statusDiv.innerHTML += '</ul>';
+                }
+            } else {
+                statusDiv.className = 'alert alert-warning mb-3';
+                statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> No fingerprints enrolled for this employee. Use "Enroll Fingerprint" to add one.';
+            }
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> ' + (data.error || 'Failed to check fingerprints');
         }
     })
     .catch(e => {
