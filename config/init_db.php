@@ -1124,24 +1124,25 @@ function runMigrations(PDO $db): void {
             CREATE TABLE IF NOT EXISTS branches (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
-                code VARCHAR(20) UNIQUE NOT NULL,
+                code VARCHAR(20) UNIQUE,
                 address TEXT,
                 phone VARCHAR(20),
                 email VARCHAR(100),
                 manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                whatsapp_group_id VARCHAR(100),
+                whatsapp_group VARCHAR(100),
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )",
-        'branch_employees' => "
-            CREATE TABLE IF NOT EXISTS branch_employees (
+        'employee_branches' => "
+            CREATE TABLE IF NOT EXISTS employee_branches (
                 id SERIAL PRIMARY KEY,
                 branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
                 employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
                 is_primary BOOLEAN DEFAULT FALSE,
+                assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(branch_id, employee_id)
+                UNIQUE(employee_id, branch_id)
             )",
         'salary_advances' => "
             CREATE TABLE IF NOT EXISTS salary_advances (
