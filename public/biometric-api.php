@@ -531,21 +531,24 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
             }
             
+            $deviceId = $input['device_id'] ?? null;
             $deviceUserId = $input['device_user_id'] ?? null;
             $employeeId = $input['employee_id'] ?? null;
+            $deviceUserName = $input['device_user_name'] ?? null;
             
-            if (!$deviceUserId || !$employeeId) {
-                jsonResponse(['success' => false, 'error' => 'device_user_id and employee_id are required'], 400);
+            if (!$deviceId || !$deviceUserId || !$employeeId) {
+                jsonResponse(['success' => false, 'error' => 'device_id, device_user_id and employee_id are required'], 400);
             }
             
-            $updateStmt = $db->prepare("UPDATE employees SET biometric_id = ? WHERE id = ?");
-            $updateStmt->execute([$deviceUserId, $employeeId]);
+            $stmt = $db->prepare("
+                INSERT INTO device_user_mapping (device_id, device_user_id, employee_id, device_user_name)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (device_id, device_user_id) 
+                DO UPDATE SET employee_id = EXCLUDED.employee_id, device_user_name = EXCLUDED.device_user_name
+            ");
+            $stmt->execute([$deviceId, $deviceUserId, $employeeId, $deviceUserName]);
             
-            if ($updateStmt->rowCount() > 0) {
-                jsonResponse(['success' => true, 'message' => "Employee $employeeId linked to device user $deviceUserId"]);
-            } else {
-                jsonResponse(['success' => false, 'error' => 'Employee not found'], 404);
-            }
+            jsonResponse(['success' => true, 'message' => "Employee $employeeId linked to device user $deviceUserId"]);
             break;
             
         case 'fetch-device-users':
@@ -559,31 +562,48 @@ try {
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['device_type'] !== 'hikvision') {
-                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
             require_once __DIR__ . '/../src/BiometricDevice.php';
             require_once __DIR__ . '/../src/HikvisionDevice.php';
+            require_once __DIR__ . '/../src/ZKTecoDevice.php';
+            
             $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
-            $hikDevice = new \App\HikvisionDevice(
-                $device['id'],
-                $device['ip_address'],
-                $device['port'] ?: 80,
-                $device['username'],
-                $password
-            );
+            $users = [];
             
-            $users = $hikDevice->getUsers();
+            if ($device['device_type'] === 'hikvision') {
+                $hikDevice = new \App\HikvisionDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 80,
+                    $device['username'],
+                    $password
+                );
+                $users = $hikDevice->getUsers();
+            } elseif ($device['device_type'] === 'zkteco') {
+                $zkDevice = new \App\ZKTecoDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 4370
+                );
+                $users = $zkDevice->getUsers();
+            } else {
+                jsonResponse(['success' => false, 'error' => 'Unsupported device type'], 400);
+            }
             
-            $empStmt = $db->query("SELECT id, name, biometric_id FROM employees");
-            $employees = $empStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $mappingStmt = $db->prepare("
+                SELECT dum.device_user_id, dum.employee_id, e.name as employee_name 
+                FROM device_user_mapping dum
+                LEFT JOIN employees e ON dum.employee_id = e.id
+                WHERE dum.device_id = ?
+            ");
+            $mappingStmt->execute([$deviceId]);
+            $mappings = $mappingStmt->fetchAll(\PDO::FETCH_ASSOC);
             $empMap = [];
-            foreach ($employees as $emp) {
-                if ($emp['biometric_id']) {
-                    $empMap[$emp['biometric_id']] = $emp;
-                }
-                $empMap[(string)$emp['id']] = $emp;
+            foreach ($mappings as $m) {
+                $empMap[$m['device_user_id']] = ['id' => $m['employee_id'], 'name' => $m['employee_name']];
             }
             
             foreach ($users as &$user) {
@@ -593,6 +613,7 @@ try {
             jsonResponse([
                 'success' => true,
                 'device_name' => $device['name'],
+                'device_type' => $device['device_type'],
                 'user_count' => count($users),
                 'users' => $users
             ]);
