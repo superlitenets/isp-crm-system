@@ -328,24 +328,31 @@ $allRoles = $roleManager->getAllRoles();
                 $bioDevices = [];
                 try {
                     $bioDb = Database::getConnection();
-                    $bioDevices = $bioDb->query("SELECT id, name, device_type FROM biometric_devices WHERE is_active = true AND device_type = 'hikvision'")->fetchAll();
+                    $bioDevices = $bioDb->query("SELECT id, name, device_type FROM biometric_devices WHERE is_active = true ORDER BY device_type, name")->fetchAll();
                 } catch (\Exception $e) {
                     // Table may not exist
                 }
+                $bioDevicesJson = json_encode($bioDevices);
                 ?>
                 
                 <?php if (!empty($bioDevices)): ?>
                 <div class="mb-3">
                     <label class="form-label">Select Device:</label>
-                    <select id="biometricDeviceSelect" class="form-select">
+                    <select id="biometricDeviceSelect" class="form-select" onchange="updateBiometricButtons()">
                         <?php foreach ($bioDevices as $dev): ?>
-                        <option value="<?= $dev['id'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['device_type']) ?>)</option>
+                        <option value="<?= $dev['id'] ?>" data-type="<?= $dev['device_type'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['device_type']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="d-flex gap-2 flex-wrap mb-2">
                     <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
-                        <i class="bi bi-upload"></i> Register Name
+                        <i class="bi bi-upload"></i> Register User
+                    </button>
+                    <button type="button" class="btn btn-success" id="btnEnrollFingerprint" onclick="startFingerprintEnrollment()" style="display:none;">
+                        <i class="bi bi-fingerprint"></i> Enroll Fingerprint
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCheckFingerprints" onclick="checkFingerprints()" style="display:none;">
+                        <i class="bi bi-search"></i> Check Enrolled
                     </button>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -357,7 +364,7 @@ $allRoles = $roleManager->getAllRoles();
                     </button>
                 </div>
                 <?php else: ?>
-                <p class="text-muted mb-0">No Hikvision biometric devices configured. Add devices in Settings.</p>
+                <p class="text-muted mb-0">No biometric devices configured. Add devices in Settings.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -365,38 +372,224 @@ $allRoles = $roleManager->getAllRoles();
 </div>
 
 <script>
-function syncEmployeeToBiometric(employeeId) {
+var bioDevicesData = <?= $bioDevicesJson ?? '[]' ?>;
+
+function updateBiometricButtons() {
+    var select = document.getElementById('biometricDeviceSelect');
+    if (!select) return;
+    var selectedOption = select.options[select.selectedIndex];
+    var deviceType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+    
+    var btnEnroll = document.getElementById('btnEnrollFingerprint');
+    var btnCheck = document.getElementById('btnCheckFingerprints');
+    
+    if (deviceType === 'zkteco') {
+        if (btnEnroll) btnEnroll.style.display = 'inline-block';
+        if (btnCheck) btnCheck.style.display = 'inline-block';
+    } else {
+        if (btnEnroll) btnEnroll.style.display = 'none';
+        if (btnCheck) btnCheck.style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateBiometricButtons();
+});
+
+function startFingerprintEnrollment() {
     var deviceId = document.getElementById('biometricDeviceSelect').value;
     var statusDiv = document.getElementById('biometricSyncStatus');
+    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+    var uid = parseInt(bioId) || <?= $employeeData['id'] ?>;
+    
+    var fingerId = prompt('Enter finger number (0-9):\n0=Right Thumb, 1=Right Index, 2=Right Middle\n5=Left Thumb, 6=Left Index, 7=Left Middle', '0');
+    if (fingerId === null) return;
+    fingerId = parseInt(fingerId) || 0;
+    
     statusDiv.className = 'alert alert-info mb-3';
-    statusDiv.textContent = 'Registering employee to biometric device...';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> <strong>Starting Fingerprint Enrollment...</strong><br>' +
+        'The device will prompt the employee to place their finger on the scanner.<br>' +
+        '<small class="text-muted">Please wait for the device to respond.</small>';
     statusDiv.classList.remove('d-none');
     
-    fetch('/biometric-api.php?action=sync-employees-to-device', {
+    fetch('/biometric-api.php?action=start-enrollment', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             device_id: parseInt(deviceId),
-            employee_ids: [employeeId]
+            uid: uid,
+            finger_id: fingerId
         })
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success && data.success_count > 0) {
+        if (data.success) {
             statusDiv.className = 'alert alert-success mb-3';
-            statusDiv.textContent = 'Employee registered to biometric device successfully!';
-        } else if (data.results && data.results[0]) {
-            statusDiv.className = 'alert alert-warning mb-3';
-            statusDiv.textContent = data.results[0].message || 'Registration completed with notes';
+            statusDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + (data.message || 'Enrollment started!') +
+                '<br><small class="text-muted">Ask the employee to place their finger on the device now.</small>';
+            if (data.enrolling) {
+                statusDiv.innerHTML += '<br><br><button class="btn btn-sm btn-outline-primary" onclick="checkEnrollmentStatus(' + uid + ', ' + fingerId + ')">Check Status</button>';
+            }
         } else {
             statusDiv.className = 'alert alert-danger mb-3';
-            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Failed: ' + (data.error || data.message || 'Unknown error');
         }
     })
     .catch(e => {
         statusDiv.className = 'alert alert-danger mb-3';
-        statusDiv.textContent = 'Error: ' + e.message;
+        statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + e.message;
     });
+}
+
+function checkEnrollmentStatus(uid, fingerId) {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking enrollment status...';
+    
+    fetch('/biometric-api.php?action=check-enrollment-status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            uid: uid,
+            finger_id: fingerId
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.enrolled) {
+            statusDiv.className = 'alert alert-success mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-fingerprint"></i> <strong>Fingerprint enrolled successfully!</strong>';
+        } else {
+            statusDiv.className = 'alert alert-warning mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (data.message || 'Fingerprint not yet enrolled. Please scan finger on device.');
+            statusDiv.innerHTML += '<br><br><button class="btn btn-sm btn-outline-primary" onclick="checkEnrollmentStatus(' + uid + ', ' + fingerId + ')">Check Again</button>';
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + e.message;
+    });
+}
+
+function checkFingerprints() {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+    var uid = parseInt(bioId) || <?= $employeeData['id'] ?>;
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking enrolled fingerprints...';
+    statusDiv.classList.remove('d-none');
+    
+    fetch('/biometric-api.php?action=get-fingerprints', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(deviceId),
+            uid: uid
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            var count = data.count || (data.fingerprints ? data.fingerprints.length : 0);
+            if (count > 0) {
+                statusDiv.className = 'alert alert-success mb-3';
+                statusDiv.innerHTML = '<i class="bi bi-fingerprint"></i> <strong>' + count + ' fingerprint(s) enrolled</strong>';
+                if (data.fingerprints && data.fingerprints.length > 0) {
+                    statusDiv.innerHTML += '<ul class="mb-0 mt-2">';
+                    data.fingerprints.forEach(function(fp) {
+                        var fingerNames = ['Right Thumb', 'Right Index', 'Right Middle', 'Right Ring', 'Right Pinky', 'Left Thumb', 'Left Index', 'Left Middle', 'Left Ring', 'Left Pinky'];
+                        var fingerName = fingerNames[fp.finger_id] || 'Finger #' + fp.finger_id;
+                        statusDiv.innerHTML += '<li>' + fingerName + '</li>';
+                    });
+                    statusDiv.innerHTML += '</ul>';
+                }
+            } else {
+                statusDiv.className = 'alert alert-warning mb-3';
+                statusDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> No fingerprints enrolled for this employee.';
+            }
+        } else {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> ' + (data.error || 'Failed to check fingerprints');
+        }
+    })
+    .catch(e => {
+        statusDiv.className = 'alert alert-danger mb-3';
+        statusDiv.innerHTML = '<i class="bi bi-x-circle"></i> Error: ' + e.message;
+    });
+}
+
+function syncEmployeeToBiometric(employeeId) {
+    var deviceId = document.getElementById('biometricDeviceSelect').value;
+    var statusDiv = document.getElementById('biometricSyncStatus');
+    var select = document.getElementById('biometricDeviceSelect');
+    var selectedOption = select.options[select.selectedIndex];
+    var deviceType = selectedOption ? selectedOption.getAttribute('data-type') : '';
+    
+    statusDiv.className = 'alert alert-info mb-3';
+    statusDiv.textContent = 'Registering employee to biometric device...';
+    statusDiv.classList.remove('d-none');
+    
+    if (deviceType === 'zkteco') {
+        var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
+        var uid = parseInt(bioId) || employeeId;
+        var empName = '<?= addslashes($employeeData['first_name'] . ' ' . $employeeData['last_name']) ?>';
+        
+        fetch('/biometric-api.php?action=register-user', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                device_id: parseInt(deviceId),
+                uid: uid,
+                name: empName,
+                employee_no: String(employeeId)
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                statusDiv.className = 'alert alert-success mb-3';
+                statusDiv.textContent = 'Employee registered to ZKTeco device successfully! UID: ' + (data.uid || uid);
+            } else {
+                statusDiv.className = 'alert alert-danger mb-3';
+                statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            }
+        })
+        .catch(e => {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Error: ' + e.message;
+        });
+    } else {
+        fetch('/biometric-api.php?action=sync-employees-to-device', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                device_id: parseInt(deviceId),
+                employee_ids: [employeeId]
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.success_count > 0) {
+                statusDiv.className = 'alert alert-success mb-3';
+                statusDiv.textContent = 'Employee registered to biometric device successfully!';
+            } else if (data.results && data.results[0]) {
+                statusDiv.className = 'alert alert-warning mb-3';
+                statusDiv.textContent = data.results[0].message || 'Registration completed with notes';
+            } else {
+                statusDiv.className = 'alert alert-danger mb-3';
+                statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            }
+        })
+        .catch(e => {
+            statusDiv.className = 'alert alert-danger mb-3';
+            statusDiv.textContent = 'Error: ' + e.message;
+        });
+    }
 }
 
 function removeFromBiometric(employeeId) {
