@@ -1,0 +1,54 @@
+composer install --no-dev --ignore-platform-reqs
+docker compose up -d --build
+Command 'composer' not found, but can be installed with:
+apt install composer
+WARN[0000] /root/isp/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion
+[+] Building 1.2s (17/20)
+ => [internal] load local bake definitions                                 0.0s
+ => => reading from stdin 867B                                             0.0s
+ => [php internal] load build definition from Dockerfile                   0.0s
+ => => transferring dockerfile: 1.32kB                                     0.0s
+ => [whatsapp internal] load build definition from Dockerfile              0.0s
+ => => transferring dockerfile: 460B                                       0.0s
+ => [php internal] load metadata for docker.io/library/composer:latest     0.8s
+ => [php internal] load metadata for docker.io/library/php:8.3-fpm         0.8s
+ => CANCELED [whatsapp internal] load metadata for docker.io/library/node  1.0s
+ => [php internal] load .dockerignore                                      0.0s
+ => => transferring context: 434B                                          0.0s
+ => [php internal] load build context                                      0.0s
+ => => transferring context: 7.25kB                                        0.0s
+ => [php stage-0  1/11] FROM docker.io/library/php:8.3-fpm@sha256:e01c5f1  0.0s
+ => => resolve docker.io/library/php:8.3-fpm@sha256:e01c5f1f77abad3d35ba9  0.0s
+ => [php] FROM docker.io/library/composer:latest@sha256:8b4d59fde3bd505c5  0.0s
+ => => resolve docker.io/library/composer:latest@sha256:8b4d59fde3bd505c5  0.0s
+ => CACHED [php stage-0  2/11] RUN ln -snf /usr/share/zoneinfo/Africa/Nai  0.0s
+ => CACHED [php stage-0  3/11] RUN apt-get update && apt-get install -y    0.0s
+ => CACHED [php stage-0  4/11] RUN mv "/usr/local/etc/php/php.ini-product  0.0s
+ => CACHED [php stage-0  5/11] RUN echo "opcache.enable=1" >> /usr/local/  0.0s
+ => CACHED [php stage-0  6/11] COPY --from=composer:latest /usr/bin/compo  0.0s
+ => CACHED [php stage-0  7/11] WORKDIR /var/www/html                       0.0s
+ => ERROR [php stage-0  8/11] COPY composer.json composer.lock ./          0.0s
+------
+ > [php stage-0  8/11] COPY composer.json composer.lock ./:
+------
+[+] up 0/2
+ ⠙ Image isp-whatsapp Building                                             1.3s
+ ⠙ Image isp-php      Building                                             1.3s
+Dockerfile:29
+
+--------------------
+
+  27 |     WORKDIR /var/www/html
+
+  28 |
+
+  29 | >>> COPY composer.json composer.lock ./
+
+  30 |     RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-scripts --no-interaction
+
+  31 |
+
+--------------------
+
+target php: failed to solve: failed to compute cache key: failed to calculate checksum of ref rh09h26mc7fo1zzlihs7btcz3::sh4kcamb0k77g8gozftcsif0v: "/composer.lock": not found
+
