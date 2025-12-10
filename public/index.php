@@ -4307,9 +4307,19 @@ $csrfToken = \App\Auth::generateToken();
     </style>
 </head>
 <body>
+    <?php
+    $sidebarSettings = new \App\Settings($db);
+    $sidebarCompanyInfo = $sidebarSettings->getCompanyInfo();
+    $sidebarLogo = $sidebarCompanyInfo['company_logo'] ?? '';
+    $sidebarCompanyName = $sidebarCompanyInfo['company_name'] ?? 'ISP CRM';
+    ?>
     <nav class="sidebar d-flex flex-column">
         <div class="brand">
-            <i class="bi bi-router"></i> ISP CRM
+            <?php if (!empty($sidebarLogo)): ?>
+                <img src="<?= htmlspecialchars($sidebarLogo) ?>" alt="<?= htmlspecialchars($sidebarCompanyName) ?>" style="max-height: 40px; max-width: 180px;">
+            <?php else: ?>
+                <i class="bi bi-router"></i> <?= htmlspecialchars($sidebarCompanyName) ?>
+            <?php endif; ?>
         </div>
         <ul class="nav flex-column">
             <li class="nav-item">

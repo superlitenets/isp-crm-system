@@ -158,6 +158,35 @@ if ($action === 'edit_template' && $id) {
                     </div>
                 </div>
             </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-image"></i> Company Logo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div id="logoPreview" class="border rounded p-3 text-center" style="width: 120px; height: 80px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);">
+                                <?php if (!empty($companyInfo['company_logo'])): ?>
+                                    <img src="<?= htmlspecialchars($companyInfo['company_logo']) ?>" alt="Logo" style="max-width: 100%; max-height: 60px;">
+                                <?php else: ?>
+                                    <span class="text-white"><i class="bi bi-router fs-2"></i></span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <input type="hidden" name="company_logo" id="companyLogoInput" value="<?= htmlspecialchars($companyInfo['company_logo'] ?? '') ?>">
+                            <input type="file" class="form-control mb-2" id="logoUpload" accept="image/*">
+                            <small class="text-muted d-block">Recommended: PNG or SVG, max 200x80px, transparent background</small>
+                            <?php if (!empty($companyInfo['company_logo'])): ?>
+                                <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="removeLogo()">
+                                    <i class="bi bi-trash"></i> Remove Logo
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="col-md-6">
@@ -277,6 +306,36 @@ document.getElementById('currencySelect').addEventListener('change', function() 
     var symbol = this.options[this.selectedIndex].dataset.symbol;
     document.getElementById('currencySymbol').value = symbol;
 });
+
+document.getElementById('logoUpload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Image size should be less than 2MB');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        document.getElementById('companyLogoInput').value = base64;
+        document.getElementById('logoPreview').innerHTML = '<img src="' + base64 + '" alt="Logo" style="max-width: 100%; max-height: 60px;">';
+    };
+    reader.readAsDataURL(file);
+});
+
+function removeLogo() {
+    if (confirm('Remove the company logo?')) {
+        document.getElementById('companyLogoInput').value = '';
+        document.getElementById('logoPreview').innerHTML = '<span class="text-white"><i class="bi bi-router fs-2"></i></span>';
+    }
+}
 </script>
 
 <?php elseif ($subpage === 'sms'): ?>
