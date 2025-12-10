@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(cors({ origin: ['http://localhost:5000', 'http://127.0.0.1:5000'] }));
+app.use(cors({ origin: true }));
 app.use(bodyParser.json());
 
 const PORT = process.env.WA_PORT || 3001;
@@ -43,7 +43,13 @@ function authMiddleware(req, res, next) {
     }
     
     const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'];
-    if (localIPs.includes(req.ip) || localIPs.includes(req.connection?.remoteAddress)) {
+    const clientIP = req.ip || req.connection?.remoteAddress || '';
+    
+    if (localIPs.includes(clientIP)) {
+        return next();
+    }
+    
+    if (process.env.DOCKER_ENV && (clientIP.startsWith('172.') || clientIP.startsWith('::ffff:172.'))) {
         return next();
     }
     
