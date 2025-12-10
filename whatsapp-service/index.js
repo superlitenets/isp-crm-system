@@ -54,6 +54,7 @@ app.use(authMiddleware);
 
 let client = null;
 let qrCodeData = null;
+let qrCodeString = null;
 let connectionStatus = 'disconnected';
 let clientInfo = null;
 
@@ -83,6 +84,7 @@ function initializeClient() {
     client.on('qr', async (qr) => {
         console.log('QR Code received');
         connectionStatus = 'qr_ready';
+        qrCodeString = qr;
         qrCodeData = await qrcode.toDataURL(qr);
     });
 
@@ -90,6 +92,7 @@ function initializeClient() {
         console.log('WhatsApp client is ready!');
         connectionStatus = 'connected';
         qrCodeData = null;
+        qrCodeString = null;
         clientInfo = client.info;
     });
 
@@ -102,6 +105,7 @@ function initializeClient() {
         console.error('Authentication failed:', msg);
         connectionStatus = 'auth_failed';
         qrCodeData = null;
+        qrCodeString = null;
     });
 
     client.on('disconnected', (reason) => {
@@ -109,6 +113,7 @@ function initializeClient() {
         connectionStatus = 'disconnected';
         clientInfo = null;
         qrCodeData = null;
+        qrCodeString = null;
     });
 
     client.initialize();
@@ -128,11 +133,29 @@ app.get('/status', (req, res) => {
 
 app.get('/qr', (req, res) => {
     if (qrCodeData) {
-        res.json({ qr: qrCodeData });
+        res.json({ qr: qrCodeData, qrString: qrCodeString });
     } else if (connectionStatus === 'connected') {
         res.json({ message: 'Already connected', status: connectionStatus });
     } else {
         res.json({ message: 'QR not available yet', status: connectionStatus });
+    }
+});
+
+app.get('/qr-terminal', async (req, res) => {
+    if (qrCodeString) {
+        res.set('Content-Type', 'text/plain');
+        const qrt = await import('qrcode-terminal');
+        let output = '';
+        qrt.default.generate(qrCodeString, { small: true }, (qr) => {
+            output = qr;
+        });
+        res.send(`WhatsApp QR Code - Scan with your phone:\n\n${output}\n\nStatus: ${connectionStatus}`);
+    } else if (connectionStatus === 'connected') {
+        res.set('Content-Type', 'text/plain');
+        res.send(`WhatsApp is already connected!\nStatus: ${connectionStatus}`);
+    } else {
+        res.set('Content-Type', 'text/plain');
+        res.send(`QR not available yet.\nStatus: ${connectionStatus}\n\nTry: POST /initialize to start the client`);
     }
 });
 
@@ -156,6 +179,7 @@ app.post('/logout', async (req, res) => {
         connectionStatus = 'disconnected';
         clientInfo = null;
         qrCodeData = null;
+        qrCodeString = null;
         res.json({ message: 'Logged out successfully', status: connectionStatus });
     } catch (error) {
         console.error('Logout error:', error);
