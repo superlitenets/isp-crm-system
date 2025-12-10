@@ -1,0 +1,22 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 20
+NOTICE: PHP message: Migration error for vendor_bill_items: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendor_bills" does not exist
+NOTICE: PHP message: Error seeding SLA policy: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type boolean: ""
+CONTEXT:  unnamed portal parameter $8 = ''
+NOTICE: PHP message: Error seeding SLA policy: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type boolean: ""
+CONTEXT:  unnamed portal parameter $8 = ''
+NOTICE: PHP message: Error seeding business hours: SQLSTATE[22P02]: Invalid text representation: 7 ERROR:  invalid input syntax for type boolean: ""
+CONTEXT:  unnamed portal parameter $4 = ''
+172.18.0.5 -  10/Dec/2025:17:13:00 +0300 "GET /index.php" 200
+NOTICE: PHP message: Migration error for vendor_bills: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendors" does not exist
+NOTICE: PHP message: Migration error for vendor_bill_items: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendor_bills" does not exist
+172.18.0.5 -  10/Dec/2025:17:13:04 +0300 "POST /index.php" 200
+NOTICE: PHP message: Migration error for vendor_bills: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendors" does not exist
+NOTICE: PHP message: Migration error for vendor_bill_items: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendor_bills" does not exist
+172.18.0.5 -  10/Dec/2025:17:13:07 +0300 "POST /index.php" 200
+NOTICE: PHP message: Migration error for vendor_bills: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendors" does not exist
+NOTICE: PHP message: Migration error for vendor_bill_items: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "vendor_bills" does not exist
+172.18.0.5 -  10/Dec/2025:17:13:20 +0300 "POST /index.php" 200
+172.18.0.5 -  10/Dec/2025:17:15:02 +0300 "GET /cron.php" 200
+172.18.0.5 -  10/Dec/2025:17:15:49 +0300 "POST /index.php" 200
+172.18.0.5 -  10/Dec/2025:17:15:52 +0300 "POST /index.php" 200
+root@superlitecrm:~/isp#
