@@ -1,0 +1,55 @@
+ => ERROR [php stage-0  9/11] RUN composer install --no-dev --optimize-autoloader --no-scripts   4.9s
+------
+ > [php stage-0  9/11] RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-scripts --no-interaction:
+0.992 Installing dependencies from lock file
+0.995 Verifying lock file contents can be installed on current platform.
+1.069 Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.
+1.071 - Required package "coding-libs/zkteco-php" is not present in the lock file.
+1.071 This usually happens when composer files are incorrectly merged or the composer.json file is manually edited.
+1.071 Read more about correctly resolving merge conflicts https://getcomposer.org/doc/articles/resolving-merge-conflicts.md
+1.071 and prefer using the "require" command over editing the composer.json file directly https://getcomposer.org/doc/03-cli.md#require-r
+1.415 Loading composer repositories with package information
+3.928 Updating dependencies
+4.768 Your requirements could not be resolved to an installable set of packages.
+4.768
+4.768   Problem 1
+4.768     - Root composer.json requires coding-libs/zkteco-php ^1.0, found coding-libs/zkteco-php[dev-master, 1.x-dev (alias of dev-master)] but it does not match your minimum-stability.
+4.768   Problem 2
+4.768     - Root composer.json requires phpoffice/phpspreadsheet ^5.3 -> satisfiable by phpoffice/phpspreadsheet[5.3.0].
+4.768     - phpoffice/phpspreadsheet 5.3.0 requires ext-gd * -> it is missing from your system. Install or enable PHP's gd extension.
+4.768
+4.768 To enable extensions, verify that they are enabled in your .ini files:
+4.768     - /usr/local/etc/php/php.ini
+4.768     - /usr/local/etc/php/conf.d/docker-fpm.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-intl.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-pdo_pgsql.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-sockets.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-sodium.ini
+4.768     - /usr/local/etc/php/conf.d/docker-php-ext-zip.ini
+4.768     - /usr/local/etc/php/conf.d/opcache.ini
+4.768     - /usr/local/etc/php/conf.d/timezone.ini
+4.768 You can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.
+4.768 Alternatively, you can run Composer with `--ignore-platform-req=ext-gd` to temporarily ignore these required extensions.
+4.768 Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.
+------
+[+] up 0/2
+ ⠙ Image isp-whatsapp Building                                                                   8.6s
+ ⠙ Image isp-php      Building                                                                   8.6s
+Dockerfile:30
+
+--------------------
+
+  28 |
+
+  29 |     COPY composer.json composer.lock ./
+
+  30 | >>> RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-scripts --no-interaction
+
+  31 |
+
+  32 |     COPY . .
+
+--------------------
+
+target php: failed to solve: process "/bin/sh -c composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-scripts --no-interaction" did not complete successfully: exit code: 2
