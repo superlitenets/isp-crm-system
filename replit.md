@@ -29,7 +29,14 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Authentication**: Session-based authentication with password hashing, CSRF protection, SQL injection prevention (prepared statements), XSS protection, and a flexible role-based access control (RBAC) system with granular permissions.
 - **Database**: PostgreSQL is used as the primary database with a clearly defined schema for modules like customers, tickets, employees, inventory, transactions, and HR.
 - **SMS Integration**: Supports custom SMS gateways (any POST/GET API) and Twilio. SMS notifications use configurable templates.
-- **WhatsApp Integration**: Facilitates direct messaging via WhatsApp Web.
+- **WhatsApp Integration**: Full-featured WhatsApp Web integration with:
+  - Real-time chat interface with conversation list and message history
+  - Automatic customer linking based on phone number matching
+  - Database storage for conversations and messages (whatsapp_conversations, whatsapp_messages)
+  - Unread message tracking and conversation previews
+  - Media message support (images, audio, documents)
+  - Session status monitoring with QR code display
+  - Node.js service running Puppeteer for WhatsApp Web automation
 - **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
 - **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
   - **Hikvision Remote Fingerprint Enrollment**: ISAPI-based remote fingerprint capture matching IVMS-4200 functionality:
