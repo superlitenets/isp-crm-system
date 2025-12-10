@@ -482,10 +482,10 @@ try {
             );
             
             if (empty($employeeIds)) {
-                $empStmt = $db->query("SELECT id, name, biometric_id, card_number FROM employees WHERE status = 'active'");
+                $empStmt = $db->query("SELECT id, name, employee_id as emp_code FROM employees WHERE status = 'active'");
             } else {
                 $placeholders = implode(',', array_fill(0, count($employeeIds), '?'));
-                $empStmt = $db->prepare("SELECT id, name, biometric_id, card_number FROM employees WHERE id IN ($placeholders)");
+                $empStmt = $db->prepare("SELECT id, name, employee_id as emp_code FROM employees WHERE id IN ($placeholders)");
                 $empStmt->execute($employeeIds);
             }
             
@@ -497,21 +497,23 @@ try {
             $startEnrollment = $input['start_enrollment'] ?? true;
             
             foreach ($employees as $emp) {
-                $bioId = $emp['biometric_id'] ?: (string)$emp['id'];
-                $result = $hikDevice->addUserWithEnrollment($bioId, $emp['name'], $emp['card_number'], $startEnrollment);
+                $bioId = (string)$emp['id'];
+                $result = $hikDevice->addUserWithEnrollment($bioId, $emp['name'], null, $startEnrollment);
                 $results[] = [
                     'employee_id' => $emp['id'],
                     'name' => $emp['name'],
-                    'biometric_id' => $bioId,
+                    'device_user_id' => $bioId,
                     'success' => $result['success'],
                     'message' => $result['message'] ?? $result['error'] ?? ''
                 ];
                 if ($result['success']) {
                     $successCount++;
-                    if (empty($emp['biometric_id'])) {
-                        $updateStmt = $db->prepare("UPDATE employees SET biometric_id = ? WHERE id = ?");
-                        $updateStmt->execute([$bioId, $emp['id']]);
-                    }
+                    $mappingStmt = $db->prepare("
+                        INSERT INTO device_user_mapping (device_id, device_user_id, employee_id, device_user_name)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT (device_id, device_user_id) DO UPDATE SET employee_id = EXCLUDED.employee_id
+                    ");
+                    $mappingStmt->execute([$deviceId, $bioId, $emp['id'], $emp['name']]);
                 } else {
                     $failCount++;
                 }
