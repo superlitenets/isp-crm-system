@@ -32,6 +32,12 @@ The system features a clean, responsive design. The public-facing landing page i
 - **WhatsApp Integration**: Facilitates direct messaging via WhatsApp Web.
 - **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
 - **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
+  - **Hikvision Remote Fingerprint Enrollment**: ISAPI-based remote fingerprint capture matching IVMS-4200 functionality:
+    - `captureFingerprint()` - Triggers device to enter capture mode, employee places finger on scanner
+    - `setupFingerprint()` - Upload fingerprint template data directly to device
+    - `getFingerprints()` - Retrieve enrolled fingerprints for an employee
+    - `deleteFingerprint()` - Remove fingerprints from device
+    - `getFingerprintCapabilities()` - Check device remote capture support
 - **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive equipment lifecycle tracking.

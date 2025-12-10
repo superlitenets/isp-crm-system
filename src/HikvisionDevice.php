@@ -670,6 +670,296 @@ class HikvisionDevice extends BiometricDevice {
         return ['success' => false, 'error' => $error];
     }
     
+    /**
+     * Remote fingerprint capture - triggers the device to enter capture mode
+     * The employee must place their finger on the device scanner
+     * This is how IVMS-4200 does remote enrollment
+     */
+    public function captureFingerprint(string $employeeNo, int $fingerPrintID = 1, int $cardReaderNo = 1): array {
+        // Method 1: JSON POST (preferred for newer devices)
+        $captureData = [
+            'CaptureFingerPrint' => [
+                'employeeNo' => $employeeNo,
+                'fingerPrintID' => $fingerPrintID,
+                'cardReaderNo' => $cardReaderNo
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            'POST',
+            json_encode($captureData),
+            'application/json'
+        );
+        
+        error_log("Hikvision captureFingerprint JSON response: " . $response['code'] . " - " . substr($response['body'] ?? '', 0, 500));
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            if (isset($data['CaptureFingerPrintResult'])) {
+                $result = $data['CaptureFingerPrintResult'];
+                if (isset($result['fingerData']) && !empty($result['fingerData'])) {
+                    // Fingerprint was captured successfully, now save it
+                    $saveResult = $this->setupFingerprint($employeeNo, $result['fingerData'], $fingerPrintID);
+                    return [
+                        'success' => true,
+                        'message' => 'Fingerprint captured and saved successfully',
+                        'employee_no' => $employeeNo,
+                        'finger_id' => $fingerPrintID,
+                        'saved' => $saveResult['success']
+                    ];
+                }
+                return [
+                    'success' => true,
+                    'message' => 'Fingerprint capture started. Place finger on device scanner now.',
+                    'employee_no' => $employeeNo,
+                    'finger_id' => $fingerPrintID,
+                    'status' => $result['status'] ?? 'capturing'
+                ];
+            }
+            return [
+                'success' => true,
+                'message' => 'Fingerprint capture initiated. Place finger on scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerPrintID
+            ];
+        }
+        
+        // Method 2: XML POST (for older devices)
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
+<CaptureFingerPrint>
+    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
+    <fingerPrintID>' . $fingerPrintID . '</fingerPrintID>
+    <cardReaderNo>' . $cardReaderNo . '</cardReaderNo>
+</CaptureFingerPrint>';
+        
+        $response2 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
+            'POST',
+            $xmlData,
+            'application/xml'
+        );
+        
+        error_log("Hikvision captureFingerprint XML response: " . $response2['code'] . " - " . substr($response2['body'] ?? '', 0, 500));
+        
+        if ($response2['code'] === 200) {
+            return [
+                'success' => true,
+                'message' => 'Fingerprint capture started. Place finger on device scanner.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerPrintID
+            ];
+        }
+        
+        // Parse error from response
+        $error = 'Fingerprint capture failed';
+        $body = $response['body'] ?: $response2['body'];
+        if ($body) {
+            if (strpos($body, '<') === 0) {
+                $xml = @simplexml_load_string($body);
+                if ($xml) {
+                    $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
+                }
+            } else {
+                $data = json_decode($body, true);
+                if ($data) {
+                    $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+                }
+            }
+        }
+        
+        return [
+            'success' => false,
+            'error' => $error,
+            'code' => $response['code'],
+            'hint' => 'Ensure employee is registered on device first. Try enrolling on device screen: Menu > User > Edit User > Add Fingerprint'
+        ];
+    }
+    
+    /**
+     * Upload/setup fingerprint data on device
+     * Use this to add fingerprint template data directly
+     */
+    public function setupFingerprint(string $employeeNo, string $fingerData, int $fingerPrintID = 1, int $cardReaderNo = 1): array {
+        $setupData = [
+            'FingerPrintCfg' => [
+                'employeeNo' => $employeeNo,
+                'enableCardReader' => [$cardReaderNo],
+                'fingerPrintID' => $fingerPrintID,
+                'fingerType' => 'normalFP',
+                'fingerData' => $fingerData
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'POST',
+            json_encode($setupData),
+            'application/json'
+        );
+        
+        error_log("Hikvision setupFingerprint response: " . $response['code'] . " - " . substr($response['body'] ?? '', 0, 500));
+        
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            if (isset($data['statusCode']) && $data['statusCode'] == 1) {
+                return ['success' => true, 'message' => 'Fingerprint saved successfully'];
+            }
+            return ['success' => true, 'message' => 'Fingerprint setup completed', 'response' => $data];
+        }
+        
+        $error = 'Failed to setup fingerprint';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+    }
+    
+    /**
+     * Get fingerprints for an employee from device
+     */
+    public function getFingerprints(string $employeeNo): array {
+        $searchData = [
+            'FingerPrintCond' => [
+                'searchID' => (string)time(),
+                'employeeNo' => $employeeNo,
+                'searchResultPosition' => 0,
+                'maxResults' => 10
+            ]
+        ];
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrintUpload?format=json',
+            'POST',
+            json_encode($searchData),
+            'application/json'
+        );
+        
+        error_log("Hikvision getFingerprints response: " . $response['code'] . " - " . substr($response['body'] ?? '', 0, 500));
+        
+        if ($response['code'] === 200 && $response['body']) {
+            $data = json_decode($response['body'], true);
+            
+            if (isset($data['FingerPrintInfo']['status'])) {
+                $status = $data['FingerPrintInfo']['status'];
+                if ($status === 'NoFP') {
+                    return ['success' => true, 'fingerprints' => [], 'count' => 0, 'message' => 'No fingerprints enrolled'];
+                }
+            }
+            
+            $fingerprints = [];
+            if (isset($data['FingerPrintInfo']['FingerPrintList'])) {
+                $list = $data['FingerPrintInfo']['FingerPrintList'];
+                if (!is_array($list)) $list = [$list];
+                foreach ($list as $fp) {
+                    $fingerprints[] = [
+                        'finger_id' => $fp['fingerPrintID'] ?? 0,
+                        'finger_type' => $fp['fingerType'] ?? 'unknown',
+                        'has_data' => !empty($fp['fingerData'])
+                    ];
+                }
+            }
+            
+            return [
+                'success' => true,
+                'fingerprints' => $fingerprints,
+                'count' => count($fingerprints),
+                'raw' => $data
+            ];
+        }
+        
+        $error = 'Failed to get fingerprints';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error, 'fingerprints' => []];
+    }
+    
+    /**
+     * Delete fingerprint from device
+     */
+    public function deleteFingerprint(string $employeeNo, ?int $fingerPrintID = null, ?int $cardReaderNo = null): array {
+        $deleteData = [
+            'FingerPrintDelete' => [
+                'employeeNo' => $employeeNo,
+                'deleteFingerPrint' => true
+            ]
+        ];
+        
+        if ($fingerPrintID !== null) {
+            $deleteData['FingerPrintDelete']['fingerPrintID'] = $fingerPrintID;
+        }
+        
+        if ($cardReaderNo !== null) {
+            $deleteData['FingerPrintDelete']['enableCardReader'] = [$cardReaderNo];
+        }
+        
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/FingerPrint/SetUp?format=json',
+            'POST',
+            json_encode($deleteData),
+            'application/json'
+        );
+        
+        if ($response['code'] === 200) {
+            return ['success' => true, 'message' => 'Fingerprint deleted successfully'];
+        }
+        
+        $error = 'Failed to delete fingerprint';
+        if ($response['body']) {
+            $data = json_decode($response['body'], true);
+            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+        }
+        
+        return ['success' => false, 'error' => $error];
+    }
+    
+    /**
+     * Get fingerprint capture capabilities
+     */
+    public function getFingerprintCapabilities(): array {
+        $response = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint/capabilities?format=json',
+            'GET'
+        );
+        
+        if ($response['code'] === 200 && $response['body']) {
+            $data = json_decode($response['body'], true);
+            return [
+                'success' => true,
+                'capabilities' => $data,
+                'supports_remote_capture' => true
+            ];
+        }
+        
+        // Try XML format
+        $response2 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint/capabilities',
+            'GET'
+        );
+        
+        if ($response2['code'] === 200 && $response2['body']) {
+            $xml = @simplexml_load_string($response2['body']);
+            if ($xml) {
+                return [
+                    'success' => true,
+                    'capabilities' => json_decode(json_encode($xml), true),
+                    'supports_remote_capture' => true
+                ];
+            }
+        }
+        
+        return [
+            'success' => false,
+            'error' => 'Remote fingerprint capture may not be supported on this device',
+            'supports_remote_capture' => false
+        ];
+    }
+    
     public function addUserWithEnrollment(string $employeeNo, string $name, ?string $cardNo = null, bool $startEnrollment = true): array {
         $existingUser = $this->getUser($employeeNo);
         $userExisted = $existingUser !== null;
