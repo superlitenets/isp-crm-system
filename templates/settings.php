@@ -3564,100 +3564,50 @@ $mpesaConfig = $mpesa->getConfig();
             
             <div class="card mb-4">
                 <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa Daraja API Configuration</h5>
+                    <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa API Credentials</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> Get your credentials from 
-                        <a href="https://developer.safaricom.co.ke/" target="_blank">Safaricom Daraja Portal</a>
-                    </div>
-                    
-                    <div class="alert alert-warning">
-                        <i class="bi bi-shield-lock"></i> <strong>Security Tip:</strong> 
-                        For production, use environment variables (MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_PASSKEY, MPESA_SHORTCODE) instead of storing credentials here.
-                    </div>
-                    
                     <input type="hidden" name="mpesa_environment" value="production">
                     
                     <div class="mb-3">
-                        <label class="form-label">Business Shortcode (Paybill/Till) *</label>
+                        <label class="form-label">Shortcode (Paybill/Till)</label>
                         <input type="text" class="form-control" name="mpesa_shortcode" 
                                value="<?= htmlspecialchars($mpesaConfig['mpesa_shortcode'] ?? '') ?>"
-                               placeholder="Your Paybill or Till Number" required>
+                               placeholder="e.g. 174379">
                     </div>
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Consumer Key *</label>
+                            <label class="form-label">Consumer Key</label>
                             <input type="text" class="form-control" name="mpesa_consumer_key" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>"
-                                   placeholder="Your Consumer Key">
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_key'] ?? '') ?>">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Consumer Secret *</label>
+                            <label class="form-label">Consumer Secret</label>
                             <input type="password" class="form-control" name="mpesa_consumer_secret" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>"
-                                   placeholder="Your Consumer Secret">
+                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_consumer_secret'] ?? '') ?>">
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Passkey *</label>
+                        <label class="form-label">Passkey</label>
                         <input type="text" class="form-control" name="mpesa_passkey" 
-                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>"
-                               placeholder="Lipa na M-Pesa Passkey" required>
-                        <div class="form-text">Get your passkey from Safaricom after going live on Daraja</div>
+                               value="<?= htmlspecialchars($mpesaConfig['mpesa_passkey'] ?? '') ?>">
                     </div>
-                </div>
-            </div>
-            
-            <div class="card mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Callback URLs</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">These URLs receive payment notifications from M-Pesa. They are auto-generated but can be customized.</p>
                     
                     <div class="mb-3">
-                        <label class="form-label">STK Push Callback URL</label>
+                        <label class="form-label">Callback URL</label>
                         <input type="url" class="form-control" name="mpesa_callback_url" 
                                value="<?= htmlspecialchars($mpesaConfig['mpesa_callback_url'] ?? $mpesa->getCallbackUrl()) ?>">
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">C2B Validation URL</label>
-                            <input type="url" class="form-control" name="mpesa_validation_url" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">C2B Confirmation URL</label>
-                            <input type="url" class="form-control" name="mpesa_confirmation_url" 
-                                   value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
-                        </div>
-                    </div>
+                    <input type="hidden" name="mpesa_validation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_validation_url'] ?? $mpesa->getValidationUrl()) ?>">
+                    <input type="hidden" name="mpesa_confirmation_url" value="<?= htmlspecialchars($mpesaConfig['mpesa_confirmation_url'] ?? $mpesa->getConfirmationUrl()) ?>">
                     
-                    <?php 
-                    $c2bRegistered = $mpesaConfig['c2b_urls_registered'] ?? null;
-                    ?>
-                    <?php if ($c2bRegistered): ?>
-                    <div class="alert alert-success py-2 small mb-3">
-                        <i class="bi bi-check-circle"></i> C2B URLs registered on <?= htmlspecialchars($c2bRegistered) ?>
-                    </div>
-                    <?php endif; ?>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save Settings
+                    </button>
                 </div>
-            </div>
-            
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-lg"></i> Save M-Pesa Settings
-                </button>
-                <button type="submit" formaction="?page=settings&subpage=mpesa&action=register_c2b" class="btn btn-outline-primary" <?= !$mpesa->isConfigured() ? 'disabled' : '' ?>>
-                    <i class="bi bi-link-45deg"></i> Register C2B URLs
-                </button>
-                <a href="?page=payments" class="btn btn-outline-success">
-                    <i class="bi bi-arrow-right"></i> Go to Payments
-                </a>
             </div>
         </form>
     </div>
@@ -3719,20 +3669,6 @@ $mpesaConfig = $mpesa->getConfig();
             </div>
         </div>
         
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Quick Help</h5>
-            </div>
-            <div class="card-body small">
-                <p><strong>To get production credentials:</strong></p>
-                <ol class="mb-0">
-                    <li>Go to <a href="https://developer.safaricom.co.ke" target="_blank">Daraja Portal</a></li>
-                    <li>Create an App under "My Apps"</li>
-                    <li>Request "Go Live" approval</li>
-                    <li>Copy your Consumer Key, Secret, and Passkey</li>
-                </ol>
-            </div>
-        </div>
     </div>
 </div>
 

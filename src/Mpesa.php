@@ -59,17 +59,23 @@ class Mpesa {
     
     public function saveConfig(string $key, string $value, bool $isEncrypted = false): bool {
         try {
+            $encryptedVal = $isEncrypted ? 't' : 'f';
             $stmt = $this->db->prepare("
                 INSERT INTO mpesa_config (config_key, config_value, is_encrypted, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (:key, :value, :encrypted, CURRENT_TIMESTAMP)
                 ON CONFLICT (config_key) DO UPDATE SET
                     config_value = EXCLUDED.config_value,
                     is_encrypted = EXCLUDED.is_encrypted,
                     updated_at = CURRENT_TIMESTAMP
             ");
-            return $stmt->execute([$key, $value, $isEncrypted]);
+            $stmt->bindValue(':key', $key);
+            $stmt->bindValue(':value', $value);
+            $stmt->bindValue(':encrypted', $isEncrypted, \PDO::PARAM_BOOL);
+            $result = $stmt->execute();
+            error_log("M-Pesa config saved: $key = " . ($result ? 'success' : 'failed'));
+            return $result;
         } catch (\Exception $e) {
-            error_log("Error saving M-Pesa config: " . $e->getMessage());
+            error_log("Error saving M-Pesa config '$key': " . $e->getMessage());
             return false;
         }
     }
