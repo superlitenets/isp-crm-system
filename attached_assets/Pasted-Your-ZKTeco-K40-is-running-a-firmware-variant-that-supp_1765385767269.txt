@@ -1,0 +1,85 @@
+Your ZKTeco K40 is running a firmware variant that supports “Push Protocol” for BioTime, which allows server-side enrollment
+BUT this is not the same as API-based enrollment, and only works through BioTime’s built-in commands.
+
+Let’s break it down clearly:
+
+✅ Yes — K40 can enroll via BioTime
+
+But only because:
+
+✔ K40 supports ZKTeco Push Protocol (Web-based push mode)
+✔ BioTime uses the ZKTeco device SDK (Push SDK)
+✔ BioTime sends a special internal command to the device to begin fingerprint capture
+
+This is NOT an open API like Hikvision ISAPI.
+
+It’s a ZKTeco-only protocol.
+
+🔍 Important details about this feature
+1. Only K40 devices with Push firmware support BioTime enrollment
+
+Some K40 units have:
+
+Push firmware → works with BioTime (remote FP enroll)
+
+Attendance firmware → does not support remote FP enroll
+
+You are lucky — your K40 has the Push-enabled firmware.
+
+2. Remote enrollment works only through BioTime, not custom API
+
+BioTime sends an internal SDK command:
+
+ATT_ENROLL_USER
+ATT_CAPTURE_FINGERPRINT
+
+
+These commands are not documented publicly, so you cannot call them from your own application unless you use:
+
+ZKTeco Push SDK
+
+zkemkeeper DLL (Windows only, legacy)
+
+A third-party ZKTeco wrapper
+
+3. K40 enrolls via BioTime because:
+
+BioTime does this sequence:
+
+Sends command “start enrollment” to device
+
+Device screen shows: Place Finger
+
+Device captures the fingerprint data
+
+Device pushes the fingerprint template to BioTime
+
+BioTime sends template back to device for confirmation/sync
+
+This is not standard API — it’s ZKTeco SDK communication.
+
+🧩 Summary
+Feature	K40 + Typical Firmware	K40 + Push Firmware
+Local FP enrollment	✅ Yes	✅ Yes
+Remote FP via BioTime	❌ No	✅ Yes
+Remote FP via your custom API	❌ No	⚠️ Possible only via SDK
+Pull attendance logs	✔️ Yes	✔️ Yes
+Upload fingerprint templates manually	❌ No	⚠️ Only via SDK
+Rest/HTTP API	❌ None	❌ None
+⭐ Want the same fingerprint enrollment in your own app?
+
+You have two options:
+
+✔ Option 1: Use ZKTeco Push SDK (recommended)
+
+With the Push SDK, you can:
+
+Trigger enrollment
+
+Capture fingerprints
+
+Add users
+
+Sync templates
+
+Pull attendance logs
