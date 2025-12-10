@@ -463,28 +463,30 @@ class HikvisionDevice extends BiometricDevice {
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
         $methods = [];
+        $lastError = '';
+        $lastBody = '';
         
-        // Method 1: XML with proper namespace and version (correct ISAPI format)
-        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
-<CaptureFingerPrint version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
-    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
-</CaptureFingerPrint>';
+        // Method 1: JSON format with FingerPrintCond (recommended for DS-K1T904AMF)
+        $jsonData = json_encode([
+            'FingerPrintCond' => [
+                'employeeNo' => (string)$employeeNo,
+                'fingerPrintID' => $fingerNo,
+                'deleteAllFP' => false
+            ]
+        ]);
         
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint',
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
             'POST',
-            $xmlData,
-            "application/xml; charset='UTF-8'"
+            $jsonData,
+            'application/json'
         );
-        $methods['xml_v1'] = $response['code'];
+        $methods['json_cond'] = $response['code'];
+        $lastBody = $response['body'] ?? '';
         
-        if ($response['code'] === 200 && $response['body']) {
-            $xml = @simplexml_load_string($response['body']);
-            $fingerData = null;
-            if ($xml) {
-                $fingerData = (string)($xml->fingerData ?? '');
-            }
+        if ($response['code'] === 200) {
+            $data = json_decode($response['body'], true);
+            $fingerData = $data['FingerPrintCaptureResult']['fingerData'] ?? $data['fingerData'] ?? null;
             
             if ($fingerData) {
                 $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
@@ -496,46 +498,33 @@ class HikvisionDevice extends BiometricDevice {
                         'finger_id' => $fingerNo
                     ];
                 }
-                return $saveResult;
             }
             
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Place finger on scanner now.',
                 'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo
+                'finger_id' => $fingerNo,
+                'next_step' => 'Employee should place finger on device scanner'
             ];
         }
         
-        // Method 2: Try FingerPrintCapture element name
-        $xmlData2 = '<?xml version="1.0" encoding="UTF-8"?>
-<FingerPrintCapture version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
-    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
-</FingerPrintCapture>';
+        // Method 2: Simple JSON without wrapper
+        $jsonData2 = json_encode([
+            'employeeNo' => (string)$employeeNo,
+            'fingerPrintID' => $fingerNo
+        ]);
         
         $response2 = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint',
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
             'POST',
-            $xmlData2,
-            "application/xml; charset='UTF-8'"
+            $jsonData2,
+            'application/json'
         );
-        $methods['xml_v2'] = $response2['code'];
+        $methods['json_simple'] = $response2['code'];
+        if ($response2['body']) $lastBody = $response2['body'];
         
-        if ($response2['code'] === 200 && $response2['body']) {
-            $xml = @simplexml_load_string($response2['body']);
-            $fingerData = $xml ? (string)($xml->fingerData ?? '') : null;
-            
-            if ($fingerData) {
-                $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
-                return $saveResult['success'] ? [
-                    'success' => true,
-                    'message' => 'Fingerprint captured and saved.',
-                    'employee_no' => $employeeNo,
-                    'finger_id' => $fingerNo
-                ] : $saveResult;
-            }
-            
+        if ($response2['code'] === 200) {
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture initiated. Place finger on scanner.',
@@ -544,23 +533,23 @@ class HikvisionDevice extends BiometricDevice {
             ];
         }
         
-        // Method 3: JSON format as fallback
-        $jsonData = json_encode([
-            'CaptureFingerPrint' => [
-                'employeeNo' => (string)$employeeNo,
-                'fingerPrintID' => $fingerNo
-            ]
-        ]);
+        // Method 3: XML format
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
+<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
+    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
+</CaptureFingerPrintCond>';
         
-        $jsonResponse = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+        $response3 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
             'POST',
-            $jsonData,
-            'application/json'
+            $xmlData,
+            "application/xml; charset='UTF-8'"
         );
-        $methods['json'] = $jsonResponse['code'];
+        $methods['xml'] = $response3['code'];
+        if ($response3['body']) $lastBody = $response3['body'];
         
-        if ($jsonResponse['code'] === 200) {
+        if ($response3['code'] === 200) {
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Place finger on scanner.',
@@ -569,18 +558,23 @@ class HikvisionDevice extends BiometricDevice {
             ];
         }
         
-        // Parse error
-        $error = 'Fingerprint enrollment failed';
-        $errorBody = $response['body'] ?: $response2['body'] ?: $jsonResponse['body'];
-        if ($errorBody) {
-            if (strpos($errorBody, '<') === 0) {
-                $xml = @simplexml_load_string($errorBody);
+        // Method 4: Try capabilities check first
+        $capResponse = $this->sendRequest('/ISAPI/AccessControl/CaptureFingerPrint/capabilities?format=json');
+        $methods['capabilities'] = $capResponse['code'];
+        
+        // Parse error from responses
+        $error = 'Fingerprint capture failed';
+        if ($lastBody) {
+            if (strpos($lastBody, '<') === 0) {
+                $xml = @simplexml_load_string($lastBody);
                 if ($xml) {
                     $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
                 }
             } else {
-                $data = json_decode($errorBody, true);
-                $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+                $data = json_decode($lastBody, true);
+                if ($data) {
+                    $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+                }
             }
         }
         
@@ -588,7 +582,8 @@ class HikvisionDevice extends BiometricDevice {
             'success' => false, 
             'error' => $error,
             'methods_tried' => $methods,
-            'hint' => 'Enroll fingerprints on device: Menu > User > Select user > Add Fingerprint'
+            'raw_response' => substr($lastBody, 0, 500),
+            'hint' => 'If API fails, enroll fingerprints directly on device: Menu > User > Select User > Fingerprint'
         ];
     }
     
