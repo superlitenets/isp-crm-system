@@ -611,123 +611,133 @@ if ($page === 'api' && $action === 'whatsapp_session') {
 
 // Web Dashboard Clock In/Out API
 if ($page === 'api' && $action === 'clock_in') {
-    ob_clean();
+    while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
     
-    if (!\App\Auth::isLoggedIn()) {
-        echo json_encode(['success' => false, 'error' => 'Not logged in']);
-        exit;
+    try {
+        if (!\App\Auth::isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Not logged in']);
+            exit;
+        }
+        
+        $userId = \App\Auth::user()['id'];
+        $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$employee) {
+            echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
+            exit;
+        }
+        
+        $today = date('Y-m-d');
+        $now = date('H:i:s');
+        
+        // Check if already clocked in
+        $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+        $stmt->execute([$employee['id'], $today]);
+        $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($attendance && $attendance['clock_in']) {
+            echo json_encode(['success' => false, 'error' => 'Already clocked in today at ' . $attendance['clock_in']]);
+            exit;
+        }
+        
+        // Calculate late minutes
+        $lateCalculator = new \App\LateDeductionCalculator($db);
+        $lateMinutes = $lateCalculator->calculateLateMinutes($employee['id'], $now);
+        $lateDeduction = $lateCalculator->calculateDeduction($employee['id'], $lateMinutes);
+        
+        if ($attendance) {
+            $stmt = $db->prepare("UPDATE attendance SET clock_in = ?, late_minutes = ?, status = 'present', source = 'web' WHERE id = ?");
+            $stmt->execute([$now, $lateMinutes, $attendance['id']]);
+        } else {
+            $stmt = $db->prepare("INSERT INTO attendance (employee_id, date, clock_in, late_minutes, status, source) VALUES (?, ?, ?, ?, 'present', 'web')");
+            $stmt->execute([$employee['id'], $today, $now, $lateMinutes]);
+        }
+        
+        $response = [
+            'success' => true,
+            'message' => 'Clocked in at ' . date('h:i A'),
+            'clock_in' => $now,
+            'is_late' => $lateMinutes > 0,
+            'late_minutes' => $lateMinutes,
+            'late_deduction' => $lateDeduction
+        ];
+        
+        echo json_encode($response);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Server error: ' . $e->getMessage()]);
     }
-    
-    $userId = \App\Auth::user()['id'];
-    $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$employee) {
-        echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
-        exit;
-    }
-    
-    $today = date('Y-m-d');
-    $now = date('H:i:s');
-    
-    // Check if already clocked in
-    $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
-    $stmt->execute([$employee['id'], $today]);
-    $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($attendance && $attendance['clock_in']) {
-        echo json_encode(['success' => false, 'error' => 'Already clocked in today at ' . $attendance['clock_in']]);
-        exit;
-    }
-    
-    // Calculate late minutes
-    $lateCalculator = new \App\LateDeductionCalculator($db);
-    $lateMinutes = $lateCalculator->calculateLateMinutes($employee['id'], $now);
-    $lateDeduction = $lateCalculator->calculateDeduction($employee['id'], $lateMinutes);
-    
-    if ($attendance) {
-        $stmt = $db->prepare("UPDATE attendance SET clock_in = ?, late_minutes = ?, status = 'present', source = 'web' WHERE id = ?");
-        $stmt->execute([$now, $lateMinutes, $attendance['id']]);
-    } else {
-        $stmt = $db->prepare("INSERT INTO attendance (employee_id, date, clock_in, late_minutes, status, source) VALUES (?, ?, ?, ?, 'present', 'web')");
-        $stmt->execute([$employee['id'], $today, $now, $lateMinutes]);
-    }
-    
-    $response = [
-        'success' => true,
-        'message' => 'Clocked in at ' . date('h:i A'),
-        'clock_in' => $now,
-        'is_late' => $lateMinutes > 0,
-        'late_minutes' => $lateMinutes,
-        'late_deduction' => $lateDeduction
-    ];
-    
-    echo json_encode($response);
     exit;
 }
 
 if ($page === 'api' && $action === 'clock_out') {
-    ob_clean();
+    while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json');
+    header('Cache-Control: no-cache');
     
-    if (!\App\Auth::isLoggedIn()) {
-        echo json_encode(['success' => false, 'error' => 'Not logged in']);
-        exit;
+    try {
+        if (!\App\Auth::isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Not logged in']);
+            exit;
+        }
+        
+        $userId = \App\Auth::user()['id'];
+        $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$employee) {
+            echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
+            exit;
+        }
+        
+        $today = date('Y-m-d');
+        $now = date('H:i:s');
+        
+        $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+        $stmt->execute([$employee['id'], $today]);
+        $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$attendance || !$attendance['clock_in']) {
+            echo json_encode(['success' => false, 'error' => 'You must clock in first']);
+            exit;
+        }
+        
+        if ($attendance['clock_out']) {
+            echo json_encode(['success' => false, 'error' => 'Already clocked out at ' . $attendance['clock_out']]);
+            exit;
+        }
+        
+        // Check minimum clock out time (configurable, default 5:00 PM)
+        $settingsObj = new \App\Settings();
+        $minClockOutHour = (int)$settingsObj->get('min_clock_out_hour', '17');
+        $currentHour = (int)date('H');
+        if ($currentHour < $minClockOutHour) {
+            $minTimeFormatted = date('g:i A', strtotime("$minClockOutHour:00"));
+            echo json_encode(['success' => false, 'error' => "Clock out is only allowed after $minTimeFormatted"]);
+            exit;
+        }
+        
+        // Calculate hours worked
+        $clockIn = strtotime($attendance['clock_in']);
+        $clockOut = strtotime($now);
+        $hoursWorked = round(($clockOut - $clockIn) / 3600, 2);
+        
+        $stmt = $db->prepare("UPDATE attendance SET clock_out = ?, hours_worked = ? WHERE id = ?");
+        $stmt->execute([$now, $hoursWorked, $attendance['id']]);
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Clocked out at ' . date('h:i A'),
+            'clock_out' => $now,
+            'hours_worked' => $hoursWorked
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Server error: ' . $e->getMessage()]);
     }
-    
-    $userId = \App\Auth::user()['id'];
-    $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$employee) {
-        echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
-        exit;
-    }
-    
-    $today = date('Y-m-d');
-    $now = date('H:i:s');
-    
-    $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
-    $stmt->execute([$employee['id'], $today]);
-    $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$attendance || !$attendance['clock_in']) {
-        echo json_encode(['success' => false, 'error' => 'You must clock in first']);
-        exit;
-    }
-    
-    if ($attendance['clock_out']) {
-        echo json_encode(['success' => false, 'error' => 'Already clocked out at ' . $attendance['clock_out']]);
-        exit;
-    }
-    
-    // Check minimum clock out time (configurable, default 5:00 PM)
-    $settingsObj = new \App\Settings();
-    $minClockOutHour = (int)$settingsObj->get('min_clock_out_hour', '17');
-    $currentHour = (int)date('H');
-    if ($currentHour < $minClockOutHour) {
-        $minTimeFormatted = date('g:i A', strtotime("$minClockOutHour:00"));
-        echo json_encode(['success' => false, 'error' => "Clock out is only allowed after $minTimeFormatted"]);
-        exit;
-    }
-    
-    // Calculate hours worked
-    $clockIn = strtotime($attendance['clock_in']);
-    $clockOut = strtotime($now);
-    $hoursWorked = round(($clockOut - $clockIn) / 3600, 2);
-    
-    $stmt = $db->prepare("UPDATE attendance SET clock_out = ?, hours_worked = ? WHERE id = ?");
-    $stmt->execute([$now, $hoursWorked, $attendance['id']]);
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Clocked out at ' . date('h:i A'),
-        'clock_out' => $now,
-        'hours_worked' => $hoursWorked
-    ]);
     exit;
 }
 
