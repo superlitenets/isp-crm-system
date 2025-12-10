@@ -1119,6 +1119,106 @@ function runMigrations(PDO $db): void {
                 reference_id INTEGER,
                 is_read BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'branches' => "
+            CREATE TABLE IF NOT EXISTS branches (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                code VARCHAR(20) UNIQUE NOT NULL,
+                address TEXT,
+                phone VARCHAR(20),
+                email VARCHAR(100),
+                manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                whatsapp_group_id VARCHAR(100),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'branch_employees' => "
+            CREATE TABLE IF NOT EXISTS branch_employees (
+                id SERIAL PRIMARY KEY,
+                branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                is_primary BOOLEAN DEFAULT FALSE,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(branch_id, employee_id)
+            )",
+        'salary_advances' => "
+            CREATE TABLE IF NOT EXISTS salary_advances (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                requested_amount DECIMAL(12, 2) NOT NULL,
+                approved_amount DECIMAL(12, 2),
+                repayment_schedule VARCHAR(20) DEFAULT 'monthly',
+                installments INTEGER DEFAULT 1,
+                outstanding_balance DECIMAL(12, 2),
+                status VARCHAR(20) DEFAULT 'pending',
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                approved_at TIMESTAMP,
+                disbursed_at TIMESTAMP,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'salary_advance_repayments' => "
+            CREATE TABLE IF NOT EXISTS salary_advance_repayments (
+                id SERIAL PRIMARY KEY,
+                advance_id INTEGER REFERENCES salary_advances(id) ON DELETE CASCADE,
+                amount DECIMAL(12, 2) NOT NULL,
+                repayment_date DATE NOT NULL,
+                payroll_id INTEGER REFERENCES payroll(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'leave_types' => "
+            CREATE TABLE IF NOT EXISTS leave_types (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) NOT NULL,
+                code VARCHAR(20) UNIQUE NOT NULL,
+                days_per_year INTEGER DEFAULT 0,
+                is_paid BOOLEAN DEFAULT TRUE,
+                requires_approval BOOLEAN DEFAULT TRUE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'leave_balances' => "
+            CREATE TABLE IF NOT EXISTS leave_balances (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                leave_type_id INTEGER REFERENCES leave_types(id) ON DELETE CASCADE,
+                year INTEGER NOT NULL,
+                entitled_days DECIMAL(5,2) DEFAULT 0,
+                used_days DECIMAL(5,2) DEFAULT 0,
+                carried_over DECIMAL(5,2) DEFAULT 0,
+                accrued_days DECIMAL(5,2) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(employee_id, leave_type_id, year)
+            )",
+        'leave_requests' => "
+            CREATE TABLE IF NOT EXISTS leave_requests (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+                leave_type_id INTEGER REFERENCES leave_types(id) ON DELETE CASCADE,
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                days_requested DECIMAL(5,2) NOT NULL,
+                reason TEXT,
+                status VARCHAR(20) DEFAULT 'pending',
+                approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                approved_at TIMESTAMP,
+                rejection_reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'public_holidays' => "
+            CREATE TABLE IF NOT EXISTS public_holidays (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                holiday_date DATE NOT NULL,
+                is_recurring BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
@@ -1168,7 +1268,9 @@ function runMigrations(PDO $db): void {
         ['tickets', 'is_escalated', 'ALTER TABLE tickets ADD COLUMN is_escalated BOOLEAN DEFAULT FALSE'],
         ['tickets', 'escalation_count', 'ALTER TABLE tickets ADD COLUMN escalation_count INTEGER DEFAULT 0'],
         ['tickets', 'satisfaction_rating', 'ALTER TABLE tickets ADD COLUMN satisfaction_rating INTEGER'],
-        ['tickets', 'closed_at', 'ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP']
+        ['tickets', 'closed_at', 'ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP'],
+        ['tickets', 'branch_id', 'ALTER TABLE tickets ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL'],
+        ['teams', 'branch_id', 'ALTER TABLE teams ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL']
     ];
     
     foreach ($columnMigrations as $migration) {
