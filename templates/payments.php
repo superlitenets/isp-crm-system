@@ -4,6 +4,9 @@ $action = $_GET['action'] ?? 'list';
 $mpesa = new \App\Mpesa();
 $isConfigured = $mpesa->isConfigured();
 
+$customerModel = new \App\Customer($db);
+$customers = $customerModel->getCustomers();
+
 $successMessage = $_SESSION['success_message'] ?? null;
 $errorMessage = $_SESSION['error_message'] ?? null;
 unset($_SESSION['success_message'], $_SESSION['error_message']);
@@ -54,82 +57,28 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 <?php if ($tab === 'stkpush'): ?>
 <div class="row">
-    <div class="col-lg-4">
-        <div class="card mb-4">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-send"></i> Send STK Push</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="?page=payments&tab=stkpush&action=send">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Customer (Optional)</label>
-                        <select class="form-select" name="customer_id" id="customerSelect">
-                            <option value="">-- Select Customer --</option>
-                            <?php 
-                            $customerModel = new \App\Customer($db);
-                            $customers = $customerModel->getCustomers();
-                            foreach ($customers as $cust): 
-                            ?>
-                            <option value="<?= $cust['id'] ?>" 
-                                    data-phone="<?= htmlspecialchars($cust['phone']) ?>"
-                                    data-account="<?= htmlspecialchars($cust['account_number']) ?>">
-                                <?= htmlspecialchars($cust['name']) ?> (<?= htmlspecialchars($cust['account_number']) ?>)
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Phone Number *</label>
-                        <input type="tel" class="form-control" name="phone" id="phoneInput" 
-                               placeholder="0712345678" required>
-                        <div class="form-text">Format: 07XXXXXXXX or 254XXXXXXXX</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Amount (KES) *</label>
-                        <input type="number" class="form-control" name="amount" min="1" max="150000" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Account Reference *</label>
-                        <input type="text" class="form-control" name="account_ref" id="accountRefInput" 
-                               maxlength="12" placeholder="Invoice/Account No" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" class="form-control" name="description" 
-                               maxlength="13" placeholder="Payment for..." value="Payment">
-                    </div>
-                    
-                    <button type="submit" class="btn btn-success w-100" <?= !$isConfigured ? 'disabled' : '' ?>>
-                        <i class="bi bi-send"></i> Send Payment Request
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-8">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-list-ul"></i> STK Push Transactions</h5>
-                <form method="GET" class="d-flex gap-2">
-                    <input type="hidden" name="page" value="payments">
-                    <input type="hidden" name="tab" value="stkpush">
-                    <select class="form-select form-select-sm" name="status" style="width: auto;">
-                        <option value="">All Status</option>
-                        <option value="completed" <?= ($_GET['status'] ?? '') === 'completed' ? 'selected' : '' ?>>Completed</option>
-                        <option value="pending" <?= ($_GET['status'] ?? '') === 'pending' ? 'selected' : '' ?>>Pending</option>
-                        <option value="failed" <?= ($_GET['status'] ?? '') === 'failed' ? 'selected' : '' ?>>Failed</option>
-                    </select>
-                    <input type="text" class="form-control form-control-sm" name="search" 
-                           placeholder="Search..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="width: 150px;">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
-                </form>
+                <div class="d-flex gap-2 align-items-center">
+                    <form method="GET" class="d-flex gap-2">
+                        <input type="hidden" name="page" value="payments">
+                        <input type="hidden" name="tab" value="stkpush">
+                        <select class="form-select form-select-sm" name="status" style="width: auto;">
+                            <option value="">All Status</option>
+                            <option value="completed" <?= ($_GET['status'] ?? '') === 'completed' ? 'selected' : '' ?>>Completed</option>
+                            <option value="pending" <?= ($_GET['status'] ?? '') === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="failed" <?= ($_GET['status'] ?? '') === 'failed' ? 'selected' : '' ?>>Failed</option>
+                        </select>
+                        <input type="text" class="form-control form-control-sm" name="search" 
+                               placeholder="Search..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>" style="width: 150px;">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+                    </form>
+                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#requestPaymentModal" <?= !$isConfigured ? 'disabled' : '' ?>>
+                        <i class="bi bi-send"></i> Request Payment
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <?php 
@@ -498,12 +447,72 @@ $dateTo = $_GET['date_to'] ?? date('Y-m-d');
     </div>
 </div>
 
+<div class="modal fade" id="requestPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-send"></i> Request Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="?page=payments&tab=stkpush&action=send">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Customer (Optional)</label>
+                        <select class="form-select" name="customer_id" id="modalCustomerSelect">
+                            <option value="">-- Select Customer --</option>
+                            <?php foreach ($customers as $cust): ?>
+                            <option value="<?= $cust['id'] ?>" 
+                                    data-phone="<?= htmlspecialchars($cust['phone']) ?>"
+                                    data-account="<?= htmlspecialchars($cust['account_number']) ?>">
+                                <?= htmlspecialchars($cust['name']) ?> (<?= htmlspecialchars($cust['account_number']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="tel" class="form-control" name="phone" id="modalPhoneInput" 
+                               placeholder="0712345678" required>
+                        <div class="form-text">Format: 07XXXXXXXX or 254XXXXXXXX</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES) *</label>
+                        <input type="number" class="form-control" name="amount" min="1" max="150000" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Account Reference *</label>
+                        <input type="text" class="form-control" name="account_ref" id="modalAccountRefInput" 
+                               maxlength="12" placeholder="Invoice/Account No" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" 
+                               maxlength="13" placeholder="Payment for..." value="Payment">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send"></i> Send Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-document.getElementById('customerSelect')?.addEventListener('change', function() {
+document.getElementById('modalCustomerSelect')?.addEventListener('change', function() {
     const selected = this.options[this.selectedIndex];
     if (selected.value) {
-        document.getElementById('phoneInput').value = selected.dataset.phone || '';
-        document.getElementById('accountRefInput').value = selected.dataset.account || '';
+        document.getElementById('modalPhoneInput').value = selected.dataset.phone || '';
+        document.getElementById('modalAccountRefInput').value = selected.dataset.account || '';
     }
 });
 
