@@ -2597,7 +2597,36 @@ if ($action === 'edit_rule' && $id) {
         $editRule['deduction_tiers'] = json_decode($editRule['deduction_tiers'], true);
     }
 }
+$latePenaltiesEnabled = $settings->get('late_penalties_enabled', '1') === '1';
 ?>
+
+<!-- Global Late Penalty Toggle -->
+<div class="card mb-4 border-warning">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h5 class="mb-1"><i class="bi bi-toggle-on text-warning"></i> Late Arrival Penalties</h5>
+                <p class="text-muted mb-0">When disabled, no late penalties will be calculated or applied to attendance records.</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <form method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="toggle_late_penalties">
+                    <input type="hidden" name="enabled" value="<?= $latePenaltiesEnabled ? '0' : '1' ?>">
+                    <?php if ($latePenaltiesEnabled): ?>
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Disable late penalties? No new penalties will be calculated.')">
+                        <i class="bi bi-toggle-on"></i> Enabled - Click to Disable
+                    </button>
+                    <?php else: ?>
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-toggle-off"></i> Disabled - Click to Enable
+                    </button>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4">
     <div class="col-md-<?= ($action === 'add_rule' || $editRule) ? '7' : '12' ?>">
