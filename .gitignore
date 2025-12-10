@@ -1,6 +1,5 @@
 # PHP
 /vendor/
-composer.lock
 *.log
 *.cache
 
