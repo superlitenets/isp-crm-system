@@ -197,6 +197,38 @@ class Mpesa {
         ];
     }
     
+    public function stkPushForInvoice(int $invoiceId, string $phone, ?float $amount = null): array {
+        $accounting = new Accounting($this->db);
+        $invoice = $accounting->getInvoice($invoiceId);
+        
+        if (!$invoice) {
+            return ['success' => false, 'message' => 'Invoice not found'];
+        }
+        
+        if ($invoice['status'] === 'paid') {
+            return ['success' => false, 'message' => 'Invoice is already paid'];
+        }
+        
+        $payAmount = $amount ?? $invoice['balance_due'];
+        if ($payAmount <= 0) {
+            return ['success' => false, 'message' => 'Invalid payment amount'];
+        }
+        
+        $accountRef = $invoice['invoice_number'];
+        $description = 'Invoice Payment';
+        
+        $result = $this->stkPush($phone, $payAmount, $accountRef, $description, $invoice['customer_id']);
+        
+        if ($result['success'] && isset($result['data']['CheckoutRequestID'])) {
+            $stmt = $this->db->prepare("
+                UPDATE mpesa_transactions SET invoice_id = ? WHERE checkout_request_id = ?
+            ");
+            $stmt->execute([$invoiceId, $result['data']['CheckoutRequestID']]);
+        }
+        
+        return $result;
+    }
+    
     public function stkQuery(string $checkoutRequestId): array {
         $accessToken = $this->getAccessToken();
         
@@ -332,7 +364,7 @@ class Mpesa {
                 WHERE checkout_request_id = ?
             ");
             
-            return $stmt->execute([
+            $updated = $stmt->execute([
                 $resultCode,
                 $resultDesc,
                 $receiptNumber,
@@ -343,9 +375,43 @@ class Mpesa {
                 json_encode($data),
                 $checkoutRequestId
             ]);
+            
+            if ($updated && $resultCode === 0 && $amount > 0) {
+                $this->applyPaymentToInvoiceFromCallback($checkoutRequestId, $amount, $receiptNumber);
+            }
+            
+            return $updated;
         } catch (\Exception $e) {
             error_log("STK callback error: " . $e->getMessage());
             return false;
+        }
+    }
+    
+    private function applyPaymentToInvoiceFromCallback(string $checkoutRequestId, float $amount, ?string $receiptNumber): void {
+        try {
+            $stmt = $this->db->prepare("SELECT invoice_id, customer_id FROM mpesa_transactions WHERE checkout_request_id = ?");
+            $stmt->execute([$checkoutRequestId]);
+            $trans = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$trans || !$trans['invoice_id']) {
+                return;
+            }
+            
+            $accounting = new Accounting($this->db);
+            $accounting->recordCustomerPayment([
+                'customer_id' => $trans['customer_id'],
+                'invoice_id' => $trans['invoice_id'],
+                'payment_date' => date('Y-m-d'),
+                'amount' => $amount,
+                'payment_method' => 'mpesa',
+                'mpesa_receipt' => $receiptNumber,
+                'notes' => 'Auto-recorded from M-Pesa STK Push',
+                'status' => 'completed'
+            ]);
+            
+            error_log("Payment of KES {$amount} applied to invoice ID {$trans['invoice_id']} via M-Pesa");
+        } catch (\Exception $e) {
+            error_log("Error applying M-Pesa payment to invoice: " . $e->getMessage());
         }
     }
     

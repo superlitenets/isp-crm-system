@@ -532,6 +532,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="btn-group">
                     <a href="?page=accounting&subpage=invoices&action=edit&id=<?= $invoice['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
                     <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal"><i class="bi bi-cash"></i> Record Payment</button>
+                    <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#mpesaPaymentModal"><i class="bi bi-phone"></i> M-Pesa</button>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body">
@@ -690,6 +693,48 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+<?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
+<div class="modal fade" id="mpesaPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-phone"></i> Pay with M-Pesa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="mpesa_invoice_stkpush">
+                    <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> An M-Pesa prompt will be sent to the phone number. The customer will need to enter their PIN to complete payment.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="tel" class="form-control" name="phone" value="<?= htmlspecialchars($invoice['customer_phone'] ?? '') ?>" placeholder="e.g., 0712345678" required>
+                        <div class="form-text">Kenyan phone number (Safaricom)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">KES</span>
+                            <input type="number" class="form-control" name="amount" value="<?= $invoice['balance_due'] ?>" min="1" max="<?= $invoice['balance_due'] ?>" step="1" required>
+                        </div>
+                        <div class="form-text">Balance: KES <?= number_format($invoice['balance_due'], 2) ?></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-send"></i> Send Payment Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php endif; ?>
 
@@ -1209,14 +1254,637 @@ document.addEventListener('DOMContentLoaded', function() {
 <?php endif; ?>
 
 <?php elseif ($subpage === 'quotes'): ?>
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> Quotes module coming soon. Create quotes and convert them to invoices.
+
+<?php if ($action === 'create' || $action === 'edit'): ?>
+<?php 
+$quote = ($action === 'edit' && $id) ? $accounting->getQuote($id) : null;
+$defaultTax = $accounting->getDefaultTaxRate();
+?>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-file-text"></i> <?= $action === 'edit' ? 'Edit Quote' : 'New Quote' ?></h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="quoteForm">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="<?= $action === 'edit' ? 'update_quote' : 'create_quote' ?>">
+            <?php if ($quote): ?>
+            <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
+            <?php endif; ?>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Customer <span class="text-danger">*</span></label>
+                    <select name="customer_id" class="form-select" required>
+                        <option value="">Select Customer</option>
+                        <?php foreach ($customers as $c): ?>
+                        <option value="<?= $c['id'] ?>" <?= ($quote['customer_id'] ?? '') == $c['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Issue Date</label>
+                    <input type="date" name="issue_date" class="form-control" value="<?= $quote['issue_date'] ?? date('Y-m-d') ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Expiry Date</label>
+                    <input type="date" name="expiry_date" class="form-control" value="<?= $quote['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')) ?>">
+                </div>
+            </div>
+            
+            <h6 class="mb-3">Line Items</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="quoteItemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 35%">Description</th>
+                            <th style="width: 10%">Qty</th>
+                            <th style="width: 15%">Unit Price</th>
+                            <th style="width: 15%">Tax Rate</th>
+                            <th style="width: 15%">Total</th>
+                            <th style="width: 10%"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($quote && !empty($quote['items'])): ?>
+                        <?php foreach ($quote['items'] as $idx => $item): ?>
+                        <tr class="quote-item-row">
+                            <td><input type="text" name="items[<?= $idx ?>][description]" class="form-control item-desc" value="<?= htmlspecialchars($item['description']) ?>" required></td>
+                            <td><input type="number" name="items[<?= $idx ?>][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="<?= $item['quantity'] ?>" required></td>
+                            <td><input type="number" name="items[<?= $idx ?>][unit_price]" class="form-control item-price" step="0.01" min="0" value="<?= $item['unit_price'] ?>" required></td>
+                            <td>
+                                <select name="items[<?= $idx ?>][tax_rate]" class="form-select item-tax">
+                                    <option value="0" <?= $item['tax_rate'] == 0 ? 'selected' : '' ?>>No Tax</option>
+                                    <?php foreach ($taxRates as $tr): ?>
+                                    <option value="<?= $tr['rate'] ?>" <?= $item['tax_rate'] == $tr['rate'] ? 'selected' : '' ?>><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td class="item-total text-end align-middle">KES <?= number_format($item['line_total'] + $item['tax_amount'], 2) ?></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <tr class="quote-item-row">
+                            <td><input type="text" name="items[0][description]" class="form-control item-desc" required></td>
+                            <td><input type="number" name="items[0][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="1" required></td>
+                            <td><input type="number" name="items[0][unit_price]" class="form-control item-price" step="0.01" min="0" value="0" required></td>
+                            <td>
+                                <select name="items[0][tax_rate]" class="form-select item-tax">
+                                    <option value="0">No Tax</option>
+                                    <?php foreach ($taxRates as $tr): ?>
+                                    <option value="<?= $tr['rate'] ?>" <?= ($defaultTax && $defaultTax['id'] == $tr['id']) ? 'selected' : '' ?>><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td class="item-total text-end align-middle">KES 0.00</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-outline-secondary mb-4" id="addQuoteRow">
+                <i class="bi bi-plus"></i> Add Line
+            </button>
+            
+            <div class="row justify-content-end mb-4">
+                <div class="col-md-4">
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Subtotal</td>
+                            <td class="text-end" id="quoteSubtotal">KES 0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Tax</td>
+                            <td class="text-end" id="quoteTax">KES 0.00</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Total</td>
+                            <td class="text-end" id="quoteTotal">KES 0.00</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Notes</label>
+                    <textarea name="notes" class="form-control" rows="3"><?= htmlspecialchars($quote['notes'] ?? '') ?></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Terms & Conditions</label>
+                    <textarea name="terms" class="form-control" rows="3"><?= htmlspecialchars($quote['terms'] ?? '') ?></textarea>
+                </div>
+            </div>
+            
+            <input type="hidden" name="subtotal" id="quoteSubtotalInput" value="0">
+            <input type="hidden" name="tax_amount" id="quoteTaxInput" value="0">
+            <input type="hidden" name="total_amount" id="quoteTotalInput" value="0">
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> <?= $action === 'edit' ? 'Update Quote' : 'Create Quote' ?></button>
+                <a href="?page=accounting&subpage=quotes" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>
 
-<?php elseif ($subpage === 'bills'): ?>
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> Bills module coming soon. Record vendor bills and track payments.
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('quoteItemsTable').getElementsByTagName('tbody')[0];
+    let rowIndex = table.rows.length;
+    
+    function calculateRowTotal(row) {
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const taxRate = parseFloat(row.querySelector('.item-tax').value) || 0;
+        const lineTotal = qty * price;
+        const tax = lineTotal * (taxRate / 100);
+        row.querySelector('.item-total').textContent = 'KES ' + (lineTotal + tax).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return { subtotal: lineTotal, tax: tax };
+    }
+    
+    function calculateTotals() {
+        let subtotal = 0, tax = 0;
+        document.querySelectorAll('.quote-item-row').forEach(row => {
+            const totals = calculateRowTotal(row);
+            subtotal += totals.subtotal;
+            tax += totals.tax;
+        });
+        document.getElementById('quoteSubtotal').textContent = 'KES ' + subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('quoteTax').textContent = 'KES ' + tax.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('quoteTotal').textContent = 'KES ' + (subtotal + tax).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('quoteSubtotalInput').value = subtotal.toFixed(2);
+        document.getElementById('quoteTaxInput').value = tax.toFixed(2);
+        document.getElementById('quoteTotalInput').value = (subtotal + tax).toFixed(2);
+    }
+    
+    document.getElementById('addQuoteRow').addEventListener('click', function() {
+        const newRow = table.insertRow();
+        newRow.className = 'quote-item-row';
+        newRow.innerHTML = `
+            <td><input type="text" name="items[${rowIndex}][description]" class="form-control item-desc" required></td>
+            <td><input type="number" name="items[${rowIndex}][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="1" required></td>
+            <td><input type="number" name="items[${rowIndex}][unit_price]" class="form-control item-price" step="0.01" min="0" value="0" required></td>
+            <td>
+                <select name="items[${rowIndex}][tax_rate]" class="form-select item-tax">
+                    <option value="0">No Tax</option>
+                    <?php foreach ($taxRates as $tr): ?>
+                    <option value="<?= $tr['rate'] ?>"><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+            <td class="item-total text-end align-middle">KES 0.00</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+        `;
+        rowIndex++;
+        attachRowEvents(newRow);
+    });
+    
+    function attachRowEvents(row) {
+        row.querySelector('.item-qty').addEventListener('input', calculateTotals);
+        row.querySelector('.item-price').addEventListener('input', calculateTotals);
+        row.querySelector('.item-tax').addEventListener('change', calculateTotals);
+        row.querySelector('.remove-row').addEventListener('click', function() {
+            if (document.querySelectorAll('.quote-item-row').length > 1) {
+                row.remove();
+                calculateTotals();
+            }
+        });
+    }
+    
+    document.querySelectorAll('.quote-item-row').forEach(attachRowEvents);
+    calculateTotals();
+});
+</script>
+
+<?php elseif ($action === 'view' && $id): ?>
+<?php $quote = $accounting->getQuote($id); ?>
+<?php if ($quote): ?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="?page=accounting&subpage=quotes" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    <div class="d-flex gap-2">
+        <?php if ($quote['status'] !== 'converted'): ?>
+        <a href="?page=accounting&subpage=quotes&action=edit&id=<?= $quote['id'] ?>" class="btn btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
+        <form method="POST" class="d-inline" onsubmit="return confirm('Convert this quote to an invoice?');">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="convert_quote_to_invoice">
+            <input type="hidden" name="quote_id" value="<?= $quote['id'] ?>">
+            <button type="submit" class="btn btn-success"><i class="bi bi-receipt"></i> Convert to Invoice</button>
+        </form>
+        <?php endif; ?>
+    </div>
 </div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h4>Quote <?= htmlspecialchars($quote['quote_number']) ?></h4>
+                <p class="text-muted mb-0">
+                    Status: 
+                    <?php
+                    $statusColors = ['draft' => 'secondary', 'sent' => 'info', 'accepted' => 'success', 'declined' => 'danger', 'expired' => 'warning', 'converted' => 'primary'];
+                    ?>
+                    <span class="badge bg-<?= $statusColors[$quote['status']] ?? 'secondary' ?>"><?= ucfirst($quote['status']) ?></span>
+                    <?php if ($quote['status'] === 'converted' && $quote['converted_to_invoice_id']): ?>
+                    <a href="?page=accounting&subpage=invoices&action=view&id=<?= $quote['converted_to_invoice_id'] ?>">View Invoice</a>
+                    <?php endif; ?>
+                </p>
+            </div>
+            <div class="col-md-6 text-end">
+                <p class="mb-1"><strong>Issue Date:</strong> <?= date('M d, Y', strtotime($quote['issue_date'])) ?></p>
+                <p class="mb-0"><strong>Expiry Date:</strong> <?= date('M d, Y', strtotime($quote['expiry_date'])) ?></p>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h6 class="text-muted">Customer</h6>
+                <p class="mb-0"><strong><?= htmlspecialchars($quote['customer_name']) ?></strong></p>
+                <?php if ($quote['customer_email']): ?><p class="mb-0 text-muted"><?= htmlspecialchars($quote['customer_email']) ?></p><?php endif; ?>
+                <?php if ($quote['customer_phone']): ?><p class="mb-0 text-muted"><?= htmlspecialchars($quote['customer_phone']) ?></p><?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="table-responsive mb-4">
+            <table class="table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-end">Qty</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end">Tax</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($quote['items'] as $item): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($item['description']) ?></td>
+                        <td class="text-end"><?= number_format($item['quantity'], 2) ?></td>
+                        <td class="text-end">KES <?= number_format($item['unit_price'], 2) ?></td>
+                        <td class="text-end"><?= $item['tax_rate'] ?>%</td>
+                        <td class="text-end">KES <?= number_format($item['line_total'] + $item['tax_amount'], 2) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="text-end"><strong>Subtotal</strong></td>
+                        <td class="text-end">KES <?= number_format($quote['subtotal'], 2) ?></td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" class="text-end"><strong>Tax</strong></td>
+                        <td class="text-end">KES <?= number_format($quote['tax_amount'], 2) ?></td>
+                    </tr>
+                    <tr class="table-dark">
+                        <td colspan="4" class="text-end"><strong>Total</strong></td>
+                        <td class="text-end"><strong>KES <?= number_format($quote['total_amount'], 2) ?></strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <?php if ($quote['notes'] || $quote['terms']): ?>
+        <div class="row">
+            <?php if ($quote['notes']): ?>
+            <div class="col-md-6">
+                <h6 class="text-muted">Notes</h6>
+                <p><?= nl2br(htmlspecialchars($quote['notes'])) ?></p>
+            </div>
+            <?php endif; ?>
+            <?php if ($quote['terms']): ?>
+            <div class="col-md-6">
+                <h6 class="text-muted">Terms & Conditions</h6>
+                <p><?= nl2br(htmlspecialchars($quote['terms'])) ?></p>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<?php else: ?>
+<div class="alert alert-warning">Quote not found.</div>
+<?php endif; ?>
+
+<?php else: ?>
+
+<?php $quotes = $accounting->getQuotes(); ?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="mb-0">All Quotes</h5>
+    <a href="?page=accounting&subpage=quotes&action=create" class="btn btn-primary"><i class="bi bi-plus"></i> New Quote</a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Quote #</th>
+                        <th>Customer</th>
+                        <th>Issue Date</th>
+                        <th>Expiry Date</th>
+                        <th class="text-end">Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($quotes)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-4">No quotes yet. <a href="?page=accounting&subpage=quotes&action=create">Create your first quote</a></td></tr>
+                    <?php else: ?>
+                    <?php foreach ($quotes as $q): ?>
+                    <?php
+                    $statusColors = ['draft' => 'secondary', 'sent' => 'info', 'accepted' => 'success', 'declined' => 'danger', 'expired' => 'warning', 'converted' => 'primary'];
+                    ?>
+                    <tr>
+                        <td><a href="?page=accounting&subpage=quotes&action=view&id=<?= $q['id'] ?>"><?= htmlspecialchars($q['quote_number']) ?></a></td>
+                        <td><?= htmlspecialchars($q['customer_name'] ?? 'N/A') ?></td>
+                        <td><?= date('M d, Y', strtotime($q['issue_date'])) ?></td>
+                        <td><?= date('M d, Y', strtotime($q['expiry_date'])) ?></td>
+                        <td class="text-end">KES <?= number_format($q['total_amount'], 2) ?></td>
+                        <td><span class="badge bg-<?= $statusColors[$q['status']] ?? 'secondary' ?>"><?= ucfirst($q['status']) ?></span></td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="?page=accounting&subpage=quotes&action=view&id=<?= $q['id'] ?>" class="btn btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                                <?php if ($q['status'] !== 'converted'): ?>
+                                <a href="?page=accounting&subpage=quotes&action=edit&id=<?= $q['id'] ?>" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php endif; ?>
+
+<?php elseif ($subpage === 'bills'): ?>
+
+<?php if ($action === 'create' || $action === 'edit'): ?>
+<?php 
+$bill = ($action === 'edit' && $id) ? $accounting->getBill($id) : null;
+$defaultTax = $accounting->getDefaultTaxRate();
+?>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> <?= $action === 'edit' ? 'Edit Bill' : 'New Bill' ?></h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="billForm">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="<?= $action === 'edit' ? 'update_bill' : 'create_bill' ?>">
+            <?php if ($bill): ?>
+            <input type="hidden" name="bill_id" value="<?= $bill['id'] ?>">
+            <?php endif; ?>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                    <select name="vendor_id" class="form-select" required>
+                        <option value="">Select Vendor</option>
+                        <?php foreach ($vendors as $v): ?>
+                        <option value="<?= $v['id'] ?>" <?= ($bill['vendor_id'] ?? '') == $v['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($v['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Bill Date</label>
+                    <input type="date" name="bill_date" class="form-control" value="<?= $bill['bill_date'] ?? date('Y-m-d') ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" name="due_date" class="form-control" value="<?= $bill['due_date'] ?? date('Y-m-d', strtotime('+30 days')) ?>">
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Reference Number</label>
+                    <input type="text" name="reference" class="form-control" value="<?= htmlspecialchars($bill['reference'] ?? '') ?>" placeholder="Vendor invoice/reference number">
+                </div>
+            </div>
+            
+            <h6 class="mb-3">Line Items</h6>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered" id="billItemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40%">Description</th>
+                            <th style="width: 10%">Qty</th>
+                            <th style="width: 15%">Unit Price</th>
+                            <th style="width: 15%">Tax Rate</th>
+                            <th style="width: 15%">Total</th>
+                            <th style="width: 5%"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($bill && !empty($bill['items'])): ?>
+                        <?php foreach ($bill['items'] as $idx => $item): ?>
+                        <tr class="bill-item-row">
+                            <td><input type="text" name="items[<?= $idx ?>][description]" class="form-control item-desc" value="<?= htmlspecialchars($item['description']) ?>" required></td>
+                            <td><input type="number" name="items[<?= $idx ?>][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="<?= $item['quantity'] ?>" required></td>
+                            <td><input type="number" name="items[<?= $idx ?>][unit_price]" class="form-control item-price" step="0.01" min="0" value="<?= $item['unit_price'] ?>" required></td>
+                            <td>
+                                <select name="items[<?= $idx ?>][tax_rate]" class="form-select item-tax">
+                                    <option value="0" <?= $item['tax_rate'] == 0 ? 'selected' : '' ?>>No Tax</option>
+                                    <?php foreach ($taxRates as $tr): ?>
+                                    <option value="<?= $tr['rate'] ?>" <?= $item['tax_rate'] == $tr['rate'] ? 'selected' : '' ?>><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td class="item-total text-end align-middle">KES <?= number_format($item['line_total'] + $item['tax_amount'], 2) ?></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <tr class="bill-item-row">
+                            <td><input type="text" name="items[0][description]" class="form-control item-desc" required></td>
+                            <td><input type="number" name="items[0][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="1" required></td>
+                            <td><input type="number" name="items[0][unit_price]" class="form-control item-price" step="0.01" min="0" value="0" required></td>
+                            <td>
+                                <select name="items[0][tax_rate]" class="form-select item-tax">
+                                    <option value="0">No Tax</option>
+                                    <?php foreach ($taxRates as $tr): ?>
+                                    <option value="<?= $tr['rate'] ?>"><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td class="item-total text-end align-middle">KES 0.00</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-outline-secondary mb-4" id="addBillRow">
+                <i class="bi bi-plus"></i> Add Line
+            </button>
+            
+            <div class="row justify-content-end mb-4">
+                <div class="col-md-4">
+                    <table class="table table-sm">
+                        <tr><td>Subtotal</td><td class="text-end" id="billSubtotal">KES 0.00</td></tr>
+                        <tr><td>Tax</td><td class="text-end" id="billTax">KES 0.00</td></tr>
+                        <tr class="fw-bold"><td>Total</td><td class="text-end" id="billTotal">KES 0.00</td></tr>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-control" rows="3"><?= htmlspecialchars($bill['notes'] ?? '') ?></textarea>
+            </div>
+            
+            <input type="hidden" name="subtotal" id="billSubtotalInput" value="0">
+            <input type="hidden" name="tax_amount" id="billTaxInput" value="0">
+            <input type="hidden" name="total_amount" id="billTotalInput" value="0">
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> <?= $action === 'edit' ? 'Update Bill' : 'Create Bill' ?></button>
+                <a href="?page=accounting&subpage=bills" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('billItemsTable').getElementsByTagName('tbody')[0];
+    let rowIndex = table.rows.length;
+    
+    function calculateRowTotal(row) {
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const taxRate = parseFloat(row.querySelector('.item-tax').value) || 0;
+        const lineTotal = qty * price;
+        const tax = lineTotal * (taxRate / 100);
+        row.querySelector('.item-total').textContent = 'KES ' + (lineTotal + tax).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return { subtotal: lineTotal, tax: tax };
+    }
+    
+    function calculateTotals() {
+        let subtotal = 0, tax = 0;
+        document.querySelectorAll('.bill-item-row').forEach(row => {
+            const totals = calculateRowTotal(row);
+            subtotal += totals.subtotal;
+            tax += totals.tax;
+        });
+        document.getElementById('billSubtotal').textContent = 'KES ' + subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('billTax').textContent = 'KES ' + tax.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('billTotal').textContent = 'KES ' + (subtotal + tax).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        document.getElementById('billSubtotalInput').value = subtotal.toFixed(2);
+        document.getElementById('billTaxInput').value = tax.toFixed(2);
+        document.getElementById('billTotalInput').value = (subtotal + tax).toFixed(2);
+    }
+    
+    document.getElementById('addBillRow').addEventListener('click', function() {
+        const newRow = table.insertRow();
+        newRow.className = 'bill-item-row';
+        newRow.innerHTML = `
+            <td><input type="text" name="items[${rowIndex}][description]" class="form-control item-desc" required></td>
+            <td><input type="number" name="items[${rowIndex}][quantity]" class="form-control item-qty" step="0.01" min="0.01" value="1" required></td>
+            <td><input type="number" name="items[${rowIndex}][unit_price]" class="form-control item-price" step="0.01" min="0" value="0" required></td>
+            <td>
+                <select name="items[${rowIndex}][tax_rate]" class="form-select item-tax">
+                    <option value="0">No Tax</option>
+                    <?php foreach ($taxRates as $tr): ?>
+                    <option value="<?= $tr['rate'] ?>"><?= htmlspecialchars($tr['name']) ?> (<?= $tr['rate'] ?>%)</option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+            <td class="item-total text-end align-middle">KES 0.00</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger remove-row"><i class="bi bi-trash"></i></button></td>
+        `;
+        rowIndex++;
+        attachRowEvents(newRow);
+    });
+    
+    function attachRowEvents(row) {
+        row.querySelector('.item-qty').addEventListener('input', calculateTotals);
+        row.querySelector('.item-price').addEventListener('input', calculateTotals);
+        row.querySelector('.item-tax').addEventListener('change', calculateTotals);
+        row.querySelector('.remove-row').addEventListener('click', function() {
+            if (document.querySelectorAll('.bill-item-row').length > 1) {
+                row.remove();
+                calculateTotals();
+            }
+        });
+    }
+    
+    document.querySelectorAll('.bill-item-row').forEach(attachRowEvents);
+    calculateTotals();
+});
+</script>
+
+<?php else: ?>
+
+<?php $bills = $accounting->getBills(); ?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="mb-0">Vendor Bills</h5>
+    <a href="?page=accounting&subpage=bills&action=create" class="btn btn-primary"><i class="bi bi-plus"></i> New Bill</a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Bill #</th>
+                        <th>Vendor</th>
+                        <th>Bill Date</th>
+                        <th>Due Date</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">Balance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($bills)): ?>
+                    <tr><td colspan="8" class="text-center text-muted py-4">No bills yet. <a href="?page=accounting&subpage=bills&action=create">Record your first bill</a></td></tr>
+                    <?php else: ?>
+                    <?php foreach ($bills as $b): ?>
+                    <?php
+                    $statusColors = ['unpaid' => 'warning', 'partial' => 'info', 'paid' => 'success', 'overdue' => 'danger'];
+                    ?>
+                    <tr>
+                        <td><a href="?page=accounting&subpage=bills&action=view&id=<?= $b['id'] ?>"><?= htmlspecialchars($b['bill_number']) ?></a></td>
+                        <td><?= htmlspecialchars($b['vendor_name'] ?? 'N/A') ?></td>
+                        <td><?= date('M d, Y', strtotime($b['bill_date'])) ?></td>
+                        <td><?= date('M d, Y', strtotime($b['due_date'])) ?></td>
+                        <td class="text-end">KES <?= number_format($b['total_amount'], 2) ?></td>
+                        <td class="text-end">KES <?= number_format($b['balance_due'], 2) ?></td>
+                        <td><span class="badge bg-<?= $statusColors[$b['status']] ?? 'secondary' ?>"><?= ucfirst($b['status']) ?></span></td>
+                        <td>
+                            <a href="?page=accounting&subpage=bills&action=view&id=<?= $b['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php endif; ?>
 
 <?php elseif ($subpage === 'reports'): ?>
 

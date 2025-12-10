@@ -387,6 +387,84 @@ class Accounting {
         return (int)$this->db->lastInsertId();
     }
     
+    public function updateQuote(int $id, array $data): void {
+        $stmt = $this->db->prepare("
+            UPDATE quotes SET customer_id = ?, issue_date = ?, expiry_date = ?, status = ?,
+                subtotal = ?, tax_amount = ?, discount_amount = ?, total_amount = ?, 
+                notes = ?, terms = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([
+            $data['customer_id'] ?: null,
+            $data['issue_date'] ?? date('Y-m-d'),
+            $data['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')),
+            $data['status'] ?? 'draft',
+            $data['subtotal'] ?? 0,
+            $data['tax_amount'] ?? 0,
+            $data['discount_amount'] ?? 0,
+            $data['total_amount'] ?? 0,
+            $data['notes'] ?? null,
+            $data['terms'] ?? null,
+            $id
+        ]);
+    }
+    
+    public function addQuoteItem(int $quoteId, array $item): int {
+        $quantity = (float)($item['quantity'] ?? 1);
+        $unitPrice = (float)($item['unit_price'] ?? 0);
+        $taxRate = (float)($item['tax_rate'] ?? 0);
+        $discount = (float)($item['discount'] ?? 0);
+        
+        $lineTotal = $quantity * $unitPrice - $discount;
+        $taxAmount = $lineTotal * ($taxRate / 100);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO quote_items (quote_id, product_id, description, quantity, unit_price, 
+                discount, tax_rate, tax_amount, line_total, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $quoteId,
+            $item['product_id'] ?: null,
+            $item['description'] ?? '',
+            $quantity,
+            $unitPrice,
+            $discount,
+            $taxRate,
+            $taxAmount,
+            $lineTotal,
+            $item['sort_order'] ?? 0
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function deleteQuoteItems(int $quoteId): void {
+        $stmt = $this->db->prepare("DELETE FROM quote_items WHERE quote_id = ?");
+        $stmt->execute([$quoteId]);
+    }
+    
+    public function recalculateQuote(int $quoteId): void {
+        $stmt = $this->db->prepare("
+            SELECT COALESCE(SUM(line_total), 0) as subtotal, COALESCE(SUM(tax_amount), 0) as tax_amount
+            FROM quote_items WHERE quote_id = ?
+        ");
+        $stmt->execute([$quoteId]);
+        $totals = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $total = $totals['subtotal'] + $totals['tax_amount'];
+        
+        $stmt = $this->db->prepare("
+            UPDATE quotes SET subtotal = ?, tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$totals['subtotal'], $totals['tax_amount'], $total, $quoteId]);
+    }
+    
+    public function updateQuoteStatus(int $id, string $status): void {
+        $stmt = $this->db->prepare("UPDATE quotes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$status, $id]);
+    }
+    
     public function convertQuoteToInvoice(int $quoteId): int {
         $quote = $this->getQuote($quoteId);
         if (!$quote) throw new \Exception("Quote not found");
@@ -482,6 +560,69 @@ class Accounting {
         ]);
         
         return (int)$this->db->lastInsertId();
+    }
+    
+    public function addBillItem(int $billId, array $item): int {
+        $quantity = (float)($item['quantity'] ?? 1);
+        $unitPrice = (float)($item['unit_price'] ?? 0);
+        $taxRate = (float)($item['tax_rate'] ?? 0);
+        $discount = (float)($item['discount'] ?? 0);
+        
+        $lineTotal = $quantity * $unitPrice - $discount;
+        $taxAmount = $lineTotal * ($taxRate / 100);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO vendor_bill_items (bill_id, product_id, description, quantity, unit_price, 
+                discount, tax_rate, tax_amount, line_total, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $billId,
+            $item['product_id'] ?? null,
+            $item['description'] ?? '',
+            $quantity,
+            $unitPrice,
+            $discount,
+            $taxRate,
+            $taxAmount,
+            $lineTotal,
+            $item['sort_order'] ?? 0
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function recalculateBill(int $billId): void {
+        $stmt = $this->db->prepare("
+            SELECT COALESCE(SUM(line_total), 0) as subtotal, COALESCE(SUM(tax_amount), 0) as tax_amount
+            FROM vendor_bill_items WHERE bill_id = ?
+        ");
+        $stmt->execute([$billId]);
+        $totals = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        $total = $totals['subtotal'] + $totals['tax_amount'];
+        
+        $stmt = $this->db->prepare("
+            UPDATE vendor_bills SET subtotal = ?, tax_amount = ?, total_amount = ?, 
+                balance_due = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$totals['subtotal'], $totals['tax_amount'], $total, $total, $billId]);
+    }
+    
+    public function updateBill(int $id, array $data): void {
+        $stmt = $this->db->prepare("
+            UPDATE vendor_bills SET vendor_id = ?, bill_date = ?, due_date = ?, 
+                reference = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([
+            $data['vendor_id'] ?: null,
+            $data['bill_date'] ?? date('Y-m-d'),
+            $data['due_date'] ?? date('Y-m-d', strtotime('+30 days')),
+            $data['reference'] ?? null,
+            $data['notes'] ?? null,
+            $id
+        ]);
     }
     
     // Expenses

@@ -1931,6 +1931,174 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_quote':
+            case 'update_quote':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to manage quotes.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $items = $_POST['items'] ?? [];
+                    
+                    if ($action === 'create_quote') {
+                        $quoteId = $accounting->createQuote([
+                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
+                            'expiry_date' => $_POST['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')),
+                            'subtotal' => $_POST['subtotal'] ?? 0,
+                            'tax_amount' => $_POST['tax_amount'] ?? 0,
+                            'total_amount' => $_POST['total_amount'] ?? 0,
+                            'notes' => $_POST['notes'] ?? null,
+                            'terms' => $_POST['terms'] ?? null,
+                            'status' => 'draft',
+                            'created_by' => $_SESSION['user_id'] ?? null
+                        ]);
+                        
+                        foreach ($items as $idx => $item) {
+                            if (!empty($item['description'])) {
+                                $item['sort_order'] = $idx;
+                                $accounting->addQuoteItem($quoteId, $item);
+                            }
+                        }
+                        $accounting->recalculateQuote($quoteId);
+                        $message = 'Quote created successfully!';
+                    } else {
+                        $quoteId = (int)$_POST['quote_id'];
+                        $accounting->updateQuote($quoteId, [
+                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'issue_date' => $_POST['issue_date'] ?? date('Y-m-d'),
+                            'expiry_date' => $_POST['expiry_date'] ?? date('Y-m-d', strtotime('+30 days')),
+                            'subtotal' => $_POST['subtotal'] ?? 0,
+                            'tax_amount' => $_POST['tax_amount'] ?? 0,
+                            'total_amount' => $_POST['total_amount'] ?? 0,
+                            'notes' => $_POST['notes'] ?? null,
+                            'terms' => $_POST['terms'] ?? null,
+                            'status' => $_POST['status'] ?? 'draft'
+                        ]);
+                        
+                        $accounting->deleteQuoteItems($quoteId);
+                        foreach ($items as $idx => $item) {
+                            if (!empty($item['description'])) {
+                                $item['sort_order'] = $idx;
+                                $accounting->addQuoteItem($quoteId, $item);
+                            }
+                        }
+                        $accounting->recalculateQuote($quoteId);
+                        $message = 'Quote updated successfully!';
+                    }
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=quotes&action=view&id=' . $quoteId);
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'convert_quote_to_invoice':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to convert quotes.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $quoteId = (int)$_POST['quote_id'];
+                    $invoiceId = $accounting->convertQuoteToInvoice($quoteId);
+                    $message = 'Quote converted to invoice successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=invoices&action=view&id=' . $invoiceId);
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'mpesa_invoice_stkpush':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to process payments.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $mpesa = new \App\Mpesa();
+                    $invoiceId = (int)$_POST['invoice_id'];
+                    $phone = $_POST['phone'] ?? '';
+                    $amount = !empty($_POST['amount']) ? (float)$_POST['amount'] : null;
+                    
+                    $result = $mpesa->stkPushForInvoice($invoiceId, $phone, $amount);
+                    
+                    if ($result['success']) {
+                        $message = 'M-Pesa payment request sent! The customer will receive a prompt on their phone.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'M-Pesa request failed: ' . ($result['message'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=invoices&action=view&id=' . $invoiceId);
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'create_bill':
+            case 'update_bill':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to manage bills.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $items = $_POST['items'] ?? [];
+                    
+                    if ($action === 'create_bill') {
+                        $billNumber = $accounting->getNextNumber('bill');
+                        $billId = $accounting->createBill([
+                            'bill_number' => $billNumber,
+                            'vendor_id' => $_POST['vendor_id'] ?? null,
+                            'bill_date' => $_POST['bill_date'] ?? date('Y-m-d'),
+                            'due_date' => $_POST['due_date'] ?? date('Y-m-d', strtotime('+30 days')),
+                            'subtotal' => $_POST['subtotal'] ?? 0,
+                            'tax_amount' => $_POST['tax_amount'] ?? 0,
+                            'total_amount' => $_POST['total_amount'] ?? 0,
+                            'reference' => $_POST['reference'] ?? null,
+                            'notes' => $_POST['notes'] ?? null,
+                            'status' => 'unpaid',
+                            'created_by' => $_SESSION['user_id'] ?? null
+                        ]);
+                        
+                        foreach ($items as $idx => $item) {
+                            if (!empty($item['description'])) {
+                                $item['sort_order'] = $idx;
+                                $accounting->addBillItem($billId, $item);
+                            }
+                        }
+                        $accounting->recalculateBill($billId);
+                        $message = 'Bill created successfully!';
+                    } else {
+                        $billId = (int)$_POST['bill_id'];
+                        $accounting->updateBill($billId, $_POST);
+                        $message = 'Bill updated successfully!';
+                    }
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=bills');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_company_settings':
                 try {
                     $settings->saveCompanyInfo($_POST);
