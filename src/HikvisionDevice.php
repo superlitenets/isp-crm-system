@@ -394,134 +394,121 @@ class HikvisionDevice extends BiometricDevice {
     }
     
     public function startFaceEnrollment(string $employeeNo): array {
-        // Method 1: Try JSON format for AccessControl FaceCapture
-        $captureData = [
-            'FaceCaptureCond' => [
-                'employeeNo' => $employeeNo
-            ]
-        ];
+        $methods = [];
+        $lastBody = '';
         
+        // Method 1: GET request with query parameter
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FaceCapture?format=json',
-            'POST',
-            json_encode($captureData),
-            'application/json'
+            '/ISAPI/AccessControl/CaptureFaceData?format=json&employeeNo=' . urlencode($employeeNo),
+            'GET'
         );
+        $methods['get_capture'] = $response['code'];
+        $lastBody = $response['body'] ?? '';
         
         if ($response['code'] === 200) {
-            $data = json_decode($response['body'], true);
-            if (isset($data['FaceCaptureResult'])) {
-                return ['success' => true, 'message' => 'Face captured successfully.', 'data' => $data];
-            }
-            return ['success' => true, 'message' => 'Face enrollment initiated. Employee should look at the camera.'];
-        }
-        
-        // Method 2: Try XML format
-        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
-<FaceCaptureCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
-</FaceCaptureCond>';
-        
-        $response2 = $this->sendRequest(
-            '/ISAPI/AccessControl/FaceCapture',
-            'POST',
-            $xmlData,
-            "application/xml; charset='UTF-8'"
-        );
-        
-        if ($response2['code'] === 200) {
-            return ['success' => true, 'message' => 'Face enrollment started. Employee should look at camera now.'];
-        }
-        
-        // Method 3: Try CaptureFaceData endpoint (some models)
-        $response3 = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFaceData?format=json&employeeNo=' . urlencode($employeeNo),
-            'POST',
-            json_encode(['employeeNo' => $employeeNo]),
-            'application/json'
-        );
-        
-        if ($response3['code'] === 200) {
             return ['success' => true, 'message' => 'Face capture started. Look at the device camera.'];
         }
         
-        $error = 'Face enrollment not supported on this device. Try enrolling directly on device screen.';
-        if ($response['body']) {
-            $data = json_decode($response['body'], true);
-            if (isset($data['statusString']) || isset($data['subStatusCode'])) {
-                $error = $data['statusString'] ?? $data['subStatusCode'];
+        // Method 2: POST with empty body
+        $response2 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFaceData?employeeNo=' . urlencode($employeeNo),
+            'POST',
+            '',
+            'application/json'
+        );
+        $methods['post_empty'] = $response2['code'];
+        if ($response2['body']) $lastBody = $response2['body'];
+        
+        if ($response2['code'] === 200) {
+            return ['success' => true, 'message' => 'Face enrollment started. Look at camera now.'];
+        }
+        
+        // Method 3: PUT with query parameter
+        $response3 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFaceData?format=json&employeeNo=' . urlencode($employeeNo),
+            'PUT',
+            '',
+            'application/json'
+        );
+        $methods['put_empty'] = $response3['code'];
+        if ($response3['body']) $lastBody = $response3['body'];
+        
+        if ($response3['code'] === 200) {
+            return ['success' => true, 'message' => 'Face capture initiated.'];
+        }
+        
+        // Method 4: Minimal XML
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?><CaptureFaceDataCond><employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo></CaptureFaceDataCond>';
+        
+        $response4 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFaceData',
+            'POST',
+            $xmlData,
+            'application/xml'
+        );
+        $methods['xml_minimal'] = $response4['code'];
+        if ($response4['body']) $lastBody = $response4['body'];
+        
+        if ($response4['code'] === 200) {
+            return ['success' => true, 'message' => 'Face capture started.'];
+        }
+        
+        // Method 5: Check capabilities
+        $capResponse = $this->sendRequest('/ISAPI/AccessControl/CaptureFaceData/capabilities');
+        $methods['capabilities'] = $capResponse['code'];
+        
+        $error = 'Face capture not supported via API';
+        if ($lastBody) {
+            if (strpos($lastBody, '<') === 0) {
+                $xml = @simplexml_load_string($lastBody);
+                if ($xml) {
+                    $error = (string)($xml->statusString ?? $xml->subStatusCode ?? $error);
+                }
+            } else {
+                $data = json_decode($lastBody, true);
+                if ($data) {
+                    $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+                }
             }
         }
         
         return [
             'success' => false, 
             'error' => $error, 
-            'hint' => 'For DS-K1T904AMF, face enrollment should be done at the device. Go to Menu > User > Add User > Enroll Face on device.',
-            'code' => $response['code']
+            'methods_tried' => $methods,
+            'hint' => 'Enroll face on device screen: Menu > User > Edit User > Add Face'
         ];
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
         $methods = [];
-        $lastError = '';
         $lastBody = '';
         
-        // Method 1: JSON format with FingerPrintCond (recommended for DS-K1T904AMF)
-        $jsonData = json_encode([
-            'FingerPrintCond' => [
-                'employeeNo' => (string)$employeeNo,
-                'fingerPrintID' => $fingerNo,
-                'deleteAllFP' => false
-            ]
-        ]);
-        
+        // Method 1: GET request with query parameters (some devices use this)
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
-            'POST',
-            $jsonData,
-            'application/json'
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json&employeeNo=' . urlencode($employeeNo) . '&fingerPrintID=' . $fingerNo,
+            'GET'
         );
-        $methods['json_cond'] = $response['code'];
+        $methods['get_query'] = $response['code'];
         $lastBody = $response['body'] ?? '';
         
         if ($response['code'] === 200) {
-            $data = json_decode($response['body'], true);
-            $fingerData = $data['FingerPrintCaptureResult']['fingerData'] ?? $data['fingerData'] ?? null;
-            
-            if ($fingerData) {
-                $saveResult = $this->saveFingerprintToEmployee($employeeNo, $fingerData, $fingerNo);
-                if ($saveResult['success']) {
-                    return [
-                        'success' => true,
-                        'message' => 'Fingerprint captured and saved successfully.',
-                        'employee_no' => $employeeNo,
-                        'finger_id' => $fingerNo
-                    ];
-                }
-            }
-            
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Place finger on scanner now.',
                 'employee_no' => $employeeNo,
-                'finger_id' => $fingerNo,
-                'next_step' => 'Employee should place finger on device scanner'
+                'finger_id' => $fingerNo
             ];
         }
         
-        // Method 2: Simple JSON without wrapper
-        $jsonData2 = json_encode([
-            'employeeNo' => (string)$employeeNo,
-            'fingerPrintID' => $fingerNo
-        ]);
-        
+        // Method 2: POST with empty body (trigger capture mode)
         $response2 = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint?format=json',
+            '/ISAPI/AccessControl/CaptureFingerPrint?employeeNo=' . urlencode($employeeNo) . '&fingerPrintID=' . $fingerNo,
             'POST',
-            $jsonData2,
+            '',
             'application/json'
         );
-        $methods['json_simple'] = $response2['code'];
+        $methods['post_empty'] = $response2['code'];
         if ($response2['body']) $lastBody = $response2['body'];
         
         if ($response2['code'] === 200) {
@@ -533,23 +520,38 @@ class HikvisionDevice extends BiometricDevice {
             ];
         }
         
-        // Method 3: XML format
-        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
-<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
-    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
-    <fingerPrintID>' . $fingerNo . '</fingerPrintID>
-</CaptureFingerPrintCond>';
-        
+        // Method 3: PUT request (some devices use PUT for capture)
         $response3 = $this->sendRequest(
-            '/ISAPI/AccessControl/CaptureFingerPrint',
-            'POST',
-            $xmlData,
-            "application/xml; charset='UTF-8'"
+            '/ISAPI/AccessControl/CaptureFingerPrint?format=json&employeeNo=' . urlencode($employeeNo),
+            'PUT',
+            '',
+            'application/json'
         );
-        $methods['xml'] = $response3['code'];
+        $methods['put_empty'] = $response3['code'];
         if ($response3['body']) $lastBody = $response3['body'];
         
         if ($response3['code'] === 200) {
+            return [
+                'success' => true, 
+                'message' => 'Fingerprint capture started.',
+                'employee_no' => $employeeNo,
+                'finger_id' => $fingerNo
+            ];
+        }
+        
+        // Method 4: Minimal XML body
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?><CaptureFingerPrintCond><employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo></CaptureFingerPrintCond>';
+        
+        $response4 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFingerPrint',
+            'POST',
+            $xmlData,
+            'application/xml'
+        );
+        $methods['xml_minimal'] = $response4['code'];
+        if ($response4['body']) $lastBody = $response4['body'];
+        
+        if ($response4['code'] === 200) {
             return [
                 'success' => true, 
                 'message' => 'Fingerprint capture started. Place finger on scanner.',
@@ -558,12 +560,13 @@ class HikvisionDevice extends BiometricDevice {
             ];
         }
         
-        // Method 4: Try capabilities check first
-        $capResponse = $this->sendRequest('/ISAPI/AccessControl/CaptureFingerPrint/capabilities?format=json');
+        // Method 5: Check capabilities
+        $capResponse = $this->sendRequest('/ISAPI/AccessControl/CaptureFingerPrint/capabilities');
         $methods['capabilities'] = $capResponse['code'];
+        $capBody = $capResponse['body'] ?? '';
         
-        // Parse error from responses
-        $error = 'Fingerprint capture failed';
+        // Parse error
+        $error = 'Fingerprint capture not supported via API';
         if ($lastBody) {
             if (strpos($lastBody, '<') === 0) {
                 $xml = @simplexml_load_string($lastBody);
@@ -582,8 +585,8 @@ class HikvisionDevice extends BiometricDevice {
             'success' => false, 
             'error' => $error,
             'methods_tried' => $methods,
-            'raw_response' => substr($lastBody, 0, 500),
-            'hint' => 'If API fails, enroll fingerprints directly on device: Menu > User > Select User > Fingerprint'
+            'capabilities_response' => substr($capBody, 0, 300),
+            'hint' => 'Enroll fingerprints on device screen: Menu > User > Edit User > Add Fingerprint'
         ];
     }
     
