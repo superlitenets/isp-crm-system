@@ -59,7 +59,7 @@ class WhatsApp {
     private function getSessionHeaders(): array {
         $headers = ['Content-Type: application/json'];
         if ($this->sessionApiSecret) {
-            $headers[] = 'X-Api-Key: ' . $this->sessionApiSecret;
+            $headers[] = 'Authorization: Bearer ' . $this->sessionApiSecret;
         }
         return $headers;
     }
