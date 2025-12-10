@@ -609,6 +609,150 @@ if ($page === 'api' && $action === 'whatsapp_session') {
     exit;
 }
 
+// Web Dashboard Clock In/Out API
+if ($page === 'api' && $action === 'clock_in') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $userId = \App\Auth::user()['id'];
+    $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$employee) {
+        echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
+        exit;
+    }
+    
+    $today = date('Y-m-d');
+    $now = date('H:i:s');
+    
+    // Check if already clocked in
+    $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+    $stmt->execute([$employee['id'], $today]);
+    $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($attendance && $attendance['clock_in']) {
+        echo json_encode(['success' => false, 'error' => 'Already clocked in today at ' . $attendance['clock_in']]);
+        exit;
+    }
+    
+    // Calculate late minutes
+    $lateCalculator = new \App\LateDeductionCalculator($db);
+    $lateMinutes = $lateCalculator->calculateLateMinutes($employee['id'], $now);
+    $lateDeduction = $lateCalculator->calculateDeduction($employee['id'], $lateMinutes);
+    
+    if ($attendance) {
+        $stmt = $db->prepare("UPDATE attendance SET clock_in = ?, late_minutes = ?, status = 'present', source = 'web' WHERE id = ?");
+        $stmt->execute([$now, $lateMinutes, $attendance['id']]);
+    } else {
+        $stmt = $db->prepare("INSERT INTO attendance (employee_id, date, clock_in, late_minutes, status, source) VALUES (?, ?, ?, ?, 'present', 'web')");
+        $stmt->execute([$employee['id'], $today, $now, $lateMinutes]);
+    }
+    
+    $response = [
+        'success' => true,
+        'message' => 'Clocked in at ' . date('h:i A'),
+        'clock_in' => $now,
+        'is_late' => $lateMinutes > 0,
+        'late_minutes' => $lateMinutes,
+        'late_deduction' => $lateDeduction
+    ];
+    
+    echo json_encode($response);
+    exit;
+}
+
+if ($page === 'api' && $action === 'clock_out') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $userId = \App\Auth::user()['id'];
+    $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$employee) {
+        echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
+        exit;
+    }
+    
+    $today = date('Y-m-d');
+    $now = date('H:i:s');
+    
+    $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+    $stmt->execute([$employee['id'], $today]);
+    $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$attendance || !$attendance['clock_in']) {
+        echo json_encode(['success' => false, 'error' => 'You must clock in first']);
+        exit;
+    }
+    
+    if ($attendance['clock_out']) {
+        echo json_encode(['success' => false, 'error' => 'Already clocked out at ' . $attendance['clock_out']]);
+        exit;
+    }
+    
+    // Calculate hours worked
+    $clockIn = strtotime($attendance['clock_in']);
+    $clockOut = strtotime($now);
+    $hoursWorked = round(($clockOut - $clockIn) / 3600, 2);
+    
+    $stmt = $db->prepare("UPDATE attendance SET clock_out = ?, hours_worked = ? WHERE id = ?");
+    $stmt->execute([$now, $hoursWorked, $attendance['id']]);
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Clocked out at ' . date('h:i A'),
+        'clock_out' => $now,
+        'hours_worked' => $hoursWorked
+    ]);
+    exit;
+}
+
+if ($page === 'api' && $action === 'attendance_status') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $userId = \App\Auth::user()['id'];
+    $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$employee) {
+        echo json_encode(['success' => true, 'data' => null, 'has_employee' => false]);
+        exit;
+    }
+    
+    $today = date('Y-m-d');
+    $stmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+    $stmt->execute([$employee['id'], $today]);
+    $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'has_employee' => true,
+        'data' => $attendance ?: null
+    ]);
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
@@ -3684,6 +3828,63 @@ $csrfToken = \App\Auth::generateToken();
     </nav>
 
     <main class="main-content">
+        <?php 
+        // Get current user's attendance status for clock-in widget
+        $userAttendance = null;
+        $hasEmployeeProfile = false;
+        $currentUserId = \App\Auth::user()['id'] ?? null;
+        if ($currentUserId) {
+            $empStmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
+            $empStmt->execute([$currentUserId]);
+            $empProfile = $empStmt->fetch(PDO::FETCH_ASSOC);
+            if ($empProfile) {
+                $hasEmployeeProfile = true;
+                $attStmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
+                $attStmt->execute([$empProfile['id'], date('Y-m-d')]);
+                $userAttendance = $attStmt->fetch(PDO::FETCH_ASSOC);
+            }
+        }
+        ?>
+        
+        <?php if ($hasEmployeeProfile): ?>
+        <!-- Clock In/Out Widget -->
+        <div id="clock-widget" class="mb-3">
+            <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center text-white">
+                            <i class="bi bi-clock-history fs-4 me-2"></i>
+                            <div>
+                                <span class="fw-bold" id="clock-display"><?= date('h:i:s A') ?></span>
+                                <span class="ms-2 small opacity-75"><?= date('l, M j') ?></span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="attendance-status" class="badge bg-light text-dark">
+                                <?php if ($userAttendance && $userAttendance['clock_in'] && $userAttendance['clock_out']): ?>
+                                    <i class="bi bi-check-circle text-success"></i> Worked <?= $userAttendance['hours_worked'] ?? 0 ?>h
+                                <?php elseif ($userAttendance && $userAttendance['clock_in']): ?>
+                                    <i class="bi bi-clock text-primary"></i> In: <?= date('h:i A', strtotime($userAttendance['clock_in'])) ?>
+                                <?php else: ?>
+                                    <i class="bi bi-x-circle text-muted"></i> Not clocked in
+                                <?php endif; ?>
+                            </span>
+                            <?php if (!$userAttendance || !$userAttendance['clock_in']): ?>
+                                <button id="btn-web-clock-in" class="btn btn-success btn-sm" onclick="webClockIn()">
+                                    <i class="bi bi-box-arrow-in-right"></i> Clock In
+                                </button>
+                            <?php elseif (!$userAttendance['clock_out']): ?>
+                                <button id="btn-web-clock-out" class="btn btn-danger btn-sm" onclick="webClockOut()">
+                                    <i class="bi bi-box-arrow-right"></i> Clock Out
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($message): ?>
         <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
             <?= htmlspecialchars($message) ?>
@@ -3803,6 +4004,77 @@ $csrfToken = \App\Auth::generateToken();
                 }
             });
         });
+        
+        // Clock widget live time update
+        function updateClockDisplay() {
+            const clockEl = document.getElementById('clock-display');
+            if (clockEl) {
+                const now = new Date();
+                clockEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+        }
+        setInterval(updateClockDisplay, 1000);
+        
+        // Web Clock In
+        async function webClockIn() {
+            const btn = document.getElementById('btn-web-clock-in');
+            if (btn) btn.disabled = true;
+            
+            try {
+                const response = await fetch('?page=api&action=clock_in', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    const statusEl = document.getElementById('attendance-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<i class="bi bi-clock text-primary"></i> In: ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    
+                    // Show late deduction alert if applicable
+                    if (result.is_late && result.late_deduction > 0) {
+                        alert('Late Clock-in!\n\nYou are ' + result.late_minutes + ' minutes late.\nDeduction: KES ' + result.late_deduction.toLocaleString());
+                    }
+                    
+                    // Replace button with clock out
+                    if (btn) {
+                        btn.outerHTML = '<button id="btn-web-clock-out" class="btn btn-danger btn-sm" onclick="webClockOut()"><i class="bi bi-box-arrow-right"></i> Clock Out</button>';
+                    }
+                } else {
+                    alert(result.error || 'Failed to clock in');
+                    if (btn) btn.disabled = false;
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+                if (btn) btn.disabled = false;
+            }
+        }
+        
+        // Web Clock Out
+        async function webClockOut() {
+            const btn = document.getElementById('btn-web-clock-out');
+            if (btn) btn.disabled = true;
+            
+            try {
+                const response = await fetch('?page=api&action=clock_out', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    const statusEl = document.getElementById('attendance-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<i class="bi bi-check-circle text-success"></i> Worked ' + result.hours_worked + 'h';
+                    }
+                    
+                    // Remove clock out button
+                    if (btn) btn.remove();
+                } else {
+                    alert(result.error || 'Failed to clock out');
+                    if (btn) btn.disabled = false;
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+                if (btn) btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
