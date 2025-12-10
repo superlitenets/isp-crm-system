@@ -1221,6 +1221,74 @@ function runMigrations(PDO $db): void {
                 holiday_date DATE NOT NULL,
                 is_recurring BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'quotes' => "
+            CREATE TABLE IF NOT EXISTS quotes (
+                id SERIAL PRIMARY KEY,
+                quote_number VARCHAR(50) UNIQUE NOT NULL,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                expiry_date DATE,
+                status VARCHAR(20) DEFAULT 'draft',
+                subtotal DECIMAL(12,2) DEFAULT 0,
+                tax_amount DECIMAL(12,2) DEFAULT 0,
+                discount_amount DECIMAL(12,2) DEFAULT 0,
+                total_amount DECIMAL(12,2) DEFAULT 0,
+                currency VARCHAR(10) DEFAULT 'KES',
+                notes TEXT,
+                terms TEXT,
+                converted_to_invoice_id INTEGER,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'quote_items' => "
+            CREATE TABLE IF NOT EXISTS quote_items (
+                id SERIAL PRIMARY KEY,
+                quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+                product_id INTEGER,
+                description TEXT NOT NULL,
+                quantity DECIMAL(10,2) DEFAULT 1,
+                unit_price DECIMAL(12,2) NOT NULL,
+                tax_rate_id INTEGER,
+                tax_amount DECIMAL(12,2) DEFAULT 0,
+                discount_percent DECIMAL(5,2) DEFAULT 0,
+                line_total DECIMAL(12,2) NOT NULL,
+                sort_order INTEGER DEFAULT 0
+            )",
+        'vendor_bills' => "
+            CREATE TABLE IF NOT EXISTS vendor_bills (
+                id SERIAL PRIMARY KEY,
+                bill_number VARCHAR(50) UNIQUE NOT NULL,
+                vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+                purchase_order_id INTEGER,
+                bill_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                due_date DATE NOT NULL,
+                status VARCHAR(20) DEFAULT 'draft',
+                subtotal DECIMAL(12,2) DEFAULT 0,
+                tax_amount DECIMAL(12,2) DEFAULT 0,
+                total_amount DECIMAL(12,2) DEFAULT 0,
+                amount_paid DECIMAL(12,2) DEFAULT 0,
+                balance_due DECIMAL(12,2) DEFAULT 0,
+                currency VARCHAR(10) DEFAULT 'KES',
+                reference VARCHAR(100),
+                notes TEXT,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'vendor_bill_items' => "
+            CREATE TABLE IF NOT EXISTS vendor_bill_items (
+                id SERIAL PRIMARY KEY,
+                bill_id INTEGER REFERENCES vendor_bills(id) ON DELETE CASCADE,
+                account_id INTEGER,
+                description TEXT NOT NULL,
+                quantity DECIMAL(10,2) DEFAULT 1,
+                unit_price DECIMAL(12,2) NOT NULL,
+                tax_rate_id INTEGER,
+                tax_amount DECIMAL(12,2) DEFAULT 0,
+                line_total DECIMAL(12,2) NOT NULL,
+                sort_order INTEGER DEFAULT 0
             )"
     ];
     
