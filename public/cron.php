@@ -14,13 +14,22 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 });
 
 try {
-    $action = $_GET['action'] ?? '';
-    $secret = $_GET['secret'] ?? '';
+    // Support both CLI arguments and GET parameters
+    $isCli = php_sapi_name() === 'cli';
+    
+    if ($isCli) {
+        $action = $argv[1] ?? '';
+        $secret = $argv[2] ?? 'cli-bypass';
+    } else {
+        $action = $_GET['action'] ?? '';
+        $secret = $_GET['secret'] ?? '';
+    }
 
     $settings = new \App\Settings();
     $cronSecret = $settings->get('cron_secret', 'isp-crm-cron-2024');
 
-    if ($secret !== $cronSecret) {
+    // Allow CLI calls without secret (they're running from the container)
+    if (!$isCli && $secret !== $cronSecret) {
         http_response_code(403);
         echo json_encode(['error' => 'Unauthorized']);
         exit;
@@ -30,6 +39,7 @@ try {
 
     switch ($action) {
         case 'daily_summary':
+        case 'scheduled_summaries':
             sendDailySummaryToGroups($db, $settings);
             break;
             
@@ -38,6 +48,7 @@ try {
             break;
             
         case 'sync_attendance':
+        case 'biometric_sync':
             syncAttendanceFromDevices($db);
             break;
             
@@ -46,7 +57,7 @@ try {
             break;
             
         default:
-            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'check_schedule', 'sync_attendance', 'leave_accrual']]);
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'scheduled_summaries', 'check_schedule', 'sync_attendance', 'biometric_sync', 'leave_accrual']]);
     }
 } catch (Throwable $e) {
     http_response_code(500);
