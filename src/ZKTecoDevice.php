@@ -24,6 +24,15 @@ class ZKTecoDevice extends BiometricDevice {
     private const CMD_DATA_WRRQ = 1503;
     private const CMD_DATA_RDY = 1504;
     private const CMD_PREPARE_DATA = 1500;
+    private const CMD_SET_USER = 8;
+    private const CMD_DELETE_USER = 18;
+    private const CMD_DELETE_USERTEMP = 19;
+    private const CMD_STARTENROLL = 61;
+    private const CMD_CANCELENROLL = 62;
+    private const CMD_ENROLL_FINGERPRINT = 63;
+    private const CMD_WRITE_FINGERPRINT = 1503;
+    private const CMD_TMP_WRITE = 87;
+    private const CMD_USER_TMP_ALL = 88;
     
     private const USHRT_MAX = 65535;
     
@@ -547,5 +556,466 @@ class ZKTecoDevice extends BiometricDevice {
         $year = $timestamp + 2000;
         
         return sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
+    }
+    
+    public function setUser(int $uid, string $userId, string $name, string $password = '', int $role = 0, string $cardNo = ''): bool {
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return false;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $userData = pack('v', $uid);
+            $userData .= chr($role);
+            $userData .= str_pad(substr($password, 0, 8), 8, "\x00");
+            $userData .= str_pad(substr($name, 0, 24), 24, "\x00");
+            $userData .= pack('V', intval($cardNo) ?: 0);
+            $userData .= str_repeat("\x00", 9);
+            $userData .= str_pad(substr($userId, 0, 9), 9, "\x00");
+            $userData .= str_repeat("\x00", 15);
+            
+            $command = $this->createHeader(self::CMD_SET_USER, $userData, $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to send set user command');
+            }
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                throw new \Exception('No response for set user');
+            }
+            
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $this->enableDevice();
+            
+            return $commandId == self::CMD_ACK_OK;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            $this->enableDevice();
+            return false;
+        }
+    }
+    
+    public function deleteUser(int $uid): bool {
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return false;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $command = $this->createHeader(self::CMD_DELETE_USER, pack('v', $uid), $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to send delete user command');
+            }
+            
+            $response = $this->receiveData();
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $this->enableDevice();
+            
+            return $commandId == self::CMD_ACK_OK;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            $this->enableDevice();
+            return false;
+        }
+    }
+    
+    public function startEnrollment(int $uid, int $fingerId): array {
+        $result = [
+            'success' => false,
+            'message' => '',
+            'enrolling' => false
+        ];
+        
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                $result['message'] = 'Connection failed';
+                return $result;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $enrollData = pack('v', $uid);
+            $enrollData .= chr($fingerId);
+            
+            $command = $this->createHeader(self::CMD_STARTENROLL, $enrollData, $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to send enrollment command');
+            }
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                throw new \Exception('No response from device');
+            }
+            
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            if ($commandId == self::CMD_ACK_OK) {
+                $result['success'] = true;
+                $result['enrolling'] = true;
+                $result['message'] = 'Enrollment started. Please place your finger on the device scanner.';
+            } else {
+                $result['message'] = 'Device rejected enrollment request. Make sure user exists on device.';
+            }
+            
+        } catch (\Exception $e) {
+            $result['message'] = $e->getMessage();
+        }
+        
+        return $result;
+    }
+    
+    public function cancelEnrollment(): bool {
+        if (!$this->socket || !$this->sessionId) {
+            return false;
+        }
+        
+        try {
+            $command = $this->createHeader(self::CMD_CANCELENROLL, '', $this->sessionId, $this->replyId);
+            @\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port);
+            $this->receiveData();
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            $this->enableDevice();
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+    
+    public function checkEnrollmentStatus(int $uid, int $fingerId): array {
+        $result = [
+            'success' => false,
+            'enrolled' => false,
+            'message' => ''
+        ];
+        
+        try {
+            $fingerprints = $this->getFingerprints($uid);
+            
+            foreach ($fingerprints as $fp) {
+                if ($fp['finger_id'] == $fingerId) {
+                    $result['success'] = true;
+                    $result['enrolled'] = true;
+                    $result['message'] = 'Fingerprint enrolled successfully';
+                    $result['template'] = $fp['template'] ?? null;
+                    return $result;
+                }
+            }
+            
+            $result['success'] = true;
+            $result['enrolled'] = false;
+            $result['message'] = 'Fingerprint not yet enrolled. Please scan finger on device.';
+            
+        } catch (\Exception $e) {
+            $result['message'] = $e->getMessage();
+        }
+        
+        return $result;
+    }
+    
+    public function getFingerprints(int $uid): array {
+        $fingerprints = [];
+        
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return $fingerprints;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(self::CMD_USERTEMP_RRQ), $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to request fingerprint data');
+            }
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                throw new \Exception('No response');
+            }
+            
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            
+            if ($commandId == self::CMD_PREPARE_DATA) {
+                $dataSize = unpack('V', substr($response, 8, 4))[1];
+                $data = $this->receiveRawData($dataSize);
+                
+                if ($data) {
+                    $fingerprints = $this->parseFingerprintData($data, $uid);
+                }
+            }
+            
+            $freeCommand = $this->createHeader(self::CMD_FREE_DATA, '', $this->sessionId, $this->replyId);
+            @\socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+        }
+        
+        $this->enableDevice();
+        return $fingerprints;
+    }
+    
+    public function setFingerprint(int $uid, int $fingerId, string $template): bool {
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return false;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $templateSize = strlen($template);
+            
+            $data = pack('v', $templateSize);
+            $data .= pack('v', $uid);
+            $data .= chr($fingerId);
+            $data .= chr(1);
+            $data .= $template;
+            
+            $command = $this->createHeader(self::CMD_TMP_WRITE, $data, $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to send fingerprint data');
+            }
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                throw new \Exception('No response');
+            }
+            
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $this->enableDevice();
+            
+            return $commandId == self::CMD_ACK_OK;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            $this->enableDevice();
+            return false;
+        }
+    }
+    
+    public function deleteFingerprint(int $uid, int $fingerId): bool {
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return false;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $data = pack('v', $uid);
+            $data .= chr($fingerId);
+            
+            $command = $this->createHeader(self::CMD_DELETE_USERTEMP, $data, $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to send delete fingerprint command');
+            }
+            
+            $response = $this->receiveData();
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $this->enableDevice();
+            
+            return $commandId == self::CMD_ACK_OK;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+            $this->enableDevice();
+            return false;
+        }
+    }
+    
+    public function getAllFingerprints(): array {
+        $fingerprints = [];
+        
+        if (!$this->socket || !$this->sessionId) {
+            if (!$this->connect()) {
+                return $fingerprints;
+            }
+        }
+        
+        $this->disableDevice();
+        
+        try {
+            $command = $this->createHeader(self::CMD_DATA_WRRQ, chr(1) . chr(self::CMD_USER_TMP_ALL), $this->sessionId, $this->replyId);
+            
+            if (!@\socket_sendto($this->socket, $command, strlen($command), 0, $this->ip, $this->port)) {
+                throw new \Exception('Failed to request all fingerprints');
+            }
+            
+            $response = $this->receiveData();
+            if ($response === false) {
+                throw new \Exception('No response');
+            }
+            
+            $commandId = unpack('v', substr($response, 0, 2))[1];
+            
+            if ($commandId == self::CMD_PREPARE_DATA) {
+                $dataSize = unpack('V', substr($response, 8, 4))[1];
+                $data = $this->receiveRawData($dataSize);
+                
+                if ($data) {
+                    $fingerprints = $this->parseFingerprintData($data);
+                }
+            }
+            
+            $freeCommand = $this->createHeader(self::CMD_FREE_DATA, '', $this->sessionId, $this->replyId);
+            @\socket_sendto($this->socket, $freeCommand, strlen($freeCommand), 0, $this->ip, $this->port);
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+        }
+        
+        $this->enableDevice();
+        return $fingerprints;
+    }
+    
+    private function parseFingerprintData(string $data, ?int $filterUid = null): array {
+        $fingerprints = [];
+        $offset = 0;
+        $dataLen = strlen($data);
+        
+        while ($offset < $dataLen) {
+            if ($offset + 6 > $dataLen) break;
+            
+            $size = unpack('v', substr($data, $offset, 2))[1];
+            $uid = unpack('v', substr($data, $offset + 2, 2))[1];
+            $fingerId = ord($data[$offset + 4]);
+            $valid = ord($data[$offset + 5]);
+            
+            if ($size <= 0 || $offset + 6 + $size > $dataLen) break;
+            
+            $template = substr($data, $offset + 6, $size);
+            
+            if ($filterUid === null || $uid == $filterUid) {
+                $fingerprints[] = [
+                    'uid' => $uid,
+                    'finger_id' => $fingerId,
+                    'valid' => $valid == 1,
+                    'template' => base64_encode($template),
+                    'template_size' => $size
+                ];
+            }
+            
+            $offset += 6 + $size;
+        }
+        
+        return $fingerprints;
+    }
+    
+    public function getDeviceInfo(): array {
+        $info = [
+            'device_name' => '',
+            'serial_number' => '',
+            'platform' => '',
+            'firmware_version' => '',
+            'users_count' => 0,
+            'fingerprints_count' => 0,
+            'logs_count' => 0
+        ];
+        
+        if (!$this->connect()) {
+            return $info;
+        }
+        
+        try {
+            $info['device_name'] = $this->getDeviceName();
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $info['serial_number'] = $this->getSerialNumber();
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $info['firmware_version'] = $this->getVersion();
+            $this->replyId = ($this->replyId + 1) % self::USHRT_MAX;
+            
+            $users = $this->getUsers();
+            $info['users_count'] = count($users);
+            
+        } catch (\Exception $e) {
+            $this->setError($e->getMessage());
+        }
+        
+        $this->disconnect();
+        return $info;
+    }
+    
+    public function syncUsersFromDatabase(\PDO $db): array {
+        $result = [
+            'success' => false,
+            'synced' => 0,
+            'errors' => []
+        ];
+        
+        try {
+            $stmt = $db->prepare("
+                SELECT dum.device_user_id, e.first_name, e.last_name, e.id as employee_id
+                FROM device_user_mapping dum
+                JOIN employees e ON dum.employee_id = e.id
+                WHERE dum.device_id = ?
+            ");
+            $stmt->execute([$this->deviceId]);
+            $mappings = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            if (!$this->connect()) {
+                $result['errors'][] = 'Connection failed';
+                return $result;
+            }
+            
+            foreach ($mappings as $mapping) {
+                try {
+                    $uid = (int)$mapping['device_user_id'];
+                    $name = trim(($mapping['first_name'] ?? '') . ' ' . ($mapping['last_name'] ?? ''));
+                    if (empty($name)) {
+                        $name = 'Employee ' . $mapping['employee_id'];
+                    }
+                    $userId = str_pad($mapping['employee_id'], 9, '0', STR_PAD_LEFT);
+                    
+                    if ($this->setUser($uid, $userId, $name, '', 0)) {
+                        $result['synced']++;
+                    } else {
+                        $result['errors'][] = "Failed to sync user {$uid}";
+                    }
+                } catch (\Exception $e) {
+                    $result['errors'][] = "Error syncing user {$mapping['device_user_id']}: " . $e->getMessage();
+                }
+            }
+            
+            $this->disconnect();
+            $result['success'] = true;
+            
+        } catch (\Exception $e) {
+            $result['errors'][] = $e->getMessage();
+        }
+        
+        return $result;
     }
 }
