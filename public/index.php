@@ -2027,9 +2027,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 try {
                     $mpesa = new \App\Mpesa();
+                    $accounting = new \App\Accounting(Database::getConnection());
                     $invoiceId = (int)$_POST['invoice_id'];
-                    $phone = $_POST['phone'] ?? '';
-                    $amount = !empty($_POST['amount']) ? (float)$_POST['amount'] : null;
+                    $phone = trim($_POST['phone'] ?? '');
+                    $requestedAmount = !empty($_POST['amount']) ? (int)$_POST['amount'] : null;
+                    
+                    $invoice = $accounting->getInvoice($invoiceId);
+                    if (!$invoice) {
+                        throw new Exception('Invoice not found');
+                    }
+                    
+                    if ($invoice['balance_due'] <= 0) {
+                        throw new Exception('This invoice is already paid in full');
+                    }
+                    
+                    if (empty($phone)) {
+                        throw new Exception('Phone number is required');
+                    }
+                    
+                    $maxAmount = floor($invoice['balance_due']);
+                    if ($maxAmount < 1 && $invoice['balance_due'] > 0) {
+                        $maxAmount = 1;
+                    }
+                    $amount = $requestedAmount ? min($requestedAmount, $maxAmount) : $maxAmount;
+                    if ($amount < 1) {
+                        throw new Exception('Amount must be at least KES 1');
+                    }
+                    
+                    if (!$mpesa->isConfigured()) {
+                        throw new Exception('M-Pesa is not configured. Please configure M-Pesa settings first.');
+                    }
                     
                     $result = $mpesa->stkPushForInvoice($invoiceId, $phone, $amount);
                     
@@ -2037,14 +2064,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $message = 'M-Pesa payment request sent! The customer will receive a prompt on their phone.';
                         $messageType = 'success';
                     } else {
-                        $message = 'M-Pesa request failed: ' . ($result['message'] ?? 'Unknown error');
+                        $errorMsg = $result['message'] ?? 'Unknown error';
+                        if (strpos($errorMsg, 'Invalid Access Token') !== false) {
+                            $message = 'M-Pesa configuration error. Please check your API credentials.';
+                        } elseif (strpos($errorMsg, 'Invalid PhoneNumber') !== false) {
+                            $message = 'Invalid phone number. Please enter a valid Safaricom number.';
+                        } else {
+                            $message = 'M-Pesa request failed: ' . $errorMsg;
+                        }
                         $messageType = 'danger';
                     }
                     \App\Auth::regenerateToken();
                     header('Location: ?page=accounting&subpage=invoices&action=view&id=' . $invoiceId);
                     exit;
                 } catch (Exception $e) {
-                    $message = 'Error: ' . $e->getMessage();
+                    $message = $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

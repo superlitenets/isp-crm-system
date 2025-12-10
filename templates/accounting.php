@@ -695,10 +695,21 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <?php if ($invoice['balance_due'] > 0 && $mpesa->isConfigured()): ?>
+<?php 
+$customerPhone = $invoice['customer_phone'] ?? '';
+if (empty($customerPhone) && !empty($invoice['customer_id'])) {
+    $custData = (new \App\Customer(Database::getConnection()))->get($invoice['customer_id']);
+    $customerPhone = $custData['phone'] ?? '';
+}
+$maxPayment = floor($invoice['balance_due']);
+if ($maxPayment < 1 && $invoice['balance_due'] > 0) {
+    $maxPayment = 1;
+}
+?>
 <div class="modal fade" id="mpesaPaymentModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST">
+            <form method="POST" id="mpesaPaymentForm">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title"><i class="bi bi-phone"></i> Pay with M-Pesa</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -707,6 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                     <input type="hidden" name="action" value="mpesa_invoice_stkpush">
                     <input type="hidden" name="invoice_id" value="<?= $invoice['id'] ?>">
+                    <input type="hidden" name="max_amount" value="<?= $maxPayment ?>">
                     
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i> An M-Pesa prompt will be sent to the phone number. The customer will need to enter their PIN to complete payment.
@@ -714,16 +726,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div class="mb-3">
                         <label class="form-label">Phone Number *</label>
-                        <input type="tel" class="form-control" name="phone" value="<?= htmlspecialchars($invoice['customer_phone'] ?? '') ?>" placeholder="e.g., 0712345678" required>
+                        <input type="tel" class="form-control" name="phone" id="mpesaPhone" value="<?= htmlspecialchars($customerPhone) ?>" placeholder="e.g., 0712345678" pattern="^(0|254|\+254)?[17][0-9]{8}$" required>
                         <div class="form-text">Kenyan phone number (Safaricom)</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Amount *</label>
+                        <label class="form-label">Amount (KES) *</label>
                         <div class="input-group">
                             <span class="input-group-text">KES</span>
-                            <input type="number" class="form-control" name="amount" value="<?= $invoice['balance_due'] ?>" min="1" max="<?= $invoice['balance_due'] ?>" step="1" required>
+                            <input type="number" class="form-control" name="amount" id="mpesaAmount" value="<?= $maxPayment ?>" min="1" max="<?= $maxPayment ?>" step="1" required>
                         </div>
-                        <div class="form-text">Balance: KES <?= number_format($invoice['balance_due'], 2) ?></div>
+                        <div class="form-text">Balance due: KES <?= number_format($invoice['balance_due'], 2) ?> (Max: KES <?= number_format($maxPayment, 0) ?>)</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -734,6 +746,23 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+<script>
+document.getElementById('mpesaPaymentForm').addEventListener('submit', function(e) {
+    const amount = parseInt(document.getElementById('mpesaAmount').value);
+    const max = <?= $maxPayment ?>;
+    if (amount < 1 || amount > max) {
+        e.preventDefault();
+        alert('Amount must be between KES 1 and KES ' + max);
+        return false;
+    }
+    const phone = document.getElementById('mpesaPhone').value.trim();
+    if (!phone.match(/^(0|254|\+254)?[17][0-9]{8}$/)) {
+        e.preventDefault();
+        alert('Please enter a valid Kenyan phone number');
+        return false;
+    }
+});
+</script>
 <?php endif; ?>
 
 <?php endif; ?>
