@@ -20,6 +20,8 @@ services:
       dockerfile: Dockerfile
     container_name: isp_crm_whatsapp
     restart: unless-stopped
+    ports:
+      - "3001:3001"
     volumes:
       - whatsapp_session:/app/.wwebjs_auth
       - whatsapp_secret:/app/.api_secret_dir
