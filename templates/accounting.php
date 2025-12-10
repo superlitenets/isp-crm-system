@@ -1163,6 +1163,117 @@ document.getElementById('mpesaPaymentForm').addEventListener('submit', function(
     </div>
 </div>
 
+<?php if ($mpesa->isConfigured()): ?>
+<div class="row g-4 mt-2">
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-phone"></i> M-Pesa STK Push</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="?page=accounting&subpage=payments" id="stkPushForm">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="accounting_stkpush">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Customer</label>
+                        <select class="form-select" name="customer_id" id="stkCustomer">
+                            <option value="">Select Customer (Optional)</option>
+                            <?php foreach ($customers as $cust): ?>
+                            <option value="<?= $cust['id'] ?>" data-phone="<?= htmlspecialchars($cust['phone'] ?? '') ?>"><?= htmlspecialchars($cust['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number *</label>
+                        <input type="tel" class="form-control" name="phone" id="stkPhone" placeholder="0712345678" required>
+                        <div class="form-text">Safaricom number</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES) *</label>
+                        <input type="number" class="form-control" name="amount" min="1" step="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Invoice (Optional)</label>
+                        <select class="form-select" name="invoice_id">
+                            <option value="">No Invoice</option>
+                            <?php 
+                            $unpaidInvoices = $accounting->getInvoices(['status' => 'sent']);
+                            foreach ($unpaidInvoices as $inv): ?>
+                            <option value="<?= $inv['id'] ?>"><?= htmlspecialchars($inv['invoice_number']) ?> - KES <?= number_format($inv['balance_due'], 2) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reference</label>
+                        <input type="text" class="form-control" name="reference" placeholder="Payment reference">
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-send"></i> Send STK Push
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> M-Pesa Transactions</h5>
+            </div>
+            <div class="card-body p-0">
+                <?php $mpesaTxns = $mpesa->getTransactions(20); ?>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Phone</th>
+                                <th>Reference</th>
+                                <th>Receipt</th>
+                                <th class="text-end">Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($mpesaTxns)): ?>
+                            <tr><td colspan="6" class="text-center text-muted py-4">No M-Pesa transactions yet</td></tr>
+                            <?php else: ?>
+                            <?php foreach ($mpesaTxns as $tx): ?>
+                            <tr>
+                                <td><?= date('M j, H:i', strtotime($tx['created_at'])) ?></td>
+                                <td><?= htmlspecialchars($tx['phone_number'] ?? '-') ?></td>
+                                <td><?= htmlspecialchars($tx['account_reference'] ?? '-') ?></td>
+                                <td><?= htmlspecialchars($tx['mpesa_receipt_number'] ?? '-') ?></td>
+                                <td class="text-end">KES <?= number_format($tx['amount'] ?? 0, 2) ?></td>
+                                <td>
+                                    <?php
+                                    $statusClass = match($tx['status'] ?? 'pending') {
+                                        'completed' => 'success',
+                                        'failed' => 'danger',
+                                        default => 'warning'
+                                    };
+                                    ?>
+                                    <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($tx['status'] ?? 'pending') ?></span>
+                                </td>
+                            </tr>
+                            <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('stkCustomer').addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    if (option.dataset.phone) {
+        document.getElementById('stkPhone').value = option.dataset.phone;
+    }
+});
+</script>
+<?php endif; ?>
+
 <?php elseif ($subpage === 'products'): ?>
 
 <?php if ($action === 'create' || $action === 'edit'): ?>

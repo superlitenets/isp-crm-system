@@ -2083,6 +2083,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
                 
+            case 'accounting_stkpush':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to process payments.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $mpesa = new \App\Mpesa();
+                    $phone = trim($_POST['phone'] ?? '');
+                    $amount = (int)($_POST['amount'] ?? 0);
+                    $invoiceId = !empty($_POST['invoice_id']) ? (int)$_POST['invoice_id'] : null;
+                    $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                    $reference = trim($_POST['reference'] ?? '') ?: 'Payment';
+                    
+                    if (empty($phone)) {
+                        throw new Exception('Phone number is required');
+                    }
+                    if ($amount < 1) {
+                        throw new Exception('Amount must be at least KES 1');
+                    }
+                    if (!$mpesa->isConfigured()) {
+                        throw new Exception('M-Pesa is not configured. Please configure M-Pesa settings first.');
+                    }
+                    
+                    if ($invoiceId) {
+                        $result = $mpesa->stkPushForInvoice($invoiceId, $phone, $amount);
+                    } else {
+                        $result = $mpesa->stkPush($phone, $amount, $reference);
+                        if ($result['success'] && $customerId) {
+                            // Link transaction to customer
+                        }
+                    }
+                    
+                    if ($result['success']) {
+                        $message = 'M-Pesa payment request sent! The customer will receive a prompt on their phone.';
+                        $messageType = 'success';
+                    } else {
+                        $errorMsg = $result['message'] ?? 'Unknown error';
+                        if (strpos($errorMsg, 'Invalid Access Token') !== false) {
+                            $message = 'M-Pesa configuration error. Please check your API credentials.';
+                        } elseif (strpos($errorMsg, 'Invalid PhoneNumber') !== false) {
+                            $message = 'Invalid phone number. Please enter a valid Safaricom number.';
+                        } else {
+                            $message = 'M-Pesa request failed: ' . $errorMsg;
+                        }
+                        $messageType = 'danger';
+                    }
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=payments');
+                    exit;
+                } catch (Exception $e) {
+                    $message = $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
             case 'create_bill':
             case 'update_bill':
                 if (!\App\Auth::can('settings.view')) {
@@ -3875,8 +3931,14 @@ if ($page === 'inventory' && isset($_GET['action'])) {
     }
 }
 
-// Handle M-Pesa payments
-if ($page === 'payments' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// Redirect old payments page to accounting payments
+if ($page === 'payments') {
+    header('Location: ?page=accounting&subpage=payments');
+    exit;
+}
+
+// Handle M-Pesa payments (legacy - kept for backwards compatibility)
+if ($page === 'payments_legacy' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $mpesa = new \App\Mpesa();
     $tab = $_GET['tab'] ?? 'stkpush';
     $paymentAction = $_GET['action'] ?? '';
@@ -3922,7 +3984,7 @@ if ($page === 'payments' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Handle M-Pesa GET actions (query status)
-if ($page === 'payments' && isset($_GET['action'])) {
+if ($page === 'payments_legacy' && isset($_GET['action'])) {
     $mpesa = new \App\Mpesa();
     $paymentAction = $_GET['action'];
     $tab = $_GET['tab'] ?? 'stkpush';
@@ -4280,13 +4342,6 @@ $csrfToken = \App\Auth::generateToken();
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
                     <i class="bi bi-box-seam"></i> Inventory
-                </a>
-            </li>
-            <?php endif; ?>
-            <?php if (\App\Auth::can('payments.view')): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'payments' ? 'active' : '' ?>" href="?page=payments">
-                    <i class="bi bi-cash-stack"></i> Payments
                 </a>
             </li>
             <?php endif; ?>

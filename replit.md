@@ -84,6 +84,7 @@ The system features a clean, responsive design. The public-facing landing page i
   - **Quotes Module**: Create, edit, view quotes with convert-to-invoice functionality
   - **Bills/Purchase Orders**: Track vendor bills with line items and due dates
   - **M-Pesa Invoice Payments**: Direct STK Push integration from invoice view for quick payment collection
+  - **Unified Payments Subpage**: M-Pesa STK Push form with customer selection, transaction history, and invoice linking all consolidated under Accounting → Payments
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
