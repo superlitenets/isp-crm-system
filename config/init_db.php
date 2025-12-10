@@ -1507,3 +1507,381 @@ function seedSLADefaults(PDO $db): void {
 if (php_sapi_name() === 'cli') {
     initializeDatabase();
 }
+
+function initializeAccountingTables(\PDO $db) {
+    $sql = "
+    -- Tax Rates
+    CREATE TABLE IF NOT EXISTS tax_rates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        rate DECIMAL(5,2) NOT NULL DEFAULT 16.00,
+        type VARCHAR(20) DEFAULT 'percentage',
+        is_inclusive BOOLEAN DEFAULT FALSE,
+        is_default BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Chart of Accounts
+    CREATE TABLE IF NOT EXISTS chart_of_accounts (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(20) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        category VARCHAR(50),
+        description TEXT,
+        parent_id INTEGER REFERENCES chart_of_accounts(id),
+        is_system BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        balance DECIMAL(15,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Products/Services Catalog
+    CREATE TABLE IF NOT EXISTS products_services (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50),
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        type VARCHAR(20) DEFAULT 'service',
+        unit_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+        cost_price DECIMAL(12,2) DEFAULT 0,
+        tax_rate_id INTEGER REFERENCES tax_rates(id),
+        income_account_id INTEGER REFERENCES chart_of_accounts(id),
+        expense_account_id INTEGER REFERENCES chart_of_accounts(id),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Vendors/Suppliers
+    CREATE TABLE IF NOT EXISTS vendors (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        contact_person VARCHAR(100),
+        email VARCHAR(100),
+        phone VARCHAR(50),
+        address TEXT,
+        city VARCHAR(100),
+        country VARCHAR(100) DEFAULT 'Kenya',
+        tax_pin VARCHAR(50),
+        payment_terms INTEGER DEFAULT 30,
+        currency VARCHAR(10) DEFAULT 'KES',
+        notes TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Invoices
+    CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        invoice_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+        ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+        issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        due_date DATE NOT NULL,
+        status VARCHAR(20) DEFAULT 'draft',
+        subtotal DECIMAL(12,2) DEFAULT 0,
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        discount_amount DECIMAL(12,2) DEFAULT 0,
+        total_amount DECIMAL(12,2) DEFAULT 0,
+        amount_paid DECIMAL(12,2) DEFAULT 0,
+        balance_due DECIMAL(12,2) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'KES',
+        notes TEXT,
+        terms TEXT,
+        is_recurring BOOLEAN DEFAULT FALSE,
+        recurring_interval VARCHAR(20),
+        next_recurring_date DATE,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Invoice Items
+    CREATE TABLE IF NOT EXISTS invoice_items (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products_services(id),
+        description TEXT NOT NULL,
+        quantity DECIMAL(10,2) DEFAULT 1,
+        unit_price DECIMAL(12,2) NOT NULL,
+        tax_rate_id INTEGER REFERENCES tax_rates(id),
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        discount_percent DECIMAL(5,2) DEFAULT 0,
+        line_total DECIMAL(12,2) NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+    
+    -- Quotes/Estimates
+    CREATE TABLE IF NOT EXISTS quotes (
+        id SERIAL PRIMARY KEY,
+        quote_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        expiry_date DATE,
+        status VARCHAR(20) DEFAULT 'draft',
+        subtotal DECIMAL(12,2) DEFAULT 0,
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        discount_amount DECIMAL(12,2) DEFAULT 0,
+        total_amount DECIMAL(12,2) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'KES',
+        notes TEXT,
+        terms TEXT,
+        converted_to_invoice_id INTEGER REFERENCES invoices(id),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Quote Items
+    CREATE TABLE IF NOT EXISTS quote_items (
+        id SERIAL PRIMARY KEY,
+        quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products_services(id),
+        description TEXT NOT NULL,
+        quantity DECIMAL(10,2) DEFAULT 1,
+        unit_price DECIMAL(12,2) NOT NULL,
+        tax_rate_id INTEGER REFERENCES tax_rates(id),
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        discount_percent DECIMAL(5,2) DEFAULT 0,
+        line_total DECIMAL(12,2) NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+    
+    -- Purchase Orders
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        po_number VARCHAR(50) UNIQUE NOT NULL,
+        vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+        order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        expected_date DATE,
+        status VARCHAR(20) DEFAULT 'draft',
+        subtotal DECIMAL(12,2) DEFAULT 0,
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        total_amount DECIMAL(12,2) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'KES',
+        notes TEXT,
+        approved_by INTEGER REFERENCES users(id),
+        approved_at TIMESTAMP,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Purchase Order Items
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id SERIAL PRIMARY KEY,
+        purchase_order_id INTEGER REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products_services(id),
+        equipment_id INTEGER REFERENCES equipment(id),
+        description TEXT NOT NULL,
+        quantity DECIMAL(10,2) DEFAULT 1,
+        received_quantity DECIMAL(10,2) DEFAULT 0,
+        unit_price DECIMAL(12,2) NOT NULL,
+        tax_rate_id INTEGER REFERENCES tax_rates(id),
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        line_total DECIMAL(12,2) NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+    
+    -- Vendor Bills
+    CREATE TABLE IF NOT EXISTS vendor_bills (
+        id SERIAL PRIMARY KEY,
+        bill_number VARCHAR(50) NOT NULL,
+        vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+        purchase_order_id INTEGER REFERENCES purchase_orders(id),
+        bill_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        due_date DATE NOT NULL,
+        status VARCHAR(20) DEFAULT 'unpaid',
+        subtotal DECIMAL(12,2) DEFAULT 0,
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        total_amount DECIMAL(12,2) DEFAULT 0,
+        amount_paid DECIMAL(12,2) DEFAULT 0,
+        balance_due DECIMAL(12,2) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'KES',
+        reference VARCHAR(100),
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Vendor Bill Items
+    CREATE TABLE IF NOT EXISTS vendor_bill_items (
+        id SERIAL PRIMARY KEY,
+        bill_id INTEGER REFERENCES vendor_bills(id) ON DELETE CASCADE,
+        account_id INTEGER REFERENCES chart_of_accounts(id),
+        description TEXT NOT NULL,
+        quantity DECIMAL(10,2) DEFAULT 1,
+        unit_price DECIMAL(12,2) NOT NULL,
+        tax_rate_id INTEGER REFERENCES tax_rates(id),
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        line_total DECIMAL(12,2) NOT NULL,
+        sort_order INTEGER DEFAULT 0
+    );
+    
+    -- Expense Categories
+    CREATE TABLE IF NOT EXISTS expense_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        account_id INTEGER REFERENCES chart_of_accounts(id),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Expenses
+    CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        expense_number VARCHAR(50),
+        category_id INTEGER REFERENCES expense_categories(id),
+        vendor_id INTEGER REFERENCES vendors(id),
+        expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        amount DECIMAL(12,2) NOT NULL,
+        tax_amount DECIMAL(12,2) DEFAULT 0,
+        total_amount DECIMAL(12,2) NOT NULL,
+        payment_method VARCHAR(50),
+        reference VARCHAR(100),
+        description TEXT,
+        receipt_url TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        approved_by INTEGER REFERENCES users(id),
+        approved_at TIMESTAMP,
+        employee_id INTEGER REFERENCES employees(id),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Customer Payments (Received)
+    CREATE TABLE IF NOT EXISTS customer_payments (
+        id SERIAL PRIMARY KEY,
+        payment_number VARCHAR(50) UNIQUE NOT NULL,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        amount DECIMAL(12,2) NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        mpesa_transaction_id INTEGER REFERENCES mpesa_transactions(id),
+        mpesa_receipt VARCHAR(50),
+        reference VARCHAR(100),
+        notes TEXT,
+        status VARCHAR(20) DEFAULT 'completed',
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Vendor Payments (Made)
+    CREATE TABLE IF NOT EXISTS vendor_payments (
+        id SERIAL PRIMARY KEY,
+        payment_number VARCHAR(50) UNIQUE NOT NULL,
+        vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+        bill_id INTEGER REFERENCES vendor_bills(id) ON DELETE SET NULL,
+        payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        amount DECIMAL(12,2) NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        reference VARCHAR(100),
+        notes TEXT,
+        status VARCHAR(20) DEFAULT 'completed',
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Accounting Settings
+    CREATE TABLE IF NOT EXISTS accounting_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+    CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
+    CREATE INDEX IF NOT EXISTS idx_quotes_customer ON quotes(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_vendor_bills_vendor ON vendor_bills(vendor_id);
+    CREATE INDEX IF NOT EXISTS idx_vendor_bills_status ON vendor_bills(status);
+    CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
+    CREATE INDEX IF NOT EXISTS idx_customer_payments_invoice ON customer_payments(invoice_id);
+    CREATE INDEX IF NOT EXISTS idx_vendor_payments_bill ON vendor_payments(bill_id);
+    ";
+    
+    $db->exec($sql);
+    
+    // Seed default tax rate
+    $checkTax = $db->query("SELECT COUNT(*) FROM tax_rates")->fetchColumn();
+    if ($checkTax == 0) {
+        $db->exec("INSERT INTO tax_rates (name, rate, is_default, is_active) VALUES ('VAT 16%', 16.00, true, true)");
+        $db->exec("INSERT INTO tax_rates (name, rate, is_default, is_active) VALUES ('Exempt', 0.00, false, true)");
+    }
+    
+    // Seed basic chart of accounts
+    $checkAccounts = $db->query("SELECT COUNT(*) FROM chart_of_accounts")->fetchColumn();
+    if ($checkAccounts == 0) {
+        $accounts = [
+            ['1000', 'Assets', 'asset', 'Assets', true],
+            ['1100', 'Cash', 'asset', 'Current Assets', true],
+            ['1110', 'M-Pesa', 'asset', 'Current Assets', true],
+            ['1120', 'Bank Account', 'asset', 'Current Assets', true],
+            ['1200', 'Accounts Receivable', 'asset', 'Current Assets', true],
+            ['1300', 'Inventory', 'asset', 'Current Assets', true],
+            ['2000', 'Liabilities', 'liability', 'Liabilities', true],
+            ['2100', 'Accounts Payable', 'liability', 'Current Liabilities', true],
+            ['2200', 'VAT Payable', 'liability', 'Current Liabilities', true],
+            ['3000', 'Equity', 'equity', 'Equity', true],
+            ['3100', 'Owners Equity', 'equity', 'Equity', true],
+            ['3200', 'Retained Earnings', 'equity', 'Equity', true],
+            ['4000', 'Revenue', 'revenue', 'Revenue', true],
+            ['4100', 'Service Revenue', 'revenue', 'Revenue', true],
+            ['4200', 'Installation Revenue', 'revenue', 'Revenue', true],
+            ['4300', 'Equipment Sales', 'revenue', 'Revenue', true],
+            ['5000', 'Expenses', 'expense', 'Expenses', true],
+            ['5100', 'Salaries & Wages', 'expense', 'Operating Expenses', true],
+            ['5200', 'Rent', 'expense', 'Operating Expenses', true],
+            ['5300', 'Utilities', 'expense', 'Operating Expenses', true],
+            ['5400', 'Internet & Bandwidth', 'expense', 'Operating Expenses', true],
+            ['5500', 'Equipment & Supplies', 'expense', 'Operating Expenses', true],
+            ['5600', 'Marketing', 'expense', 'Operating Expenses', true],
+            ['5700', 'Transport', 'expense', 'Operating Expenses', true]
+        ];
+        
+        $stmt = $db->prepare("INSERT INTO chart_of_accounts (code, name, type, category, is_system) VALUES (?, ?, ?, ?, ?)");
+        foreach ($accounts as $acc) {
+            try { $stmt->execute($acc); } catch (PDOException $e) {}
+        }
+    }
+    
+    // Seed expense categories
+    $checkCats = $db->query("SELECT COUNT(*) FROM expense_categories")->fetchColumn();
+    if ($checkCats == 0) {
+        $categories = ['Salaries', 'Rent', 'Utilities', 'Internet & Bandwidth', 'Equipment', 'Office Supplies', 'Transport', 'Marketing', 'Repairs & Maintenance', 'Other'];
+        $stmt = $db->prepare("INSERT INTO expense_categories (name) VALUES (?)");
+        foreach ($categories as $cat) {
+            try { $stmt->execute([$cat]); } catch (PDOException $e) {}
+        }
+    }
+    
+    // Seed accounting settings
+    $checkSettings = $db->query("SELECT COUNT(*) FROM accounting_settings")->fetchColumn();
+    if ($checkSettings == 0) {
+        $settings = [
+            ['invoice_prefix', 'INV-'],
+            ['invoice_next_number', '1001'],
+            ['quote_prefix', 'QUO-'],
+            ['quote_next_number', '1001'],
+            ['po_prefix', 'PO-'],
+            ['po_next_number', '1001'],
+            ['payment_prefix', 'PAY-'],
+            ['payment_next_number', '1001'],
+            ['default_payment_terms', '30'],
+            ['default_currency', 'KES'],
+            ['company_tax_pin', '']
+        ];
+        $stmt = $db->prepare("INSERT INTO accounting_settings (setting_key, setting_value) VALUES (?, ?)");
+        foreach ($settings as $s) {
+            try { $stmt->execute($s); } catch (PDOException $e) {}
+        }
+    }
+}

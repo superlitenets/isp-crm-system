@@ -1728,6 +1728,209 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_invoice':
+            case 'update_invoice':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to manage invoices.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $items = $_POST['items'] ?? [];
+                    
+                    if ($action === 'create_invoice') {
+                        $invoiceId = $accounting->createInvoice([
+                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'issue_date' => $_POST['issue_date'],
+                            'due_date' => $_POST['due_date'],
+                            'status' => $_POST['status'] ?? 'draft',
+                            'subtotal' => $_POST['subtotal'],
+                            'tax_amount' => $_POST['tax_amount'],
+                            'total_amount' => $_POST['total_amount'],
+                            'notes' => $_POST['notes'] ?? null,
+                            'terms' => $_POST['terms'] ?? null,
+                            'created_by' => $currentUser['id']
+                        ]);
+                    } else {
+                        $invoiceId = (int)$_POST['invoice_id'];
+                        $accounting->updateInvoice($invoiceId, [
+                            'customer_id' => $_POST['customer_id'] ?? null,
+                            'issue_date' => $_POST['issue_date'],
+                            'due_date' => $_POST['due_date'],
+                            'status' => $_POST['status'],
+                            'subtotal' => $_POST['subtotal'],
+                            'tax_amount' => $_POST['tax_amount'],
+                            'total_amount' => $_POST['total_amount'],
+                            'notes' => $_POST['notes'] ?? null,
+                            'terms' => $_POST['terms'] ?? null
+                        ]);
+                        $accounting->deleteInvoiceItems($invoiceId);
+                    }
+                    
+                    foreach ($items as $idx => $item) {
+                        if (!empty($item['description'])) {
+                            $qty = (float)($item['quantity'] ?? 1);
+                            $price = (float)($item['unit_price'] ?? 0);
+                            $taxRateId = !empty($item['tax_rate_id']) ? (int)$item['tax_rate_id'] : null;
+                            
+                            $taxAmount = 0;
+                            if ($taxRateId) {
+                                $taxStmt = Database::getConnection()->prepare("SELECT rate FROM tax_rates WHERE id = ?");
+                                $taxStmt->execute([$taxRateId]);
+                                $taxRate = (float)$taxStmt->fetchColumn();
+                                $taxAmount = ($qty * $price) * ($taxRate / 100);
+                            }
+                            
+                            $accounting->addInvoiceItem($invoiceId, [
+                                'product_id' => !empty($item['product_id']) ? (int)$item['product_id'] : null,
+                                'description' => $item['description'],
+                                'quantity' => $qty,
+                                'unit_price' => $price,
+                                'tax_rate_id' => $taxRateId,
+                                'tax_amount' => $taxAmount,
+                                'line_total' => ($qty * $price) + $taxAmount,
+                                'sort_order' => $idx
+                            ]);
+                        }
+                    }
+                    
+                    $accounting->recalculateInvoice($invoiceId);
+                    
+                    $message = $action === 'create_invoice' ? 'Invoice created successfully!' : 'Invoice updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=invoices&action=view&id=' . $invoiceId);
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'record_customer_payment':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to record payments.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $paymentId = $accounting->recordCustomerPayment([
+                        'customer_id' => $_POST['customer_id'] ?? null,
+                        'invoice_id' => !empty($_POST['invoice_id']) ? (int)$_POST['invoice_id'] : null,
+                        'payment_date' => $_POST['payment_date'] ?? date('Y-m-d'),
+                        'amount' => (float)$_POST['amount'],
+                        'payment_method' => $_POST['payment_method'],
+                        'reference' => $_POST['reference'] ?? null,
+                        'notes' => $_POST['notes'] ?? null,
+                        'created_by' => $currentUser['id']
+                    ]);
+                    
+                    $message = 'Payment recorded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    
+                    if (!empty($_POST['invoice_id'])) {
+                        header('Location: ?page=accounting&subpage=invoices&action=view&id=' . $_POST['invoice_id']);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_vendor':
+            case 'update_vendor':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to manage vendors.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    
+                    if ($action === 'create_vendor') {
+                        $accounting->createVendor($_POST);
+                        $message = 'Vendor created successfully!';
+                    } else {
+                        $accounting->updateVendor((int)$_POST['vendor_id'], $_POST);
+                        $message = 'Vendor updated successfully!';
+                    }
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=vendors');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_expense':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to record expenses.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    $amount = (float)$_POST['amount'];
+                    $taxAmount = (float)($_POST['tax_amount'] ?? 0);
+                    
+                    $accounting->createExpense([
+                        'category_id' => $_POST['category_id'] ?? null,
+                        'vendor_id' => !empty($_POST['vendor_id']) ? (int)$_POST['vendor_id'] : null,
+                        'expense_date' => $_POST['expense_date'] ?? date('Y-m-d'),
+                        'amount' => $amount,
+                        'tax_amount' => $taxAmount,
+                        'total_amount' => $amount + $taxAmount,
+                        'payment_method' => $_POST['payment_method'] ?? null,
+                        'reference' => $_POST['reference'] ?? null,
+                        'description' => $_POST['description'] ?? null,
+                        'status' => 'approved',
+                        'created_by' => $currentUser['id']
+                    ]);
+                    
+                    $message = 'Expense recorded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=expenses');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_product':
+            case 'update_product':
+                if (!\App\Auth::can('settings.view')) {
+                    $message = 'You do not have permission to manage products.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $accounting = new \App\Accounting(Database::getConnection());
+                    
+                    if ($action === 'create_product') {
+                        $accounting->createProduct($_POST);
+                        $message = 'Product/service created successfully!';
+                    } else {
+                        $accounting->updateProduct((int)$_POST['product_id'], $_POST);
+                        $message = 'Product/service updated successfully!';
+                    }
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=accounting&subpage=products');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_company_settings':
                 try {
                     $settings->saveCompanyInfo($_POST);
@@ -3927,6 +4130,13 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
+                <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
+                    <i class="bi bi-calculator"></i> Accounting
+                </a>
+            </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('settings.view')): ?>
+            <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
                     <i class="bi bi-gear"></i> Settings
                 </a>
@@ -4105,6 +4315,13 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/branches.php';
+                }
+                break;
+            case 'accounting':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/accounting.php';
                 }
                 break;
             default:

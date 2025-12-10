@@ -69,6 +69,18 @@ The system features a clean, responsive design. The public-facing landing page i
   - Public holidays calendar
   - Mobile API for leave requests from PWA
   - Cron job for monthly leave accrual
+- **Accounting Module (Dec 2025)**: Comprehensive financial management:
+  - Dashboard with receivables, payables, and monthly summaries
+  - Chart of Accounts with predefined categories
+  - Products/Services catalog for invoices
+  - Customer Invoices: create, edit, view with line items, VAT calculation
+  - Invoice payment recording with balance tracking
+  - Vendors/Suppliers management
+  - Expense tracking by category
+  - Customer payments with M-Pesa integration
+  - Reports: Profit & Loss, AR Aging, AP Aging
+  - Configurable tax rates (16% VAT default)
+  - Auto-generated invoice/quote/payment numbers
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
