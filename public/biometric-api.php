@@ -112,7 +112,7 @@ function isSessionAuthenticated(): bool {
 }
 
 $publicActions = ['health'];
-$sessionActions = ['fetch-device-users', 'sync-employees-to-device', 'register-user', 'delete-device-user', 'start-enrollment', 'capture-fingerprint', 'get-fingerprints', 'delete-fingerprint', 'link-device-user'];
+$sessionActions = ['fetch-device-users', 'sync-employees-to-device', 'register-user', 'delete-device-user', 'start-enrollment', 'capture-fingerprint', 'get-fingerprints', 'delete-fingerprint', 'link-device-user', 'check-enrollment-status', 'cancel-enrollment', 'zkteco-device-info', 'zkteco-set-fingerprint'];
 $requiresAuth = !in_array($action, $publicActions);
 
 if ($requiresAuth) {
@@ -370,11 +370,14 @@ try {
             
             $deviceId = $input['device_id'] ?? null;
             $employeeNo = $input['employee_no'] ?? $input['employee_id'] ?? null;
+            $uid = $input['uid'] ?? null;
             $name = $input['name'] ?? null;
             $cardNo = $input['card_no'] ?? null;
+            $password = $input['password'] ?? '';
+            $role = $input['role'] ?? 0;
             
-            if (!$deviceId || !$employeeNo || !$name) {
-                jsonResponse(['success' => false, 'error' => 'device_id, employee_no, and name are required'], 400);
+            if (!$deviceId || !$name) {
+                jsonResponse(['success' => false, 'error' => 'device_id and name are required'], 400);
             }
             
             $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
@@ -385,19 +388,44 @@ try {
                 jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            
             if ($device['device_type'] === 'hikvision') {
-                require_once __DIR__ . '/../src/BiometricDevice.php';
+                if (!$employeeNo) {
+                    jsonResponse(['success' => false, 'error' => 'employee_no is required for Hikvision'], 400);
+                }
                 require_once __DIR__ . '/../src/HikvisionDevice.php';
-                $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+                $devicePassword = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
                 $hikDevice = new \App\HikvisionDevice(
                     $device['id'],
                     $device['ip_address'],
                     $device['port'] ?: 80,
                     $device['username'],
-                    $password
+                    $devicePassword
                 );
                 $startEnrollment = $input['start_enrollment'] ?? true;
                 $result = $hikDevice->addUserWithEnrollment((string)$employeeNo, $name, $cardNo, $startEnrollment);
+            } elseif ($device['device_type'] === 'zkteco') {
+                if (!$uid) {
+                    jsonResponse(['success' => false, 'error' => 'uid is required for ZKTeco (numeric user ID on device)'], 400);
+                }
+                require_once __DIR__ . '/../src/ZKTecoDevice.php';
+                $zkDevice = new \App\ZKTecoDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 4370,
+                    $device['username'],
+                    null
+                );
+                $userId = $employeeNo ?? str_pad($uid, 9, '0', STR_PAD_LEFT);
+                $addResult = $zkDevice->setUser((int)$uid, $userId, $name, $password, (int)$role, $cardNo ?? '');
+                $zkDevice->disconnect();
+                
+                if ($addResult) {
+                    $result = ['success' => true, 'message' => 'User registered on ZKTeco device', 'uid' => (int)$uid];
+                } else {
+                    $result = ['success' => false, 'error' => 'Failed to register user on device'];
+                }
             } else {
                 $result = ['success' => false, 'error' => 'User registration not supported for this device type'];
             }
@@ -413,33 +441,49 @@ try {
             
             $deviceId = $input['device_id'] ?? null;
             $employeeNo = $input['employee_no'] ?? null;
+            $uid = $input['uid'] ?? null;
             $fingerId = $input['finger_id'] ?? 1;
             
-            if (!$deviceId || !$employeeNo) {
-                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            if (!$deviceId || (!$employeeNo && !$uid)) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no (or uid for ZKTeco) are required'], 400);
             }
             
             $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['device_type'] !== 'hikvision') {
-                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
             require_once __DIR__ . '/../src/BiometricDevice.php';
-            require_once __DIR__ . '/../src/HikvisionDevice.php';
-            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
-            $hikDevice = new \App\HikvisionDevice(
-                $device['id'],
-                $device['ip_address'],
-                $device['port'] ?: 80,
-                $device['username'],
-                $password
-            );
             
-            // Use the new captureFingerprint method for remote enrollment
-            $result = $hikDevice->captureFingerprint((string)$employeeNo, (int)$fingerId);
+            if ($device['device_type'] === 'hikvision') {
+                require_once __DIR__ . '/../src/HikvisionDevice.php';
+                $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+                $hikDevice = new \App\HikvisionDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 80,
+                    $device['username'],
+                    $password
+                );
+                $result = $hikDevice->captureFingerprint((string)$employeeNo, (int)$fingerId);
+            } elseif ($device['device_type'] === 'zkteco') {
+                require_once __DIR__ . '/../src/ZKTecoDevice.php';
+                $zkDevice = new \App\ZKTecoDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 4370,
+                    $device['username'],
+                    null
+                );
+                $deviceUid = $uid ?? (int)$employeeNo;
+                $result = $zkDevice->startEnrollment($deviceUid, (int)$fingerId);
+                $zkDevice->disconnect();
+            } else {
+                jsonResponse(['success' => false, 'error' => 'Fingerprint enrollment not supported for this device type'], 400);
+            }
             
             jsonResponse($result, $result['success'] ? 200 : 400);
             break;
@@ -451,31 +495,49 @@ try {
             
             $deviceId = $input['device_id'] ?? null;
             $employeeNo = $input['employee_no'] ?? null;
+            $uid = $input['uid'] ?? null;
             
-            if (!$deviceId || !$employeeNo) {
-                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            if (!$deviceId || (!$employeeNo && !$uid)) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no (or uid) are required'], 400);
             }
             
             $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['device_type'] !== 'hikvision') {
-                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
             require_once __DIR__ . '/../src/BiometricDevice.php';
-            require_once __DIR__ . '/../src/HikvisionDevice.php';
-            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
-            $hikDevice = new \App\HikvisionDevice(
-                $device['id'],
-                $device['ip_address'],
-                $device['port'] ?: 80,
-                $device['username'],
-                $password
-            );
             
-            $result = $hikDevice->getFingerprints((string)$employeeNo);
+            if ($device['device_type'] === 'hikvision') {
+                require_once __DIR__ . '/../src/HikvisionDevice.php';
+                $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+                $hikDevice = new \App\HikvisionDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 80,
+                    $device['username'],
+                    $password
+                );
+                $result = $hikDevice->getFingerprints((string)$employeeNo);
+            } elseif ($device['device_type'] === 'zkteco') {
+                require_once __DIR__ . '/../src/ZKTecoDevice.php';
+                $zkDevice = new \App\ZKTecoDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 4370,
+                    $device['username'],
+                    null
+                );
+                $deviceUid = $uid ?? (int)$employeeNo;
+                $fingerprints = $zkDevice->getFingerprints($deviceUid);
+                $zkDevice->disconnect();
+                $result = ['success' => true, 'fingerprints' => $fingerprints, 'count' => count($fingerprints)];
+            } else {
+                jsonResponse(['success' => false, 'error' => 'Get fingerprints not supported for this device type'], 400);
+            }
             
             jsonResponse($result, $result['success'] ? 200 : 400);
             break;
@@ -487,32 +549,50 @@ try {
             
             $deviceId = $input['device_id'] ?? null;
             $employeeNo = $input['employee_no'] ?? null;
+            $uid = $input['uid'] ?? null;
             $fingerId = $input['finger_id'] ?? null;
             
-            if (!$deviceId || !$employeeNo) {
-                jsonResponse(['success' => false, 'error' => 'device_id and employee_no are required'], 400);
+            if (!$deviceId || (!$employeeNo && !$uid)) {
+                jsonResponse(['success' => false, 'error' => 'device_id and employee_no (or uid) are required'], 400);
             }
             
             $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
             $deviceStmt->execute([$deviceId]);
             $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
             
-            if (!$device || $device['device_type'] !== 'hikvision') {
-                jsonResponse(['success' => false, 'error' => 'Hikvision device not found'], 404);
+            if (!$device) {
+                jsonResponse(['success' => false, 'error' => 'Device not found'], 404);
             }
             
             require_once __DIR__ . '/../src/BiometricDevice.php';
-            require_once __DIR__ . '/../src/HikvisionDevice.php';
-            $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
-            $hikDevice = new \App\HikvisionDevice(
-                $device['id'],
-                $device['ip_address'],
-                $device['port'] ?: 80,
-                $device['username'],
-                $password
-            );
             
-            $result = $hikDevice->deleteFingerprint((string)$employeeNo, $fingerId);
+            if ($device['device_type'] === 'hikvision') {
+                require_once __DIR__ . '/../src/HikvisionDevice.php';
+                $password = \App\BiometricDevice::decryptPassword($device['password_encrypted']);
+                $hikDevice = new \App\HikvisionDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 80,
+                    $device['username'],
+                    $password
+                );
+                $result = $hikDevice->deleteFingerprint((string)$employeeNo, $fingerId);
+            } elseif ($device['device_type'] === 'zkteco') {
+                require_once __DIR__ . '/../src/ZKTecoDevice.php';
+                $zkDevice = new \App\ZKTecoDevice(
+                    $device['id'],
+                    $device['ip_address'],
+                    $device['port'] ?: 4370,
+                    $device['username'],
+                    null
+                );
+                $deviceUid = $uid ?? (int)$employeeNo;
+                $deleteResult = $zkDevice->deleteFingerprint($deviceUid, (int)$fingerId);
+                $zkDevice->disconnect();
+                $result = ['success' => $deleteResult, 'message' => $deleteResult ? 'Fingerprint deleted' : 'Failed to delete fingerprint'];
+            } else {
+                jsonResponse(['success' => false, 'error' => 'Delete fingerprint not supported for this device type'], 400);
+            }
             
             jsonResponse($result, $result['success'] ? 200 : 400);
             break;
@@ -773,6 +853,148 @@ try {
                 'success' => true,
                 'processed' => count($results),
                 'results' => $results
+            ]);
+            break;
+            
+        case 'check-enrollment-status':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $uid = $input['uid'] ?? null;
+            $fingerId = $input['finger_id'] ?? 1;
+            
+            if (!$deviceId || !$uid) {
+                jsonResponse(['success' => false, 'error' => 'device_id and uid are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'zkteco') {
+                jsonResponse(['success' => false, 'error' => 'ZKTeco device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/ZKTecoDevice.php';
+            $zkDevice = new \App\ZKTecoDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 4370,
+                $device['username'],
+                null
+            );
+            $result = $zkDevice->checkEnrollmentStatus((int)$uid, (int)$fingerId);
+            $zkDevice->disconnect();
+            
+            jsonResponse($result, 200);
+            break;
+            
+        case 'cancel-enrollment':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            
+            if (!$deviceId) {
+                jsonResponse(['success' => false, 'error' => 'device_id is required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'zkteco') {
+                jsonResponse(['success' => false, 'error' => 'ZKTeco device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/ZKTecoDevice.php';
+            $zkDevice = new \App\ZKTecoDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 4370,
+                $device['username'],
+                null
+            );
+            $cancelled = $zkDevice->cancelEnrollment();
+            $zkDevice->disconnect();
+            
+            jsonResponse(['success' => $cancelled, 'message' => $cancelled ? 'Enrollment cancelled' : 'Failed to cancel enrollment']);
+            break;
+            
+        case 'zkteco-device-info':
+            $deviceId = $_GET['device_id'] ?? $input['device_id'] ?? null;
+            
+            if (!$deviceId) {
+                jsonResponse(['success' => false, 'error' => 'device_id is required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'zkteco') {
+                jsonResponse(['success' => false, 'error' => 'ZKTeco device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/ZKTecoDevice.php';
+            $zkDevice = new \App\ZKTecoDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 4370,
+                $device['username'],
+                null
+            );
+            $info = $zkDevice->getDeviceInfo();
+            $zkDevice->disconnect();
+            
+            jsonResponse(['success' => true, 'device_info' => $info]);
+            break;
+            
+        case 'zkteco-set-fingerprint':
+            if ($method !== 'POST') {
+                jsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+            }
+            
+            $deviceId = $input['device_id'] ?? null;
+            $uid = $input['uid'] ?? null;
+            $fingerId = $input['finger_id'] ?? 1;
+            $template = $input['template'] ?? null;
+            
+            if (!$deviceId || !$uid || !$template) {
+                jsonResponse(['success' => false, 'error' => 'device_id, uid, and template are required'], 400);
+            }
+            
+            $deviceStmt = $db->prepare("SELECT * FROM biometric_devices WHERE id = ?");
+            $deviceStmt->execute([$deviceId]);
+            $device = $deviceStmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$device || $device['device_type'] !== 'zkteco') {
+                jsonResponse(['success' => false, 'error' => 'ZKTeco device not found'], 404);
+            }
+            
+            require_once __DIR__ . '/../src/BiometricDevice.php';
+            require_once __DIR__ . '/../src/ZKTecoDevice.php';
+            $zkDevice = new \App\ZKTecoDevice(
+                $device['id'],
+                $device['ip_address'],
+                $device['port'] ?: 4370,
+                $device['username'],
+                null
+            );
+            
+            $templateData = base64_decode($template);
+            $setResult = $zkDevice->setFingerprint((int)$uid, (int)$fingerId, $templateData);
+            $zkDevice->disconnect();
+            
+            jsonResponse([
+                'success' => $setResult, 
+                'message' => $setResult ? 'Fingerprint template uploaded' : 'Failed to upload fingerprint template'
             ]);
             break;
             
