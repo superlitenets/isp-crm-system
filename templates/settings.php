@@ -285,6 +285,7 @@ document.getElementById('currencySelect').addEventListener('change', function() 
 $testResult = null;
 $sendTestResult = null;
 $smsSettings = $settings->getSMSSettings();
+$primaryGateway = $settings->getPrimaryNotificationGateway();
 
 if (($_GET['action'] ?? '') === 'test') {
     $testResult = $smsGateway->testConnection();
@@ -293,6 +294,35 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
     $sendTestResult = $smsGateway->send($_GET['phone'], 'Test message from ISP CRM System. If you received this, your SMS gateway is working!');
 }
 ?>
+
+<!-- Primary Notification Gateway -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-send-check"></i> Primary Notification Gateway</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="save_primary_gateway">
+            <div class="row align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label">Choose Primary Channel for Notifications</label>
+                    <select class="form-select" name="primary_notification_gateway">
+                        <option value="both" <?= $primaryGateway === 'both' ? 'selected' : '' ?>>Both SMS & WhatsApp</option>
+                        <option value="whatsapp" <?= $primaryGateway === 'whatsapp' ? 'selected' : '' ?>>WhatsApp Only</option>
+                        <option value="sms" <?= $primaryGateway === 'sms' ? 'selected' : '' ?>>SMS Only</option>
+                    </select>
+                    <small class="text-muted">This controls how ticket, order, and complaint notifications are sent to customers</small>
+                </div>
+                <div class="col-md-6">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="row g-4">
     <div class="col-md-6">

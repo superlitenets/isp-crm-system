@@ -7,12 +7,14 @@ use PDO;
 class Complaint {
     private PDO $db;
     private SMSGateway $sms;
+    private WhatsApp $whatsapp;
     private Settings $settings;
     private ActivityLog $activityLog;
 
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
+        $this->whatsapp = new WhatsApp();
         $this->settings = new Settings();
         $this->activityLog = new ActivityLog();
     }
@@ -79,7 +81,24 @@ class Complaint {
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
-        $this->sms->send($data['customer_phone'], $message);
+        
+        $primaryGateway = $this->settings->getPrimaryNotificationGateway();
+        
+        if ($primaryGateway === 'sms' || $primaryGateway === 'both') {
+            $this->sms->send($data['customer_phone'], $message);
+        }
+        
+        if ($primaryGateway === 'whatsapp' || $primaryGateway === 'both') {
+            try {
+                $waTemplate = $this->settings->get('wa_template_complaint_received', '');
+                $waMessage = !empty(trim($waTemplate)) 
+                    ? str_replace(array_keys($placeholders), array_values($placeholders), $waTemplate) 
+                    : $message;
+                $this->whatsapp->send($data['customer_phone'], $waMessage);
+            } catch (\Throwable $e) {
+                error_log("WhatsApp complaint notification failed: " . $e->getMessage());
+            }
+        }
     }
 
     public function getAll(array $filters = []): array {
@@ -307,7 +326,24 @@ class Complaint {
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
-        $this->sms->send($complaint['customer_phone'], $message);
+        
+        $primaryGateway = $this->settings->getPrimaryNotificationGateway();
+        
+        if ($primaryGateway === 'sms' || $primaryGateway === 'both') {
+            $this->sms->send($complaint['customer_phone'], $message);
+        }
+        
+        if ($primaryGateway === 'whatsapp' || $primaryGateway === 'both') {
+            try {
+                $waTemplate = $this->settings->get('wa_template_complaint_approved', '');
+                $waMessage = !empty(trim($waTemplate)) 
+                    ? str_replace(array_keys($placeholders), array_values($placeholders), $waTemplate) 
+                    : $message;
+                $this->whatsapp->send($complaint['customer_phone'], $waMessage);
+            } catch (\Throwable $e) {
+                error_log("WhatsApp complaint approved notification failed: " . $e->getMessage());
+            }
+        }
     }
 
     public function updatePriority(int $id, string $priority): bool {

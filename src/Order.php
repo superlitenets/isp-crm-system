@@ -5,12 +5,14 @@ namespace App;
 class Order {
     private \PDO $db;
     private SMSGateway $sms;
+    private WhatsApp $whatsapp;
     private Settings $settings;
     private ActivityLog $activityLog;
     
     public function __construct() {
         $this->db = \Database::getConnection();
         $this->sms = new SMSGateway();
+        $this->whatsapp = new WhatsApp();
         $this->settings = new Settings();
         $this->activityLog = new ActivityLog();
     }
@@ -117,7 +119,24 @@ class Order {
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
-        $this->sms->send($data['customer_phone'], $message);
+        
+        $primaryGateway = $this->settings->getPrimaryNotificationGateway();
+        
+        if ($primaryGateway === 'sms' || $primaryGateway === 'both') {
+            $this->sms->send($data['customer_phone'], $message);
+        }
+        
+        if ($primaryGateway === 'whatsapp' || $primaryGateway === 'both') {
+            try {
+                $waTemplate = $this->settings->get('wa_template_order_confirmation', '');
+                $waMessage = !empty(trim($waTemplate)) 
+                    ? str_replace(array_keys($placeholders), array_values($placeholders), $waTemplate) 
+                    : $message;
+                $this->whatsapp->send($data['customer_phone'], $waMessage);
+            } catch (\Throwable $e) {
+                error_log("WhatsApp order confirmation failed: " . $e->getMessage());
+            }
+        }
     }
     
     private function createCommission(int $orderId, int $salespersonId, float $amount): void {
@@ -364,7 +383,24 @@ class Order {
         ];
         
         $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
-        $this->sms->send($order['customer_phone'], $message);
+        
+        $primaryGateway = $this->settings->getPrimaryNotificationGateway();
+        
+        if ($primaryGateway === 'sms' || $primaryGateway === 'both') {
+            $this->sms->send($order['customer_phone'], $message);
+        }
+        
+        if ($primaryGateway === 'whatsapp' || $primaryGateway === 'both') {
+            try {
+                $waTemplate = $this->settings->get('wa_template_order_accepted', '');
+                $waMessage = !empty(trim($waTemplate)) 
+                    ? str_replace(array_keys($placeholders), array_values($placeholders), $waTemplate) 
+                    : $message;
+                $this->whatsapp->send($order['customer_phone'], $waMessage);
+            } catch (\Throwable $e) {
+                error_log("WhatsApp ticket created notification failed: " . $e->getMessage());
+            }
+        }
     }
     
     public function getStats(?int $userId = null): array {

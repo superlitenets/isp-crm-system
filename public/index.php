@@ -1729,6 +1729,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+            
+            case 'save_primary_gateway':
+                try {
+                    $gateway = $_POST['primary_notification_gateway'] ?? 'both';
+                    $settings->setPrimaryNotificationGateway($gateway);
+                    \App\Settings::clearCache();
+                    $message = 'Primary notification gateway saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving gateway setting: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
 
             case 'save_whatsapp_settings':
                 try {
