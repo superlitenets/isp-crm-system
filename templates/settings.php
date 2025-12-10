@@ -3692,8 +3692,94 @@ $mpesaConfig = $mpesa->getConfig();
             </div>
         </div>
         
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-phone"></i> Test STK Push</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($mpesa->isConfigured()): ?>
+                <div class="mb-3">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="testPhone" placeholder="254712345678">
+                    <small class="text-muted">Format: 254XXXXXXXXX</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Amount (KES)</label>
+                    <input type="number" class="form-control" id="testAmount" value="1" min="1">
+                </div>
+                <button type="button" class="btn btn-success w-100" onclick="testStkPush()">
+                    <i class="bi bi-send"></i> Send Test STK Push
+                </button>
+                <div id="stkResult" class="mt-3"></div>
+                <?php else: ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Configure M-Pesa first to test STK Push
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Quick Help</h5>
+            </div>
+            <div class="card-body small">
+                <p><strong>To get production credentials:</strong></p>
+                <ol class="mb-0">
+                    <li>Go to <a href="https://developer.safaricom.co.ke" target="_blank">Daraja Portal</a></li>
+                    <li>Create an App under "My Apps"</li>
+                    <li>Request "Go Live" approval</li>
+                    <li>Copy your Consumer Key, Secret, and Passkey</li>
+                </ol>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+async function testStkPush() {
+    const phone = document.getElementById('testPhone').value.trim();
+    const amount = document.getElementById('testAmount').value;
+    const resultDiv = document.getElementById('stkResult');
+    
+    if (!phone || !amount) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Please enter phone and amount</div>';
+        return;
+    }
+    
+    if (!phone.match(/^254\d{9}$/)) {
+        resultDiv.innerHTML = '<div class="alert alert-warning">Phone must be in format 254XXXXXXXXX</div>';
+        return;
+    }
+    
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Sending STK Push...</div>';
+    
+    try {
+        const response = await fetch('/api/mpesa-test.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({phone, amount: parseFloat(amount)})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> <strong>STK Push Sent!</strong><br>
+                <small>Check your phone for the payment prompt.</small><br>
+                <small class="text-muted">Checkout ID: ${data.checkoutRequestId || 'N/A'}</small>
+            </div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">
+                <i class="bi bi-x-circle"></i> <strong>Failed</strong><br>
+                <small>${data.error || 'Unknown error'}</small>
+            </div>`;
+        }
+    } catch (e) {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+    }
+}
+</script>
 
 <?php elseif ($subpage === 'sales'): ?>
 <?php
