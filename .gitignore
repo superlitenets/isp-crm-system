@@ -28,6 +28,17 @@ sessions/
 
 # Node.js
 node_modules/
+**/node_modules/
 whatsapp-service/.wwebjs_auth/
 whatsapp-service/.wwebjs_cache/
 whatsapp-service/.api_secret
+
+# Large files - exclude from git
+*.zip
+public/*.zip
+public/isp-crm-complete.zip
+public/isp-crm-docker.zip
+
+# Chromium binaries
+.local-chromium/
+**/chrome-linux/
