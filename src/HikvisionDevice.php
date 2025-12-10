@@ -394,31 +394,71 @@ class HikvisionDevice extends BiometricDevice {
     }
     
     public function startFaceEnrollment(string $employeeNo): array {
+        // Method 1: Try JSON format for AccessControl FaceCapture
         $captureData = [
-            'FaceCapture' => [
-                'employeeNo' => $employeeNo,
-                'faceLibType' => 'blackFD'
+            'FaceCaptureCond' => [
+                'employeeNo' => $employeeNo
             ]
         ];
         
         $response = $this->sendRequest(
-            '/ISAPI/AccessControl/FaceCapture/Start?format=json',
-            'PUT',
+            '/ISAPI/AccessControl/FaceCapture?format=json',
+            'POST',
             json_encode($captureData),
             'application/json'
         );
         
         if ($response['code'] === 200) {
-            return ['success' => true, 'message' => 'Face enrollment started on device. Employee should look at the camera.'];
+            $data = json_decode($response['body'], true);
+            if (isset($data['FaceCaptureResult'])) {
+                return ['success' => true, 'message' => 'Face captured successfully.', 'data' => $data];
+            }
+            return ['success' => true, 'message' => 'Face enrollment initiated. Employee should look at the camera.'];
         }
         
-        $error = 'Failed to start face enrollment';
+        // Method 2: Try XML format
+        $xmlData = '<?xml version="1.0" encoding="UTF-8"?>
+<FaceCaptureCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <employeeNo>' . htmlspecialchars($employeeNo) . '</employeeNo>
+</FaceCaptureCond>';
+        
+        $response2 = $this->sendRequest(
+            '/ISAPI/AccessControl/FaceCapture',
+            'POST',
+            $xmlData,
+            "application/xml; charset='UTF-8'"
+        );
+        
+        if ($response2['code'] === 200) {
+            return ['success' => true, 'message' => 'Face enrollment started. Employee should look at camera now.'];
+        }
+        
+        // Method 3: Try CaptureFaceData endpoint (some models)
+        $response3 = $this->sendRequest(
+            '/ISAPI/AccessControl/CaptureFaceData?format=json&employeeNo=' . urlencode($employeeNo),
+            'POST',
+            json_encode(['employeeNo' => $employeeNo]),
+            'application/json'
+        );
+        
+        if ($response3['code'] === 200) {
+            return ['success' => true, 'message' => 'Face capture started. Look at the device camera.'];
+        }
+        
+        $error = 'Face enrollment not supported on this device. Try enrolling directly on device screen.';
         if ($response['body']) {
             $data = json_decode($response['body'], true);
-            $error = $data['statusString'] ?? $data['subStatusCode'] ?? $error;
+            if (isset($data['statusString']) || isset($data['subStatusCode'])) {
+                $error = $data['statusString'] ?? $data['subStatusCode'];
+            }
         }
         
-        return ['success' => false, 'error' => $error, 'code' => $response['code']];
+        return [
+            'success' => false, 
+            'error' => $error, 
+            'hint' => 'For DS-K1T904AMF, face enrollment should be done at the device. Go to Menu > User > Add User > Enroll Face on device.',
+            'code' => $response['code']
+        ];
     }
     
     public function startFingerprintEnrollment(string $employeeNo, int $fingerNo = 1): array {
