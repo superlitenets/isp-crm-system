@@ -321,23 +321,15 @@ $isConnected = ($sessionStatus['status'] ?? '') === 'connected';
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-dark" style="background: var(--chat-header);">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/dashboard">
-                <i class="bi bi-router"></i> ISP CRM
-            </a>
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-light">
-                    <span class="status-dot <?= $isConnected ? 'connected' : 'disconnected' ?>"></span>
-                    <?= $isConnected ? 'Connected' : 'Disconnected' ?>
-                </span>
-                <a href="/settings?tab=whatsapp" class="btn btn-outline-light btn-sm">
-                    <i class="bi bi-gear"></i> Settings
-                </a>
-                <a href="/dashboard" class="btn btn-outline-light btn-sm">
-                    <i class="bi bi-arrow-left"></i> Back
-                </a>
-            </div>
+            <span class="navbar-brand mb-0 h5">
+                <i class="bi bi-whatsapp me-2"></i>WhatsApp Chat
+            </span>
+            <span class="text-light">
+                <span class="status-dot <?= $isConnected ? 'connected' : 'disconnected' ?>"></span>
+                <?= $isConnected ? 'Connected' : 'Disconnected' ?>
+            </span>
         </div>
     </nav>
 
