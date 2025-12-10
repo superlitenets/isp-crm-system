@@ -887,10 +887,13 @@ class WhatsApp {
     public function storeMessage(int $conversationId, array $messageData): array {
         $db = \Database::getConnection();
         
+        // Get message ID (service returns 'id', some calls use 'messageId')
+        $messageId = $messageData['id'] ?? $messageData['messageId'] ?? null;
+        
         // Check for duplicate
-        if (!empty($messageData['messageId'])) {
+        if (!empty($messageId)) {
             $stmt = $db->prepare("SELECT id FROM whatsapp_messages WHERE message_id = ?");
-            $stmt->execute([$messageData['messageId']]);
+            $stmt->execute([$messageId]);
             if ($stmt->fetch()) {
                 return ['success' => false, 'error' => 'Duplicate message'];
             }
@@ -908,7 +911,7 @@ class WhatsApp {
         
         $stmt->execute([
             $conversationId,
-            $messageData['messageId'] ?? null,
+            $messageId,
             $messageData['fromMe'] ?? false ? 'outgoing' : 'incoming',
             $messageData['senderPhone'] ?? null,
             $messageData['senderName'] ?? null,
