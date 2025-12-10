@@ -368,10 +368,18 @@ app.get('/chats', async (req, res) => {
     try {
         const chats = await client.getChats();
         const chatList = await Promise.all(chats.slice(0, 50).map(async chat => {
-            const contact = chat.isGroup ? null : await chat.getContact();
+            let contactName = null;
+            if (!chat.isGroup) {
+                try {
+                    const contact = await chat.getContact();
+                    contactName = contact?.pushname || contact?.name || null;
+                } catch (e) {
+                    // Contact lookup may fail on newer WhatsApp versions
+                }
+            }
             return {
                 id: chat.id._serialized,
-                name: chat.name || contact?.pushname || contact?.name || chat.id.user,
+                name: chat.name || contactName || chat.id.user,
                 isGroup: chat.isGroup,
                 unreadCount: chat.unreadCount,
                 lastMessageAt: chat.timestamp,
