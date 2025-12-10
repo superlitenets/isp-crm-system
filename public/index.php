@@ -647,7 +647,11 @@ if ($page === 'api' && $action === 'clock_in') {
         // Calculate late minutes
         $lateCalculator = new \App\LateDeductionCalculator($db);
         $lateMinutes = $lateCalculator->calculateLateMinutes($employee['id'], $now);
-        $lateDeduction = $lateCalculator->calculateDeduction($employee['id'], $lateMinutes);
+        $lateDeduction = 0;
+        $rule = $lateCalculator->getRuleForEmployee($employee['id']);
+        if ($rule && $lateMinutes > 0) {
+            $lateDeduction = $lateCalculator->calculateDeduction($lateMinutes, $rule);
+        }
         
         if ($attendance) {
             $stmt = $db->prepare("UPDATE attendance SET clock_in = ?, late_minutes = ?, status = 'present', source = 'web' WHERE id = ?");
