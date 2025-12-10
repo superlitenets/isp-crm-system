@@ -20,7 +20,9 @@ class WhatsApp {
         $countryCode = $settings->get('whatsapp_country_code', '254');
         $this->defaultCountryCode = !empty($countryCode) ? $countryCode : '254';
         $this->provider = $settings->get('whatsapp_provider', 'web');
-        $this->sessionServiceUrl = $settings->get('whatsapp_session_url', 'http://localhost:3001');
+        $this->sessionServiceUrl = $settings->get('whatsapp_session_url', '') 
+            ?: getenv('WHATSAPP_SESSION_URL') 
+            ?: 'http://localhost:3001';
         $this->sessionApiSecret = $settings->get('whatsapp_session_secret', '') ?: $this->loadSessionSecretFromFile();
         
         if ($this->provider === 'meta') {
