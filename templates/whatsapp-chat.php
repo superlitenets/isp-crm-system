@@ -457,18 +457,38 @@ async function fetchAPI(url, options = {}) {
     return response.json();
 }
 
-async function refreshChats() {
+async function refreshChats(silent = false) {
     try {
         const data = await fetchAPI('/api/whatsapp-chat.php?action=chats');
         if (data.success && data.chats) {
+            const oldChats = chats;
             chats = data.chats;
-            renderChatList(chats);
-        } else if (data.error) {
+            
+            // Only re-render if first load or changes detected
+            if (!silent || oldChats.length !== chats.length || hasChatsChanged(oldChats, chats)) {
+                renderChatList(chats);
+            }
+        } else if (data.error && !silent) {
             document.getElementById('chatList').innerHTML = `<div class="text-center p-4 text-danger"><i class="bi bi-exclamation-circle"></i> ${data.error}</div>`;
         }
     } catch (error) {
-        document.getElementById('chatList').innerHTML = '<div class="text-center p-4 text-danger"><i class="bi bi-exclamation-circle"></i> Connection error</div>';
+        if (!silent) {
+            document.getElementById('chatList').innerHTML = '<div class="text-center p-4 text-danger"><i class="bi bi-exclamation-circle"></i> Connection error</div>';
+        }
     }
+}
+
+function hasChatsChanged(oldChats, newChats) {
+    if (oldChats.length !== newChats.length) return true;
+    for (let i = 0; i < oldChats.length; i++) {
+        const o = oldChats[i];
+        const n = newChats[i];
+        if (o.id !== n.id || o.unreadCount !== n.unreadCount || 
+            o.lastMessageAt !== n.lastMessageAt || o.lastMessagePreview !== n.lastMessagePreview) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function renderChatList(chatList) {
@@ -732,5 +752,5 @@ document.getElementById('searchChats').addEventListener('input', function() {
 });
 
 refreshChats();
-setInterval(refreshChats, 30000);
+setInterval(() => refreshChats(true), 30000);
 </script>
