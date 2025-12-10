@@ -456,6 +456,7 @@ function initializeDatabase(): void {
     );
 
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS late_minutes INTEGER DEFAULT 0;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS deduction DECIMAL(10,2) DEFAULT 0;
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'manual';
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS biometric_log_id INTEGER;
 
