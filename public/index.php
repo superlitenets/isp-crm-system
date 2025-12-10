@@ -2992,6 +2992,35 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
             }
             break;
 
+        case 'change_employee_password':
+            if (!\App\Auth::isAdmin()) {
+                $message = 'Only administrators can change employee passwords.';
+                $messageType = 'danger';
+            } else {
+                $employeeId = (int)($_POST['employee_id'] ?? 0);
+                $newPassword = $_POST['new_password'] ?? '';
+                $confirmPassword = $_POST['confirm_password'] ?? '';
+                
+                if ($newPassword !== $confirmPassword) {
+                    $message = 'Passwords do not match.';
+                    $messageType = 'danger';
+                } elseif (strlen($newPassword) < 6) {
+                    $message = 'Password must be at least 6 characters.';
+                    $messageType = 'danger';
+                } else {
+                    $result = $employee->changeUserPassword($employeeId, $newPassword);
+                    if ($result['success']) {
+                        $message = $result['message'];
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } else {
+                        $message = $result['error'];
+                        $messageType = 'danger';
+                    }
+                }
+            }
+            break;
+
         case 'add_team_member':
             if (!\App\Auth::isAdmin()) {
                 $message = 'Only administrators can add team members.';

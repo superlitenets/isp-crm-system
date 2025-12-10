@@ -3232,6 +3232,13 @@ $leaveTab = $_GET['tab'] ?? 'requests';
                             <a href="?page=hr&action=edit_employee&id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            <?php if (\App\Auth::isAdmin() && $emp['user_id']): ?>
+                            <button type="button" class="btn btn-sm btn-outline-warning" title="Change Password" 
+                                    data-bs-toggle="modal" data-bs-target="#changePasswordModal"
+                                    onclick="setPasswordChangeEmployee(<?= $emp['id'] ?>, '<?= htmlspecialchars(addslashes($emp['name'])) ?>')">
+                                <i class="bi bi-key"></i>
+                            </button>
+                            <?php endif; ?>
                             <?php if (\App\Auth::isAdmin()): ?>
                             <form method="POST" class="d-inline" onsubmit="return confirm('Delete this employee?')">
                                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
@@ -3368,4 +3375,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+function setPasswordChangeEmployee(employeeId, employeeName) {
+    document.getElementById('passwordChangeEmployeeId').value = employeeId;
+    document.getElementById('passwordChangeEmployeeName').textContent = employeeName;
+    document.getElementById('newPasswordInput').value = '';
+    document.getElementById('confirmPasswordInput').value = '';
+}
 </script>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-key"></i> Change Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="change_employee_password">
+                    <input type="hidden" name="employee_id" id="passwordChangeEmployeeId">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        Changing password for: <strong id="passwordChangeEmployeeName"></strong>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="new_password" id="newPasswordInput" class="form-control" required minlength="6">
+                        <small class="text-muted">Minimum 6 characters</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" id="confirmPasswordInput" class="form-control" required minlength="6">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-key"></i> Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

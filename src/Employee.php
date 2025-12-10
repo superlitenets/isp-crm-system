@@ -105,6 +105,60 @@ class Employee {
         return $result;
     }
     
+    public function changeUserPassword(int $employeeId, string $newPassword): array {
+        $stmt = $this->db->prepare("SELECT user_id, name FROM employees WHERE id = ?");
+        $stmt->execute([$employeeId]);
+        $employee = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$employee) {
+            return ['success' => false, 'error' => 'Employee not found'];
+        }
+        
+        if (!$employee['user_id']) {
+            return ['success' => false, 'error' => 'Employee does not have a linked user account'];
+        }
+        
+        if (strlen($newPassword) < 6) {
+            return ['success' => false, 'error' => 'Password must be at least 6 characters'];
+        }
+        
+        $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        
+        $updateStmt = $this->db->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+        $result = $updateStmt->execute([$passwordHash, $employee['user_id']]);
+        
+        if ($result) {
+            return ['success' => true, 'message' => 'Password changed successfully for ' . $employee['name']];
+        }
+        
+        return ['success' => false, 'error' => 'Failed to update password'];
+    }
+    
+    public function changeUserPasswordByUserId(int $userId, string $newPassword): array {
+        if (strlen($newPassword) < 6) {
+            return ['success' => false, 'error' => 'Password must be at least 6 characters'];
+        }
+        
+        $stmt = $this->db->prepare("SELECT id, name FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            return ['success' => false, 'error' => 'User not found'];
+        }
+        
+        $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        
+        $updateStmt = $this->db->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+        $result = $updateStmt->execute([$passwordHash, $userId]);
+        
+        if ($result) {
+            return ['success' => true, 'message' => 'Password changed successfully for ' . $user['name']];
+        }
+        
+        return ['success' => false, 'error' => 'Failed to update password'];
+    }
+    
     public function getUserByEmployeeId(int $employeeId): ?array {
         $stmt = $this->db->prepare("
             SELECT u.*, r.display_name as role_display_name 
