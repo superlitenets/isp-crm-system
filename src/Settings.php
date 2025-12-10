@@ -319,6 +319,17 @@ class Settings {
             'whatsapp_provider' => $this->get('whatsapp_provider', 'web'),
         ];
     }
+    
+    public function getPrimaryNotificationGateway(): string {
+        return $this->get('primary_notification_gateway', 'both');
+    }
+    
+    public function setPrimaryNotificationGateway(string $gateway): bool {
+        if (!in_array($gateway, ['sms', 'whatsapp', 'both'])) {
+            $gateway = 'both';
+        }
+        return $this->set('primary_notification_gateway', $gateway);
+    }
 
     public function saveWhatsAppSettings(array $data): bool {
         $fields = [
