@@ -11,7 +11,7 @@ $stats = $accounting->getDashboardStats();
 $taxRates = $accounting->getTaxRates();
 $products = $accounting->getProducts();
 $vendors = $accounting->getVendors();
-$customers = $customerModel->getCustomers();
+$customers = $customerModel->getAll();
 $expenseCategories = $accounting->getExpenseCategories();
 ?>
 
