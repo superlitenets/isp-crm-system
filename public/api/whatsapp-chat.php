@@ -83,6 +83,8 @@ try {
             
         case 'messages':
             $chatId = $_GET['chatId'] ?? '';
+            $since = isset($_GET['since']) ? (int)$_GET['since'] : 0;
+            
             if (!$chatId) {
                 throw new Exception('Chat ID required');
             }
@@ -107,13 +109,18 @@ try {
                         ];
                     }, $result['messages']);
                     
+                    // Filter by since timestamp if provided
+                    if ($since > 0) {
+                        $messages = array_values(array_filter($messages, fn($m) => $m['timestamp'] > $since));
+                    }
+                    
                     foreach ($result['messages'] as $msg) {
                         $whatsapp->storeMessage($conversation['id'], $msg);
                     }
                     
                     echo json_encode(['success' => true, 'messages' => $messages]);
                 } else {
-                    $messages = $whatsapp->getConversationMessages($conversation['id'], 100);
+                    $messages = $whatsapp->getConversationMessages($conversation['id'], 100, $since);
                     $formatted = array_map(function($m) {
                         return [
                             'id' => $m['id'],

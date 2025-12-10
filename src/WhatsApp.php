@@ -963,8 +963,22 @@ class WhatsApp {
     /**
      * Get messages for a conversation from database
      */
-    public function getConversationMessages(int $conversationId, int $limit = 100, int $offset = 0): array {
+    public function getConversationMessages(int $conversationId, int $limit = 100, int $since = 0): array {
         $db = \Database::getConnection();
+        
+        if ($since > 0) {
+            $sinceTime = date('Y-m-d H:i:s', $since);
+            $stmt = $db->prepare("
+                SELECT m.*, u.name as sent_by_name
+                FROM whatsapp_messages m
+                LEFT JOIN users u ON m.sent_by = u.id
+                WHERE m.conversation_id = ? AND m.timestamp > ?
+                ORDER BY m.timestamp ASC
+                LIMIT ?
+            ");
+            $stmt->execute([$conversationId, $sinceTime, $limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
         
         $stmt = $db->prepare("
             SELECT m.*, u.name as sent_by_name
@@ -972,9 +986,9 @@ class WhatsApp {
             LEFT JOIN users u ON m.sent_by = u.id
             WHERE m.conversation_id = ?
             ORDER BY m.timestamp DESC
-            LIMIT ? OFFSET ?
+            LIMIT ?
         ");
-        $stmt->execute([$conversationId, $limit, $offset]);
+        $stmt->execute([$conversationId, $limit]);
         return array_reverse($stmt->fetchAll(\PDO::FETCH_ASSOC));
     }
     

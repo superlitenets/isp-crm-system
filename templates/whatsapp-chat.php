@@ -448,6 +448,7 @@ $isConnected = ($sessionStatus['status'] ?? '') === 'connected';
 let currentChat = null;
 let chats = [];
 let pollingInterval = null;
+let lastMessageTimestamp = 0;
 
 async function fetchAPI(url, options = {}) {
     const response = await fetch(url, {
@@ -539,17 +540,39 @@ async function openChat(chat) {
     startPolling();
 }
 
-async function loadMessages(chatId) {
+async function loadMessages(chatId, isInitial = true) {
     const container = document.getElementById('chatMessages');
-    container.innerHTML = '<div class="text-center p-4"><div class="spinner-border spinner-border-sm"></div></div>';
+    
+    if (isInitial) {
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border spinner-border-sm"></div></div>';
+        lastMessageTimestamp = 0;
+    }
     
     try {
-        const data = await fetchAPI(`/api/whatsapp-chat.php?action=messages&chatId=${chatId}`);
+        let url = `/api/whatsapp-chat.php?action=messages&chatId=${chatId}`;
+        if (!isInitial && lastMessageTimestamp > 0) {
+            url += `&since=${lastMessageTimestamp}`;
+        }
+        
+        const data = await fetchAPI(url);
         if (data.success) {
-            renderMessages(data.messages);
+            if (isInitial) {
+                renderMessages(data.messages);
+            } else if (data.messages && data.messages.length > 0) {
+                // Append only new messages
+                data.messages.forEach(msg => appendMessage(msg));
+            }
+            
+            // Update last timestamp
+            if (data.messages && data.messages.length > 0) {
+                const lastMsg = data.messages[data.messages.length - 1];
+                lastMessageTimestamp = lastMsg.timestamp || 0;
+            }
         }
     } catch (error) {
-        container.innerHTML = '<div class="text-center p-4 text-danger">Error loading messages</div>';
+        if (isInitial) {
+            container.innerHTML = '<div class="text-center p-4 text-danger">Error loading messages</div>';
+        }
     }
 }
 
@@ -629,7 +652,7 @@ function startPolling() {
     stopPolling();
     pollingInterval = setInterval(async () => {
         if (currentChat) {
-            await loadMessages(currentChat.id);
+            await loadMessages(currentChat.id, false);
         }
     }, 5000);
 }
