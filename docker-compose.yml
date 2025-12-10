@@ -11,6 +11,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
     networks:
       - crm_network
 
@@ -34,13 +36,14 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    network_mode: host
     environment:
-      - PGHOST=db
-      - PGPORT=5432
+      - PGHOST=127.0.0.1
+      - PGPORT=5433
       - PGDATABASE=${POSTGRES_DB}
       - PGUSER=${POSTGRES_USER}
       - PGPASSWORD=${POSTGRES_PASSWORD}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5433/${POSTGRES_DB}
       - SESSION_SECRET=${SESSION_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - BIOMETRIC_API_KEY=${BIOMETRIC_API_KEY:-}
@@ -50,7 +53,7 @@ services:
       - ADVANTA_URL=${ADVANTA_URL:-}
       - WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-true}
       - WHATSAPP_DEFAULT_COUNTRY_CODE=${WHATSAPP_DEFAULT_COUNTRY_CODE:-254}
-      - WHATSAPP_SESSION_URL=http://whatsapp:3001
+      - WHATSAPP_SESSION_URL=http://127.0.0.1:3001
       - SMARTOLT_API_URL=${SMARTOLT_API_URL:-}
       - SMARTOLT_API_KEY=${SMARTOLT_API_KEY:-}
       - MPESA_ENV=${MPESA_ENV:-production}
@@ -64,11 +67,6 @@ services:
     volumes:
       - ./logs:/var/www/html/logs
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
-    networks:
-      - crm_network
-      - host_access
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   nginx:
     image: nginx:stable-alpine
@@ -89,10 +87,6 @@ services:
 networks:
   crm_network:
     driver: bridge
-  host_access:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 volumes:
   db_data:
