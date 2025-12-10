@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/Auth.php';
+require_once __DIR__ . '/../../src/Settings.php';
 require_once __DIR__ . '/../../src/WhatsApp.php';
 require_once __DIR__ . '/../../src/Customer.php';
 
