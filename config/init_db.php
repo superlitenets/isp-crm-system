@@ -1301,6 +1301,42 @@ function runMigrations(PDO $db): void {
                 details JSONB,
                 ip_address VARCHAR(45),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'whatsapp_conversations' => "
+            CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+                id SERIAL PRIMARY KEY,
+                chat_id VARCHAR(100) UNIQUE NOT NULL,
+                phone VARCHAR(30) NOT NULL,
+                contact_name VARCHAR(150),
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                is_group BOOLEAN DEFAULT FALSE,
+                unread_count INTEGER DEFAULT 0,
+                last_message_at TIMESTAMP,
+                last_message_preview TEXT,
+                status VARCHAR(20) DEFAULT 'active',
+                assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'whatsapp_messages' => "
+            CREATE TABLE IF NOT EXISTS whatsapp_messages (
+                id SERIAL PRIMARY KEY,
+                conversation_id INTEGER REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
+                message_id VARCHAR(150) UNIQUE,
+                direction VARCHAR(10) NOT NULL DEFAULT 'incoming',
+                sender_phone VARCHAR(30),
+                sender_name VARCHAR(150),
+                message_type VARCHAR(30) DEFAULT 'text',
+                body TEXT,
+                media_url TEXT,
+                media_mime_type VARCHAR(100),
+                media_filename VARCHAR(255),
+                is_read BOOLEAN DEFAULT FALSE,
+                is_delivered BOOLEAN DEFAULT FALSE,
+                sent_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                raw_data JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     

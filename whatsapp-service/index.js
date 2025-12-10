@@ -63,12 +63,16 @@ function initializeClient() {
         client.destroy();
     }
     
+    const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium';
+    console.log('Using Chromium at:', chromiumPath);
+    
     client = new Client({
         authStrategy: new LocalAuth({
             dataPath: SESSION_PATH
         }),
         puppeteer: {
             headless: true,
+            executablePath: chromiumPath,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -76,7 +80,8 @@ function initializeClient() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--single-process'
             ]
         }
     });
@@ -116,8 +121,63 @@ function initializeClient() {
         qrCodeString = null;
     });
 
+    // Listen for incoming messages
+    client.on('message', async (msg) => {
+        console.log('Incoming message from:', msg.from, 'Body:', msg.body?.substring(0, 50));
+        
+        // Store message in database via webhook
+        try {
+            const messageData = {
+                event: 'message_received',
+                from: msg.from,
+                to: msg.to,
+                body: msg.body,
+                type: msg.type,
+                timestamp: msg.timestamp,
+                messageId: msg.id._serialized,
+                isGroup: msg.from.endsWith('@g.us'),
+                senderName: msg._data?.notifyName || null,
+                hasMedia: msg.hasMedia
+            };
+            
+            // Store in messages array for polling
+            recentMessages.push(messageData);
+            if (recentMessages.length > 100) recentMessages.shift();
+            
+            // Emit to connected clients
+            messageCallbacks.forEach(cb => cb(messageData));
+        } catch (error) {
+            console.error('Error processing incoming message:', error);
+        }
+    });
+
+    // Listen for message acknowledgments (delivery, read receipts)
+    client.on('message_ack', (msg, ack) => {
+        const ackStatus = {
+            '-1': 'error',
+            '0': 'pending',
+            '1': 'sent',
+            '2': 'delivered',
+            '3': 'read',
+            '4': 'played'
+        };
+        console.log('Message ack:', msg.id._serialized, ackStatus[ack] || ack);
+        
+        // Notify callbacks
+        messageCallbacks.forEach(cb => cb({
+            event: 'message_ack',
+            messageId: msg.id._serialized,
+            ack: ack,
+            status: ackStatus[ack] || 'unknown'
+        }));
+    });
+
     client.initialize();
 }
+
+// Store recent messages for polling
+let recentMessages = [];
+let messageCallbacks = [];
 
 app.get('/status', (req, res) => {
     res.json({
@@ -291,6 +351,140 @@ app.post('/send-bulk', async (req, res) => {
     }
     
     res.json({ results, total: phones.length, sent: results.filter(r => r.success).length });
+});
+
+// Get all chats/conversations
+app.get('/chats', async (req, res) => {
+    if (connectionStatus !== 'connected') {
+        return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
+    }
+    
+    try {
+        const chats = await client.getChats();
+        const chatList = await Promise.all(chats.slice(0, 50).map(async chat => {
+            const contact = chat.isGroup ? null : await chat.getContact();
+            return {
+                id: chat.id._serialized,
+                name: chat.name || contact?.pushname || contact?.name || chat.id.user,
+                isGroup: chat.isGroup,
+                unreadCount: chat.unreadCount,
+                lastMessageAt: chat.timestamp,
+                phone: chat.id.user
+            };
+        }));
+        res.json({ chats: chatList });
+    } catch (error) {
+        console.error('Get chats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get chat history for a specific chat
+app.get('/chat/:chatId/messages', async (req, res) => {
+    const { chatId } = req.params;
+    const { limit = 50 } = req.query;
+    
+    if (connectionStatus !== 'connected') {
+        return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
+    }
+    
+    try {
+        const chat = await client.getChatById(chatId);
+        const messages = await chat.fetchMessages({ limit: parseInt(limit) });
+        
+        const messageList = messages.map(msg => ({
+            id: msg.id._serialized,
+            body: msg.body,
+            type: msg.type,
+            fromMe: msg.fromMe,
+            timestamp: msg.timestamp,
+            senderName: msg._data?.notifyName,
+            hasMedia: msg.hasMedia
+        }));
+        
+        res.json({ messages: messageList, chatId });
+    } catch (error) {
+        console.error('Get messages error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get recent incoming messages
+app.get('/messages/recent', (req, res) => {
+    const { since } = req.query;
+    let messages = recentMessages;
+    
+    if (since) {
+        const sinceTimestamp = parseInt(since);
+        messages = recentMessages.filter(m => m.timestamp > sinceTimestamp);
+    }
+    
+    res.json({ messages });
+});
+
+// SSE endpoint for real-time message updates
+app.get('/messages/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    const callback = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    
+    messageCallbacks.push(callback);
+    
+    req.on('close', () => {
+        const index = messageCallbacks.indexOf(callback);
+        if (index > -1) {
+            messageCallbacks.splice(index, 1);
+        }
+    });
+});
+
+// Send message to a chat and get the sent message info
+app.post('/chat/:chatId/send', async (req, res) => {
+    const { chatId } = req.params;
+    const { message } = req.body;
+    
+    if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    if (connectionStatus !== 'connected') {
+        return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
+    }
+    
+    try {
+        const result = await client.sendMessage(chatId, message);
+        res.json({ 
+            success: true, 
+            messageId: result.id._serialized,
+            timestamp: result.timestamp,
+            chatId
+        });
+    } catch (error) {
+        console.error('Send chat message error:', error);
+        res.status(500).json({ error: error.message, success: false });
+    }
+});
+
+// Mark chat as read
+app.post('/chat/:chatId/read', async (req, res) => {
+    const { chatId } = req.params;
+    
+    if (connectionStatus !== 'connected') {
+        return res.status(503).json({ error: 'WhatsApp not connected', status: connectionStatus });
+    }
+    
+    try {
+        const chat = await client.getChatById(chatId);
+        await chat.sendSeen();
+        res.json({ success: true, chatId });
+    } catch (error) {
+        console.error('Mark read error:', error);
+        res.status(500).json({ error: error.message, success: false });
+    }
 });
 
 if (fs.existsSync(SESSION_PATH)) {

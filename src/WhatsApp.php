@@ -674,4 +674,361 @@ class WhatsApp {
             return ['success' => false, 'error' => $e->getMessage(), 'method' => 'session'];
         }
     }
+    
+    // ========== Chat System Methods ==========
+    
+    /**
+     * Get all chats from WhatsApp service
+     */
+    public function getChats(): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chats');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error || $httpCode !== 200) {
+                return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'chats' => []];
+            }
+            
+            $data = json_decode($response, true);
+            return ['success' => true, 'chats' => $data['chats'] ?? []];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'chats' => []];
+        }
+    }
+    
+    /**
+     * Get chat messages from WhatsApp service
+     */
+    public function getChatMessages(string $chatId, int $limit = 50): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/messages?limit=' . $limit);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error || $httpCode !== 200) {
+                return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'messages' => []];
+            }
+            
+            $data = json_decode($response, true);
+            return ['success' => true, 'messages' => $data['messages'] ?? [], 'chatId' => $chatId];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'messages' => []];
+        }
+    }
+    
+    /**
+     * Send message to a specific chat
+     */
+    public function sendToChat(string $chatId, string $message): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/send');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $message]));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if ($httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false)) {
+                return [
+                    'success' => true,
+                    'messageId' => $data['messageId'] ?? null,
+                    'timestamp' => $data['timestamp'] ?? time(),
+                    'chatId' => $chatId
+                ];
+            } else {
+                return ['success' => false, 'error' => $data['error'] ?? "HTTP $httpCode"];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Mark chat as read
+     */
+    public function markChatAsRead(string $chatId): array {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/read');
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return ['success' => false, 'error' => $error];
+            }
+            
+            return json_decode($response, true) ?? ['success' => false, 'error' => 'Invalid response'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Get recent messages from WhatsApp service
+     */
+    public function getRecentMessages(?int $since = null): array {
+        try {
+            $url = $this->sessionServiceUrl . '/messages/recent';
+            if ($since !== null) {
+                $url .= '?since=' . $since;
+            }
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error || $httpCode !== 200) {
+                return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'messages' => []];
+            }
+            
+            $data = json_decode($response, true);
+            return ['success' => true, 'messages' => $data['messages'] ?? []];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'messages' => []];
+        }
+    }
+    
+    /**
+     * Match phone number to customer
+     */
+    public function findCustomerByPhone(string $phone): ?array {
+        $db = \Database::getConnection();
+        $formattedPhone = $this->formatPhone($phone);
+        
+        // Try multiple formats
+        $formats = [
+            $formattedPhone,
+            '+' . $formattedPhone,
+            '0' . substr($formattedPhone, strlen($this->defaultCountryCode)),
+            ltrim($formattedPhone, '0')
+        ];
+        
+        $placeholders = implode(',', array_fill(0, count($formats), '?'));
+        $stmt = $db->prepare("SELECT id, account_number, name, phone, email, address FROM customers WHERE REPLACE(REPLACE(phone, '+', ''), ' ', '') IN ($placeholders) LIMIT 1");
+        $stmt->execute(array_map(fn($p) => str_replace(['+', ' '], '', $p), $formats));
+        $customer = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return $customer ?: null;
+    }
+    
+    /**
+     * Get or create conversation record
+     */
+    public function getOrCreateConversation(string $chatId, string $phone, ?string $contactName = null, bool $isGroup = false): array {
+        $db = \Database::getConnection();
+        
+        // Check if exists
+        $stmt = $db->prepare("SELECT * FROM whatsapp_conversations WHERE chat_id = ?");
+        $stmt->execute([$chatId]);
+        $conversation = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($conversation) {
+            return $conversation;
+        }
+        
+        // Find customer by phone
+        $customer = $this->findCustomerByPhone($phone);
+        $customerId = $customer ? $customer['id'] : null;
+        
+        // Create new conversation
+        $stmt = $db->prepare("
+            INSERT INTO whatsapp_conversations (chat_id, phone, contact_name, customer_id, is_group, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+            RETURNING *
+        ");
+        $stmt->execute([$chatId, $phone, $contactName, $customerId, $isGroup ? 't' : 'f']);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Store message in database
+     */
+    public function storeMessage(int $conversationId, array $messageData): array {
+        $db = \Database::getConnection();
+        
+        // Check for duplicate
+        if (!empty($messageData['messageId'])) {
+            $stmt = $db->prepare("SELECT id FROM whatsapp_messages WHERE message_id = ?");
+            $stmt->execute([$messageData['messageId']]);
+            if ($stmt->fetch()) {
+                return ['success' => false, 'error' => 'Duplicate message'];
+            }
+        }
+        
+        $stmt = $db->prepare("
+            INSERT INTO whatsapp_messages (conversation_id, message_id, direction, sender_phone, sender_name, message_type, body, is_read, timestamp, raw_data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            RETURNING *
+        ");
+        
+        $timestamp = isset($messageData['timestamp']) 
+            ? date('Y-m-d H:i:s', $messageData['timestamp']) 
+            : date('Y-m-d H:i:s');
+        
+        $stmt->execute([
+            $conversationId,
+            $messageData['messageId'] ?? null,
+            $messageData['fromMe'] ?? false ? 'outgoing' : 'incoming',
+            $messageData['senderPhone'] ?? null,
+            $messageData['senderName'] ?? null,
+            $messageData['type'] ?? 'text',
+            $messageData['body'] ?? '',
+            $messageData['fromMe'] ?? false ? 't' : 'f',
+            $timestamp,
+            json_encode($messageData)
+        ]);
+        
+        $message = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        // Update conversation
+        $db->prepare("
+            UPDATE whatsapp_conversations 
+            SET last_message_at = ?, last_message_preview = ?, updated_at = NOW(),
+                unread_count = CASE WHEN ? = 'incoming' THEN unread_count + 1 ELSE unread_count END
+            WHERE id = ?
+        ")->execute([
+            $timestamp,
+            substr($messageData['body'] ?? '', 0, 100),
+            $messageData['fromMe'] ?? false ? 'outgoing' : 'incoming',
+            $conversationId
+        ]);
+        
+        return ['success' => true, 'message' => $message];
+    }
+    
+    /**
+     * Get conversations from database
+     */
+    public function getConversations(int $limit = 50, int $offset = 0): array {
+        $db = \Database::getConnection();
+        
+        $stmt = $db->prepare("
+            SELECT c.*, 
+                   cu.name as customer_name, cu.account_number,
+                   u.name as assigned_to_name
+            FROM whatsapp_conversations c
+            LEFT JOIN customers cu ON c.customer_id = cu.id
+            LEFT JOIN users u ON c.assigned_to = u.id
+            ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+            LIMIT ? OFFSET ?
+        ");
+        $stmt->execute([$limit, $offset]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    /**
+     * Get messages for a conversation from database
+     */
+    public function getConversationMessages(int $conversationId, int $limit = 100, int $offset = 0): array {
+        $db = \Database::getConnection();
+        
+        $stmt = $db->prepare("
+            SELECT m.*, u.name as sent_by_name
+            FROM whatsapp_messages m
+            LEFT JOIN users u ON m.sent_by = u.id
+            WHERE m.conversation_id = ?
+            ORDER BY m.timestamp DESC
+            LIMIT ? OFFSET ?
+        ");
+        $stmt->execute([$conversationId, $limit, $offset]);
+        return array_reverse($stmt->fetchAll(\PDO::FETCH_ASSOC));
+    }
+    
+    /**
+     * Link conversation to customer
+     */
+    public function linkConversationToCustomer(int $conversationId, int $customerId): bool {
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("UPDATE whatsapp_conversations SET customer_id = ?, updated_at = NOW() WHERE id = ?");
+        return $stmt->execute([$customerId, $conversationId]);
+    }
+    
+    /**
+     * Assign conversation to user
+     */
+    public function assignConversation(int $conversationId, ?int $userId): bool {
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("UPDATE whatsapp_conversations SET assigned_to = ?, updated_at = NOW() WHERE id = ?");
+        return $stmt->execute([$userId, $conversationId]);
+    }
+    
+    /**
+     * Mark conversation messages as read
+     */
+    public function markConversationAsRead(int $conversationId): bool {
+        $db = \Database::getConnection();
+        
+        $db->prepare("UPDATE whatsapp_messages SET is_read = true WHERE conversation_id = ? AND direction = 'incoming'")->execute([$conversationId]);
+        $db->prepare("UPDATE whatsapp_conversations SET unread_count = 0, updated_at = NOW() WHERE id = ?")->execute([$conversationId]);
+        
+        return true;
+    }
+    
+    /**
+     * Get conversation by ID
+     */
+    public function getConversationById(int $id): ?array {
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT c.*, 
+                   cu.name as customer_name, cu.account_number, cu.phone as customer_phone,
+                   u.name as assigned_to_name
+            FROM whatsapp_conversations c
+            LEFT JOIN customers cu ON c.customer_id = cu.id
+            LEFT JOIN users u ON c.assigned_to = u.id
+            WHERE c.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    /**
+     * Get unread count across all conversations
+     */
+    public function getTotalUnreadCount(): int {
+        $db = \Database::getConnection();
+        $stmt = $db->query("SELECT COALESCE(SUM(unread_count), 0) FROM whatsapp_conversations");
+        return (int) $stmt->fetchColumn();
+    }
 }

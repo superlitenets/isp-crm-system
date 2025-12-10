@@ -4392,6 +4392,11 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'whatsapp-chat' ? 'active' : '' ?>" href="?page=whatsapp-chat">
+                    <i class="bi bi-whatsapp"></i> WhatsApp Chat
+                </a>
+            </li>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
@@ -4581,6 +4586,9 @@ $csrfToken = \App\Auth::generateToken();
                     include __DIR__ . '/../templates/accounting.php';
                 }
                 break;
+            case 'whatsapp-chat':
+                include __DIR__ . '/../templates/whatsapp-chat.php';
+                exit;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
         }
