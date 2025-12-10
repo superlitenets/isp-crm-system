@@ -1277,7 +1277,8 @@ function runMigrations(PDO $db): void {
         ['tickets', 'satisfaction_rating', 'ALTER TABLE tickets ADD COLUMN satisfaction_rating INTEGER'],
         ['tickets', 'closed_at', 'ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP'],
         ['tickets', 'branch_id', 'ALTER TABLE tickets ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL'],
-        ['teams', 'branch_id', 'ALTER TABLE teams ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL']
+        ['teams', 'branch_id', 'ALTER TABLE teams ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL'],
+        ['branches', 'whatsapp_group', 'ALTER TABLE branches ADD COLUMN whatsapp_group VARCHAR(100)']
     ];
     
     foreach ($columnMigrations as $migration) {
