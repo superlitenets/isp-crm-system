@@ -38,13 +38,25 @@ The system features a clean, responsive design. The public-facing landing page i
   - Session status monitoring with QR code display
   - Node.js service running Puppeteer for WhatsApp Web automation
 - **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
-- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
+- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (UDP Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
   - **Hikvision Remote Fingerprint Enrollment**: ISAPI-based remote fingerprint capture matching IVMS-4200 functionality:
     - `captureFingerprint()` - Triggers device to enter capture mode, employee places finger on scanner
     - `setupFingerprint()` - Upload fingerprint template data directly to device
     - `getFingerprints()` - Retrieve enrolled fingerprints for an employee
     - `deleteFingerprint()` - Remove fingerprints from device
     - `getFingerprintCapabilities()` - Check device remote capture support
+  - **ZKTeco K40 Fingerprint Enrollment (Dec 2025)**: UDP protocol-based user and fingerprint management:
+    - `setUser()` - Register/update user on device (uid, name, employee ID, password, role, card number)
+    - `deleteUser()` - Remove user from device
+    - `startEnrollment()` - Initiate fingerprint enrollment on device (device shows "Place Finger")
+    - `cancelEnrollment()` - Cancel ongoing enrollment session
+    - `checkEnrollmentStatus()` - Check if fingerprint was enrolled successfully
+    - `getFingerprints()` - Retrieve fingerprint templates for a user (up to 10 fingers)
+    - `setFingerprint()` - Upload fingerprint template to device
+    - `deleteFingerprint()` - Remove specific fingerprint from device
+    - `getDeviceInfo()` - Get device name, serial, firmware, user/fingerprint counts
+    - `getUsers()` - Fetch all users registered on device
+    - `getAttendance()` - Pull attendance logs with direction and verification type
 - **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive equipment lifecycle tracking.
