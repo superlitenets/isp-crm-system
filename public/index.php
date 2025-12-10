@@ -4588,7 +4588,7 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'whatsapp-chat':
                 include __DIR__ . '/../templates/whatsapp-chat.php';
-                exit;
+                break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
         }
