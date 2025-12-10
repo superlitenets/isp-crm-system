@@ -506,6 +506,13 @@ class MobileAPI {
         $today = date('Y-m-d');
         $now = date('H:i:s');
         
+        // Check minimum clock out time (5:00 PM)
+        $minClockOutHour = 17; // 5 PM in 24-hour format
+        $currentHour = (int)date('H');
+        if ($currentHour < $minClockOutHour) {
+            return ['success' => false, 'message' => 'Clock out is only allowed after 5:00 PM'];
+        }
+        
         $stmt = $this->db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
         $stmt->execute([$employeeId, $today]);
         $existing = $stmt->fetch(\PDO::FETCH_ASSOC);

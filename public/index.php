@@ -704,6 +704,14 @@ if ($page === 'api' && $action === 'clock_out') {
         exit;
     }
     
+    // Check minimum clock out time (5:00 PM)
+    $minClockOutHour = 17; // 5 PM in 24-hour format
+    $currentHour = (int)date('H');
+    if ($currentHour < $minClockOutHour) {
+        echo json_encode(['success' => false, 'error' => 'Clock out is only allowed after 5:00 PM']);
+        exit;
+    }
+    
     // Calculate hours worked
     $clockIn = strtotime($attendance['clock_in']);
     $clockOut = strtotime($now);

@@ -93,6 +93,14 @@ class RealTimeAttendanceProcessor {
             'message' => ''
         ];
         
+        // Check minimum clock out time (5:00 PM)
+        $minClockOutHour = 17; // 5 PM in 24-hour format
+        $clockOutHour = (int)date('H', strtotime($clockOutTime));
+        if ($clockOutHour < $minClockOutHour) {
+            $result['message'] = 'Clock out is only allowed after 5:00 PM';
+            return $result;
+        }
+        
         $attendance = $this->getAttendance($employeeId, $date);
         
         if (!$attendance || !$attendance['clock_in']) {
