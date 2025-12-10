@@ -2065,6 +2065,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'save_mpesa_settings':
                 try {
+                    error_log("M-Pesa settings save started");
                     $mpesa = new \App\Mpesa();
                     $savedCount = 0;
                     $savedCount += $mpesa->saveConfig('mpesa_environment', $_POST['mpesa_environment'] ?? 'sandbox') ? 1 : 0;
@@ -2075,12 +2076,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $savedCount += $mpesa->saveConfig('mpesa_callback_url', $_POST['mpesa_callback_url'] ?? '') ? 1 : 0;
                     $savedCount += $mpesa->saveConfig('mpesa_validation_url', $_POST['mpesa_validation_url'] ?? '') ? 1 : 0;
                     $savedCount += $mpesa->saveConfig('mpesa_confirmation_url', $_POST['mpesa_confirmation_url'] ?? '') ? 1 : 0;
+                    error_log("M-Pesa settings saved count: $savedCount");
                     \App\Auth::regenerateToken();
-                    $_SESSION['flash_message'] = "M-Pesa settings saved successfully!";
+                    $_SESSION['flash_message'] = "M-Pesa settings saved successfully! ($savedCount items)";
                     $_SESSION['flash_type'] = 'success';
                     header('Location: ?page=settings&subpage=mpesa');
                     exit;
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
+                    error_log("M-Pesa settings save error: " . $e->getMessage());
                     $message = 'Error saving M-Pesa settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
