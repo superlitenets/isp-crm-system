@@ -39,11 +39,13 @@ try {
 
     switch ($action) {
         case 'daily_summary':
-        case 'scheduled_summaries':
+            // Force send immediately (manual trigger only)
             sendDailySummaryToGroups($db, $settings);
             break;
             
+        case 'scheduled_summaries':
         case 'check_schedule':
+            // Scheduled - checks time and prevents duplicates
             checkAndSendScheduledSummaries($db, $settings);
             break;
             
