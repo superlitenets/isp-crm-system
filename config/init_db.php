@@ -1237,6 +1237,8 @@ function runMigrations(PDO $db): void {
         ['orders', 'salesperson_id', 'ALTER TABLE orders ADD COLUMN salesperson_id INTEGER REFERENCES salespersons(id) ON DELETE SET NULL'],
         ['orders', 'commission_paid', 'ALTER TABLE orders ADD COLUMN commission_paid BOOLEAN DEFAULT FALSE'],
         ['orders', 'lead_source', "ALTER TABLE orders ADD COLUMN lead_source VARCHAR(50) DEFAULT 'web'"],
+        ['orders', 'ticket_id', 'ALTER TABLE orders ADD COLUMN ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL'],
+        ['orders', 'customer_id', 'ALTER TABLE orders ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL'],
         ['users', 'role_id', 'ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE SET NULL'],
         ['tickets', 'team_id', 'ALTER TABLE tickets ADD COLUMN team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL'],
         ['tickets', 'sla_policy_id', 'ALTER TABLE tickets ADD COLUMN sla_policy_id INTEGER REFERENCES sla_policies(id) ON DELETE SET NULL'],
