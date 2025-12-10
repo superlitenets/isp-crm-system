@@ -83,6 +83,7 @@ const app = {
     async refreshCurrentScreen() {
         if (this.currentScreen === 'salesperson-screen') {
             await this.loadSalespersonDashboard();
+            await this.loadSalespersonAttendance();
         } else if (this.currentScreen === 'technician-screen') {
             await this.loadTechnicianDashboard();
         }
@@ -167,6 +168,7 @@ const app = {
             this.showScreen('salesperson-screen');
             document.getElementById('sp-user-name').textContent = this.user.name;
             this.loadSalespersonDashboard();
+            this.loadSalespersonAttendance();
         } else {
             this.showScreen('technician-screen');
             document.getElementById('tech-user-name').textContent = this.user.name;
@@ -342,10 +344,13 @@ const app = {
         return parseFloat(num || 0).toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     },
     
-    renderAttendanceStatus(attendance) {
-        const statusEl = document.getElementById('attendance-status');
-        const clockInBtn = document.getElementById('btn-clock-in');
-        const clockOutBtn = document.getElementById('btn-clock-out');
+    renderAttendanceStatus(attendance, prefix = '') {
+        // Support both technician (no prefix) and salesperson ('sp-' prefix) screens
+        const statusEl = document.getElementById(prefix + 'attendance-status');
+        const clockInBtn = document.getElementById(prefix + 'btn-clock-in');
+        const clockOutBtn = document.getElementById(prefix + 'btn-clock-out');
+        
+        if (!statusEl || !clockInBtn || !clockOutBtn) return;
         
         if (attendance) {
             if (attendance.clock_in && !attendance.clock_out) {
@@ -372,6 +377,13 @@ const app = {
         const result = await this.api('today-attendance');
         if (result.success) {
             this.renderAttendanceStatus(result.data);
+        }
+    },
+    
+    async loadSalespersonAttendance() {
+        const result = await this.api('today-attendance');
+        if (result.success) {
+            this.renderAttendanceStatus(result.data, 'sp-');
         }
     },
     
@@ -420,7 +432,11 @@ const app = {
             } else {
                 this.showToast(result.message, 'success');
             }
+            // Refresh attendance status for both screens
             this.loadAttendanceStatus();
+            if (this.salesperson) {
+                this.loadSalespersonAttendance();
+            }
         } else {
             this.showToast(result.message || result.error, 'warning');
         }
@@ -456,7 +472,11 @@ const app = {
         
         if (result.success) {
             this.showToast(result.message, 'success');
+            // Refresh attendance status for both screens
             this.loadAttendanceStatus();
+            if (this.salesperson) {
+                this.loadSalespersonAttendance();
+            }
         } else {
             this.showToast(result.message || result.error, 'warning');
         }
@@ -831,10 +851,22 @@ const app = {
     
     updateClock() {
         const now = new Date();
-        document.getElementById('current-time').textContent = now.toLocaleTimeString();
-        document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', { 
+        const timeStr = now.toLocaleTimeString();
+        const dateStr = now.toLocaleDateString('en-US', { 
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
         });
+        
+        // Update technician clock
+        const techTimeEl = document.getElementById('current-time');
+        const techDateEl = document.getElementById('current-date');
+        if (techTimeEl) techTimeEl.textContent = timeStr;
+        if (techDateEl) techDateEl.textContent = dateStr;
+        
+        // Update salesperson clock
+        const spTimeEl = document.getElementById('sp-current-time');
+        const spDateEl = document.getElementById('sp-current-date');
+        if (spTimeEl) spTimeEl.textContent = timeStr;
+        if (spDateEl) spDateEl.textContent = dateStr;
     },
     
     formatNumber(num) {

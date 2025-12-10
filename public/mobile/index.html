@@ -54,6 +54,21 @@
             </nav>
 
             <div class="main-content">
+                <!-- Attendance Section for Salesperson -->
+                <div id="sp-attendance-card" class="attendance-section">
+                    <div class="attendance-time" id="sp-current-time"></div>
+                    <div class="attendance-date" id="sp-current-date"></div>
+                    <div class="attendance-buttons">
+                        <button class="btn btn-success btn-lg" id="sp-btn-clock-in" onclick="app.clockIn()">
+                            <i class="bi bi-box-arrow-in-right"></i> Clock In
+                        </button>
+                        <button class="btn btn-danger btn-lg" id="sp-btn-clock-out" onclick="app.clockOut()" disabled>
+                            <i class="bi bi-box-arrow-right"></i> Clock Out
+                        </button>
+                    </div>
+                    <div id="sp-attendance-status" class="attendance-status"></div>
+                </div>
+
                 <div id="sp-stats" class="stats-cards">
                     <div class="stat-card">
                         <div class="stat-value" id="sp-total-orders">0</div>
