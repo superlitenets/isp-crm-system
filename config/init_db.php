@@ -1289,6 +1289,18 @@ function runMigrations(PDO $db): void {
                 tax_amount DECIMAL(12,2) DEFAULT 0,
                 line_total DECIMAL(12,2) NOT NULL,
                 sort_order INTEGER DEFAULT 0
+            )",
+        'activity_logs' => "
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                action_type VARCHAR(50) NOT NULL,
+                entity_type VARCHAR(50),
+                entity_id INTEGER,
+                entity_reference VARCHAR(100),
+                details JSONB,
+                ip_address VARCHAR(45),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
