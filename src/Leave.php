@@ -28,19 +28,15 @@ class Leave {
     
     public function createLeaveType(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO leave_types (name, code, description, days_per_year, is_paid, requires_approval, allow_negative_balance, max_carryover_days, accrual_type, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO leave_types (name, code, days_per_year, is_paid, requires_approval, is_active)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
             strtoupper($data['code']),
-            $data['description'] ?? null,
             $data['days_per_year'] ?? 0,
             !empty($data['is_paid']),
             !empty($data['requires_approval']),
-            !empty($data['allow_negative_balance']),
-            $data['max_carryover_days'] ?? 0,
-            $data['accrual_type'] ?? 'monthly',
             !empty($data['is_active'])
         ]);
         return (int)$this->db->lastInsertId();
@@ -49,21 +45,16 @@ class Leave {
     public function updateLeaveType(int $id, array $data): bool {
         $stmt = $this->db->prepare("
             UPDATE leave_types SET 
-                name = ?, code = ?, description = ?, days_per_year = ?, is_paid = ?, 
-                requires_approval = ?, allow_negative_balance = ?, max_carryover_days = ?, 
-                accrual_type = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                name = ?, code = ?, days_per_year = ?, is_paid = ?, 
+                requires_approval = ?, is_active = ?
             WHERE id = ?
         ");
         return $stmt->execute([
             $data['name'],
             strtoupper($data['code']),
-            $data['description'] ?? null,
             $data['days_per_year'] ?? 0,
             !empty($data['is_paid']),
             !empty($data['requires_approval']),
-            !empty($data['allow_negative_balance']),
-            $data['max_carryover_days'] ?? 0,
-            $data['accrual_type'] ?? 'monthly',
             !empty($data['is_active']),
             $id
         ]);
@@ -74,12 +65,10 @@ class Leave {
                     lr.days_requested as total_days,
                     e.name as employee_name, e.employee_id as employee_code,
                     lt.name as leave_type_name, lt.code as leave_type_code,
-                    b.name as branch_name,
-                    u.username as approved_by_name
+                    u.name as approved_by_name
                 FROM leave_requests lr
                 LEFT JOIN employees e ON lr.employee_id = e.id
                 LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id
-                LEFT JOIN branches b ON lr.branch_id = b.id
                 LEFT JOIN users u ON lr.approved_by = u.id
                 WHERE 1=1";
         $params = [];
@@ -94,10 +83,6 @@ class Leave {
             $params[] = $filters['employee_id'];
         }
         
-        if (!empty($filters['branch_id'])) {
-            $sql .= " AND lr.branch_id = ?";
-            $params[] = $filters['branch_id'];
-        }
         
         if (!empty($filters['leave_type_id'])) {
             $sql .= " AND lr.leave_type_id = ?";
@@ -127,12 +112,10 @@ class Leave {
                 lr.days_requested as total_days,
                 e.name as employee_name, e.employee_id as employee_code,
                 lt.name as leave_type_name, lt.code as leave_type_code,
-                b.name as branch_name,
-                u.username as approved_by_name
+                u.name as approved_by_name
             FROM leave_requests lr
             LEFT JOIN employees e ON lr.employee_id = e.id
             LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id
-            LEFT JOIN branches b ON lr.branch_id = b.id
             LEFT JOIN users u ON lr.approved_by = u.id
             WHERE lr.id = ?
         ");
@@ -183,18 +166,15 @@ class Leave {
         }
         
         $stmt = $this->db->prepare("
-            INSERT INTO leave_requests (employee_id, leave_type_id, branch_id, start_date, end_date, total_days, is_half_day, half_day_type, reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO leave_requests (employee_id, leave_type_id, start_date, end_date, days_requested, reason)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['employee_id'],
             $data['leave_type_id'],
-            !empty($data['branch_id']) ? $data['branch_id'] : null,
             $data['start_date'],
             $data['end_date'],
             $totalDays,
-            !empty($data['is_half_day']),
-            $data['half_day_type'] ?? null,
             $data['reason'] ?? null
         ]);
         

@@ -17,11 +17,9 @@ class SalaryAdvance {
                     sa.installments as repayment_installments,
                     CASE WHEN sa.installments > 0 THEN COALESCE(sa.approved_amount, sa.requested_amount) / sa.installments ELSE 0 END as repayment_amount,
                     e.name as employee_name, e.employee_id as employee_code,
-                    b.name as branch_name,
-                    u.username as approved_by_name
+                    u.name as approved_by_name
                 FROM salary_advances sa
                 LEFT JOIN employees e ON sa.employee_id = e.id
-                LEFT JOIN branches b ON sa.branch_id = b.id
                 LEFT JOIN users u ON sa.approved_by = u.id
                 WHERE 1=1";
         $params = [];
@@ -36,10 +34,6 @@ class SalaryAdvance {
             $params[] = $filters['employee_id'];
         }
         
-        if (!empty($filters['branch_id'])) {
-            $sql .= " AND sa.branch_id = ?";
-            $params[] = $filters['branch_id'];
-        }
         
         $sql .= " ORDER BY sa.created_at DESC";
         
@@ -57,11 +51,9 @@ class SalaryAdvance {
                 sa.installments as repayment_installments,
                 CASE WHEN sa.installments > 0 THEN COALESCE(sa.approved_amount, sa.requested_amount) / sa.installments ELSE 0 END as repayment_amount,
                 e.name as employee_name, e.employee_id as employee_code,
-                b.name as branch_name,
-                u.username as approved_by_name
+                u.name as approved_by_name
             FROM salary_advances sa
             LEFT JOIN employees e ON sa.employee_id = e.id
-            LEFT JOIN branches b ON sa.branch_id = b.id
             LEFT JOIN users u ON sa.approved_by = u.id
             WHERE sa.id = ?
         ");
@@ -82,22 +74,21 @@ class SalaryAdvance {
     }
     
     public function create(array $data): int {
-        $repaymentAmount = $data['amount'] / ($data['repayment_installments'] ?? 1);
+        $installments = $data['repayment_installments'] ?? $data['installments'] ?? 1;
+        $amount = $data['amount'] ?? $data['requested_amount'];
         
         $stmt = $this->db->prepare("
-            INSERT INTO salary_advances (employee_id, branch_id, amount, reason, repayment_type, repayment_installments, repayment_amount, balance, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            INSERT INTO salary_advances (employee_id, requested_amount, repayment_schedule, installments, outstanding_balance, notes, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
         ");
         
         $stmt->execute([
             $data['employee_id'],
-            !empty($data['branch_id']) ? $data['branch_id'] : null,
-            $data['amount'],
-            $data['reason'] ?? null,
-            $data['repayment_type'] ?? 'monthly',
-            $data['repayment_installments'] ?? 1,
-            round($repaymentAmount, 2),
-            $data['amount']
+            $amount,
+            $data['repayment_type'] ?? $data['repayment_schedule'] ?? 'monthly',
+            $installments,
+            $amount,
+            $data['reason'] ?? $data['notes'] ?? null
         ]);
         
         return (int)$this->db->lastInsertId();
