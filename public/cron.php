@@ -443,10 +443,19 @@ function syncAttendanceFromDevices(\PDO $db): void {
     $results = [];
     $processor = new \App\RealTimeAttendanceProcessor($db);
     
-    $since = date('Y-m-d H:i:s', strtotime('-1 hour'));
-    
     foreach ($devices as $deviceRow) {
         $deviceResult = ['device' => $deviceRow['name'], 'synced' => 0, 'errors' => []];
+        
+        // Calculate since time: use last_sync_at if available, otherwise start of today
+        if (!empty($deviceRow['last_sync_at'])) {
+            // Go back 5 minutes from last sync to handle any clock skew
+            $since = date('Y-m-d H:i:s', strtotime($deviceRow['last_sync_at'] . ' -5 minutes'));
+        } else {
+            // First sync: get all records from start of today
+            $since = date('Y-m-d 00:00:00');
+        }
+        
+        $deviceResult['sync_since'] = $since;
         
         try {
             $device = null;
@@ -480,6 +489,7 @@ function syncAttendanceFromDevices(\PDO $db): void {
             }
             
             $attendance = $device->getAttendance($since);
+            $latestTime = null;
             
             foreach ($attendance as $record) {
                 $processResult = $processor->processBiometricEvent(
@@ -493,10 +503,21 @@ function syncAttendanceFromDevices(\PDO $db): void {
                 if ($processResult['success'] ?? false) {
                     $deviceResult['synced']++;
                 }
+                
+                // Track the latest record time
+                if (!$latestTime || $record['log_time'] > $latestTime) {
+                    $latestTime = $record['log_time'];
+                }
             }
             
             $deviceResult['records_found'] = count($attendance);
             $deviceResult['verification_types'] = array_unique(array_column($attendance, 'verification_type'));
+            
+            // Update last_sync_at for this device
+            $newSyncTime = $latestTime ?: date('Y-m-d H:i:s');
+            $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync_at = ? WHERE id = ?");
+            $updateStmt->execute([$newSyncTime, $deviceRow['id']]);
+            $deviceResult['last_sync_updated'] = $newSyncTime;
             
         } catch (\Throwable $e) {
             $deviceResult['errors'][] = $e->getMessage();
