@@ -503,6 +503,145 @@
                 <div id="customer-detail-content"></div>
             </div>
         </div>
+
+        <div id="leave-screen" class="screen">
+            <nav class="navbar navbar-dark bg-info fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Leave Requests</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.showNewLeaveRequest()">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="leave-balance-card" class="leave-balance-card"></div>
+                <div class="section-header mt-3">
+                    <h6><i class="bi bi-list-ul"></i> My Requests</h6>
+                </div>
+                <div id="leave-requests-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="new-leave-screen" class="screen">
+            <nav class="navbar navbar-dark bg-info fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Request Leave</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content form-content">
+                <form id="new-leave-form">
+                    <div class="mb-3">
+                        <label class="form-label">Leave Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="leave-type" required>
+                            <option value="">Select leave type</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="leave-start-date" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">End Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="leave-end-date" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="leave-half-day" onchange="app.toggleHalfDay()">
+                            <label class="form-check-label" for="leave-half-day">Half Day</label>
+                        </div>
+                    </div>
+                    <div class="mb-3 d-none" id="half-day-type-group">
+                        <label class="form-label">Half Day Type</label>
+                        <select class="form-select" id="leave-half-day-type">
+                            <option value="morning">Morning</option>
+                            <option value="afternoon">Afternoon</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" id="leave-reason" rows="3" placeholder="Reason for leave..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-info btn-lg w-100 text-white">
+                        <i class="bi bi-send"></i> Submit Request
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div id="advance-screen" class="screen">
+            <nav class="navbar navbar-dark bg-warning fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Salary Advance</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="app.showNewAdvanceRequest()">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+            </nav>
+            <div class="main-content">
+                <div id="advance-summary-card" class="advance-summary-card"></div>
+                <div class="section-header mt-3">
+                    <h6><i class="bi bi-list-ul"></i> My Advances</h6>
+                </div>
+                <div id="advances-list" class="list-container"></div>
+            </div>
+        </div>
+
+        <div id="new-advance-screen" class="screen">
+            <nav class="navbar navbar-dark bg-warning fixed-top">
+                <div class="container-fluid">
+                    <button class="btn btn-link text-white p-0" onclick="app.goBack()">
+                        <i class="bi bi-arrow-left fs-5"></i>
+                    </button>
+                    <span class="navbar-brand mb-0">Request Advance</span>
+                    <span style="width: 24px;"></span>
+                </div>
+            </nav>
+            <div class="main-content form-content">
+                <form id="new-advance-form">
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control form-control-lg" id="advance-amount" placeholder="0.00" min="1" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Repayment Type</label>
+                        <select class="form-select" id="advance-repayment-type">
+                            <option value="monthly">Monthly</option>
+                            <option value="bi-weekly">Bi-Weekly</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Installments</label>
+                        <select class="form-select" id="advance-installments">
+                            <option value="1">1 (Full repayment)</option>
+                            <option value="2">2 installments</option>
+                            <option value="3">3 installments</option>
+                            <option value="4">4 installments</option>
+                            <option value="6">6 installments</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" id="advance-reason" rows="3" placeholder="Reason for advance request..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-warning btn-lg w-100">
+                        <i class="bi bi-send"></i> Submit Request
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div id="ptr-indicator" class="ptr-indicator">

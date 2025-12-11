@@ -1589,6 +1589,20 @@ const app = {
                     </div>
                     <i class="bi bi-chevron-right text-muted"></i>
                 </div>
+                <div class="settings-item" onclick="app.showLeaveRequests()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-calendar-event settings-icon text-info"></i>
+                        <span class="settings-item-text">Leave Requests</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+                <div class="settings-item" onclick="app.showSalaryAdvances()">
+                    <div class="settings-item-left">
+                        <i class="bi bi-cash-coin settings-icon text-warning"></i>
+                        <span class="settings-item-text">Salary Advance</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
             </div>
             
             <div class="settings-list">
@@ -1845,10 +1859,282 @@ const app = {
         }
         
         return '<span class="sla-badge on-track"><i class="bi bi-check-circle"></i> On Track</span>';
+    },
+    
+    async showLeaveRequests() {
+        this.showScreen('leave-screen');
+        const balanceCard = document.getElementById('leave-balance-card');
+        const listContainer = document.getElementById('leave-requests-list');
+        
+        balanceCard.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm text-info"></div></div>';
+        listContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-info"></div></div>';
+        
+        const [balanceResult, requestsResult] = await Promise.all([
+            this.api('leave-balance'),
+            this.api('leave-requests')
+        ]);
+        
+        if (balanceResult.success && balanceResult.data) {
+            const b = balanceResult.data;
+            balanceCard.innerHTML = `
+                <div class="balance-header"><i class="bi bi-calendar-event me-2"></i>Leave Balance</div>
+                <div class="balance-grid">
+                    <div class="balance-item">
+                        <div class="balance-value text-success">${b.available || 0}</div>
+                        <div class="balance-label">Available</div>
+                    </div>
+                    <div class="balance-item">
+                        <div class="balance-value text-primary">${b.total || 0}</div>
+                        <div class="balance-label">Total</div>
+                    </div>
+                    <div class="balance-item">
+                        <div class="balance-value text-warning">${b.used || 0}</div>
+                        <div class="balance-label">Used</div>
+                    </div>
+                    <div class="balance-item">
+                        <div class="balance-value text-info">${b.pending || 0}</div>
+                        <div class="balance-label">Pending</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            balanceCard.innerHTML = '<div class="text-center text-muted p-3">Unable to load balance</div>';
+        }
+        
+        if (requestsResult.success && requestsResult.data && requestsResult.data.length > 0) {
+            listContainer.innerHTML = requestsResult.data.map(r => `
+                <div class="list-item">
+                    <div class="list-item-header">
+                        <div>
+                            <h6 class="list-item-title">${r.leave_type_name || 'Leave'}</h6>
+                            <p class="list-item-subtitle">${this.formatDateRange(r.start_date, r.end_date)}${r.is_half_day ? ' (Half Day)' : ''}</p>
+                        </div>
+                        <span class="badge ${this.getLeaveStatusBadge(r.status)}">${r.status}</span>
+                    </div>
+                    ${r.reason ? `<div class="list-item-meta text-muted small">${r.reason}</div>` : ''}
+                    ${r.status === 'pending' ? `
+                        <button class="btn btn-sm btn-outline-danger mt-2" onclick="app.cancelLeaveRequest(${r.id})">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('');
+        } else {
+            listContainer.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p>No leave requests yet</p></div>';
+        }
+    },
+    
+    formatDateRange(start, end) {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const options = { month: 'short', day: 'numeric' };
+        if (start === end) {
+            return startDate.toLocaleDateString('en-US', { ...options, year: 'numeric' });
+        }
+        return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', { ...options, year: 'numeric' })}`;
+    },
+    
+    getLeaveStatusBadge(status) {
+        const badges = {
+            'pending': 'bg-warning text-dark',
+            'approved': 'bg-success',
+            'rejected': 'bg-danger',
+            'cancelled': 'bg-secondary'
+        };
+        return badges[status] || 'bg-secondary';
+    },
+    
+    async showNewLeaveRequest() {
+        this.showScreen('new-leave-screen');
+        const select = document.getElementById('leave-type');
+        select.innerHTML = '<option value="">Loading...</option>';
+        
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('leave-start-date').value = today;
+        document.getElementById('leave-end-date').value = today;
+        document.getElementById('leave-half-day').checked = false;
+        document.getElementById('half-day-type-group').classList.add('d-none');
+        document.getElementById('leave-reason').value = '';
+        
+        const result = await this.api('leave-types');
+        if (result.success && result.data) {
+            select.innerHTML = '<option value="">Select leave type</option>' + 
+                result.data.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        } else {
+            select.innerHTML = '<option value="">Failed to load types</option>';
+        }
+    },
+    
+    toggleHalfDay() {
+        const isHalfDay = document.getElementById('leave-half-day').checked;
+        document.getElementById('half-day-type-group').classList.toggle('d-none', !isHalfDay);
+        if (isHalfDay) {
+            document.getElementById('leave-end-date').value = document.getElementById('leave-start-date').value;
+            document.getElementById('leave-end-date').disabled = true;
+        } else {
+            document.getElementById('leave-end-date').disabled = false;
+        }
+    },
+    
+    async submitLeaveRequest() {
+        const leaveTypeId = document.getElementById('leave-type').value;
+        const startDate = document.getElementById('leave-start-date').value;
+        const endDate = document.getElementById('leave-end-date').value;
+        const isHalfDay = document.getElementById('leave-half-day').checked;
+        const halfDayType = document.getElementById('leave-half-day-type').value;
+        const reason = document.getElementById('leave-reason').value;
+        
+        if (!leaveTypeId || !startDate || !endDate) {
+            this.showToast('Please fill all required fields', 'danger');
+            return;
+        }
+        
+        const result = await this.api('submit-leave-request', 'POST', {
+            leave_type_id: leaveTypeId,
+            start_date: startDate,
+            end_date: isHalfDay ? startDate : endDate,
+            is_half_day: isHalfDay,
+            half_day_type: isHalfDay ? halfDayType : null,
+            reason: reason
+        });
+        
+        if (result.success) {
+            this.showToast('Leave request submitted!', 'success');
+            this.goBack();
+            this.showLeaveRequests();
+        } else {
+            this.showToast(result.error || 'Failed to submit request', 'danger');
+        }
+    },
+    
+    async cancelLeaveRequest(requestId) {
+        if (!confirm('Are you sure you want to cancel this leave request?')) return;
+        
+        const result = await this.api('cancel-leave-request', 'POST', { request_id: requestId });
+        if (result.success) {
+            this.showToast('Request cancelled', 'success');
+            this.showLeaveRequests();
+        } else {
+            this.showToast(result.error || 'Failed to cancel', 'danger');
+        }
+    },
+    
+    async showSalaryAdvances() {
+        this.showScreen('advance-screen');
+        const summaryCard = document.getElementById('advance-summary-card');
+        const listContainer = document.getElementById('advances-list');
+        
+        summaryCard.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm text-warning"></div></div>';
+        listContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-warning"></div></div>';
+        
+        const result = await this.api('salary-advances');
+        
+        if (result.success) {
+            const outstanding = result.total_outstanding || 0;
+            summaryCard.innerHTML = `
+                <div class="balance-header"><i class="bi bi-cash-coin me-2"></i>Outstanding Balance</div>
+                <div class="outstanding-amount ${outstanding > 0 ? 'text-danger' : 'text-success'}">
+                    KES ${this.formatNumber(outstanding)}
+                </div>
+            `;
+            
+            if (result.data && result.data.length > 0) {
+                listContainer.innerHTML = result.data.map(a => `
+                    <div class="list-item">
+                        <div class="list-item-header">
+                            <div>
+                                <h6 class="list-item-title">KES ${this.formatNumber(a.amount)}</h6>
+                                <p class="list-item-subtitle">${new Date(a.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <span class="badge ${this.getAdvanceStatusBadge(a.status)}">${a.status}</span>
+                        </div>
+                        <div class="list-item-meta">
+                            <span><i class="bi bi-arrow-repeat"></i> ${a.repayment_type} (${a.repayment_installments}x)</span>
+                            ${a.outstanding_amount > 0 ? `<span class="text-danger">Outstanding: KES ${this.formatNumber(a.outstanding_amount)}</span>` : ''}
+                        </div>
+                        ${a.reason ? `<div class="small text-muted mt-1">${a.reason}</div>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                listContainer.innerHTML = '<div class="empty-state"><i class="bi bi-cash"></i><p>No salary advances</p></div>';
+            }
+        } else {
+            summaryCard.innerHTML = '<div class="text-center text-muted p-3">Unable to load data</div>';
+            listContainer.innerHTML = '';
+        }
+    },
+    
+    getAdvanceStatusBadge(status) {
+        const badges = {
+            'pending': 'bg-warning text-dark',
+            'approved': 'bg-info',
+            'rejected': 'bg-danger',
+            'disbursed': 'bg-success',
+            'repaying': 'bg-primary',
+            'completed': 'bg-secondary'
+        };
+        return badges[status] || 'bg-secondary';
+    },
+    
+    showNewAdvanceRequest() {
+        this.showScreen('new-advance-screen');
+        document.getElementById('advance-amount').value = '';
+        document.getElementById('advance-repayment-type').value = 'monthly';
+        document.getElementById('advance-installments').value = '1';
+        document.getElementById('advance-reason').value = '';
+    },
+    
+    async submitAdvanceRequest() {
+        const amount = parseFloat(document.getElementById('advance-amount').value);
+        const repaymentType = document.getElementById('advance-repayment-type').value;
+        const installments = parseInt(document.getElementById('advance-installments').value);
+        const reason = document.getElementById('advance-reason').value;
+        
+        if (!amount || amount <= 0) {
+            this.showToast('Please enter a valid amount', 'danger');
+            return;
+        }
+        
+        const result = await this.api('request-advance', 'POST', {
+            amount: amount,
+            repayment_type: repaymentType,
+            repayment_installments: installments,
+            reason: reason
+        });
+        
+        if (result.success) {
+            this.showToast('Advance request submitted!', 'success');
+            this.goBack();
+            this.showSalaryAdvances();
+        } else {
+            this.showToast(result.error || 'Failed to submit request', 'danger');
+        }
+    },
+    
+    initLeaveForm() {
+        const form = document.getElementById('new-leave-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitLeaveRequest();
+            });
+        }
+    },
+    
+    initAdvanceForm() {
+        const form = document.getElementById('new-advance-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitAdvanceRequest();
+            });
+        }
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
     app.initTicketForm();
+    app.initLeaveForm();
+    app.initAdvanceForm();
 });

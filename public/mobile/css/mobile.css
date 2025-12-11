@@ -1414,3 +1414,77 @@ body.dark-mode .late-deduction-content .late-time {
     color: #888;
     margin-bottom: 1.5rem;
 }
+
+/* Leave Request Styles */
+.leave-balance-card,
+.advance-summary-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+body.dark-mode .leave-balance-card,
+body.dark-mode .advance-summary-card {
+    background: #1e1e1e;
+}
+
+.balance-header {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+body.dark-mode .balance-header {
+    color: #eee;
+}
+
+.balance-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.balance-item {
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+body.dark-mode .balance-item {
+    background: #2d2d2d;
+}
+
+.balance-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.balance-label {
+    font-size: 0.7rem;
+    color: #666;
+    text-transform: uppercase;
+}
+
+body.dark-mode .balance-label {
+    color: #aaa;
+}
+
+.outstanding-amount {
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Navbar colors for leave and advance */
+.bg-info {
+    background-color: #17a2b8 !important;
+}
+
+.bg-warning .navbar-brand,
+.bg-warning .btn-link {
+    color: #333 !important;
+}
