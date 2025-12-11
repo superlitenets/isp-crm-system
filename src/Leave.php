@@ -148,7 +148,9 @@ class Leave {
                         + ($balance['carried_over_days'] ?? 0) + ($balance['adjusted_days'] ?? 0)
                         - ($balance['used_days'] ?? 0) - ($balance['pending_days'] ?? 0);
         
-        $maxAnnualDays = $leaveType['days_per_year'] ?? 21;
+        $configuredLimit = $leaveType['days_per_year'] ?? 0;
+        $maxAnnualDays = $configuredLimit > 0 ? $configuredLimit : 21;
+        
         $usedThisYear = $balance['used_days'] ?? 0;
         $pendingThisYear = $balance['pending_days'] ?? 0;
         $totalIfApproved = $usedThisYear + $pendingThisYear + $requestedDays;

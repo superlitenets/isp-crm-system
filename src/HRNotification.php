@@ -31,16 +31,15 @@ class HRNotification {
         }
         
         $employee = $this->getEmployee($request['employee_id']);
-        if (!$employee || empty($employee['phone'])) {
-            return false;
-        }
+        $employeeName = $employee['name'] ?? $request['employee_name'] ?? 'Employee';
+        $employeeCode = $employee['employee_id'] ?? $request['employee_code'] ?? '';
         
         $companyName = $this->settings->get('company_name', 'ISP CRM');
         $currency = $this->settings->get('currency', 'KES');
         
         $placeholders = [
-            '{employee_name}' => $employee['name'] ?? '',
-            '{employee_code}' => $employee['employee_id'] ?? '',
+            '{employee_name}' => $employeeName,
+            '{employee_code}' => $employeeCode,
             '{leave_type}' => $request['leave_type_name'] ?? $request['leave_type'] ?? '',
             '{total_days}' => $request['total_days'] ?? '',
             '{start_date}' => isset($request['start_date']) ? date('M j, Y', strtotime($request['start_date'])) : '',
@@ -59,11 +58,13 @@ class HRNotification {
             if ($adminPhone) {
                 return $this->sms->send($adminPhone, $message)['success'] ?? false;
             }
+            return false;
         } else {
-            return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+            if ($employee && !empty($employee['phone'])) {
+                return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+            }
+            return false;
         }
-        
-        return false;
     }
     
     public function sendAdvanceNotification(string $eventType, array $advance): bool {
@@ -73,16 +74,15 @@ class HRNotification {
         }
         
         $employee = $this->getEmployee($advance['employee_id']);
-        if (!$employee || empty($employee['phone'])) {
-            return false;
-        }
+        $employeeName = $employee['name'] ?? $advance['employee_name'] ?? 'Employee';
+        $employeeCode = $employee['employee_id'] ?? $advance['employee_code'] ?? '';
         
         $companyName = $this->settings->get('company_name', 'ISP CRM');
         $currency = $this->settings->get('currency', 'KES');
         
         $placeholders = [
-            '{employee_name}' => $employee['name'] ?? '',
-            '{employee_code}' => $employee['employee_id'] ?? '',
+            '{employee_name}' => $employeeName,
+            '{employee_code}' => $employeeCode,
             '{amount}' => number_format($advance['amount'] ?? 0, 2),
             '{balance}' => number_format($advance['balance'] ?? $advance['amount'] ?? 0, 2),
             '{reason}' => $advance['reason'] ?? 'Not specified',
@@ -103,11 +103,13 @@ class HRNotification {
             if ($adminPhone) {
                 return $this->sms->send($adminPhone, $message)['success'] ?? false;
             }
+            return false;
         } else {
-            return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+            if ($employee && !empty($employee['phone'])) {
+                return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+            }
+            return false;
         }
-        
-        return false;
     }
     
     public function createInAppNotification(int $userId, string $title, string $message, string $type = 'info', ?string $link = null): int {

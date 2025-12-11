@@ -1595,7 +1595,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'create_advance':
                 try {
                     $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
-                    $salaryAdvance->create($_POST);
+                    $advanceId = $salaryAdvance->create($_POST);
+                    $advance = $salaryAdvance->getById($advanceId);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendAdvanceNotification('advance_request_created', $advance);
+                    $hrNotification->notifyAdminsOfAdvanceRequest($advance);
+                    
                     $message = 'Salary advance request created successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1609,6 +1615,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
                     $salaryAdvance->approve((int)$_POST['id'], $currentUser['id']);
+                    $advance = $salaryAdvance->getById((int)$_POST['id']);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendAdvanceNotification('advance_approved', $advance);
+                    $hrNotification->notifyEmployeeOfAdvanceDecision($advance);
+                    
                     $message = 'Salary advance approved successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1622,6 +1634,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
                     $salaryAdvance->reject((int)$_POST['id'], $currentUser['id'], $_POST['notes'] ?? null);
+                    $advance = $salaryAdvance->getById((int)$_POST['id']);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendAdvanceNotification('advance_rejected', $advance);
+                    $hrNotification->notifyEmployeeOfAdvanceDecision($advance);
+                    
                     $message = 'Salary advance rejected.';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1635,6 +1653,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
                     $salaryAdvance->disburse((int)$_POST['id']);
+                    $advance = $salaryAdvance->getById((int)$_POST['id']);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendAdvanceNotification('advance_disbursed', $advance);
+                    
                     $message = 'Salary advance disbursed successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1666,7 +1689,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'create_leave_request':
                 try {
                     $leaveService = new \App\Leave(Database::getConnection());
-                    $leaveService->createRequest($_POST);
+                    $requestId = $leaveService->createRequest($_POST);
+                    $request = $leaveService->getRequest($requestId);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendLeaveNotification('leave_request_created', $request);
+                    $hrNotification->notifyAdminsOfLeaveRequest($request);
+                    
                     $message = 'Leave request submitted successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1680,6 +1709,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $leaveService = new \App\Leave(Database::getConnection());
                     $leaveService->approve((int)$_POST['id'], $currentUser['id']);
+                    $request = $leaveService->getRequest((int)$_POST['id']);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendLeaveNotification('leave_approved', $request);
+                    $hrNotification->notifyEmployeeOfLeaveDecision($request);
+                    
                     $message = 'Leave request approved!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
@@ -1693,6 +1728,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $leaveService = new \App\Leave(Database::getConnection());
                     $leaveService->reject((int)$_POST['id'], $currentUser['id'], $_POST['rejection_reason'] ?? null);
+                    $request = $leaveService->getRequest((int)$_POST['id']);
+                    
+                    $hrNotification = new \App\HRNotification(Database::getConnection());
+                    $hrNotification->sendLeaveNotification('leave_rejected', $request);
+                    $hrNotification->notifyEmployeeOfLeaveDecision($request);
+                    
                     $message = 'Leave request rejected.';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
