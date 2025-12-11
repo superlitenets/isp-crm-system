@@ -12,7 +12,7 @@ Key capabilities include:
 - Secure authentication and communication features like SMS notifications and WhatsApp Web integration.
 - SmartOLT integration for real-time network monitoring and ONU provisioning.
 - Comprehensive reporting and activity logging.
-- Enhanced mobile PWA for salespersons and technicians with performance tracking, offline support, dark mode, customer search, GPS navigation, notifications center, and attendance history.
+- Enhanced mobile PWA for salespersons and technicians with performance tracking, offline support, dark mode, customer search, GPS navigation, notifications center, attendance history, leave requests, and salary advance requests.
 
 The business vision is to offer a powerful, all-in-one platform that enhances operational efficiency, improves customer satisfaction, and supports the growth of ISPs by automating critical business processes.
 
