@@ -76,6 +76,14 @@ class Customer {
         return $result ?: null;
     }
 
+    public function findByPhone(string $phone): ?array {
+        $normalizedPhone = preg_replace('/[^0-9+]/', '', $phone);
+        $stmt = $this->db->prepare("SELECT * FROM customers WHERE REPLACE(REPLACE(phone, ' ', ''), '-', '') = ? OR phone = ?");
+        $stmt->execute([$normalizedPhone, $phone]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
     public function getAll(string $search = '', int $limit = 50, int $offset = 0, ?int $userId = null): array {
         $sql = "SELECT * FROM customers WHERE 1=1";
         $params = [];

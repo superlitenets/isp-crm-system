@@ -1113,10 +1113,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                     break;
                 }
+                
+                $customerType = $_POST['customer_type'] ?? 'existing';
                 $customerId = (int)($_POST['customer_id'] ?? 0);
                 $subject = trim($_POST['subject'] ?? '');
                 $description = trim($_POST['description'] ?? '');
                 $category = trim($_POST['category'] ?? '');
+                
+                // Handle inline new customer creation
+                if ($customerType === 'new') {
+                    $newName = trim($_POST['new_customer_name'] ?? '');
+                    $newPhone = trim($_POST['new_customer_phone'] ?? '');
+                    $newEmail = trim($_POST['new_customer_email'] ?? '');
+                    $newPlan = trim($_POST['new_customer_service_plan'] ?? 'basic');
+                    $newAddress = trim($_POST['new_customer_address'] ?? '');
+                    
+                    if (empty($newName) || empty($newPhone) || empty($newAddress)) {
+                        $message = 'Please fill in all required customer fields (Name, Phone, Address).';
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    // Check if customer with same phone exists
+                    $existingByPhone = $customer->findByPhone($newPhone);
+                    if ($existingByPhone) {
+                        $message = 'A customer with this phone number already exists. Please select from existing customers.';
+                        $messageType = 'warning';
+                        break;
+                    }
+                    
+                    try {
+                        $customerId = $customer->create([
+                            'name' => $newName,
+                            'phone' => $newPhone,
+                            'email' => $newEmail,
+                            'service_plan' => $newPlan,
+                            'address' => $newAddress,
+                            'connection_status' => 'pending'
+                        ]);
+                        $_POST['customer_id'] = $customerId;
+                    } catch (Exception $e) {
+                        $message = 'Error creating new customer: ' . $e->getMessage();
+                        $messageType = 'danger';
+                        break;
+                    }
+                }
                 
                 if (empty($customerId) || empty($subject) || empty($description) || empty($category)) {
                     $message = 'Please fill in all required fields.';
@@ -1127,7 +1168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try {
                         $ticketId = $ticket->create($_POST);
-                        $message = 'Ticket created successfully! SMS notifications sent.';
+                        $customerCreatedMsg = ($customerType === 'new') ? ' New customer created.' : '';
+                        $message = 'Ticket created successfully!' . $customerCreatedMsg . ' SMS notifications sent.';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
                     } catch (Exception $e) {

@@ -31,19 +31,69 @@ if (isset($_GET['customer_id'])) {
             
             <div class="row g-3">
                 <?php if ($action === 'create'): ?>
-                <div class="col-md-6">
-                    <label class="form-label">Customer *</label>
-                    <select class="form-select" name="customer_id" required>
+                <?php $allCustomers = $customer->getAll(); ?>
+                <div class="col-12">
+                    <label class="form-label">Customer Type *</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="customer_type" id="existingCustomer" value="existing" checked>
+                        <label class="btn btn-outline-primary" for="existingCustomer">
+                            <i class="bi bi-person-check"></i> Existing Customer
+                        </label>
+                        <input type="radio" class="btn-check" name="customer_type" id="newCustomer" value="new">
+                        <label class="btn btn-outline-success" for="newCustomer">
+                            <i class="bi bi-person-plus"></i> New Customer
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-md-6" id="existingCustomerSection">
+                    <label class="form-label">Select Customer *</label>
+                    <select class="form-select" name="customer_id" id="customerIdSelect">
                         <option value="">Select Customer</option>
-                        <?php
-                        $allCustomers = $customer->getAll();
-                        foreach ($allCustomers as $c):
-                        ?>
+                        <?php foreach ($allCustomers as $c): ?>
                         <option value="<?= $c['id'] ?>" <?= ($preselectedCustomer && $preselectedCustomer['id'] == $c['id']) ? 'selected' : '' ?>>
                             <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?>)
                         </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                
+                <div id="newCustomerSection" style="display: none;">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-person-plus"></i> New Customer Details
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Full Name *</label>
+                                    <input type="text" class="form-control" name="new_customer_name" id="newCustomerName" placeholder="Enter customer name">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone Number *</label>
+                                    <input type="tel" class="form-control" name="new_customer_phone" id="newCustomerPhone" placeholder="+254712345678">
+                                    <small class="text-muted">Include country code for SMS</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" name="new_customer_email" placeholder="customer@example.com">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Service Plan *</label>
+                                    <?php $servicePlans = $customer->getServicePlans(); ?>
+                                    <select class="form-select" name="new_customer_service_plan" id="newCustomerPlan">
+                                        <?php foreach ($servicePlans as $key => $label): ?>
+                                        <option value="<?= $key ?>"><?= $label ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Installation Address *</label>
+                                    <textarea class="form-control" name="new_customer_address" id="newCustomerAddress" rows="2" placeholder="Enter installation address"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <?php endif; ?>
                 
@@ -144,6 +194,49 @@ if (isset($_GET['customer_id'])) {
         </form>
     </div>
 </div>
+
+<?php if ($action === 'create'): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const existingRadio = document.getElementById('existingCustomer');
+    const newRadio = document.getElementById('newCustomer');
+    const existingSection = document.getElementById('existingCustomerSection');
+    const newSection = document.getElementById('newCustomerSection');
+    const customerIdSelect = document.getElementById('customerIdSelect');
+    const newCustomerName = document.getElementById('newCustomerName');
+    const newCustomerPhone = document.getElementById('newCustomerPhone');
+    const newCustomerPlan = document.getElementById('newCustomerPlan');
+    const newCustomerAddress = document.getElementById('newCustomerAddress');
+    
+    function toggleCustomerSections() {
+        if (newRadio.checked) {
+            existingSection.style.display = 'none';
+            newSection.style.display = 'block';
+            customerIdSelect.removeAttribute('required');
+            customerIdSelect.value = '';
+            newCustomerName.setAttribute('required', 'required');
+            newCustomerPhone.setAttribute('required', 'required');
+            newCustomerPlan.setAttribute('required', 'required');
+            newCustomerAddress.setAttribute('required', 'required');
+        } else {
+            existingSection.style.display = 'block';
+            newSection.style.display = 'none';
+            customerIdSelect.setAttribute('required', 'required');
+            newCustomerName.removeAttribute('required');
+            newCustomerPhone.removeAttribute('required');
+            newCustomerPlan.removeAttribute('required');
+            newCustomerAddress.removeAttribute('required');
+        }
+    }
+    
+    existingRadio.addEventListener('change', toggleCustomerSections);
+    newRadio.addEventListener('change', toggleCustomerSections);
+    
+    // Initialize
+    toggleCustomerSections();
+});
+</script>
+<?php endif; ?>
 
 <?php elseif ($action === 'view' && $ticketData): ?>
 <?php
