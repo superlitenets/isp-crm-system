@@ -77,14 +77,25 @@ The system features a clean, responsive design. The public-facing landing page i
   - Track repayments and outstanding balances
   - Automatic integration with payroll as deductions
   - Mobile API for employees to request advances
+  - SMS notifications on request creation, approval, rejection, and disbursement
+  - In-app notifications for admins and employees
 - **Leave Management System (Dec 2025)**: Comprehensive leave tracking:
   - Multiple leave types (Annual, Sick, Unpaid, Maternity, Paternity, Compassionate)
-  - 21 days annual leave with monthly accrual (trickle-down: 1.75 days/month)
-  - Leave request and approval workflow
+  - 21 days annual leave limit enforced with validation (defaults to 21 if not configured)
+  - Monthly accrual (trickle-down: 1.75 days/month)
+  - Leave request and approval workflow with balance validation
   - Balance tracking with carryover support
   - Public holidays calendar
   - Mobile API for leave requests from PWA
   - Cron job for monthly leave accrual
+  - SMS notifications on request creation, approval, and rejection
+  - In-app notifications for admins and employees
+- **HR Notification System (Dec 2025)**: Configurable SMS templates for HR events:
+  - Template management in hr_notification_templates table
+  - Supports leave and salary advance events
+  - Customizable message placeholders for employee name, dates, amounts, etc.
+  - Admin phone notification for new requests
+  - Employee phone notification for approvals/rejections
 - **Accounting Module (Dec 2025)**: Comprehensive financial management:
   - Dashboard with receivables, payables, and monthly summaries
   - Chart of Accounts with predefined categories
