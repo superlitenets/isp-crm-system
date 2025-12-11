@@ -51,15 +51,15 @@ try {
                 break;
             }
             
-            $email = $input['email'] ?? '';
+            $identifier = $input['email'] ?? $input['identifier'] ?? '';
             $password = $input['password'] ?? '';
             
-            if (!$email || !$password) {
-                echo json_encode(['success' => false, 'error' => 'Email and password required']);
+            if (!$identifier || !$password) {
+                echo json_encode(['success' => false, 'error' => 'Email/phone and password required']);
                 break;
             }
             
-            $result = $api->authenticate($email, $password);
+            $result = $api->authenticate($identifier, $password);
             
             if ($result) {
                 $salesperson = $api->getSalespersonByUserId($result['user']['id']);
@@ -73,7 +73,7 @@ try {
                     'employee' => $employee
                 ]);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Invalid email or password']);
+                echo json_encode(['success' => false, 'error' => 'Invalid email/phone or password']);
             }
             break;
             

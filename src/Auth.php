@@ -11,7 +11,7 @@ class Auth {
         }
     }
 
-    public static function login(string $email, string $password): bool {
+    public static function login(string $identifier, string $password): bool {
         $db = \Database::getConnection();
         
         $rolesTableExists = false;
@@ -22,18 +22,31 @@ class Auth {
             $rolesTableExists = false;
         }
         
+        // Build all possible phone variants for Kenya numbers
+        $phoneVariants = self::getKenyaPhoneVariants($identifier);
+        
+        // Build phone IN clause with proper column reference
+        $phoneClauseRoles = '';  // For query with roles table (uses u. prefix)
+        $phoneClauseSimple = ''; // For query without roles table
+        
+        if (count($phoneVariants) > 0) {
+            $inPlaceholders = implode(',', array_fill(0, count($phoneVariants), '?'));
+            $phoneClauseRoles = ' OR u.phone IN (' . $inPlaceholders . ')';
+            $phoneClauseSimple = ' OR phone IN (' . $inPlaceholders . ')';
+        }
+        
         if ($rolesTableExists) {
             $stmt = $db->prepare("
                 SELECT u.*, r.name as role_name, r.display_name as role_display_name
                 FROM users u
                 LEFT JOIN roles r ON u.role_id = r.id
-                WHERE u.email = ?
+                WHERE u.email = ?" . $phoneClauseRoles . "
             ");
         } else {
-            $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = ?" . $phoneClauseSimple);
         }
         
-        $stmt->execute([$email]);
+        $stmt->execute(array_merge([$identifier], $phoneVariants));
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password_hash'])) {
@@ -57,6 +70,56 @@ class Auth {
     public static function logout(): void {
         $_SESSION = [];
         session_destroy();
+    }
+    
+    /**
+     * Generate all possible Kenya phone number variants for matching
+     * Handles: 07xxx, +254xxx, 254xxx formats
+     */
+    public static function getKenyaPhoneVariants(string $input): array {
+        // Remove spaces, dashes, and parentheses
+        $cleaned = preg_replace('/[\s\-\(\)]/', '', $input);
+        
+        // If it's an email (contains @), return empty array
+        if (strpos($cleaned, '@') !== false) {
+            return [];
+        }
+        
+        // If it doesn't look like a phone number, return just the cleaned version
+        if (!preg_match('/^[\+]?[0-9]{9,15}$/', $cleaned)) {
+            return [$cleaned];
+        }
+        
+        $variants = [$cleaned];
+        
+        // Extract the base 9 digits (after country code)
+        $baseDigits = null;
+        
+        if (preg_match('/^\+254(\d{9})$/', $cleaned, $m)) {
+            // Input: +254712345678
+            $baseDigits = $m[1];
+        } elseif (preg_match('/^254(\d{9})$/', $cleaned, $m)) {
+            // Input: 254712345678
+            $baseDigits = $m[1];
+        } elseif (preg_match('/^0(\d{9})$/', $cleaned, $m)) {
+            // Input: 0712345678
+            $baseDigits = $m[1];
+        } elseif (preg_match('/^(\d{9})$/', $cleaned, $m)) {
+            // Input: 712345678 (just 9 digits)
+            $baseDigits = $m[1];
+        }
+        
+        if ($baseDigits) {
+            // Generate all variants
+            $variants = array_unique([
+                $cleaned,
+                '0' . $baseDigits,           // 0712345678
+                '254' . $baseDigits,         // 254712345678
+                '+254' . $baseDigits,        // +254712345678
+            ]);
+        }
+        
+        return array_values($variants);
     }
 
     public static function check(): bool {

@@ -62,10 +62,10 @@
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <div class="mb-3">
-                <label class="form-label">Email</label>
+                <label class="form-label">Email or Phone</label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                    <input type="email" class="form-control" name="email" required autofocus placeholder="Enter your email" autocomplete="email">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text" class="form-control" name="email" required autofocus placeholder="Enter email or phone number" autocomplete="username">
                 </div>
             </div>
             <div class="mb-4">

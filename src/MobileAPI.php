@@ -9,9 +9,18 @@ class MobileAPI {
         $this->db = $db ?? \Database::getConnection();
     }
     
-    public function authenticate(string $email, string $password): ?array {
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->execute([$email]);
+    public function authenticate(string $identifier, string $password): ?array {
+        // Build all possible phone variants for Kenya numbers
+        $phoneVariants = \App\Auth::getKenyaPhoneVariants($identifier);
+        
+        // Build placeholders for phone variants
+        $phonePlaceholders = '';
+        if (count($phoneVariants) > 0) {
+            $phonePlaceholders = ' OR phone IN (' . implode(',', array_fill(0, count($phoneVariants), '?')) . ')';
+        }
+        
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?" . $phonePlaceholders);
+        $stmt->execute(array_merge([$identifier], $phoneVariants));
         $user = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($user && password_verify($password, $user['password_hash'])) {
