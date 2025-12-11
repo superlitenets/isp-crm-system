@@ -3601,6 +3601,44 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 }
             }
             break;
+
+        case 'remove_late_penalty':
+            try {
+                $attendanceId = (int)$_POST['attendance_id'];
+                $stmt = $db->prepare("UPDATE attendance SET late_minutes = 0, deduction = 0 WHERE id = ?");
+                $stmt->execute([$attendanceId]);
+                $message = 'Late penalty removed successfully!';
+                $messageType = 'success';
+                \App\Auth::regenerateToken();
+            } catch (Exception $e) {
+                $message = 'Error: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+
+        case 'update_late_penalty':
+            try {
+                $attendanceId = (int)$_POST['attendance_id'];
+                $lateMinutes = max(0, (int)$_POST['late_minutes']);
+                $deduction = max(0, (float)$_POST['deduction']);
+                $reason = trim($_POST['adjustment_reason'] ?? '');
+                
+                $stmt = $db->prepare("UPDATE attendance SET late_minutes = ?, deduction = ? WHERE id = ?");
+                $stmt->execute([$lateMinutes, $deduction, $attendanceId]);
+                
+                if (!empty($reason)) {
+                    \App\ActivityLog::log($db, 'attendance', $attendanceId, 'penalty_adjusted', 
+                        "Late penalty adjusted: {$lateMinutes} min, KES {$deduction}. Reason: {$reason}");
+                }
+                
+                $message = 'Late penalty updated successfully!';
+                $messageType = 'success';
+                \App\Auth::regenerateToken();
+            } catch (Exception $e) {
+                $message = 'Error: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
     }
 }
 
