@@ -2533,7 +2533,7 @@ if ($selectedEmployeeId) {
 
 <?php elseif ($subpage === 'advances'): ?>
 <?php
-$salaryAdvance = new \App\SalaryAdvance();
+$salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
 $advanceStats = $salaryAdvance->getStatistics();
 $advanceFilter = $_GET['status'] ?? '';
 $advances = $salaryAdvance->getAll(['status' => $advanceFilter]);
@@ -2808,7 +2808,7 @@ document.getElementById('recordPaymentModal')?.addEventListener('show.bs.modal',
 
 <?php elseif ($subpage === 'leave'): ?>
 <?php
-$leaveService = new \App\Leave();
+$leaveService = new \App\Leave(Database::getConnection());
 $leaveStats = $leaveService->getStatistics();
 $leaveTypes = $leaveService->getAllLeaveTypes();
 $leaveFilter = $_GET['status'] ?? '';
