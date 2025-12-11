@@ -221,6 +221,9 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     // Branch-specific summaries
     $branchClass = new \App\Branch();
     $branchesWithGroups = $branchClass->getBranchesWithWhatsAppGroups();
+    $allBranches = $branchClass->getAll();
+    
+    $branchSummaries = [];
     
     foreach ($branchesWithGroups as $branch) {
         $branchData = $branchClass->getBranchSummaryData($branch['id'], $today);
@@ -252,6 +255,18 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         
         $branchMessage .= "\n_" . ($branch['code'] ?? $branch['name']) . " - " . ($settings->get('company_name', 'Your ISP')) . "_";
         
+        $branchSummaries[$branch['id']] = [
+            'name' => $branch['name'],
+            'code' => $branch['code'] ?? '',
+            'employees' => count($branchEmployees),
+            'present' => count($branchPresent),
+            'absent' => count($branchAbsent),
+            'late' => count($branchLate),
+            'new_tickets' => count($branchNew),
+            'in_progress' => count($branchInProgress),
+            'resolved' => count($branchResolved)
+        ];
+        
         if ($provider === 'session') {
             $result = $whatsapp->sendToGroup($branch['whatsapp_group'], $branchMessage);
             $results['branch_' . $branch['id']] = $result;
@@ -261,6 +276,102 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         } else {
             $results['branch_' . $branch['id']] = ['success' => false, 'error' => 'Session provider required for branch groups'];
             $errors[] = "Branch {$branch['name']}: WhatsApp Session provider required for group messaging";
+        }
+    }
+    
+    // Daily Operations Group consolidated summary
+    $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
+    if (!empty($operationsGroupId) && $provider === 'session') {
+        $totalTickets = count($tickets);
+        $totalResolved = count($resolved);
+        $totalInProgress = count($inProgress);
+        $totalOpen = count($newTickets);
+        $totalHours = round(array_sum(array_column($employees, 'hours_worked')), 1);
+        
+        $slaBreachedStmt = $db->query("
+            SELECT COUNT(*) FROM tickets 
+            WHERE DATE(created_at) = '$today' 
+            AND (sla_response_breached = true OR sla_resolution_breached = true)
+        ");
+        $totalSlaBreached = $slaBreachedStmt->fetchColumn() ?: 0;
+        
+        $branchBreakdownText = "";
+        foreach ($branchSummaries as $bs) {
+            $branchBreakdownText .= "\n🏢 *{$bs['name']}*\n";
+            $branchBreakdownText .= "  👥 Present: {$bs['present']}/{$bs['employees']} | Late: {$bs['late']}\n";
+            $branchBreakdownText .= "  🎫 New: {$bs['new_tickets']} | Progress: {$bs['in_progress']} | Done: {$bs['resolved']}";
+        }
+        
+        if (empty($branchBreakdownText)) {
+            $branchBreakdownText = "No branch data available";
+        }
+        
+        $topPerformersStmt = $db->query("
+            SELECT u.name, COUNT(t.id) as resolved_count
+            FROM tickets t
+            JOIN users u ON t.assigned_to = u.id
+            WHERE DATE(t.resolved_at) = '$today'
+            GROUP BY u.id, u.name
+            ORDER BY resolved_count DESC
+            LIMIT 5
+        ");
+        $topPerformers = $topPerformersStmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $topPerformersText = "";
+        $rank = 1;
+        foreach ($topPerformers as $tp) {
+            $medal = $rank === 1 ? '🥇' : ($rank === 2 ? '🥈' : ($rank === 3 ? '🥉' : '•'));
+            $topPerformersText .= "{$medal} {$tp['name']}: {$tp['resolved_count']} tickets\n";
+            $rank++;
+        }
+        
+        if (empty($topPerformersText)) {
+            $topPerformersText = "No resolved tickets today";
+        }
+        
+        $opsTemplate = $settings->get('wa_template_operations_daily_summary', '');
+        if (!empty($opsTemplate)) {
+            $opsMessage = str_replace([
+                '{date}', '{time}', '{company_name}',
+                '{total_tickets}', '{total_resolved}', '{total_in_progress}', '{total_open}', '{total_sla_breached}',
+                '{total_employees}', '{total_present}', '{total_absent}', '{total_late}', '{total_hours}',
+                '{branch_summaries}', '{top_performers}', '{branch_count}'
+            ], [
+                date('l, M j, Y'), date('h:i A'), $settings->get('company_name', 'Your ISP'),
+                $totalTickets, $totalResolved, $totalInProgress, $totalOpen, $totalSlaBreached,
+                count($employees), count($present), count($absent), count($lateCount), $totalHours,
+                $branchBreakdownText, $topPerformersText, count($allBranches)
+            ], $opsTemplate);
+        } else {
+            $opsMessage = "📊 *DAILY OPERATIONS SUMMARY*\n";
+            $opsMessage .= "📅 Date: " . date('l, M j, Y') . "\n";
+            $opsMessage .= "🏢 Company: " . $settings->get('company_name', 'Your ISP') . "\n\n";
+            
+            $opsMessage .= "👥 *ATTENDANCE OVERVIEW*\n";
+            $opsMessage .= "• Total Employees: " . count($employees) . "\n";
+            $opsMessage .= "• Present: " . count($present) . "\n";
+            $opsMessage .= "• Absent: " . count($absent) . "\n";
+            $opsMessage .= "• Late: " . count($lateCount) . "\n";
+            $opsMessage .= "• Hours Worked: {$totalHours} hrs\n\n";
+            
+            $opsMessage .= "📈 *TICKET STATISTICS*\n";
+            $opsMessage .= "• Total Tickets Today: {$totalTickets}\n";
+            $opsMessage .= "• Resolved: {$totalResolved}\n";
+            $opsMessage .= "• In Progress: {$totalInProgress}\n";
+            $opsMessage .= "• Open: {$totalOpen}\n";
+            $opsMessage .= "• SLA Breached: {$totalSlaBreached}\n\n";
+            
+            $opsMessage .= "🏢 *BRANCH BREAKDOWN*" . $branchBreakdownText . "\n\n";
+            
+            $opsMessage .= "🏆 *TOP PERFORMERS*\n" . $topPerformersText . "\n";
+            
+            $opsMessage .= "⏰ Generated at " . date('h:i A');
+        }
+        
+        $opsResult = $whatsapp->sendToGroup($operationsGroupId, $opsMessage);
+        $results['operations_group'] = $opsResult;
+        if (!$opsResult['success']) {
+            $errors[] = "Daily Operations Group: " . ($opsResult['error'] ?? 'Unknown error');
         }
     }
     

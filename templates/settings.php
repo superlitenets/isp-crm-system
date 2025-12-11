@@ -729,6 +729,11 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                     <textarea class="form-control" name="wa_template_branch_daily_summary" rows="8"><?= htmlspecialchars($settings->get('wa_template_branch_daily_summary', "📊 *DAILY BRANCH SUMMARY*\n🏢 Branch: {branch_name}\n📅 Date: {date}\n\n📈 *Ticket Statistics:*\n• New Tickets: {new_tickets}\n• Resolved: {resolved_tickets}\n• In Progress: {in_progress_tickets}\n• Open: {open_tickets}\n• SLA Breached: {sla_breached}\n\n👥 *Team Performance:*\n{team_performance}\n\n⏰ Generated at {time}")) ?></textarea>
                                     <small class="text-muted">Placeholders: {branch_name}, {branch_code}, {date}, {time}, {new_tickets}, {resolved_tickets}, {in_progress_tickets}, {open_tickets}, {closed_tickets}, {sla_breached}, {escalated_tickets}, {team_performance}, {top_performer}</small>
                                 </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Daily Operations Summary</label>
+                                    <textarea class="form-control" name="wa_template_operations_daily_summary" rows="10"><?= htmlspecialchars($settings->get('wa_template_operations_daily_summary', "📊 *DAILY OPERATIONS SUMMARY*\n📅 Date: {date}\n🏢 Company: {company_name}\n\n👥 *ATTENDANCE OVERVIEW*\n• Total Employees: {total_employees}\n• Present: {total_present}\n• Absent: {total_absent}\n• Late: {total_late}\n• Hours Worked: {total_hours}\n\n📈 *TICKET STATISTICS*\n• Total Tickets Today: {total_tickets}\n• Resolved: {total_resolved}\n• In Progress: {total_in_progress}\n• Open: {total_open}\n• SLA Breached: {total_sla_breached}\n\n🏢 *BRANCH BREAKDOWN*\n{branch_summaries}\n\n🏆 *TOP PERFORMERS*\n{top_performers}\n\n⏰ Generated at {time}")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {date}, {time}, {company_name}, {total_tickets}, {total_resolved}, {total_in_progress}, {total_open}, {total_sla_breached}, {total_employees}, {total_present}, {total_absent}, {total_late}, {total_hours}, {branch_summaries}, {top_performers}, {branch_count}</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1154,6 +1159,24 @@ function resetToDefaults() {
                         </div>
                     </div>
                     
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold"><i class="bi bi-clipboard-data text-primary"></i> Daily Operations WhatsApp Group</label>
+                            <input type="text" class="form-control" name="whatsapp_operations_group_id" id="whatsappOperationsGroupId"
+                                   value="<?= htmlspecialchars($settings->get('whatsapp_operations_group_id', '')) ?>" 
+                                   placeholder="e.g., 254712345678-1234567890@g.us">
+                            <small class="text-muted">This group receives consolidated daily summaries including tickets, attendance, and all branch activities. Leave empty to disable.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary" onclick="selectOperationsGroup()">
+                                    <i class="bi bi-people"></i> Select from Groups
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <hr class="my-3">
                     
                     <div class="row g-3">
@@ -1425,6 +1448,48 @@ function updateSummaryGroups() {
         }
     });
     document.getElementById('waDailySummaryGroups').value = JSON.stringify(selectedGroups);
+}
+
+function selectOperationsGroup() {
+    const listContainer = document.getElementById('groupSelectList');
+    
+    if (cachedGroups.length === 0) {
+        listContainer.innerHTML = '<span class="text-muted">Loading groups...</span>';
+        fetch(waApiBase + 'groups')
+            .then(r => r.json())
+            .then(data => {
+                cachedGroups = data.groups || [];
+                renderOperationsGroupList();
+            })
+            .catch(err => {
+                listContainer.innerHTML = '<span class="text-danger">Failed to load: ' + err.message + '</span>';
+            });
+    } else {
+        renderOperationsGroupList();
+    }
+    
+    new bootstrap.Modal(document.getElementById('groupSelectModal')).show();
+}
+
+function renderOperationsGroupList() {
+    const listContainer = document.getElementById('groupSelectList');
+    const currentValue = document.getElementById('whatsappOperationsGroupId').value;
+    
+    let html = '<div class="list-group">';
+    cachedGroups.forEach(g => {
+        const selected = g.id === currentValue ? 'active' : '';
+        html += `<a href="#" class="list-group-item list-group-item-action ${selected}" onclick="selectOperationsGroupItem('${g.id}', '${g.name.replace(/'/g, "\\'")}'); return false;">
+            <i class="bi bi-people me-2"></i> ${g.name}
+            <small class="text-muted d-block">${g.id}</small>
+        </a>`;
+    });
+    html += '</div>';
+    listContainer.innerHTML = html;
+}
+
+function selectOperationsGroupItem(groupId, groupName) {
+    document.getElementById('whatsappOperationsGroupId').value = groupId;
+    bootstrap.Modal.getInstance(document.getElementById('groupSelectModal')).hide();
 }
 
 function selectGroupFor(inputId) {
