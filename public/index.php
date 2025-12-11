@@ -4525,7 +4525,7 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'whatsapp-chat' ? 'active' : '' ?>" href="?page=whatsapp-chat">
-                    <i class="bi bi-whatsapp"></i> WhatsApp Chat
+                    <i class="bi bi-chat-dots"></i> Quick Chat
                 </a>
             </li>
             <?php if (\App\Auth::can('settings.view')): ?>

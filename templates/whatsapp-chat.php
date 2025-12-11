@@ -392,7 +392,7 @@ $isConnected = ($sessionStatus['status'] ?? '') === 'connected';
 <div class="whatsapp-page">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h4 class="mb-1"><i class="bi bi-whatsapp text-success me-2"></i>WhatsApp Chat</h4>
+            <h4 class="mb-1"><i class="bi bi-chat-dots text-success me-2"></i>Quick Chat</h4>
             <p class="text-muted mb-0 small">Manage customer conversations directly from your CRM</p>
         </div>
         <div class="d-flex align-items-center gap-3">
