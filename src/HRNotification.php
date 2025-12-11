@@ -114,10 +114,10 @@ class HRNotification {
     
     public function createInAppNotification(int $userId, string $title, string $message, string $type = 'info', ?string $link = null): int {
         $stmt = $this->db->prepare("
-            INSERT INTO user_notifications (user_id, title, message, type, link)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO user_notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
         ");
-        $stmt->execute([$userId, $title, $message, $type, $link]);
+        $stmt->execute([$userId, $title, $message, $type]);
         return (int)$this->db->lastInsertId();
     }
     
