@@ -11,6 +11,11 @@ class SalaryAdvance {
     
     public function getAll(array $filters = []): array {
         $sql = "SELECT sa.*, 
+                    COALESCE(sa.approved_amount, sa.requested_amount) as amount,
+                    sa.outstanding_balance as balance,
+                    sa.repayment_schedule as repayment_type,
+                    sa.installments as repayment_installments,
+                    CASE WHEN sa.installments > 0 THEN COALESCE(sa.approved_amount, sa.requested_amount) / sa.installments ELSE 0 END as repayment_amount,
                     e.name as employee_name, e.employee_id as employee_code,
                     b.name as branch_name,
                     u.username as approved_by_name
@@ -46,6 +51,11 @@ class SalaryAdvance {
     public function getById(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT sa.*, 
+                COALESCE(sa.approved_amount, sa.requested_amount) as amount,
+                sa.outstanding_balance as balance,
+                sa.repayment_schedule as repayment_type,
+                sa.installments as repayment_installments,
+                CASE WHEN sa.installments > 0 THEN COALESCE(sa.approved_amount, sa.requested_amount) / sa.installments ELSE 0 END as repayment_amount,
                 e.name as employee_name, e.employee_id as employee_code,
                 b.name as branch_name,
                 u.username as approved_by_name
@@ -262,8 +272,8 @@ class SalaryAdvance {
                 COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
                 COUNT(*) FILTER (WHERE status IN ('disbursed', 'repaying')) as active_count,
                 COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
-                COALESCE(SUM(amount) FILTER (WHERE status IN ('disbursed', 'repaying')), 0) as total_outstanding,
-                COALESCE(SUM(balance) FILTER (WHERE status IN ('disbursed', 'repaying')), 0) as total_balance
+                COALESCE(SUM(COALESCE(approved_amount, requested_amount)) FILTER (WHERE status IN ('disbursed', 'repaying')), 0) as total_outstanding,
+                COALESCE(SUM(outstanding_balance) FILTER (WHERE status IN ('disbursed', 'repaying')), 0) as total_balance
             FROM salary_advances
         ");
         return $stmt->fetch();

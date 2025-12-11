@@ -71,6 +71,7 @@ class Leave {
     
     public function getRequests(array $filters = []): array {
         $sql = "SELECT lr.*, 
+                    lr.days_requested as total_days,
                     e.name as employee_name, e.employee_id as employee_code,
                     lt.name as leave_type_name, lt.code as leave_type_code,
                     b.name as branch_name,
@@ -123,6 +124,7 @@ class Leave {
     public function getRequest(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT lr.*, 
+                lr.days_requested as total_days,
                 e.name as employee_name, e.employee_id as employee_code,
                 lt.name as leave_type_name, lt.code as leave_type_code,
                 b.name as branch_name,
@@ -483,7 +485,7 @@ class Leave {
                 COUNT(*) FILTER (WHERE status = 'pending') as pending_requests,
                 COUNT(*) FILTER (WHERE status = 'approved') as approved_requests,
                 COUNT(*) FILTER (WHERE status = 'rejected') as rejected_requests,
-                COALESCE(SUM(total_days) FILTER (WHERE status = 'approved'), 0) as total_days_taken
+                COALESCE(SUM(days_requested) FILTER (WHERE status = 'approved'), 0) as total_days_taken
             FROM leave_requests
             WHERE EXTRACT(YEAR FROM start_date) = ?
         ");
