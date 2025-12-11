@@ -291,8 +291,9 @@ class Leave {
             $entitledDays = $leaveType['days_per_year'] ?? 0;
             
             $carryOver = 0;
-            if ($leaveType['max_carryover_days'] > 0) {
-                $carryOver = $this->getCarryOverDays($employeeId, $leaveTypeId, $year - 1, $leaveType['max_carryover_days']);
+            $maxCarryover = $leaveType['max_carryover_days'] ?? 0;
+            if ($maxCarryover > 0) {
+                $carryOver = $this->getCarryOverDays($employeeId, $leaveTypeId, $year - 1, $maxCarryover);
             }
             
             $stmt = $this->db->prepare("
@@ -331,7 +332,7 @@ class Leave {
             SELECT e.id as employee_id, lt.id as leave_type_id, lt.days_per_year
             FROM employees e
             CROSS JOIN leave_types lt
-            WHERE e.is_active = TRUE AND lt.is_active = TRUE AND lt.accrual_type = 'monthly' AND lt.days_per_year > 0
+            WHERE e.is_active = TRUE AND lt.is_active = TRUE AND lt.days_per_year > 0
         ");
         $employees = $stmt->fetchAll();
         

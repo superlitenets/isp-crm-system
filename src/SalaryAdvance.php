@@ -161,19 +161,17 @@ class SalaryAdvance {
             ]);
             $paymentId = (int)$this->db->lastInsertId();
             
-            $newTotalRepaid = $advance['total_repaid'] + $data['amount'];
-            $newBalance = $advance['amount'] - $newTotalRepaid;
+            $currentBalance = $advance['balance'] ?? $advance['outstanding_balance'] ?? $advance['amount'];
+            $newBalance = $currentBalance - $data['amount'];
             $newStatus = $newBalance <= 0 ? 'completed' : 'repaying';
-            $nextDeduction = $newBalance > 0 ? $this->calculateNextDeductionDate($advance['repayment_type']) : null;
             
             $stmt = $this->db->prepare("
                 UPDATE salary_advances 
-                SET total_repaid = ?, balance = ?, status = ?, next_deduction_date = ?, 
-                    completed_at = CASE WHEN ? <= 0 THEN CURRENT_TIMESTAMP ELSE completed_at END,
+                SET outstanding_balance = ?, status = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
-            $stmt->execute([$newTotalRepaid, max(0, $newBalance), $newStatus, $nextDeduction, $newBalance, $advanceId]);
+            $stmt->execute([max(0, $newBalance), $newStatus, $advanceId]);
             
             $this->db->commit();
             return $paymentId;
@@ -185,7 +183,7 @@ class SalaryAdvance {
     
     public function getPayments(int $advanceId): array {
         $stmt = $this->db->prepare("
-            SELECT sap.*, u.username as recorded_by_name
+            SELECT sap.*, u.name as recorded_by_name
             FROM salary_advance_payments sap
             LEFT JOIN users u ON sap.recorded_by = u.id
             WHERE sap.advance_id = ?
@@ -201,7 +199,7 @@ class SalaryAdvance {
             FROM salary_advances sa
             JOIN employees e ON sa.employee_id = e.id
             WHERE sa.status IN ('disbursed', 'repaying')
-            AND sa.balance > 0
+            AND sa.outstanding_balance > 0
             AND (sa.next_deduction_date IS NULL OR sa.next_deduction_date <= CURRENT_DATE)
             ORDER BY sa.employee_id
         ");
@@ -221,7 +219,7 @@ class SalaryAdvance {
     
     public function getEmployeeTotalOutstanding(int $employeeId): float {
         $stmt = $this->db->prepare("
-            SELECT COALESCE(SUM(balance), 0) as total
+            SELECT COALESCE(SUM(outstanding_balance), 0) as total
             FROM salary_advances 
             WHERE employee_id = ? AND status IN ('disbursed', 'repaying')
         ");
