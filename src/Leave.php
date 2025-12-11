@@ -139,8 +139,44 @@ class Leave {
         return $result ?: null;
     }
     
+    public function validateLeaveRequest(int $employeeId, int $leaveTypeId, float $requestedDays): array {
+        $year = (int)date('Y');
+        $balance = $this->getOrCreateBalance($employeeId, $leaveTypeId, $year);
+        $leaveType = $this->getLeaveType($leaveTypeId);
+        
+        $availableDays = ($balance['entitled_days'] ?? 0) + ($balance['accrued_days'] ?? 0) 
+                        + ($balance['carried_over_days'] ?? 0) + ($balance['adjusted_days'] ?? 0)
+                        - ($balance['used_days'] ?? 0) - ($balance['pending_days'] ?? 0);
+        
+        $maxAnnualDays = $leaveType['days_per_year'] ?? 21;
+        $usedThisYear = $balance['used_days'] ?? 0;
+        $pendingThisYear = $balance['pending_days'] ?? 0;
+        $totalIfApproved = $usedThisYear + $pendingThisYear + $requestedDays;
+        
+        if ($totalIfApproved > $maxAnnualDays && !($leaveType['allow_negative_balance'] ?? false)) {
+            return [
+                'valid' => false,
+                'error' => "This request would exceed your annual leave limit of {$maxAnnualDays} days. You have used {$usedThisYear} days with {$pendingThisYear} days pending."
+            ];
+        }
+        
+        if ($requestedDays > $availableDays && !($leaveType['allow_negative_balance'] ?? false)) {
+            return [
+                'valid' => false,
+                'error' => "Insufficient leave balance. Available: {$availableDays} days, Requested: {$requestedDays} days."
+            ];
+        }
+        
+        return ['valid' => true, 'available_days' => $availableDays];
+    }
+    
     public function createRequest(array $data): int {
         $totalDays = $this->calculateLeaveDays($data['start_date'], $data['end_date'], !empty($data['is_half_day']));
+        
+        $validation = $this->validateLeaveRequest($data['employee_id'], $data['leave_type_id'], $totalDays);
+        if (!$validation['valid']) {
+            throw new \Exception($validation['error']);
+        }
         
         $stmt = $this->db->prepare("
             INSERT INTO leave_requests (employee_id, leave_type_id, branch_id, start_date, end_date, total_days, is_half_day, half_day_type, reason)
