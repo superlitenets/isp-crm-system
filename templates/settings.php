@@ -705,6 +705,34 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                         </div>
                     </div>
                 </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#branchTemplates">
+                            <i class="bi bi-building me-2"></i> Branch WhatsApp Group Notifications
+                        </button>
+                    </h2>
+                    <div id="branchTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Note:</strong> These templates are sent to branch WhatsApp groups. Requires WhatsApp Session provider and branch WhatsApp Group ID configured.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Ticket Assigned to Branch</label>
+                                    <textarea class="form-control" name="wa_template_branch_ticket_assigned" rows="6"><?= htmlspecialchars($settings->get('wa_template_branch_ticket_assigned', "🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Address: {customer_address}\n\n👷 *{assignment_info}*\n\n🏢 Branch: {branch_name}")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_address}, {customer_email}, {technician_name}, {team_name}, {assignment_info}, {branch_name}, {branch_code}</small>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Daily Branch Summary</label>
+                                    <textarea class="form-control" name="wa_template_branch_daily_summary" rows="8"><?= htmlspecialchars($settings->get('wa_template_branch_daily_summary', "📊 *DAILY BRANCH SUMMARY*\n🏢 Branch: {branch_name}\n📅 Date: {date}\n\n📈 *Ticket Statistics:*\n• New Tickets: {new_tickets}\n• Resolved: {resolved_tickets}\n• In Progress: {in_progress_tickets}\n• Open: {open_tickets}\n• SLA Breached: {sla_breached}\n\n👥 *Team Performance:*\n{team_performance}\n\n⏰ Generated at {time}")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {branch_name}, {branch_code}, {date}, {time}, {new_tickets}, {resolved_tickets}, {in_progress_tickets}, {open_tickets}, {closed_tickets}, {sla_breached}, {escalated_tickets}, {team_performance}, {top_performer}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="mt-4">
@@ -733,7 +761,9 @@ function resetToDefaults() {
         'sms_template_complaint_approved': 'Your complaint #{complaint_number} has been approved and converted to Ticket #{ticket_number}. A technician will be assigned shortly.',
         'sms_template_order_confirmation': 'Thank you! Order #{order_number} received for {package_name}. Amount: KES {amount}. We will contact you to schedule installation.',
         'sms_template_order_accepted': 'Great news! Order #{order_number} accepted. Ticket #{ticket_number} created for installation. Our team will contact you soon.',
-        'sms_template_hr_notice': 'ISP HR Notice - {subject}: {message}'
+        'sms_template_hr_notice': 'ISP HR Notice - {subject}: {message}',
+        'wa_template_branch_ticket_assigned': '🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Address: {customer_address}\n\n👷 *{assignment_info}*\n\n🏢 Branch: {branch_name}',
+        'wa_template_branch_daily_summary': '📊 *DAILY BRANCH SUMMARY*\n🏢 Branch: {branch_name}\n📅 Date: {date}\n\n📈 *Ticket Statistics:*\n• New Tickets: {new_tickets}\n• Resolved: {resolved_tickets}\n• In Progress: {in_progress_tickets}\n• Open: {open_tickets}\n• SLA Breached: {sla_breached}\n\n👥 *Team Performance:*\n{team_performance}\n\n⏰ Generated at {time}'
     };
     
     for (const [name, value] of Object.entries(defaults)) {

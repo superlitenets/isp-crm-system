@@ -826,41 +826,62 @@ class Ticket {
         $customer = (new Customer())->find($ticket['customer_id']);
         if (!$customer) return;
         
-        $assignedTo = null;
-        $teamName = null;
+        $technicianName = '';
+        $teamName = '';
         
         if ($ticket['assigned_to']) {
             $technician = $this->getUser($ticket['assigned_to']);
-            $assignedTo = $technician['name'] ?? 'Unknown';
+            $technicianName = $technician['name'] ?? 'Unknown';
         }
         
         if ($ticket['team_id']) {
             $team = $this->getTeam($ticket['team_id']);
-            $teamName = $team['name'] ?? null;
+            $teamName = $team['name'] ?? '';
         }
         
         $assignmentInfo = '';
-        if ($assignedTo && $teamName) {
-            $assignmentInfo = "Assigned to: {$assignedTo} (Team: {$teamName})";
-        } elseif ($assignedTo) {
-            $assignmentInfo = "Assigned to: {$assignedTo}";
+        if ($technicianName && $teamName) {
+            $assignmentInfo = "Assigned to: {$technicianName} (Team: {$teamName})";
+        } elseif ($technicianName) {
+            $assignmentInfo = "Assigned to: {$technicianName}";
         } elseif ($teamName) {
             $assignmentInfo = "Assigned to Team: {$teamName}";
         } else {
             $assignmentInfo = "Unassigned";
         }
         
-        $message = "🎫 *NEW TICKET ASSIGNED*\n\n"
-            . "📋 *Ticket:* #{$ticket['ticket_number']}\n"
-            . "📌 *Subject:* {$ticket['subject']}\n"
-            . "🏷️ *Category:* " . ucfirst($ticket['category'] ?? 'General') . "\n"
-            . "⚡ *Priority:* " . ucfirst($ticket['priority'] ?? 'Medium') . "\n\n"
-            . "👤 *Customer Details:*\n"
-            . "• Name: {$customer['name']}\n"
-            . "• Phone: {$customer['phone']}\n"
-            . "• Address: {$customer['address']}\n\n"
-            . "👷 *{$assignmentInfo}*\n\n"
-            . "🏢 Branch: {$branchData['name']}";
+        $placeholders = [
+            '{ticket_number}' => $ticket['ticket_number'],
+            '{subject}' => $ticket['subject'] ?? '',
+            '{description}' => substr($ticket['description'] ?? '', 0, 100),
+            '{category}' => ucfirst($ticket['category'] ?? 'General'),
+            '{priority}' => ucfirst($ticket['priority'] ?? 'Medium'),
+            '{customer_name}' => $customer['name'] ?? 'Customer',
+            '{customer_phone}' => $customer['phone'] ?? '',
+            '{customer_address}' => $customer['address'] ?? '',
+            '{customer_email}' => $customer['email'] ?? '',
+            '{technician_name}' => $technicianName,
+            '{team_name}' => $teamName,
+            '{assignment_info}' => $assignmentInfo,
+            '{branch_name}' => $branchData['name'] ?? '',
+            '{branch_code}' => $branchData['code'] ?? ''
+        ];
+        
+        $message = $this->buildSMSFromTemplate('wa_template_branch_ticket_assigned', $placeholders);
+        
+        if (empty(trim(str_replace(array_keys($placeholders), '', $message)))) {
+            $message = "🎫 *NEW TICKET ASSIGNED*\n\n"
+                . "📋 *Ticket:* #{$ticket['ticket_number']}\n"
+                . "📌 *Subject:* {$ticket['subject']}\n"
+                . "🏷️ *Category:* " . ucfirst($ticket['category'] ?? 'General') . "\n"
+                . "⚡ *Priority:* " . ucfirst($ticket['priority'] ?? 'Medium') . "\n\n"
+                . "👤 *Customer Details:*\n"
+                . "• Name: {$customer['name']}\n"
+                . "• Phone: {$customer['phone']}\n"
+                . "• Address: {$customer['address']}\n\n"
+                . "👷 *{$assignmentInfo}*\n\n"
+                . "🏢 Branch: {$branchData['name']}";
+        }
         
         try {
             $result = $this->whatsapp->sendToGroup($branchData['whatsapp_group'], $message);
