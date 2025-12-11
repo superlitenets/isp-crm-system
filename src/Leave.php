@@ -29,15 +29,15 @@ class Leave {
     public function createLeaveType(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO leave_types (name, code, days_per_year, is_paid, requires_approval, is_active)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?::boolean, ?::boolean, ?::boolean)
         ");
         $stmt->execute([
             $data['name'],
             strtoupper($data['code']),
-            $data['days_per_year'] ?? 0,
-            !empty($data['is_paid']),
-            !empty($data['requires_approval']),
-            !empty($data['is_active'])
+            (int)($data['days_per_year'] ?? 0),
+            !empty($data['is_paid']) ? 'true' : 'false',
+            !empty($data['requires_approval']) ? 'true' : 'false',
+            !empty($data['is_active']) ? 'true' : 'false'
         ]);
         return (int)$this->db->lastInsertId();
     }
@@ -45,17 +45,17 @@ class Leave {
     public function updateLeaveType(int $id, array $data): bool {
         $stmt = $this->db->prepare("
             UPDATE leave_types SET 
-                name = ?, code = ?, days_per_year = ?, is_paid = ?, 
-                requires_approval = ?, is_active = ?
+                name = ?, code = ?, days_per_year = ?, is_paid = ?::boolean, 
+                requires_approval = ?::boolean, is_active = ?::boolean
             WHERE id = ?
         ");
         return $stmt->execute([
             $data['name'],
             strtoupper($data['code']),
-            $data['days_per_year'] ?? 0,
-            !empty($data['is_paid']),
-            !empty($data['requires_approval']),
-            !empty($data['is_active']),
+            (int)($data['days_per_year'] ?? 0),
+            !empty($data['is_paid']) ? 'true' : 'false',
+            !empty($data['requires_approval']) ? 'true' : 'false',
+            !empty($data['is_active']) ? 'true' : 'false',
             $id
         ]);
     }
