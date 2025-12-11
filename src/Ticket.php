@@ -108,6 +108,14 @@ class Ticket {
         if ($teamId) {
             $this->notifyTeamMembers($ticketId, $teamId);
         }
+        
+        if ($branchId && ($assignedTo || $teamId)) {
+            try {
+                $this->notifyBranchWhatsAppGroup($ticketId, $branchId);
+            } catch (\Throwable $e) {
+                error_log("Failed to notify branch WhatsApp group: " . $e->getMessage());
+            }
+        }
 
         $this->activityLog->log('create', 'ticket', $ticketId, $ticketNumber, "Created ticket: {$data['subject']}");
         
@@ -234,6 +242,17 @@ class Ticket {
                 }
             } catch (\Throwable $e) {
                 error_log("Failed to notify team: " . $e->getMessage());
+            }
+            
+            try {
+                $assignmentChanged = (isset($data['assigned_to']) && $data['assigned_to'] != $ticket['assigned_to']) 
+                    || (isset($data['team_id']) && $data['team_id'] != $ticket['team_id']);
+                $branchId = $data['branch_id'] ?? $ticket['branch_id'];
+                if ($assignmentChanged && $branchId) {
+                    $this->notifyBranchWhatsAppGroup($id, (int)$branchId);
+                }
+            } catch (\Throwable $e) {
+                error_log("Failed to notify branch WhatsApp group: " . $e->getMessage());
             }
 
             try {
@@ -790,6 +809,69 @@ class Ticket {
                 $result = $this->sms->send($member['phone'], $message);
                 $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
             }
+        }
+    }
+    
+    public function notifyBranchWhatsAppGroup(int $ticketId, ?int $branchId = null): void {
+        $ticket = $this->find($ticketId);
+        if (!$ticket) return;
+        
+        $branchId = $branchId ?? $ticket['branch_id'];
+        if (!$branchId) return;
+        
+        $branch = new Branch();
+        $branchData = $branch->find($branchId);
+        if (!$branchData || empty($branchData['whatsapp_group'])) return;
+        
+        $customer = (new Customer())->find($ticket['customer_id']);
+        if (!$customer) return;
+        
+        $assignedTo = null;
+        $teamName = null;
+        
+        if ($ticket['assigned_to']) {
+            $technician = $this->getUser($ticket['assigned_to']);
+            $assignedTo = $technician['name'] ?? 'Unknown';
+        }
+        
+        if ($ticket['team_id']) {
+            $team = $this->getTeam($ticket['team_id']);
+            $teamName = $team['name'] ?? null;
+        }
+        
+        $assignmentInfo = '';
+        if ($assignedTo && $teamName) {
+            $assignmentInfo = "Assigned to: {$assignedTo} (Team: {$teamName})";
+        } elseif ($assignedTo) {
+            $assignmentInfo = "Assigned to: {$assignedTo}";
+        } elseif ($teamName) {
+            $assignmentInfo = "Assigned to Team: {$teamName}";
+        } else {
+            $assignmentInfo = "Unassigned";
+        }
+        
+        $message = "🎫 *NEW TICKET ASSIGNED*\n\n"
+            . "📋 *Ticket:* #{$ticket['ticket_number']}\n"
+            . "📌 *Subject:* {$ticket['subject']}\n"
+            . "🏷️ *Category:* " . ucfirst($ticket['category'] ?? 'General') . "\n"
+            . "⚡ *Priority:* " . ucfirst($ticket['priority'] ?? 'Medium') . "\n\n"
+            . "👤 *Customer Details:*\n"
+            . "• Name: {$customer['name']}\n"
+            . "• Phone: {$customer['phone']}\n"
+            . "• Address: {$customer['address']}\n\n"
+            . "👷 *{$assignmentInfo}*\n\n"
+            . "🏢 Branch: {$branchData['name']}";
+        
+        try {
+            $result = $this->whatsapp->sendToGroup($branchData['whatsapp_group'], $message);
+            if ($result['success']) {
+                $this->whatsapp->logMessage($ticketId, null, null, $branchData['whatsapp_group'], 'branch_group', $message, 'sent', 'ticket_assigned_branch');
+                error_log("WhatsApp branch group notification sent for ticket {$ticket['ticket_number']} to branch {$branchData['name']}");
+            } else {
+                error_log("WhatsApp branch group notification failed: " . ($result['error'] ?? 'Unknown error'));
+            }
+        } catch (\Throwable $e) {
+            error_log("WhatsApp branch group notification error for ticket $ticketId: " . $e->getMessage());
         }
     }
     
