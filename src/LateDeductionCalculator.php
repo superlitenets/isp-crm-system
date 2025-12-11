@@ -327,6 +327,7 @@ class LateDeductionCalculator {
         
         $sql = "
             SELECT 
+                a.id,
                 a.date,
                 a.clock_in,
                 a.late_minutes,
