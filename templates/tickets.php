@@ -39,6 +39,10 @@ if (isset($_GET['customer_id'])) {
                         <label class="btn btn-outline-primary" for="existingCustomer">
                             <i class="bi bi-person-check"></i> Existing Customer
                         </label>
+                        <input type="radio" class="btn-check" name="customer_type" id="billingCustomer" value="billing">
+                        <label class="btn btn-outline-info" for="billingCustomer">
+                            <i class="bi bi-cloud-arrow-down"></i> From Billing
+                        </label>
                         <input type="radio" class="btn-check" name="customer_type" id="newCustomer" value="new">
                         <label class="btn btn-outline-success" for="newCustomer">
                             <i class="bi bi-person-plus"></i> New Customer
@@ -52,10 +56,54 @@ if (isset($_GET['customer_id'])) {
                         <option value="">Select Customer</option>
                         <?php foreach ($allCustomers as $c): ?>
                         <option value="<?= $c['id'] ?>" <?= ($preselectedCustomer && $preselectedCustomer['id'] == $c['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?>)
+                            <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?><?= !empty($c['username']) ? ' - ' . $c['username'] : '' ?>)
                         </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                
+                <div id="billingCustomerSection" class="col-12" style="display: none;">
+                    <div class="card bg-light mb-3">
+                        <div class="card-header bg-info text-white">
+                            <i class="bi bi-cloud-arrow-down"></i> Search Billing System
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Search by Name, Username, or Phone</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="billingSearchInput" placeholder="Enter at least 2 characters...">
+                                        <button type="button" class="btn btn-info" id="billingSearchBtn">
+                                            <i class="bi bi-search"></i> Search
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div id="billingSearchStatus" class="text-muted"></div>
+                                </div>
+                                <div class="col-12">
+                                    <div id="billingSearchResults" style="max-height: 300px; overflow-y: auto;"></div>
+                                </div>
+                                <div class="col-12" id="selectedBillingCustomer" style="display: none;">
+                                    <div class="alert alert-info mb-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong id="selectedBillingName"></strong>
+                                                <span class="badge bg-secondary ms-2" id="selectedBillingUsername"></span>
+                                                <br><small id="selectedBillingPhone"></small>
+                                                <br><small id="selectedBillingAddress"></small>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearBillingSelection()">
+                                                <i class="bi bi-x"></i> Clear
+                                            </button>
+                                        </div>
+                                        <input type="hidden" name="billing_customer" id="billingCustomerData">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="newCustomerSection" style="display: none;">
@@ -199,8 +247,10 @@ if (isset($_GET['customer_id'])) {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const existingRadio = document.getElementById('existingCustomer');
+    const billingRadio = document.getElementById('billingCustomer');
     const newRadio = document.getElementById('newCustomer');
     const existingSection = document.getElementById('existingCustomerSection');
+    const billingSection = document.getElementById('billingCustomerSection');
     const newSection = document.getElementById('newCustomerSection');
     const customerIdSelect = document.getElementById('customerIdSelect');
     const newCustomerName = document.getElementById('newCustomerName');
@@ -209,31 +259,107 @@ document.addEventListener('DOMContentLoaded', function() {
     const newCustomerAddress = document.getElementById('newCustomerAddress');
     
     function toggleCustomerSections() {
-        if (newRadio.checked) {
-            existingSection.style.display = 'none';
+        existingSection.style.display = 'none';
+        billingSection.style.display = 'none';
+        newSection.style.display = 'none';
+        customerIdSelect.removeAttribute('required');
+        newCustomerName.removeAttribute('required');
+        newCustomerPhone.removeAttribute('required');
+        newCustomerPlan.removeAttribute('required');
+        newCustomerAddress.removeAttribute('required');
+        
+        if (existingRadio.checked) {
+            existingSection.style.display = 'block';
+            customerIdSelect.setAttribute('required', 'required');
+        } else if (billingRadio.checked) {
+            billingSection.style.display = 'block';
+        } else if (newRadio.checked) {
             newSection.style.display = 'block';
-            customerIdSelect.removeAttribute('required');
-            customerIdSelect.value = '';
             newCustomerName.setAttribute('required', 'required');
             newCustomerPhone.setAttribute('required', 'required');
             newCustomerPlan.setAttribute('required', 'required');
             newCustomerAddress.setAttribute('required', 'required');
-        } else {
-            existingSection.style.display = 'block';
-            newSection.style.display = 'none';
-            customerIdSelect.setAttribute('required', 'required');
-            newCustomerName.removeAttribute('required');
-            newCustomerPhone.removeAttribute('required');
-            newCustomerPlan.removeAttribute('required');
-            newCustomerAddress.removeAttribute('required');
         }
     }
     
     existingRadio.addEventListener('change', toggleCustomerSections);
+    billingRadio.addEventListener('change', toggleCustomerSections);
     newRadio.addEventListener('change', toggleCustomerSections);
     
-    // Initialize
     toggleCustomerSections();
+    
+    const billingSearchInput = document.getElementById('billingSearchInput');
+    const billingSearchBtn = document.getElementById('billingSearchBtn');
+    const billingSearchResults = document.getElementById('billingSearchResults');
+    const billingSearchStatus = document.getElementById('billingSearchStatus');
+    const selectedBillingCustomer = document.getElementById('selectedBillingCustomer');
+    const billingCustomerData = document.getElementById('billingCustomerData');
+    
+    function searchBillingCustomers() {
+        const query = billingSearchInput.value.trim();
+        if (query.length < 2) {
+            billingSearchStatus.innerHTML = '<span class="text-warning">Enter at least 2 characters</span>';
+            return;
+        }
+        
+        billingSearchStatus.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Searching...';
+        billingSearchResults.innerHTML = '';
+        
+        fetch('/api/billing.php?action=search&q=' + encodeURIComponent(query))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    billingSearchStatus.innerHTML = '<span class="text-danger">' + data.error + '</span>';
+                    return;
+                }
+                
+                billingSearchStatus.innerHTML = '<span class="text-success">Found ' + (data.total || 0) + ' customers</span>';
+                
+                if (!data.customers || data.customers.length === 0) {
+                    billingSearchResults.innerHTML = '<div class="alert alert-warning">No customers found</div>';
+                    return;
+                }
+                
+                let html = '<div class="list-group">';
+                data.customers.forEach(c => {
+                    html += '<button type="button" class="list-group-item list-group-item-action" onclick=\'selectBillingCustomer(' + JSON.stringify(c) + ')\'>' +
+                        '<div class="d-flex justify-content-between">' +
+                        '<div><strong>' + (c.name || 'N/A') + '</strong>' +
+                        (c.username ? ' <span class="badge bg-secondary">' + c.username + '</span>' : '') +
+                        '<br><small class="text-muted">' + (c.phone || 'No phone') + ' | ' + (c.service_plan || 'N/A') + '</small></div>' +
+                        '<small class="text-muted">' + (c.connection_status || '') + '</small>' +
+                        '</div></button>';
+                });
+                html += '</div>';
+                billingSearchResults.innerHTML = html;
+            })
+            .catch(err => {
+                billingSearchStatus.innerHTML = '<span class="text-danger">Error: ' + err.message + '</span>';
+            });
+    }
+    
+    billingSearchBtn.addEventListener('click', searchBillingCustomers);
+    billingSearchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchBillingCustomers();
+        }
+    });
+    
+    window.selectBillingCustomer = function(customer) {
+        document.getElementById('selectedBillingName').textContent = customer.name || 'N/A';
+        document.getElementById('selectedBillingUsername').textContent = customer.username || '';
+        document.getElementById('selectedBillingPhone').textContent = customer.phone || 'No phone';
+        document.getElementById('selectedBillingAddress').textContent = customer.address || 'No address';
+        billingCustomerData.value = JSON.stringify(customer);
+        selectedBillingCustomer.style.display = 'block';
+        billingSearchResults.innerHTML = '';
+    };
+    
+    window.clearBillingSelection = function() {
+        selectedBillingCustomer.style.display = 'none';
+        billingCustomerData.value = '';
+    };
 });
 </script>
 <?php endif; ?>

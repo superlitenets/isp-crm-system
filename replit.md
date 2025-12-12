@@ -112,6 +112,14 @@ The system features a clean, responsive design. The public-facing landing page i
   - **Bills/Purchase Orders**: Track vendor bills with line items and due dates
   - **M-Pesa Invoice Payments**: Direct STK Push integration from invoice view for quick payment collection
   - **Unified Payments Subpage**: M-Pesa STK Push form with customer selection, transaction history, and invoice linking all consolidated under Accounting → Payments
+- **Billing System Integration (Dec 2025)**: One-ISP API integration for customer data:
+  - Configurable API token in Settings → Billing API
+  - Search billing customers when creating tickets ("From Billing" option)
+  - Auto-fill customer details (name, phone, email, address, service plan)
+  - Username field added to customers table for billing system usernames
+  - On-demand query approach keeps data fresh without duplication
+  - Imports customer to local database when ticket is created
+  - API endpoint at `/api/billing.php` for customer search
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
@@ -126,3 +134,4 @@ The system adopts a modular design allowing for extensibility. Configuration is 
 - **Hikvision Biometric Devices**: Integrated for attendance tracking via ISAPI.
 - **M-Pesa**: Integrated for mobile money payments (STK Push, C2B).
 - **SmartOLT API**: Integrated for network monitoring and ONU management.
+- **One-ISP Billing API**: Integrated for customer data lookup and import.

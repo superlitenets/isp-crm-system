@@ -15,8 +15,8 @@ class Customer {
 
     public function create(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO customers (account_number, name, email, phone, address, service_plan, connection_status, installation_date, notes, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO customers (account_number, name, email, phone, address, service_plan, connection_status, installation_date, notes, created_by, username, billing_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -29,7 +29,9 @@ class Customer {
             $data['connection_status'] ?? 'active',
             $data['installation_date'] ?? null,
             $data['notes'] ?? null,
-            $data['created_by'] ?? ($_SESSION['user_id'] ?? null)
+            $data['created_by'] ?? ($_SESSION['user_id'] ?? null),
+            $data['username'] ?? null,
+            $data['billing_id'] ?? null
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -39,7 +41,7 @@ class Customer {
         $fields = [];
         $values = [];
         
-        foreach (['name', 'email', 'phone', 'address', 'service_plan', 'connection_status', 'installation_date', 'notes'] as $field) {
+        foreach (['name', 'email', 'phone', 'address', 'service_plan', 'connection_status', 'installation_date', 'notes', 'username', 'billing_id'] as $field) {
             if (isset($data[$field])) {
                 $fields[] = "$field = ?";
                 $values[] = $data[$field] === '' ? null : $data[$field];

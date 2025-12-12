@@ -1163,6 +1163,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
+                if ($customerType === 'billing') {
+                    $billingData = $_POST['billing_customer'] ?? '';
+                    if (empty($billingData)) {
+                        $message = 'Please search and select a customer from the billing system.';
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    $billingCustomer = json_decode($billingData, true);
+                    if (!$billingCustomer) {
+                        $message = 'Invalid billing customer data.';
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    $billingName = !empty($billingCustomer['name']) ? $billingCustomer['name'] : 'Billing Customer';
+                    $billingPhone = !empty($billingCustomer['phone']) ? $billingCustomer['phone'] : null;
+                    $billingAddress = !empty($billingCustomer['address']) ? $billingCustomer['address'] : 'N/A';
+                    $billingPlan = !empty($billingCustomer['service_plan']) ? $billingCustomer['service_plan'] : 'Standard';
+                    
+                    if (empty($billingPhone)) {
+                        $message = 'Billing customer must have a phone number.';
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    $existingByPhone = $customer->findByPhone($billingPhone);
+                    if ($existingByPhone) {
+                        $customerId = $existingByPhone['id'];
+                        $customer->update($customerId, [
+                            'name' => $billingName,
+                            'email' => $billingCustomer['email'] ?? $existingByPhone['email'],
+                            'address' => $billingAddress,
+                            'service_plan' => $billingPlan,
+                            'connection_status' => $billingCustomer['connection_status'] ?? $existingByPhone['connection_status'],
+                            'username' => $billingCustomer['username'] ?? $existingByPhone['username'],
+                            'billing_id' => $billingCustomer['billing_id'] ?? $existingByPhone['billing_id'],
+                        ]);
+                    } else {
+                        try {
+                            $customerId = $customer->create([
+                                'name' => $billingName,
+                                'phone' => $billingPhone,
+                                'email' => $billingCustomer['email'] ?? null,
+                                'service_plan' => $billingPlan,
+                                'address' => $billingAddress,
+                                'connection_status' => $billingCustomer['connection_status'] ?? 'active',
+                                'username' => $billingCustomer['username'] ?? null,
+                                'billing_id' => $billingCustomer['billing_id'] ?? null,
+                            ]);
+                        } catch (Exception $e) {
+                            $message = 'Error importing billing customer: ' . $e->getMessage();
+                            $messageType = 'danger';
+                            break;
+                        }
+                    }
+                    $_POST['customer_id'] = $customerId;
+                }
+                
                 if (empty($customerId) || empty($subject) || empty($description) || empty($category)) {
                     $message = 'Please fill in all required fields.';
                     $messageType = 'danger';
@@ -1172,7 +1231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try {
                         $ticketId = $ticket->create($_POST);
-                        $customerCreatedMsg = ($customerType === 'new') ? ' New customer created.' : '';
+                        $customerCreatedMsg = ($customerType === 'new') ? ' New customer created.' : (($customerType === 'billing') ? ' Customer imported from billing.' : '');
                         $message = 'Ticket created successfully!' . $customerCreatedMsg . ' SMS notifications sent.';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
@@ -2467,6 +2526,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } catch (Exception $e) {
                     $db->rollBack();
                     $message = 'Error updating branch employees: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'save_billing_api':
+                try {
+                    $token = trim($_POST['oneisp_api_token'] ?? '');
+                    $settings->set('oneisp_api_token', $token);
+                    \App\Settings::clearCache();
+                    $message = 'Billing API settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving billing API settings: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

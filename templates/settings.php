@@ -121,6 +121,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-diagram-3"></i> Branches
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'billing_api' ? 'active' : '' ?>" href="?page=settings&subpage=billing_api">
+            <i class="bi bi-cloud-arrow-down"></i> Billing API
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -5766,5 +5771,125 @@ if ($action === 'edit_branch' && $id) {
         <?php endif; ?>
     </div>
 </div>
+
+<?php elseif ($subpage === 'billing_api'): ?>
+<?php
+require_once __DIR__ . '/../src/OneISP.php';
+$oneIsp = new \App\OneISP();
+$billingToken = $settings->get('oneisp_api_token', '');
+$testResult = null;
+if (($_GET['action'] ?? '') === 'test_billing') {
+    $testResult = $oneIsp->testConnection();
+}
+?>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> Billing System Integration (One-ISP)</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($testResult): ?>
+                <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <strong><?= $testResult['success'] ? 'Connection Successful!' : 'Connection Failed' ?></strong>
+                    <?php if (!$testResult['success']): ?>
+                    <br><?= htmlspecialchars($testResult['error'] ?? 'Unknown error') ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+                
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_billing_api">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">API Base URL</label>
+                        <input type="text" class="form-control" value="https://ns3.api.one-isp.net/api/isp" readonly disabled>
+                        <small class="text-muted">One-ISP Billing System API</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">API Token</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="oneisp_api_token" id="billingApiToken"
+                                   value="<?= htmlspecialchars($billingToken) ?>" placeholder="Enter your API token">
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility()">
+                                <i class="bi bi-eye" id="toggleIcon"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Get your API token from your One-ISP billing dashboard</small>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Save Settings
+                        </button>
+                        <?php if ($oneIsp->isConfigured()): ?>
+                        <a href="?page=settings&subpage=billing_api&action=test_billing" class="btn btn-outline-info">
+                            <i class="bi bi-arrow-repeat"></i> Test Connection
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> About Billing Integration</h5>
+            </div>
+            <div class="card-body">
+                <p>Connect to your One-ISP billing system to:</p>
+                <ul class="mb-3">
+                    <li>Search billing customers when creating tickets</li>
+                    <li>Auto-fill customer details from billing</li>
+                    <li>View customer username and service info</li>
+                </ul>
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-lightbulb"></i> Customers are queried on-demand from billing when needed, keeping data fresh and avoiding duplication.
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-plug"></i> Connection Status</h5>
+            </div>
+            <div class="card-body text-center">
+                <?php if ($oneIsp->isConfigured()): ?>
+                <div class="text-success mb-2">
+                    <i class="bi bi-check-circle-fill display-4"></i>
+                </div>
+                <h5 class="text-success">Configured</h5>
+                <p class="text-muted mb-0">API token is set</p>
+                <?php else: ?>
+                <div class="text-secondary mb-2">
+                    <i class="bi bi-x-circle-fill display-4"></i>
+                </div>
+                <h5 class="text-secondary">Not Configured</h5>
+                <p class="text-muted mb-0">Enter your API token to enable</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTokenVisibility() {
+    var input = document.getElementById('billingApiToken');
+    var icon = document.getElementById('toggleIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+</script>
 
 <?php endif; ?>
