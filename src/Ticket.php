@@ -117,11 +117,15 @@ class Ticket {
             }
         }
 
-        $this->activityLog->log('create', 'ticket', $ticketId, $ticketNumber, "Created ticket: {$data['subject']}");
-        
-        if ($assignedTo) {
-            $user = $this->getUser($assignedTo);
-            $this->activityLog->log('assign', 'ticket', $ticketId, $ticketNumber, "Assigned to: " . ($user['name'] ?? 'Unknown'));
+        try {
+            $this->activityLog->log('create', 'ticket', $ticketId, $ticketNumber, "Created ticket: {$data['subject']}");
+            
+            if ($assignedTo) {
+                $user = $this->getUser($assignedTo);
+                $this->activityLog->log('assign', 'ticket', $ticketId, $ticketNumber, "Assigned to: " . ($user['name'] ?? 'Unknown'));
+            }
+        } catch (\Throwable $e) {
+            error_log("Activity log failed for ticket $ticketId: " . $e->getMessage());
         }
 
         return $ticketId;
