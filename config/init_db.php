@@ -1397,7 +1397,7 @@ function runMigrations(PDO $db): void {
         ['teams', 'branch_id', 'ALTER TABLE teams ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL'],
         ['branches', 'whatsapp_group', 'ALTER TABLE branches ADD COLUMN whatsapp_group VARCHAR(100)'],
         ['customers', 'username', 'ALTER TABLE customers ADD COLUMN username VARCHAR(100)'],
-        ['customers', 'billing_id', 'ALTER TABLE customers ADD COLUMN billing_id INTEGER']
+        ['customers', 'billing_id', 'ALTER TABLE customers ADD COLUMN billing_id VARCHAR(100)']
     ];
     
     foreach ($columnMigrations as $migration) {
