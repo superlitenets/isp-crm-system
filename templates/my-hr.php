@@ -1,9 +1,4 @@
 <?php
-require_once __DIR__ . '/../src/Leave.php';
-require_once __DIR__ . '/../src/SalaryAdvance.php';
-require_once __DIR__ . '/../src/Employee.php';
-require_once __DIR__ . '/../src/MobileAPI.php';
-
 $subpage = $_GET['subpage'] ?? 'overview';
 $currentUserId = \App\Auth::user()['id'] ?? null;
 
