@@ -237,7 +237,7 @@ class SalaryAdvance {
     }
     
     private function calculateNextDeductionDate(string $repaymentType): string {
-        $date = new DateTime();
+        $date = new \DateTime();
         
         switch ($repaymentType) {
             case 'weekly':

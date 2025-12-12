@@ -406,8 +406,8 @@ class Leave {
             return 0.5;
         }
         
-        $start = new DateTime($startDate);
-        $end = new DateTime($endDate);
+        $start = new \DateTime($startDate);
+        $end = new \DateTime($endDate);
         $days = 0;
         
         while ($start <= $end) {

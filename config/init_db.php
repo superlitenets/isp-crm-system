@@ -1454,11 +1454,24 @@ function runMigrations(PDO $db): void {
                 year INTEGER NOT NULL,
                 entitled_days DECIMAL(5,2) DEFAULT 0,
                 used_days DECIMAL(5,2) DEFAULT 0,
+                pending_days DECIMAL(5,2) DEFAULT 0,
                 carried_over DECIMAL(5,2) DEFAULT 0,
+                carried_over_days DECIMAL(5,2) DEFAULT 0,
+                adjusted_days DECIMAL(5,2) DEFAULT 0,
                 accrued_days DECIMAL(5,2) DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(employee_id, leave_type_id, year)
+            )",
+        'leave_calendar' => "
+            CREATE TABLE IF NOT EXISTS leave_calendar (
+                id SERIAL PRIMARY KEY,
+                date DATE NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                is_public_holiday BOOLEAN DEFAULT FALSE,
+                branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(date, branch_id)
             )",
         'leave_requests' => "
             CREATE TABLE IF NOT EXISTS leave_requests (
