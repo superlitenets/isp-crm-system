@@ -86,15 +86,16 @@ class OneISP {
         return $result;
     }
     
-    public function mapCustomerToLocal(array $billingCustomer): array {
+    public function mapCustomerToLocal(array $billingCustomer): ?array {
         $firstName = trim($billingCustomer['FirstName'] ?? '');
         $lastName = trim($billingCustomer['LastName'] ?? '');
-        $username = $billingCustomer['UserName'] ?? null;
         
         $fullName = trim($firstName . ' ' . $lastName);
         if (empty($fullName)) {
-            $fullName = $username ?? ('Customer #' . ($billingCustomer['ID'] ?? 'Unknown'));
+            return null;
         }
+        
+        $username = $billingCustomer['UserName'] ?? null;
         
         $phone = $billingCustomer['PhoneNumber'] ?? null;
         

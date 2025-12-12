@@ -44,6 +44,9 @@ switch ($action) {
         
         foreach ($data as $customer) {
             $mapped = $oneIsp->mapCustomerToLocal($customer);
+            if ($mapped === null) {
+                continue;
+            }
             $customers[] = [
                 'billing_id' => $mapped['billing_id'],
                 'username' => $mapped['username'],
