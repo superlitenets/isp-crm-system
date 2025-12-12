@@ -2,12 +2,9 @@
 $pageTitle = 'Stock Requests';
 ob_start();
 
-require_once __DIR__ . '/../src/StockRequest.php';
-require_once __DIR__ . '/../src/InventoryWarehouse.php';
-
 $userId = $_SESSION['user_id'] ?? null;
-$stockRequest = new StockRequest($db);
-$warehouseManager = new InventoryWarehouse($db);
+$stockRequest = new \App\StockRequest($db);
+$warehouseManager = new \App\InventoryWarehouse($db);
 
 $view = $_GET['view'] ?? 'list';
 $action = $_GET['action'] ?? '';

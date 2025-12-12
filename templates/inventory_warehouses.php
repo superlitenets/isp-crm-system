@@ -2,8 +2,7 @@
 $pageTitle = 'Warehouse Management';
 ob_start();
 
-require_once __DIR__ . '/../src/InventoryWarehouse.php';
-$warehouseManager = new InventoryWarehouse($db);
+$warehouseManager = new \App\InventoryWarehouse($db);
 
 $view = $_GET['view'] ?? 'warehouses';
 $action = $_GET['action'] ?? 'list';

@@ -1,5 +1,10 @@
 <?php
 
+namespace App;
+
+use PDO;
+use Exception;
+
 class StockRequest {
     private PDO $db;
 
@@ -52,7 +57,7 @@ class StockRequest {
                 u2.name as approved_by_name,
                 u3.name as picked_by_name,
                 u4.name as handed_to_name,
-                t.title as ticket_title,
+                t.subject as ticket_title,
                 c.name as customer_name,
                 (SELECT COUNT(*) FROM inventory_stock_request_items WHERE request_id = sr.id) as item_count
                 FROM inventory_stock_requests sr
@@ -78,7 +83,7 @@ class StockRequest {
                 u2.name as approved_by_name,
                 u3.name as picked_by_name,
                 u4.name as handed_to_name,
-                t.title as ticket_title,
+                t.subject as ticket_title,
                 c.name as customer_name
             FROM inventory_stock_requests sr
             LEFT JOIN inventory_warehouses w ON sr.warehouse_id = w.id
@@ -300,7 +305,7 @@ class StockRequest {
 
         $sql = "SELECT u.*, e.name as equipment_name, e.serial_number,
                 emp.first_name || ' ' || emp.last_name as employee_name,
-                t.title as ticket_title,
+                t.subject as ticket_title,
                 c.name as customer_name,
                 usr.name as recorded_by_name
                 FROM inventory_usage u

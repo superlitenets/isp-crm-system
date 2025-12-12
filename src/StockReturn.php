@@ -1,5 +1,10 @@
 <?php
 
+namespace App;
+
+use PDO;
+use Exception;
+
 class StockReturn {
     private PDO $db;
 

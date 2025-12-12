@@ -2,12 +2,9 @@
 $pageTitle = 'Returns & RMA';
 ob_start();
 
-require_once __DIR__ . '/../src/StockReturn.php';
-require_once __DIR__ . '/../src/InventoryWarehouse.php';
-
 $userId = $_SESSION['user_id'] ?? null;
-$stockReturn = new StockReturn($db);
-$warehouseManager = new InventoryWarehouse($db);
+$stockReturn = new \App\StockReturn($db);
+$warehouseManager = new \App\InventoryWarehouse($db);
 
 $view = $_GET['view'] ?? 'returns';
 $action = $_GET['action'] ?? '';
