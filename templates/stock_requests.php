@@ -95,7 +95,7 @@ $warehouses = $warehouseManager->getWarehouses(['is_active' => true]);
 $requestTypes = $stockRequest->getRequestTypes();
 $statuses = $stockRequest->getStatuses();
 
-$usersStmt = $db->query("SELECT id, name FROM users WHERE is_active = TRUE ORDER BY name");
+$usersStmt = $db->query("SELECT id, name FROM users ORDER BY name");
 $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $categoriesStmt = $db->query("SELECT id, name FROM equipment_categories ORDER BY name");

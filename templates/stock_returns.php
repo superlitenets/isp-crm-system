@@ -85,7 +85,7 @@ $rmaStatuses = $stockReturn->getRmaStatuses();
 $rmaResolutions = $stockReturn->getRmaResolutions();
 $lossTypes = $stockReturn->getLossTypes();
 
-$usersStmt = $db->query("SELECT id, name FROM users WHERE is_active = TRUE ORDER BY name");
+$usersStmt = $db->query("SELECT id, name FROM users ORDER BY name");
 $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $equipmentStmt = $db->query("SELECT id, name, serial_number, mac_address FROM equipment ORDER BY name");

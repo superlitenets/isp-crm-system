@@ -82,7 +82,7 @@ $warehouses = $warehouseManager->getWarehouses();
 $warehouseTypes = $warehouseManager->getWarehouseTypes();
 $locationTypes = $warehouseManager->getLocationTypes();
 
-$usersStmt = $db->query("SELECT id, name FROM users WHERE is_active = TRUE ORDER BY name");
+$usersStmt = $db->query("SELECT id, name FROM users ORDER BY name");
 $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
