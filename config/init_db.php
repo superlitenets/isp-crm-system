@@ -1507,6 +1507,7 @@ function seedRolesAndPermissions(PDO $db): void {
         
         // Sales
         ['sales.view', 'View Sales', 'sales', 'Can view sales dashboard'],
+        ['sales.view_all', 'View All Sales', 'sales', 'Can view all salespersons data'],
         ['sales.manage', 'Manage Sales', 'sales', 'Can manage salesperson assignments'],
         ['sales.commission', 'View Commission', 'sales', 'Can view and manage commissions'],
         ['sales.leads', 'Manage Leads', 'sales', 'Can create and manage leads'],

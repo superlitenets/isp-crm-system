@@ -439,10 +439,41 @@ class MobileAPI {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
-    public function getEmployeeByUserId(int $userId): ?array {
+    public function getEmployeeByUserId(int $userId, bool $autoCreate = false): ?array {
         $stmt = $this->db->prepare("SELECT * FROM employees WHERE user_id = ?");
         $stmt->execute([$userId]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+        $employee = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($employee) {
+            return $employee;
+        }
+        
+        if ($autoCreate) {
+            $stmt = $this->db->prepare("SELECT id, name, email, phone, role FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($user) {
+                $employeeId = 'EMP-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
+                $stmt = $this->db->prepare("
+                    INSERT INTO employees (user_id, employee_id, name, email, phone, position, employment_status, hire_date)
+                    VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_DATE)
+                    RETURNING *
+                ");
+                $position = ucfirst($user['role'] ?? 'Staff');
+                $stmt->execute([
+                    $userId,
+                    $employeeId,
+                    $user['name'],
+                    $user['email'],
+                    $user['phone'],
+                    $position
+                ]);
+                return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+            }
+        }
+        
+        return null;
     }
     
     public function clockIn(int $employeeId, ?float $latitude = null, ?float $longitude = null): array {

@@ -1,13 +1,18 @@
 <?php
 $action = $_GET['action'] ?? 'list';
 $salespersonModel = new \App\Salesperson($db);
+
+$canViewAll = \App\Auth::can('sales.view_all') || \App\Auth::isAdmin();
+$currentUserId = $_SESSION['user_id'] ?? null;
+$mySalesperson = $currentUserId ? $salespersonModel->getByUserId($currentUserId) : null;
 ?>
 
 <div class="container-fluid py-4">
     <?php if ($action === 'list'): ?>
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2><i class="bi bi-people-fill me-2"></i>Sales Team</h2>
+            <h2><i class="bi bi-people-fill me-2"></i><?= $canViewAll ? 'Sales Team' : 'My Sales' ?></h2>
             <div>
+                <?php if ($canViewAll): ?>
                 <a href="?page=sales&action=leaderboard" class="btn btn-outline-primary me-2">
                     <i class="bi bi-trophy me-1"></i>Leaderboard
                 </a>
@@ -17,6 +22,14 @@ $salespersonModel = new \App\Salesperson($db);
                 <a href="?page=sales&action=add" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-1"></i>Add Salesperson
                 </a>
+                <?php elseif ($mySalesperson): ?>
+                <a href="?page=sales&action=view&id=<?= $mySalesperson['id'] ?>" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-graph-up me-1"></i>My Performance
+                </a>
+                <a href="?page=sales&action=orders&id=<?= $mySalesperson['id'] ?>" class="btn btn-outline-success">
+                    <i class="bi bi-cart me-1"></i>My Orders
+                </a>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -39,7 +52,13 @@ $salespersonModel = new \App\Salesperson($db);
                         </thead>
                         <tbody>
                             <?php 
-                            $salespersons = $salespersonModel->getAll();
+                            if ($canViewAll) {
+                                $salespersons = $salespersonModel->getAll();
+                            } elseif ($mySalesperson) {
+                                $salespersons = [$mySalesperson];
+                            } else {
+                                $salespersons = [];
+                            }
                             foreach ($salespersons as $sp): 
                             ?>
                             <tr>
@@ -77,6 +96,7 @@ $salespersonModel = new \App\Salesperson($db);
                                         <a href="?page=sales&action=view&id=<?= $sp['id'] ?>" class="btn btn-outline-primary" title="View">
                                             <i class="bi bi-eye"></i>
                                         </a>
+                                        <?php if ($canViewAll): ?>
                                         <a href="?page=sales&action=edit&id=<?= $sp['id'] ?>" class="btn btn-outline-secondary" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </a>
@@ -84,6 +104,7 @@ $salespersonModel = new \App\Salesperson($db);
                                                 onclick="confirmDelete(<?= $sp['id'] ?>, '<?= htmlspecialchars($sp['name']) ?>')">
                                             <i class="bi bi-trash"></i>
                                         </button>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
@@ -92,7 +113,11 @@ $salespersonModel = new \App\Salesperson($db);
                             <tr>
                                 <td colspan="9" class="text-center py-4 text-muted">
                                     <i class="bi bi-people display-4 d-block mb-2"></i>
+                                    <?php if ($canViewAll): ?>
                                     No salespersons found. <a href="?page=sales&action=add">Add your first salesperson</a>
+                                    <?php else: ?>
+                                    You are not registered as a salesperson. Please contact your administrator.
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endif; ?>
@@ -104,6 +129,10 @@ $salespersonModel = new \App\Salesperson($db);
 
     <?php elseif ($action === 'add' || $action === 'edit'): ?>
         <?php
+        if (!$canViewAll) {
+            echo '<div class="alert alert-danger">Access denied. Only administrators can add or edit salespersons.</div>';
+            return;
+        }
         $sp = null;
         if ($action === 'edit' && isset($_GET['id'])) {
             $sp = $salespersonModel->getById((int)$_GET['id']);
@@ -236,6 +265,10 @@ $salespersonModel = new \App\Salesperson($db);
         $sp = $salespersonModel->getById((int)$_GET['id']);
         if (!$sp) {
             echo '<div class="alert alert-danger">Salesperson not found.</div>';
+            return;
+        }
+        if (!$canViewAll && (!$mySalesperson || $mySalesperson['id'] != $sp['id'])) {
+            echo '<div class="alert alert-danger">Access denied. You can only view your own sales data.</div>';
             return;
         }
         $stats = $salespersonModel->getSalesStats($sp['id']);

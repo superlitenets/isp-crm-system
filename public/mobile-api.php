@@ -301,9 +301,9 @@ try {
             
         case 'leave-balance':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             
@@ -321,9 +321,9 @@ try {
             
         case 'leave-requests':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             
@@ -334,9 +334,9 @@ try {
             
         case 'submit-leave-request':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             
@@ -364,9 +364,9 @@ try {
             
         case 'cancel-leave-request':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             
@@ -391,9 +391,9 @@ try {
             
         case 'salary-advances':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             
@@ -405,9 +405,9 @@ try {
             
         case 'request-advance':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id']);
+            $employee = $api->getEmployeeByUserId($user['id'], true);
             if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Employee not found']);
+                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
                 break;
             }
             

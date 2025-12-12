@@ -4532,6 +4532,11 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-chat-dots"></i> Quick Chat
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'my-hr' ? 'active' : '' ?>" href="?page=my-hr">
+                    <i class="bi bi-person-badge"></i> My HR
+                </a>
+            </li>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
@@ -4723,6 +4728,9 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'whatsapp-chat':
                 include __DIR__ . '/../templates/whatsapp-chat.php';
+                break;
+            case 'my-hr':
+                include __DIR__ . '/../templates/my-hr.php';
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';

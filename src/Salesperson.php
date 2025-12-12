@@ -301,6 +301,21 @@ class Salesperson {
         return $result ?: null;
     }
 
+    public function getByUserId(int $userId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT s.*, 
+                   e.name as employee_name,
+                   u.name as user_name
+            FROM salespersons s
+            LEFT JOIN employees e ON s.employee_id = e.id
+            LEFT JOIN users u ON s.user_id = u.id
+            WHERE s.user_id = ?
+        ");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     public function getEmployeeSalesMetrics(int $employeeId, ?string $periodStart = null, ?string $periodEnd = null): array {
         $salesperson = $this->getByEmployeeId($employeeId);
         
