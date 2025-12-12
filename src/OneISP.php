@@ -17,8 +17,8 @@ class OneISP {
         if (empty($this->token)) {
             $stmt = $this->db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'oneisp_api_token'");
             $stmt->execute();
-            $result = $stmt->fetch();
-            $this->token = $result ? $result['setting_value'] : null;
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $this->token = !empty($result['setting_value']) ? trim($result['setting_value']) : null;
         }
     }
     
