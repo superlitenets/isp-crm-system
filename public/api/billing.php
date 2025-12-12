@@ -1,9 +1,10 @@
 <?php
-header('Content-Type: application/json');
+error_reporting(0);
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/Auth.php';
 require_once __DIR__ . '/../../src/OneISP.php';
 
+header('Content-Type: application/json');
 session_start();
 
 if (!\App\Auth::check()) {

@@ -7,7 +7,7 @@ class OneISP {
     private string $baseUrl = 'https://ns3.api.one-isp.net/api/isp';
     private ?string $token = null;
     
-    public function __construct(\PDO $db = null) {
+    public function __construct(?\PDO $db = null) {
         $this->db = $db ?? \Database::getConnection();
         $this->loadToken();
     }
