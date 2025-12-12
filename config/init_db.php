@@ -1412,6 +1412,18 @@ function runMigrations(PDO $db): void {
         }
     }
     
+    // Auto-fix: Convert billing_id from integer to varchar if needed (One-ISP uses string IDs)
+    try {
+        $typeCheck = $db->query("SELECT data_type FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'billing_id'");
+        $dataType = $typeCheck->fetchColumn();
+        if ($dataType === 'integer') {
+            $db->exec("ALTER TABLE customers ALTER COLUMN billing_id TYPE VARCHAR(100) USING billing_id::VARCHAR");
+            error_log("Auto-fix: Converted customers.billing_id from integer to varchar");
+        }
+    } catch (PDOException $e) {
+        error_log("Auto-fix billing_id error: " . $e->getMessage());
+    }
+    
     seedRolesAndPermissions($db);
     seedSLADefaults($db);
 }
