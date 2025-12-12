@@ -818,6 +818,268 @@ function runMigrations(PDO $db): void {
                 repair_notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )",
+        'inventory_warehouses' => "
+            CREATE TABLE IF NOT EXISTS inventory_warehouses (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                code VARCHAR(20) UNIQUE NOT NULL,
+                type VARCHAR(30) NOT NULL DEFAULT 'depot',
+                address TEXT,
+                phone VARCHAR(20),
+                manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_locations' => "
+            CREATE TABLE IF NOT EXISTS inventory_locations (
+                id SERIAL PRIMARY KEY,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                code VARCHAR(50),
+                type VARCHAR(30) DEFAULT 'shelf',
+                capacity INTEGER,
+                notes TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_purchase_orders' => "
+            CREATE TABLE IF NOT EXISTS inventory_purchase_orders (
+                id SERIAL PRIMARY KEY,
+                po_number VARCHAR(30) UNIQUE NOT NULL,
+                supplier_name VARCHAR(200),
+                supplier_contact VARCHAR(100),
+                order_date DATE NOT NULL,
+                expected_date DATE,
+                status VARCHAR(20) DEFAULT 'pending',
+                total_amount DECIMAL(12, 2) DEFAULT 0,
+                notes TEXT,
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                approved_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_po_items' => "
+            CREATE TABLE IF NOT EXISTS inventory_po_items (
+                id SERIAL PRIMARY KEY,
+                po_id INTEGER REFERENCES inventory_purchase_orders(id) ON DELETE CASCADE,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                item_name VARCHAR(200) NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price DECIMAL(12, 2) DEFAULT 0,
+                received_qty INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_receipts' => "
+            CREATE TABLE IF NOT EXISTS inventory_receipts (
+                id SERIAL PRIMARY KEY,
+                receipt_number VARCHAR(30) UNIQUE NOT NULL,
+                po_id INTEGER REFERENCES inventory_purchase_orders(id) ON DELETE SET NULL,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                receipt_date DATE NOT NULL,
+                supplier_name VARCHAR(200),
+                delivery_note VARCHAR(100),
+                status VARCHAR(20) DEFAULT 'pending',
+                notes TEXT,
+                received_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                verified_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                verified_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_receipt_items' => "
+            CREATE TABLE IF NOT EXISTS inventory_receipt_items (
+                id SERIAL PRIMARY KEY,
+                receipt_id INTEGER REFERENCES inventory_receipts(id) ON DELETE CASCADE,
+                po_item_id INTEGER REFERENCES inventory_po_items(id) ON DELETE SET NULL,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                item_name VARCHAR(200) NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                serial_number VARCHAR(100),
+                mac_address VARCHAR(50),
+                condition VARCHAR(20) DEFAULT 'new',
+                location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL,
+                unit_cost DECIMAL(12, 2) DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_stock_requests' => "
+            CREATE TABLE IF NOT EXISTS inventory_stock_requests (
+                id SERIAL PRIMARY KEY,
+                request_number VARCHAR(30) UNIQUE NOT NULL,
+                requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                request_type VARCHAR(30) NOT NULL DEFAULT 'technician',
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                priority VARCHAR(20) DEFAULT 'normal',
+                status VARCHAR(20) DEFAULT 'pending',
+                required_date DATE,
+                notes TEXT,
+                approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                approved_at TIMESTAMP,
+                picked_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                picked_at TIMESTAMP,
+                handed_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                handover_at TIMESTAMP,
+                handover_signature TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_stock_request_items' => "
+            CREATE TABLE IF NOT EXISTS inventory_stock_request_items (
+                id SERIAL PRIMARY KEY,
+                request_id INTEGER REFERENCES inventory_stock_requests(id) ON DELETE CASCADE,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                item_name VARCHAR(200),
+                quantity_requested INTEGER NOT NULL DEFAULT 1,
+                quantity_approved INTEGER DEFAULT 0,
+                quantity_picked INTEGER DEFAULT 0,
+                quantity_used INTEGER DEFAULT 0,
+                quantity_returned INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_usage' => "
+            CREATE TABLE IF NOT EXISTS inventory_usage (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                request_item_id INTEGER REFERENCES inventory_stock_request_items(id) ON DELETE SET NULL,
+                ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+                job_type VARCHAR(50) NOT NULL DEFAULT 'installation',
+                quantity INTEGER DEFAULT 1,
+                usage_date DATE NOT NULL,
+                notes TEXT,
+                recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_returns' => "
+            CREATE TABLE IF NOT EXISTS inventory_returns (
+                id SERIAL PRIMARY KEY,
+                return_number VARCHAR(30) UNIQUE NOT NULL,
+                request_id INTEGER REFERENCES inventory_stock_requests(id) ON DELETE SET NULL,
+                returned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                return_date DATE NOT NULL,
+                return_type VARCHAR(30) DEFAULT 'unused',
+                status VARCHAR(20) DEFAULT 'pending',
+                notes TEXT,
+                received_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                received_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_return_items' => "
+            CREATE TABLE IF NOT EXISTS inventory_return_items (
+                id SERIAL PRIMARY KEY,
+                return_id INTEGER REFERENCES inventory_returns(id) ON DELETE CASCADE,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                request_item_id INTEGER REFERENCES inventory_stock_request_items(id) ON DELETE SET NULL,
+                quantity INTEGER DEFAULT 1,
+                condition VARCHAR(20) DEFAULT 'good',
+                location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_rma' => "
+            CREATE TABLE IF NOT EXISTS inventory_rma (
+                id SERIAL PRIMARY KEY,
+                rma_number VARCHAR(30) UNIQUE NOT NULL,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                fault_id INTEGER REFERENCES equipment_faults(id) ON DELETE SET NULL,
+                vendor_name VARCHAR(200),
+                vendor_contact VARCHAR(100),
+                status VARCHAR(20) DEFAULT 'pending',
+                shipped_date DATE,
+                received_date DATE,
+                resolution VARCHAR(50),
+                resolution_notes TEXT,
+                replacement_equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_loss_reports' => "
+            CREATE TABLE IF NOT EXISTS inventory_loss_reports (
+                id SERIAL PRIMARY KEY,
+                report_number VARCHAR(30) UNIQUE NOT NULL,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                reported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+                loss_type VARCHAR(30) NOT NULL DEFAULT 'lost',
+                loss_date DATE NOT NULL,
+                description TEXT NOT NULL,
+                estimated_value DECIMAL(12, 2),
+                investigation_status VARCHAR(20) DEFAULT 'pending',
+                investigation_notes TEXT,
+                resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                resolved_at TIMESTAMP,
+                resolution VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_stock_movements' => "
+            CREATE TABLE IF NOT EXISTS inventory_stock_movements (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                movement_type VARCHAR(30) NOT NULL,
+                from_location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL,
+                to_location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL,
+                from_warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                to_warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                quantity INTEGER DEFAULT 1,
+                reference_type VARCHAR(30),
+                reference_id INTEGER,
+                notes TEXT,
+                performed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_stock_levels' => "
+            CREATE TABLE IF NOT EXISTS inventory_stock_levels (
+                id SERIAL PRIMARY KEY,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE CASCADE,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE CASCADE,
+                min_quantity INTEGER DEFAULT 0,
+                max_quantity INTEGER DEFAULT 100,
+                reorder_point INTEGER DEFAULT 10,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(category_id, warehouse_id)
+            )",
+        'inventory_audits' => "
+            CREATE TABLE IF NOT EXISTS inventory_audits (
+                id SERIAL PRIMARY KEY,
+                audit_number VARCHAR(30) UNIQUE NOT NULL,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL,
+                audit_type VARCHAR(30) DEFAULT 'full',
+                scheduled_date DATE,
+                completed_date DATE,
+                status VARCHAR(20) DEFAULT 'pending',
+                notes TEXT,
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                completed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'inventory_audit_items' => "
+            CREATE TABLE IF NOT EXISTS inventory_audit_items (
+                id SERIAL PRIMARY KEY,
+                audit_id INTEGER REFERENCES inventory_audits(id) ON DELETE CASCADE,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                expected_qty INTEGER DEFAULT 0,
+                actual_qty INTEGER DEFAULT 0,
+                variance INTEGER DEFAULT 0,
+                notes TEXT,
+                verified_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                verified_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
         'mobile_tokens' => "
             CREATE TABLE IF NOT EXISTS mobile_tokens (
                 id SERIAL PRIMARY KEY,
@@ -1397,7 +1659,15 @@ function runMigrations(PDO $db): void {
         ['teams', 'branch_id', 'ALTER TABLE teams ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL'],
         ['branches', 'whatsapp_group', 'ALTER TABLE branches ADD COLUMN whatsapp_group VARCHAR(100)'],
         ['customers', 'username', 'ALTER TABLE customers ADD COLUMN username VARCHAR(100)'],
-        ['customers', 'billing_id', 'ALTER TABLE customers ADD COLUMN billing_id VARCHAR(100)']
+        ['customers', 'billing_id', 'ALTER TABLE customers ADD COLUMN billing_id VARCHAR(100)'],
+        ['equipment', 'warehouse_id', 'ALTER TABLE equipment ADD COLUMN warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE SET NULL'],
+        ['equipment', 'location_id', 'ALTER TABLE equipment ADD COLUMN location_id INTEGER REFERENCES inventory_locations(id) ON DELETE SET NULL'],
+        ['equipment', 'quantity', 'ALTER TABLE equipment ADD COLUMN quantity INTEGER DEFAULT 1'],
+        ['equipment', 'sku', 'ALTER TABLE equipment ADD COLUMN sku VARCHAR(50)'],
+        ['equipment', 'barcode', 'ALTER TABLE equipment ADD COLUMN barcode VARCHAR(100)'],
+        ['equipment_categories', 'parent_id', 'ALTER TABLE equipment_categories ADD COLUMN parent_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL'],
+        ['equipment_categories', 'item_type', "ALTER TABLE equipment_categories ADD COLUMN item_type VARCHAR(30) DEFAULT 'serialized'"],
+        ['equipment_loans', 'deposit_paid', 'ALTER TABLE equipment_loans ADD COLUMN deposit_paid BOOLEAN DEFAULT FALSE']
     ];
     
     foreach ($columnMigrations as $migration) {

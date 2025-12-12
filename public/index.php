@@ -4735,6 +4735,27 @@ $csrfToken = \App\Auth::generateToken();
                     include __DIR__ . '/../templates/inventory.php';
                 }
                 break;
+            case 'inventory_warehouses':
+                if (!\App\Auth::can('inventory.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/inventory_warehouses.php';
+                }
+                break;
+            case 'stock_requests':
+                if (!\App\Auth::can('inventory.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/stock_requests.php';
+                }
+                break;
+            case 'stock_returns':
+                if (!\App\Auth::can('inventory.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/stock_returns.php';
+                }
+                break;
             case 'payments':
                 if (!\App\Auth::can('payments.view')) {
                     $accessDenied = true;

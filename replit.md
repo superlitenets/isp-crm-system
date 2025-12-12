@@ -51,6 +51,16 @@ The system features a clean, responsive design. The public-facing landing page i
 - **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive equipment lifecycle tracking.
+- **Enhanced Inventory System (Dec 2025)**: Complete warehouse and stock management:
+  - **Warehouse Management**: Multi-warehouse/depot structure with location hierarchy (shelves, bins, racks, zones)
+  - **Stock Intake**: Purchase orders, goods receipts with serial/MAC tracking, automatic stock level updates
+  - **Disbursement Workflow**: Stock requests with approval → pick → handover flow, technician kit management
+  - **Field Usage Tracking**: Record equipment usage at job sites, link to tickets/customers, real-time stock deduction
+  - **Returns & RMA**: Stock returns processing, vendor RMA tracking, equipment condition assessment
+  - **Loss Reporting**: Track lost/stolen/damaged equipment with investigation workflow
+  - **Stock Movements**: Complete audit trail of all equipment transfers between locations
+  - New tables: inventory_warehouses, inventory_locations, inventory_purchase_orders, inventory_po_items, inventory_receipts, inventory_receipt_items, inventory_stock_requests, inventory_stock_request_items, inventory_usage, inventory_returns, inventory_return_items, inventory_rma, inventory_loss_reports, inventory_stock_movements, inventory_stock_levels, inventory_audits, inventory_audit_items
+  - New classes: InventoryWarehouse.php, StockRequest.php, StockReturn.php
 - **SLA Management**: Auto-applies policies based on ticket priority, considering business hours and holidays for accurate timer calculations.
 - **Complaints Module**: Implements an approval workflow for public complaints before conversion to tickets.
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning capabilities.

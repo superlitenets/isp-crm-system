@@ -31,6 +31,22 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
     </div>
     <?php endif; ?>
 
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="btn-group flex-wrap mb-3" role="group">
+                <a href="?page=inventory_warehouses" class="btn btn-outline-primary">
+                    <i class="bi bi-building"></i> Warehouses
+                </a>
+                <a href="?page=stock_requests" class="btn btn-outline-success">
+                    <i class="bi bi-box-arrow-up"></i> Stock Requests
+                </a>
+                <a href="?page=stock_returns" class="btn btn-outline-warning">
+                    <i class="bi bi-arrow-return-left"></i> Returns & RMA
+                </a>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
             <a class="nav-link <?= $tab === 'overview' ? 'active' : '' ?>" href="?page=inventory&tab=overview">
