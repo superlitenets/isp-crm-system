@@ -58,6 +58,15 @@ switch ($action) {
         echo json_encode(['success' => true, 'customers' => $customers, 'total' => count($customers)]);
         break;
         
+    case 'debug':
+        $search = trim($_GET['q'] ?? 'test');
+        $result = $oneIsp->searchCustomers($search);
+        echo json_encode([
+            'raw_response' => $result,
+            'sample_customer' => isset($result['data']['data'][0]) ? $result['data']['data'][0] : (isset($result['data'][0]) ? $result['data'][0] : null)
+        ], JSON_PRETTY_PRINT);
+        break;
+        
     case 'test':
         $result = $oneIsp->testConnection();
         echo json_encode($result);
