@@ -4605,11 +4605,13 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-chat-dots"></i> Quick Chat
                 </a>
             </li>
+            <?php if ($currentUser['role'] !== 'admin'): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'my-hr' ? 'active' : '' ?>" href="?page=my-hr">
                     <i class="bi bi-person-badge"></i> My HR
                 </a>
             </li>
+            <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
