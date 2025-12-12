@@ -87,30 +87,39 @@ class OneISP {
     }
     
     public function mapCustomerToLocal(array $billingCustomer): array {
-        $firstName = trim($billingCustomer['first_name'] ?? '');
-        $lastName = trim($billingCustomer['last_name'] ?? '');
-        $fullName = $billingCustomer['name'] ?? null;
+        $firstName = trim($billingCustomer['FirstName'] ?? '');
+        $lastName = trim($billingCustomer['LastName'] ?? '');
+        $username = $billingCustomer['UserName'] ?? null;
         
+        $fullName = trim($firstName . ' ' . $lastName);
         if (empty($fullName)) {
-            $fullName = trim($firstName . ' ' . $lastName);
-        }
-        if (empty($fullName)) {
-            $fullName = 'Billing Customer #' . ($billingCustomer['id'] ?? 'Unknown');
+            $fullName = $username ?? ('Customer #' . ($billingCustomer['ID'] ?? 'Unknown'));
         }
         
-        $phone = $billingCustomer['phone'] ?? $billingCustomer['mobile'] ?? null;
-        $address = $billingCustomer['address'] ?? $billingCustomer['physical_address'] ?? 'N/A';
-        $servicePlan = $billingCustomer['package'] ?? $billingCustomer['tariff'] ?? 'Standard';
+        $phone = $billingCustomer['PhoneNumber'] ?? null;
+        
+        $location = $billingCustomer['Location'] ?? '';
+        $apartment = $billingCustomer['Apartment'] ?? '';
+        $address = !empty($location) ? $location : (!empty($apartment) ? $apartment : 'N/A');
+        
+        $servicePlan = $billingCustomer['PackageName'] ?? 'Standard';
+        
+        $status = 'active';
+        if (!empty($billingCustomer['DisabledAt'])) {
+            $status = 'inactive';
+        } elseif (!empty($billingCustomer['PausedAt'])) {
+            $status = 'suspended';
+        }
         
         return [
-            'billing_id' => $billingCustomer['id'] ?? null,
-            'username' => $billingCustomer['username'] ?? null,
+            'billing_id' => $billingCustomer['ID'] ?? null,
+            'username' => $username,
             'name' => $fullName,
-            'email' => $billingCustomer['email'] ?? null,
+            'email' => $billingCustomer['Email'] ?? null,
             'phone' => $phone,
-            'address' => !empty($address) ? $address : 'N/A',
+            'address' => $address,
             'service_plan' => !empty($servicePlan) ? $servicePlan : 'Standard',
-            'connection_status' => $this->mapStatus($billingCustomer['status'] ?? 'active'),
+            'connection_status' => $this->mapStatus($status),
         ];
     }
     

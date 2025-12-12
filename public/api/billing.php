@@ -37,7 +37,7 @@ switch ($action) {
         }
         
         $customers = [];
-        $data = $result['data']['data'] ?? $result['data'] ?? [];
+        $data = $result['data']['Customers'] ?? $result['data']['data'] ?? $result['data'] ?? [];
         if (!is_array($data)) {
             $data = [];
         }
