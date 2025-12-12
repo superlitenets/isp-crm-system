@@ -11,7 +11,7 @@ $settings = new \App\Settings($db);
 $currencySymbol = $settings->get('currency_symbol', 'KES');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $employeeRecord) {
-    if (!\App\Auth::verifyToken($_POST['csrf_token'] ?? '')) {
+    if (!\App\Auth::validateToken($_POST['csrf_token'] ?? '')) {
         $errorMsg = 'Invalid request. Please try again.';
     } else {
         $postAction = $_POST['action'] ?? '';
