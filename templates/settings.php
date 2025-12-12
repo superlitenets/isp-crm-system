@@ -5819,11 +5819,9 @@ if (($_GET['action'] ?? '') === 'test_billing') {
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg"></i> Save
                         </button>
-                        <?php if ($oneIsp->isConfigured()): ?>
                         <a href="?page=settings&subpage=billing_api&action=test_billing" class="btn btn-outline-info">
                             <i class="bi bi-arrow-repeat"></i> Test Connection
                         </a>
-                        <?php endif; ?>
                     </div>
                 </form>
             </div>
