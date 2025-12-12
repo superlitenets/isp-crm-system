@@ -101,7 +101,7 @@ class InventoryWarehouse {
         return $stmt->execute(['id' => $id]);
     }
 
-    public function getLocations(int $warehouseId = null): array {
+    public function getLocations(?int $warehouseId = null): array {
         $where = ['1=1'];
         $params = [];
 
@@ -227,7 +227,7 @@ class InventoryWarehouse {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function moveEquipment(int $equipmentId, int $toWarehouseId, int $toLocationId = null, int $performedBy = null, string $notes = null): bool {
+    public function moveEquipment(int $equipmentId, int $toWarehouseId, ?int $toLocationId = null, ?int $performedBy = null, ?string $notes = null): bool {
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("SELECT warehouse_id, location_id FROM equipment WHERE id = :id");
@@ -266,7 +266,7 @@ class InventoryWarehouse {
         }
     }
 
-    public function getMovementHistory(int $equipmentId = null, int $warehouseId = null, int $limit = 50): array {
+    public function getMovementHistory(?int $equipmentId = null, ?int $warehouseId = null, int $limit = 50): array {
         $where = ['1=1'];
         $params = ['limit' => $limit];
 

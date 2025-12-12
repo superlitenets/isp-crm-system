@@ -180,7 +180,7 @@ class StockRequest {
         }
     }
 
-    public function rejectRequest(int $id, int $rejectedBy, string $reason = null): bool {
+    public function rejectRequest(int $id, int $rejectedBy, ?string $reason = null): bool {
         $stmt = $this->db->prepare("
             UPDATE inventory_stock_requests 
             SET status = 'rejected', approved_by = :rejected_by, approved_at = CURRENT_TIMESTAMP, 
@@ -219,7 +219,7 @@ class StockRequest {
         }
     }
 
-    public function handover(int $id, int $handedTo, string $signature = null): bool {
+    public function handover(int $id, int $handedTo, ?string $signature = null): bool {
         $stmt = $this->db->prepare("
             UPDATE inventory_stock_requests 
             SET status = 'handed_over', handed_to = :handed_to, handover_at = CURRENT_TIMESTAMP, 
@@ -229,7 +229,7 @@ class StockRequest {
         return $stmt->execute(['id' => $id, 'handed_to' => $handedTo, 'signature' => $signature]);
     }
 
-    public function recordUsage(int $requestItemId, int $ticketId, int $customerId, int $employeeId, int $quantity, string $jobType, int $recordedBy, string $notes = null): int {
+    public function recordUsage(int $requestItemId, int $ticketId, int $customerId, int $employeeId, int $quantity, string $jobType, int $recordedBy, ?string $notes = null): int {
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("SELECT equipment_id FROM inventory_stock_request_items WHERE id = :id");
@@ -348,7 +348,7 @@ class StockRequest {
         return $stmt->execute(['id' => $id]);
     }
 
-    public function cancelRequest(int $id, string $reason = null): bool {
+    public function cancelRequest(int $id, ?string $reason = null): bool {
         $stmt = $this->db->prepare("
             UPDATE inventory_stock_requests 
             SET status = 'cancelled', 
