@@ -4541,8 +4541,19 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::can('hr.view')): ?>
             <li class="nav-item">
+                <?php 
+                $pendingHrRequests = 0;
+                if (\App\Auth::isAdmin() || \App\Auth::can('hr.approve_leave') || \App\Auth::can('hr.approve_advance')) {
+                    $pendingLeave = $db->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
+                    $pendingAdvance = $db->query("SELECT COUNT(*) FROM salary_advances WHERE status = 'pending'")->fetchColumn();
+                    $pendingHrRequests = (int)$pendingLeave + (int)$pendingAdvance;
+                }
+                ?>
                 <a class="nav-link <?= $page === 'hr' ? 'active' : '' ?>" href="?page=hr">
                     <i class="bi bi-people-fill"></i> HR
+                    <?php if ($pendingHrRequests > 0): ?>
+                    <span class="badge bg-danger rounded-pill ms-1"><?= $pendingHrRequests ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <?php endif; ?>

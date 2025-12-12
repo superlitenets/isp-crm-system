@@ -96,10 +96,11 @@ The system features a clean, responsive design. The public-facing landing page i
   - Leave request and approval workflow with balance validation
   - Balance tracking with carryover support
   - Public holidays calendar
-  - Mobile API for leave requests from PWA
+  - Mobile API for leave requests from PWA with try/catch error handling
   - Cron job for monthly leave accrual
   - SMS notifications on request creation, approval, and rejection
   - In-app notifications for admins and employees
+  - HR navigation badge showing pending leave + salary advance requests count
 - **HR Notification System (Dec 2025)**: Configurable SMS templates for HR events:
   - Template management in hr_notification_templates table
   - Supports leave and salary advance events

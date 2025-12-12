@@ -1696,6 +1696,7 @@ function runMigrations(PDO $db): void {
     
     seedRolesAndPermissions($db);
     seedSLADefaults($db);
+    seedLeaveTypes($db);
 }
 
 function seedRolesAndPermissions(PDO $db): void {
@@ -1987,6 +1988,35 @@ function seedSLADefaults(PDO $db): void {
             $stmt->execute($hours);
         } catch (PDOException $e) {
             error_log("Error seeding business hours: " . $e->getMessage());
+        }
+    }
+}
+
+function seedLeaveTypes(PDO $db): void {
+    $checkLeave = $db->query("SELECT COUNT(*) FROM leave_types")->fetchColumn();
+    if ($checkLeave > 0) {
+        return;
+    }
+    
+    $leaveTypes = [
+        ['Annual Leave', 'ANNUAL', 21, true, true, true],
+        ['Sick Leave', 'SICK', 14, true, true, true],
+        ['Unpaid Leave', 'UNPAID', 0, false, true, true],
+        ['Maternity Leave', 'MATERNITY', 90, true, true, true],
+        ['Paternity Leave', 'PATERNITY', 14, true, true, true],
+        ['Compassionate Leave', 'COMPASSION', 5, true, true, true]
+    ];
+    
+    $stmt = $db->prepare("
+        INSERT INTO leave_types (name, code, days_per_year, is_paid, requires_approval, is_active)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    
+    foreach ($leaveTypes as $type) {
+        try {
+            $stmt->execute($type);
+        } catch (PDOException $e) {
+            error_log("Error seeding leave type: " . $e->getMessage());
         }
     }
 }

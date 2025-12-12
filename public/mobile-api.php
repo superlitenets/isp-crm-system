@@ -301,35 +301,47 @@ try {
             
         case 'leave-balance':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id'], true);
-            if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
-                break;
+            try {
+                $employee = $api->getEmployeeByUserId($user['id'], true);
+                if (!$employee) {
+                    echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
+                    break;
+                }
+                
+                $leaveService = new \App\Leave($db);
+                $balance = $leaveService->getEmployeeBalance($employee['id']);
+                echo json_encode(['success' => true, 'data' => $balance]);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'Failed to load leave balance: ' . $e->getMessage()]);
             }
-            
-            $leaveService = new \App\Leave($db);
-            $balance = $leaveService->getEmployeeBalance($employee['id']);
-            echo json_encode(['success' => true, 'data' => $balance]);
             break;
             
         case 'leave-types':
             requireAuth();
-            $leaveService = new \App\Leave($db);
-            $types = $leaveService->getLeaveTypes();
-            echo json_encode(['success' => true, 'data' => $types]);
+            try {
+                $leaveService = new \App\Leave($db);
+                $types = $leaveService->getLeaveTypes();
+                echo json_encode(['success' => true, 'data' => $types]);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'Failed to load leave types: ' . $e->getMessage()]);
+            }
             break;
             
         case 'leave-requests':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id'], true);
-            if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
-                break;
+            try {
+                $employee = $api->getEmployeeByUserId($user['id'], true);
+                if (!$employee) {
+                    echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
+                    break;
+                }
+                
+                $leaveService = new \App\Leave($db);
+                $requests = $leaveService->getEmployeeRequests($employee['id']);
+                echo json_encode(['success' => true, 'data' => $requests]);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'Failed to load leave requests: ' . $e->getMessage()]);
             }
-            
-            $leaveService = new \App\Leave($db);
-            $requests = $leaveService->getEmployeeRequests($employee['id']);
-            echo json_encode(['success' => true, 'data' => $requests]);
             break;
             
         case 'submit-leave-request':
@@ -391,16 +403,20 @@ try {
             
         case 'salary-advances':
             requireAuth();
-            $employee = $api->getEmployeeByUserId($user['id'], true);
-            if (!$employee) {
-                echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
-                break;
+            try {
+                $employee = $api->getEmployeeByUserId($user['id'], true);
+                if (!$employee) {
+                    echo json_encode(['success' => false, 'error' => 'Could not create employee record']);
+                    break;
+                }
+                
+                $advanceService = new \App\SalaryAdvance($db);
+                $advances = $advanceService->getByEmployee($employee['id']);
+                $outstanding = $advanceService->getEmployeeTotalOutstanding($employee['id']);
+                echo json_encode(['success' => true, 'data' => $advances, 'total_outstanding' => $outstanding]);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => 'Failed to load salary advances: ' . $e->getMessage()]);
             }
-            
-            $advanceService = new \App\SalaryAdvance($db);
-            $advances = $advanceService->getByEmployee($employee['id']);
-            $outstanding = $advanceService->getEmployeeTotalOutstanding($employee['id']);
-            echo json_encode(['success' => true, 'data' => $advances, 'total_outstanding' => $outstanding]);
             break;
             
         case 'request-advance':
