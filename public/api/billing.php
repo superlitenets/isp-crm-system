@@ -25,8 +25,10 @@ if (!$oneIsp->isConfigured()) {
 switch ($action) {
     case 'search':
         $search = trim($_GET['q'] ?? '');
-        if (strlen($search) < 2) {
-            echo json_encode(['customers' => [], 'message' => 'Enter at least 2 characters']);
+        $search = preg_replace('/[^0-9]/', '', $search);
+        
+        if (strlen($search) < 9) {
+            echo json_encode(['customers' => [], 'message' => 'Enter at least 9 digits of phone number']);
             exit;
         }
         
@@ -43,6 +45,11 @@ switch ($action) {
         }
         
         foreach ($data as $customer) {
+            $phone = preg_replace('/[^0-9]/', '', $customer['PhoneNumber'] ?? '');
+            if (empty($phone) || strpos($phone, $search) === false) {
+                continue;
+            }
+            
             $mapped = $oneIsp->mapCustomerToLocal($customer);
             if ($mapped === null) {
                 continue;
