@@ -432,13 +432,23 @@ function checkAndSendScheduledSummaries(\PDO $db, \App\Settings $settings): void
 }
 
 function syncAttendanceFromDevices(\PDO $db): void {
-    require_once __DIR__ . '/../src/BiometricDevice.php';
-    require_once __DIR__ . '/../src/HikvisionDevice.php';
-    require_once __DIR__ . '/../src/ZKTecoDevice.php';
-    require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
+    // Use PostgreSQL advisory lock to prevent overlapping cron executions
+    $lockId = 12345; // Unique lock ID for biometric sync
+    $lockResult = $db->query("SELECT pg_try_advisory_lock($lockId)")->fetchColumn();
     
-    $stmt = $db->query("SELECT * FROM biometric_devices WHERE is_active = true");
-    $devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    if (!$lockResult) {
+        echo json_encode(['success' => false, 'error' => 'Another sync is already running']);
+        return;
+    }
+    
+    try {
+        require_once __DIR__ . '/../src/BiometricDevice.php';
+        require_once __DIR__ . '/../src/HikvisionDevice.php';
+        require_once __DIR__ . '/../src/ZKTecoDevice.php';
+        require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
+        
+        $stmt = $db->query("SELECT * FROM biometric_devices WHERE is_active = true");
+        $devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
     
     $results = [];
     $processor = new \App\RealTimeAttendanceProcessor($db);
@@ -533,6 +543,10 @@ function syncAttendanceFromDevices(\PDO $db): void {
         'total_synced' => $totalSynced,
         'devices' => $results
     ]);
+    } finally {
+        // Release the advisory lock
+        $db->query("SELECT pg_advisory_unlock(12345)");
+    }
 }
 
 function runLeaveAccrual(\PDO $db): void {

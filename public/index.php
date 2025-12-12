@@ -80,7 +80,11 @@ require_once __DIR__ . '/../src/Complaint.php';
 require_once __DIR__ . '/../src/ActivityLog.php';
 require_once __DIR__ . '/../src/Reports.php';
 
-initializeDatabase();
+// Skip schema initialization in production (run via deployment script instead)
+// Set SKIP_DB_INIT=1 in production environment
+if (!getenv('SKIP_DB_INIT')) {
+    initializeDatabase();
+}
 
 $db = Database::getConnection();
 
