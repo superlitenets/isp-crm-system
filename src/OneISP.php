@@ -14,6 +14,12 @@ class OneISP {
     
     private function loadToken(): void {
         $this->token = getenv('ONEISP_API_TOKEN') ?: null;
+        if (empty($this->token)) {
+            $stmt = $this->db->prepare("SELECT setting_value FROM settings WHERE setting_key = 'oneisp_api_token'");
+            $stmt->execute();
+            $result = $stmt->fetch();
+            $this->token = $result ? $result['setting_value'] : null;
+        }
     }
     
     public function isConfigured(): bool {

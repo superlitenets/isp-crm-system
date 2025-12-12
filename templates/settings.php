@@ -121,6 +121,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-diagram-3"></i> Branches
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'billing_api' ? 'active' : '' ?>" href="?page=settings&subpage=billing_api">
+            <i class="bi bi-cloud-arrow-down"></i> Customers API
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -5766,5 +5771,99 @@ if ($action === 'edit_branch' && $id) {
         <?php endif; ?>
     </div>
 </div>
+
+<?php elseif ($subpage === 'billing_api'): ?>
+<?php
+require_once __DIR__ . '/../src/OneISP.php';
+$oneIsp = new \App\OneISP();
+$billingToken = $settings->get('oneisp_api_token', '');
+$testResult = null;
+if (($_GET['action'] ?? '') === 'test_billing') {
+    $testResult = $oneIsp->testConnection();
+}
+?>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> Customers API</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($testResult): ?>
+                <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
+                    <strong><?= $testResult['success'] ? 'Connection Successful!' : 'Connection Failed' ?></strong>
+                    <?php if (!$testResult['success']): ?>
+                    <br><?= htmlspecialchars($testResult['error'] ?? 'Unknown error') ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php endif; ?>
+                
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_billing_api">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="oneisp_api_token" id="billingApiToken"
+                                   value="<?= htmlspecialchars($billingToken) ?>" placeholder="Enter your API key">
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility()">
+                                <i class="bi bi-eye" id="toggleIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Save
+                        </button>
+                        <?php if ($oneIsp->isConfigured()): ?>
+                        <a href="?page=settings&subpage=billing_api&action=test_billing" class="btn btn-outline-info">
+                            <i class="bi bi-arrow-repeat"></i> Test Connection
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-plug"></i> Status</h5>
+            </div>
+            <div class="card-body text-center">
+                <?php if ($oneIsp->isConfigured()): ?>
+                <div class="text-success mb-2">
+                    <i class="bi bi-check-circle-fill display-4"></i>
+                </div>
+                <h5 class="text-success">Connected</h5>
+                <?php else: ?>
+                <div class="text-secondary mb-2">
+                    <i class="bi bi-x-circle-fill display-4"></i>
+                </div>
+                <h5 class="text-secondary">Not Configured</h5>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTokenVisibility() {
+    var input = document.getElementById('billingApiToken');
+    var icon = document.getElementById('toggleIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+</script>
 
 <?php endif; ?>
