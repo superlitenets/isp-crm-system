@@ -91,7 +91,7 @@ $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 $equipmentStmt = $db->query("SELECT id, name, serial_number, mac_address FROM equipment ORDER BY name");
 $equipment = $equipmentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$employeesStmt = $db->query("SELECT id, first_name, last_name FROM employees ORDER BY first_name");
+$employeesStmt = $db->query("SELECT id, name FROM employees ORDER BY name");
 $employees = $employeesStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -692,7 +692,7 @@ $employees = $employeesStmt->fetchAll(PDO::FETCH_ASSOC);
                         <select class="form-select" name="employee_id">
                             <option value="">Select Employee</option>
                             <?php foreach ($employees as $emp): ?>
-                                <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['first_name'] . ' ' . $emp['last_name']) ?></option>
+                                <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
