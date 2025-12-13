@@ -660,8 +660,3 @@ $requests = $stockRequest->getRequests(array_filter($filters));
         <?php endif; ?>
     <?php endif; ?>
 </div>
-
-<?php
-$content = ob_get_clean();
-include __DIR__ . '/layout.php';
-?>

@@ -633,8 +633,3 @@ document.getElementById('locationModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('locationActive').checked = true;
 });
 </script>
-
-<?php
-$content = ob_get_clean();
-include __DIR__ . '/layout.php';
-?>

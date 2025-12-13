@@ -747,8 +747,3 @@ document.getElementById('rmaModal').addEventListener('hidden.bs.modal', function
     document.getElementById('rmaStatusFields').style.display = 'none';
 });
 </script>
-
-<?php
-$content = ob_get_clean();
-include __DIR__ . '/layout.php';
-?>
