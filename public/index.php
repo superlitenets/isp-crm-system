@@ -4094,6 +4094,79 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit;
                     }
                     break;
+                    
+                case 'kits':
+                    if ($inventoryAction === 'save') {
+                        $data = [
+                            'kit_name' => $_POST['kit_name'],
+                            'technician_id' => $_POST['technician_id'] ?: null,
+                            'status' => $_POST['status'] ?? 'active',
+                            'issued_at' => $_POST['issued_at'] ?? date('Y-m-d'),
+                            'created_by' => $currentUser['id'],
+                            'notes' => $_POST['notes'] ?? null
+                        ];
+                        if (!empty($_POST['id'])) {
+                            $inventory->updateTechnicianKit((int)$_POST['id'], $data);
+                            $_SESSION['success_message'] = 'Technician kit updated successfully!';
+                        } else {
+                            $inventory->createTechnicianKit($data);
+                            $_SESSION['success_message'] = 'Technician kit created successfully!';
+                        }
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=kits');
+                        exit;
+                    } elseif ($inventoryAction === 'add_item') {
+                        $inventory->addKitItem(
+                            (int)$_POST['kit_id'],
+                            (int)$_POST['equipment_id'],
+                            (int)($_POST['quantity'] ?? 1),
+                            $_POST['notes'] ?? null
+                        );
+                        $_SESSION['success_message'] = 'Item added to kit successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=kits&action=view&id=' . $_POST['kit_id']);
+                        exit;
+                    } elseif ($inventoryAction === 'remove_item') {
+                        $inventory->removeKitItem((int)$_POST['item_id']);
+                        $_SESSION['success_message'] = 'Item removed from kit.';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=kits&action=view&id=' . $_POST['kit_id']);
+                        exit;
+                    } elseif ($inventoryAction === 'return') {
+                        $inventory->returnTechnicianKit((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Kit marked as returned.';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=kits');
+                        exit;
+                    }
+                    break;
+                    
+                case 'thresholds':
+                    if ($inventoryAction === 'save') {
+                        $data = [
+                            'id' => $_POST['id'] ?: null,
+                            'category_id' => $_POST['category_id'] ?: null,
+                            'warehouse_id' => $_POST['warehouse_id'] ?: null,
+                            'min_quantity' => (int)($_POST['min_quantity'] ?? 0),
+                            'max_quantity' => (int)($_POST['max_quantity'] ?? 0),
+                            'reorder_point' => (int)($_POST['reorder_point'] ?? 0),
+                            'reorder_quantity' => (int)($_POST['reorder_quantity'] ?? 0),
+                            'notify_on_low' => isset($_POST['notify_on_low']),
+                            'notify_on_excess' => isset($_POST['notify_on_excess'])
+                        ];
+                        $inventory->saveThreshold($data);
+                        $_SESSION['success_message'] = 'Stock threshold saved successfully!';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=thresholds');
+                        exit;
+                    } elseif ($inventoryAction === 'delete') {
+                        $inventory->deleteThreshold((int)$_POST['id']);
+                        $_SESSION['success_message'] = 'Threshold deleted.';
+                        \App\Auth::regenerateToken();
+                        header('Location: ?page=inventory&tab=thresholds');
+                        exit;
+                    }
+                    break;
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();

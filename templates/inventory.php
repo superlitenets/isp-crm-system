@@ -79,6 +79,21 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link <?= $tab === 'kits' ? 'active' : '' ?>" href="?page=inventory&tab=kits">
+                <i class="bi bi-briefcase"></i> Technician Kits
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $tab === 'thresholds' ? 'active' : '' ?>" href="?page=inventory&tab=thresholds">
+                <i class="bi bi-sliders"></i> Thresholds
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?= $tab === 'reports' ? 'active' : '' ?>" href="?page=inventory&tab=reports">
+                <i class="bi bi-file-earmark-bar-graph"></i> Reports
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link <?= $tab === 'import' ? 'active' : '' ?>" href="?page=inventory&tab=import">
                 <i class="bi bi-upload"></i> Import/Export
             </a>
@@ -145,6 +160,108 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <h2 class="mb-0">KES <?= number_format($stats['total_value'], 2) ?></h2>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    <?php $lowStockItems = $inventory->getLowStockItems(); ?>
+    <?php if (!empty($lowStockItems)): ?>
+    <div class="card mt-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Low Stock Alerts (<?= count($lowStockItems) ?>)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Min Quantity</th>
+                            <th>Reorder Point</th>
+                            <th>Suggested Order</th>
+                            <th>Alert Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($lowStockItems as $item): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($item['category_name']) ?></strong></td>
+                            <td><?= $item['current_stock'] ?></td>
+                            <td><?= $item['min_quantity'] ?></td>
+                            <td><?= $item['reorder_point'] ?></td>
+                            <td><?= $item['reorder_quantity'] ?></td>
+                            <td>
+                                <?php if ($item['alert_level'] === 'critical'): ?>
+                                <span class="badge bg-danger">Critical</span>
+                                <?php else: ?>
+                                <span class="badge bg-warning text-dark">Low</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Stock Levels by Category -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Stock Levels by Category</h5>
+        </div>
+        <div class="card-body">
+            <?php $stockLevels = $inventory->getStockLevelsByCategory(); ?>
+            <?php if (empty($stockLevels)): ?>
+            <p class="text-muted mb-0">No categories defined yet.</p>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Total</th>
+                            <th>Available</th>
+                            <th>Assigned</th>
+                            <th>On Loan</th>
+                            <th>Faulty</th>
+                            <th>Stock Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($stockLevels as $level): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($level['category_name']) ?></strong></td>
+                            <td><?= $level['total_count'] ?></td>
+                            <td><span class="badge bg-success"><?= $level['available_count'] ?></span></td>
+                            <td><span class="badge bg-info"><?= $level['assigned_count'] ?></span></td>
+                            <td><span class="badge bg-warning text-dark"><?= $level['on_loan_count'] ?></span></td>
+                            <td><span class="badge bg-danger"><?= $level['faulty_count'] ?></span></td>
+                            <td>
+                                <?php 
+                                $available = $level['available_count'];
+                                $minQty = $level['min_quantity'];
+                                $reorderPt = $level['reorder_point'];
+                                if ($minQty > 0 || $reorderPt > 0):
+                                    if ($available <= $minQty): ?>
+                                    <span class="badge bg-danger">Critical</span>
+                                    <?php elseif ($available <= $reorderPt): ?>
+                                    <span class="badge bg-warning text-dark">Low</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-success">OK</span>
+                                    <?php endif;
+                                else: ?>
+                                <span class="badge bg-secondary">No threshold</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -1229,5 +1346,597 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         categorySelect.addEventListener('change', updateExportLink);
     });
     </script>
+
+    <?php elseif ($tab === 'kits'): ?>
+    <!-- Technician Kits Tab -->
+    <?php if ($action === 'add' || $action === 'edit'): ?>
+        <?php 
+        $kit = $action === 'edit' && $id ? $inventory->getTechnicianKit((int)$id) : null;
+        $db = \Database::getConnection();
+        $employees = $db->query("SELECT id, name FROM employees WHERE employment_status = 'active' ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
+        ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><?= $action === 'edit' ? 'Edit Technician Kit' : 'Create New Kit' ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="?page=inventory&tab=kits&action=save">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="id" value="<?= $kit['id'] ?? '' ?>">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Kit Name *</label>
+                            <input type="text" class="form-control" name="kit_name" required value="<?= htmlspecialchars($kit['kit_name'] ?? '') ?>" placeholder="e.g., Field Kit #1">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Assign to Technician</label>
+                            <select class="form-select" name="technician_id">
+                                <option value="">-- Unassigned --</option>
+                                <?php foreach ($employees as $emp): ?>
+                                <option value="<?= $emp['id'] ?>" <?= ($kit['technician_id'] ?? '') == $emp['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($emp['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Issue Date</label>
+                            <input type="date" class="form-control" name="issued_at" value="<?= $kit['issued_at'] ?? date('Y-m-d') ?>">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="active" <?= ($kit['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Active</option>
+                                <option value="returned" <?= ($kit['status'] ?? '') === 'returned' ? 'selected' : '' ?>>Returned</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2"><?= htmlspecialchars($kit['notes'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Kit</button>
+                        <a href="?page=inventory&tab=kits" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php elseif ($action === 'view' && $id): ?>
+        <?php 
+        $kit = $inventory->getTechnicianKit((int)$id);
+        $kitItems = $inventory->getKitItems((int)$id);
+        $availableEquipment = $inventory->getAvailableEquipment();
+        ?>
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-briefcase"></i> <?= htmlspecialchars($kit['kit_name']) ?></h5>
+                <div>
+                    <a href="?page=inventory&tab=kits&action=edit&id=<?= $id ?>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i> Edit</a>
+                    <a href="?page=inventory&tab=kits" class="btn btn-sm btn-secondary">Back</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>Technician:</strong> <?= htmlspecialchars($kit['technician_name'] ?? 'Unassigned') ?></p>
+                        <p><strong>Issue Date:</strong> <?= $kit['issued_at'] ?? 'N/A' ?></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Status:</strong> 
+                            <span class="badge bg-<?= $kit['status'] === 'active' ? 'success' : 'secondary' ?>">
+                                <?= ucfirst($kit['status']) ?>
+                            </span>
+                        </p>
+                        <p><strong>Items:</strong> <?= count($kitItems) ?></p>
+                    </div>
+                </div>
+                
+                <?php if ($kit['notes']): ?>
+                <p><strong>Notes:</strong> <?= nl2br(htmlspecialchars($kit['notes'])) ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Kit Items -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Kit Contents</h5>
+            </div>
+            <div class="card-body">
+                <?php if (empty($kitItems)): ?>
+                <p class="text-muted">No items in this kit yet.</p>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Equipment</th>
+                                <th>Category</th>
+                                <th>Serial Number</th>
+                                <th>Quantity</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($kitItems as $item): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($item['equipment_name']) ?></td>
+                                <td><?= htmlspecialchars($item['category_name'] ?? '-') ?></td>
+                                <td><code><?= htmlspecialchars($item['serial_number'] ?? '-') ?></code></td>
+                                <td><?= $item['quantity'] ?></td>
+                                <td>
+                                    <form method="POST" action="?page=inventory&tab=kits&action=remove_item" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                        <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
+                                        <input type="hidden" name="kit_id" value="<?= $id ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this item from the kit?');">
+                                            <i class="bi bi-x"></i> Remove
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Add Item to Kit -->
+        <?php if ($kit['status'] === 'active' && !empty($availableEquipment)): ?>
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Item to Kit</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="?page=inventory&tab=kits&action=add_item" class="row g-3">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="kit_id" value="<?= $id ?>">
+                    
+                    <div class="col-md-6">
+                        <label class="form-label">Equipment</label>
+                        <select class="form-select" name="equipment_id" required>
+                            <option value="">-- Select Equipment --</option>
+                            <?php foreach ($availableEquipment as $eq): ?>
+                            <option value="<?= $eq['id'] ?>">
+                                <?= htmlspecialchars($eq['name']) ?> 
+                                <?php if ($eq['serial_number']): ?>(<?= $eq['serial_number'] ?>)<?php endif; ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" class="form-control" name="quantity" value="1" min="1">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus"></i> Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php else: ?>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Technician Kits</h5>
+                <a href="?page=inventory&tab=kits&action=add" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Create Kit
+                </a>
+            </div>
+            <div class="card-body">
+                <?php $kits = $inventory->getTechnicianKits(); ?>
+                <?php if (empty($kits)): ?>
+                <p class="text-muted text-center">No technician kits created yet.</p>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Kit Name</th>
+                                <th>Technician</th>
+                                <th>Items</th>
+                                <th>Issued</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($kits as $kit): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($kit['kit_name']) ?></strong></td>
+                                <td><?= htmlspecialchars($kit['technician_name'] ?? 'Unassigned') ?></td>
+                                <td><span class="badge bg-secondary"><?= $kit['item_count'] ?></span></td>
+                                <td><?= $kit['issued_at'] ?? '-' ?></td>
+                                <td>
+                                    <span class="badge bg-<?= $kit['status'] === 'active' ? 'success' : 'secondary' ?>">
+                                        <?= ucfirst($kit['status']) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="?page=inventory&tab=kits&action=view&id=<?= $kit['id'] ?>" class="btn btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+                                        <a href="?page=inventory&tab=kits&action=edit&id=<?= $kit['id'] ?>" class="btn btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>
+                                        <?php if ($kit['status'] === 'active'): ?>
+                                        <form method="POST" action="?page=inventory&tab=kits&action=return" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                            <input type="hidden" name="id" value="<?= $kit['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-success" title="Mark Returned" onclick="return confirm('Mark this kit as returned?');">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php elseif ($tab === 'thresholds'): ?>
+    <!-- Stock Thresholds Tab -->
+    <?php if ($action === 'add' || $action === 'edit'): ?>
+        <?php 
+        $threshold = $action === 'edit' && $id ? $inventory->getThreshold((int)$id) : null;
+        $db = \Database::getConnection();
+        $warehouses = [];
+        try {
+            $warehouses = $db->query("SELECT id, name FROM inventory_warehouses WHERE is_active = true ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {}
+        ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><?= $action === 'edit' ? 'Edit Threshold' : 'Add Stock Threshold' ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="?page=inventory&tab=thresholds&action=save">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="id" value="<?= $threshold['id'] ?? '' ?>">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Category *</label>
+                            <select class="form-select" name="category_id" required>
+                                <option value="">-- Select Category --</option>
+                                <?php foreach ($categories as $cat): ?>
+                                <option value="<?= $cat['id'] ?>" <?= ($threshold['category_id'] ?? '') == $cat['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($cat['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Warehouse (Optional)</label>
+                            <select class="form-select" name="warehouse_id">
+                                <option value="">All Warehouses</option>
+                                <?php foreach ($warehouses as $wh): ?>
+                                <option value="<?= $wh['id'] ?>" <?= ($threshold['warehouse_id'] ?? '') == $wh['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($wh['name']) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Minimum Quantity</label>
+                            <input type="number" class="form-control" name="min_quantity" value="<?= $threshold['min_quantity'] ?? 0 ?>" min="0">
+                            <small class="text-muted">Critical alert level</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Reorder Point</label>
+                            <input type="number" class="form-control" name="reorder_point" value="<?= $threshold['reorder_point'] ?? 0 ?>" min="0">
+                            <small class="text-muted">Low stock warning</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Reorder Quantity</label>
+                            <input type="number" class="form-control" name="reorder_quantity" value="<?= $threshold['reorder_quantity'] ?? 0 ?>" min="0">
+                            <small class="text-muted">Suggested order amount</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Maximum Quantity</label>
+                            <input type="number" class="form-control" name="max_quantity" value="<?= $threshold['max_quantity'] ?? 0 ?>" min="0">
+                            <small class="text-muted">Excess alert level</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="notify_on_low" value="1" <?= ($threshold['notify_on_low'] ?? true) ? 'checked' : '' ?>>
+                                <label class="form-check-label">Notify when stock is low</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="notify_on_excess" value="1" <?= ($threshold['notify_on_excess'] ?? false) ? 'checked' : '' ?>>
+                                <label class="form-check-label">Notify when stock exceeds maximum</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Threshold</button>
+                        <a href="?page=inventory&tab=thresholds" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Stock Thresholds</h5>
+                <a href="?page=inventory&tab=thresholds&action=add" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Add Threshold
+                </a>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Define minimum and maximum stock levels for each category. The system will alert you when stock falls below or exceeds these thresholds.</p>
+                
+                <?php $thresholds = $inventory->getThresholds(); ?>
+                <?php if (empty($thresholds)): ?>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> No thresholds configured yet. Add thresholds to enable stock level alerts.
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Warehouse</th>
+                                <th>Min Qty</th>
+                                <th>Reorder Point</th>
+                                <th>Reorder Qty</th>
+                                <th>Max Qty</th>
+                                <th>Alerts</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($thresholds as $th): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($th['category_name'] ?? 'All') ?></strong></td>
+                                <td><?= htmlspecialchars($th['warehouse_name'] ?? 'All') ?></td>
+                                <td><?= $th['min_quantity'] ?></td>
+                                <td><?= $th['reorder_point'] ?></td>
+                                <td><?= $th['reorder_quantity'] ?></td>
+                                <td><?= $th['max_quantity'] ?></td>
+                                <td>
+                                    <?php if ($th['notify_on_low']): ?>
+                                    <span class="badge bg-warning text-dark">Low</span>
+                                    <?php endif; ?>
+                                    <?php if ($th['notify_on_excess']): ?>
+                                    <span class="badge bg-info">Excess</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="?page=inventory&tab=thresholds&action=edit&id=<?= $th['id'] ?>" class="btn btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>
+                                        <form method="POST" action="?page=inventory&tab=thresholds&action=delete" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                            <input type="hidden" name="id" value="<?= $th['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Delete this threshold?');">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php elseif ($tab === 'reports'): ?>
+    <!-- Inventory Reports Tab -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="btn-group flex-wrap" role="group">
+                <?php $reportType = $_GET['report'] ?? 'stock_levels'; ?>
+                <a href="?page=inventory&tab=reports&report=stock_levels" class="btn btn-<?= $reportType === 'stock_levels' ? 'primary' : 'outline-primary' ?>">Stock Levels</a>
+                <a href="?page=inventory&tab=reports&report=aging" class="btn btn-<?= $reportType === 'aging' ? 'primary' : 'outline-primary' ?>">Equipment Aging</a>
+                <a href="?page=inventory&tab=reports&report=consumption" class="btn btn-<?= $reportType === 'consumption' ? 'primary' : 'outline-primary' ?>">Consumption</a>
+                <a href="?page=inventory&tab=reports&report=rma" class="btn btn-<?= $reportType === 'rma' ? 'primary' : 'outline-primary' ?>">RMA Turnaround</a>
+                <a href="?page=inventory&tab=reports&report=warranty" class="btn btn-<?= $reportType === 'warranty' ? 'primary' : 'outline-primary' ?>">Warranty Status</a>
+                <a href="?page=inventory&tab=reports&report=value" class="btn btn-<?= $reportType === 'value' ? 'primary' : 'outline-primary' ?>">Asset Value</a>
+            </div>
+        </div>
+    </div>
+
+    <?php if ($reportType === 'stock_levels'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-box-seam"></i> Stock Levels Report</h5></div>
+        <div class="card-body">
+            <?php $stockReport = $inventory->getStockLevelsReport(); ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Category</th><th>Total</th><th>Available</th><th>Assigned</th><th>On Loan</th><th>Faulty</th><th>Retired</th><th>Total Value</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($stockReport as $row): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></strong></td>
+                            <td><?= $row['total_items'] ?></td>
+                            <td><span class="badge bg-success"><?= $row['available'] ?></span></td>
+                            <td><span class="badge bg-info"><?= $row['assigned'] ?></span></td>
+                            <td><span class="badge bg-warning text-dark"><?= $row['on_loan'] ?></span></td>
+                            <td><span class="badge bg-danger"><?= $row['faulty'] ?></span></td>
+                            <td><span class="badge bg-secondary"><?= $row['retired'] ?></span></td>
+                            <td>KES <?= number_format($row['total_value'], 2) ?></td>
+                            <td>
+                                <?php if ($row['min_qty'] > 0 && $row['available'] <= $row['min_qty']): ?>
+                                <span class="badge bg-danger">Critical</span>
+                                <?php elseif ($row['reorder_point'] > 0 && $row['available'] <= $row['reorder_point']): ?>
+                                <span class="badge bg-warning text-dark">Low</span>
+                                <?php elseif ($row['min_qty'] > 0 || $row['reorder_point'] > 0): ?>
+                                <span class="badge bg-success">OK</span>
+                                <?php else: ?>
+                                <span class="badge bg-secondary">-</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'aging'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-clock-history"></i> Equipment Aging Report</h5></div>
+        <div class="card-body">
+            <?php $agingReport = $inventory->getAgingReport(); ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Age</th><th>Category</th><th>Items</th><th>Available</th><th>Needs Attention</th><th>Total Value</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($agingReport as $row): ?>
+                        <tr>
+                            <td><span class="badge bg-<?= $row['age_bracket'] === 'Over 2 years' ? 'danger' : ($row['age_bracket'] === '1-2 years' ? 'warning' : 'secondary') ?>"><?= $row['age_bracket'] ?></span></td>
+                            <td><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></td>
+                            <td><?= $row['item_count'] ?></td>
+                            <td><?= $row['available_count'] ?></td>
+                            <td><?= $row['needs_attention'] > 0 ? '<span class="badge bg-danger">' . $row['needs_attention'] . '</span>' : '-' ?></td>
+                            <td>KES <?= number_format($row['total_value'], 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'consumption'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-graph-down"></i> Consumption Report</h5></div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3">
+                <input type="hidden" name="page" value="inventory">
+                <input type="hidden" name="tab" value="reports">
+                <input type="hidden" name="report" value="consumption">
+                <div class="col-md-4"><label class="form-label">Start Date</label><input type="date" class="form-control" name="start_date" value="<?= $_GET['start_date'] ?? date('Y-m-01') ?>"></div>
+                <div class="col-md-4"><label class="form-label">End Date</label><input type="date" class="form-control" name="end_date" value="<?= $_GET['end_date'] ?? date('Y-m-d') ?>"></div>
+                <div class="col-md-4"><label class="form-label">&nbsp;</label><button type="submit" class="btn btn-primary d-block">Generate Report</button></div>
+            </form>
+            <?php 
+            $startDate = $_GET['start_date'] ?? date('Y-m-01');
+            $endDate = $_GET['end_date'] ?? date('Y-m-d');
+            $consumptionReport = $inventory->getConsumptionReport($startDate, $endDate); 
+            ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Category</th><th>Assigned</th><th>Loaned</th><th>Returned (Assignment)</th><th>Returned (Loan)</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($consumptionReport as $row): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></strong></td>
+                            <td><?= $row['assigned_count'] ?></td>
+                            <td><?= $row['loaned_count'] ?></td>
+                            <td><?= $row['returned_from_assignment'] ?></td>
+                            <td><?= $row['returned_from_loan'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'rma'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> RMA Turnaround Report</h5></div>
+        <div class="card-body">
+            <?php $rmaReport = $inventory->getRMATurnaroundReport(); ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Category</th><th>Total Faults</th><th>Pending</th><th>In Progress</th><th>Repaired</th><th>Avg Repair Days</th><th>Avg Cost</th><th>Total Cost</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($rmaReport as $row): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></strong></td>
+                            <td><?= $row['total_faults'] ?></td>
+                            <td><span class="badge bg-warning text-dark"><?= $row['pending'] ?></span></td>
+                            <td><span class="badge bg-info"><?= $row['in_progress'] ?></span></td>
+                            <td><span class="badge bg-success"><?= $row['repaired'] ?></span></td>
+                            <td><?= $row['avg_repair_days'] ?? '-' ?> days</td>
+                            <td>KES <?= number_format($row['avg_repair_cost'] ?? 0, 2) ?></td>
+                            <td>KES <?= number_format($row['total_repair_cost'] ?? 0, 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'warranty'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-shield-check"></i> Warranty Status Report</h5></div>
+        <div class="card-body">
+            <?php $warrantyReport = $inventory->getWarrantyExpiryReport(); ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Warranty Status</th><th>Category</th><th>Items</th><th>Total Value</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($warrantyReport as $row): ?>
+                        <tr>
+                            <td><span class="badge bg-<?= $row['warranty_status'] === 'Expired' ? 'danger' : ($row['warranty_status'] === 'Expiring in 30 days' ? 'warning' : 'success') ?>"><?= $row['warranty_status'] ?></span></td>
+                            <td><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></td>
+                            <td><?= $row['item_count'] ?></td>
+                            <td>KES <?= number_format($row['total_value'], 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'value'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Asset Value Report</h5></div>
+        <div class="card-body">
+            <?php $valueReport = $inventory->getEquipmentValueReport(); ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Category</th><th>Items</th><th>Total Value</th><th>Avg Value</th><th>Min Value</th><th>Max Value</th></tr></thead>
+                    <tbody>
+                        <?php $grandTotal = 0; foreach ($valueReport as $row): $grandTotal += $row['total_value']; ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized') ?></strong></td>
+                            <td><?= $row['item_count'] ?></td>
+                            <td>KES <?= number_format($row['total_value'], 2) ?></td>
+                            <td>KES <?= number_format($row['avg_value'], 2) ?></td>
+                            <td>KES <?= number_format($row['min_value'], 2) ?></td>
+                            <td>KES <?= number_format($row['max_value'], 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot class="table-dark"><tr><th colspan="2">Grand Total</th><th colspan="4">KES <?= number_format($grandTotal, 2) ?></th></tr></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php endif; ?>
 </div>

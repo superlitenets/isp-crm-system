@@ -798,4 +798,585 @@ class Inventory {
         $lower = strtolower(trim($value));
         return in_array($lower, $valid) ? $lower : 'available';
     }
+    
+    // ==================== STOCK THRESHOLDS ====================
+    
+    public function getThresholds(): array {
+        $stmt = $this->db->query("
+            SELECT t.*, c.name as category_name, w.name as warehouse_name
+            FROM inventory_thresholds t
+            LEFT JOIN equipment_categories c ON t.category_id = c.id
+            LEFT JOIN inventory_warehouses w ON t.warehouse_id = w.id
+            ORDER BY c.name, w.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getThreshold(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT t.*, c.name as category_name, w.name as warehouse_name
+            FROM inventory_thresholds t
+            LEFT JOIN equipment_categories c ON t.category_id = c.id
+            LEFT JOIN inventory_warehouses w ON t.warehouse_id = w.id
+            WHERE t.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function saveThreshold(array $data): int {
+        if (!empty($data['id'])) {
+            $stmt = $this->db->prepare("
+                UPDATE inventory_thresholds SET
+                    category_id = ?, warehouse_id = ?, min_quantity = ?, max_quantity = ?,
+                    reorder_point = ?, reorder_quantity = ?, notify_on_low = ?, notify_on_excess = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['category_id'] ?: null,
+                $data['warehouse_id'] ?: null,
+                $data['min_quantity'] ?? 0,
+                $data['max_quantity'] ?? 0,
+                $data['reorder_point'] ?? 0,
+                $data['reorder_quantity'] ?? 0,
+                $data['notify_on_low'] ?? true,
+                $data['notify_on_excess'] ?? false,
+                $data['id']
+            ]);
+            return (int) $data['id'];
+        } else {
+            $stmt = $this->db->prepare("
+                INSERT INTO inventory_thresholds 
+                    (category_id, warehouse_id, min_quantity, max_quantity, reorder_point, reorder_quantity, notify_on_low, notify_on_excess)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['category_id'] ?: null,
+                $data['warehouse_id'] ?: null,
+                $data['min_quantity'] ?? 0,
+                $data['max_quantity'] ?? 0,
+                $data['reorder_point'] ?? 0,
+                $data['reorder_quantity'] ?? 0,
+                $data['notify_on_low'] ?? true,
+                $data['notify_on_excess'] ?? false
+            ]);
+            return (int) $this->db->lastInsertId();
+        }
+    }
+    
+    public function deleteThreshold(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM inventory_thresholds WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+    
+    public function getLowStockItems(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                c.id as category_id,
+                c.name as category_name,
+                t.min_quantity,
+                t.reorder_point,
+                t.reorder_quantity,
+                COUNT(e.id) as current_stock,
+                CASE 
+                    WHEN COUNT(e.id) <= t.min_quantity THEN 'critical'
+                    WHEN COUNT(e.id) <= t.reorder_point THEN 'low'
+                    ELSE 'ok'
+                END as alert_level
+            FROM inventory_thresholds t
+            JOIN equipment_categories c ON t.category_id = c.id
+            LEFT JOIN equipment e ON e.category_id = c.id AND e.status = 'available'
+            WHERE t.notify_on_low = true
+            GROUP BY c.id, c.name, t.min_quantity, t.reorder_point, t.reorder_quantity
+            HAVING COUNT(e.id) <= t.reorder_point
+            ORDER BY 
+                CASE WHEN COUNT(e.id) <= t.min_quantity THEN 0 ELSE 1 END,
+                c.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getStockLevelsByCategory(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                c.id as category_id,
+                c.name as category_name,
+                COUNT(e.id) as total_count,
+                COUNT(CASE WHEN e.status = 'available' THEN 1 END) as available_count,
+                COUNT(CASE WHEN e.status = 'assigned' THEN 1 END) as assigned_count,
+                COUNT(CASE WHEN e.status = 'on_loan' THEN 1 END) as on_loan_count,
+                COUNT(CASE WHEN e.status = 'faulty' THEN 1 END) as faulty_count,
+                COALESCE(t.min_quantity, 0) as min_quantity,
+                COALESCE(t.reorder_point, 0) as reorder_point
+            FROM equipment_categories c
+            LEFT JOIN equipment e ON e.category_id = c.id
+            LEFT JOIN inventory_thresholds t ON t.category_id = c.id AND t.warehouse_id IS NULL
+            GROUP BY c.id, c.name, t.min_quantity, t.reorder_point
+            ORDER BY c.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== EQUIPMENT LIFECYCLE ====================
+    
+    public function updateLifecycleStatus(int $equipmentId, string $newStatus, int $changedBy, ?array $extra = null): bool {
+        $validStatuses = ['received', 'in_stock', 'assigned', 'installed', 'faulty', 'rma', 'disposed'];
+        if (!in_array($newStatus, $validStatuses)) {
+            throw new \Exception("Invalid lifecycle status: $newStatus");
+        }
+        
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("SELECT lifecycle_status FROM equipment WHERE id = ?");
+            $stmt->execute([$equipmentId]);
+            $oldStatus = $stmt->fetchColumn() ?: 'received';
+            
+            $updateFields = [
+                'lifecycle_status' => $newStatus,
+                'last_lifecycle_change' => date('Y-m-d H:i:s')
+            ];
+            
+            if ($newStatus === 'installed' && $extra) {
+                $updateFields['installed_customer_id'] = $extra['customer_id'] ?? null;
+                $updateFields['installed_at'] = $extra['installed_at'] ?? date('Y-m-d H:i:s');
+                $updateFields['installed_by'] = $extra['installed_by'] ?? $changedBy;
+            }
+            
+            $setClauses = [];
+            $params = [];
+            foreach ($updateFields as $field => $value) {
+                $setClauses[] = "$field = ?";
+                $params[] = $value;
+            }
+            $params[] = $equipmentId;
+            
+            $sql = "UPDATE equipment SET " . implode(', ', $setClauses) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            
+            $logStmt = $this->db->prepare("
+                INSERT INTO equipment_lifecycle_logs (equipment_id, old_status, new_status, changed_by, notes, extra_data)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $logStmt->execute([
+                $equipmentId,
+                $oldStatus,
+                $newStatus,
+                $changedBy,
+                $extra['notes'] ?? null,
+                $extra ? json_encode($extra) : null
+            ]);
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    
+    public function getLifecycleLogs(int $equipmentId): array {
+        $stmt = $this->db->prepare("
+            SELECT l.*, u.name as changed_by_name
+            FROM equipment_lifecycle_logs l
+            LEFT JOIN users u ON l.changed_by = u.id
+            WHERE l.equipment_id = ?
+            ORDER BY l.changed_at DESC
+        ");
+        $stmt->execute([$equipmentId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== TECHNICIAN KITS ====================
+    
+    public function getTechnicianKits(array $filters = []): array {
+        $sql = "
+            SELECT k.*, e.name as technician_name, u.name as created_by_name,
+                   (SELECT COUNT(*) FROM technician_kit_items WHERE kit_id = k.id) as item_count
+            FROM technician_kits k
+            LEFT JOIN employees e ON k.technician_id = e.id
+            LEFT JOIN users u ON k.created_by = u.id
+            WHERE 1=1
+        ";
+        $params = [];
+        
+        if (!empty($filters['technician_id'])) {
+            $sql .= " AND k.technician_id = ?";
+            $params[] = $filters['technician_id'];
+        }
+        if (!empty($filters['status'])) {
+            $sql .= " AND k.status = ?";
+            $params[] = $filters['status'];
+        }
+        
+        $sql .= " ORDER BY k.created_at DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getTechnicianKit(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT k.*, e.name as technician_name
+            FROM technician_kits k
+            LEFT JOIN employees e ON k.technician_id = e.id
+            WHERE k.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createTechnicianKit(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO technician_kits (kit_name, technician_id, status, issued_at, created_by, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['kit_name'],
+            $data['technician_id'] ?: null,
+            $data['status'] ?? 'active',
+            $data['issued_at'] ?? date('Y-m-d'),
+            $data['created_by'] ?? null,
+            $data['notes'] ?? null
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+    
+    public function updateTechnicianKit(int $id, array $data): bool {
+        $stmt = $this->db->prepare("
+            UPDATE technician_kits SET
+                kit_name = ?, technician_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $data['kit_name'],
+            $data['technician_id'] ?: null,
+            $data['status'] ?? 'active',
+            $data['notes'] ?? null,
+            $id
+        ]);
+    }
+    
+    public function returnTechnicianKit(int $id, ?string $returnDate = null): bool {
+        $stmt = $this->db->prepare("
+            UPDATE technician_kits SET status = 'returned', returned_at = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([$returnDate ?? date('Y-m-d'), $id]);
+    }
+    
+    public function getKitItems(int $kitId): array {
+        $stmt = $this->db->prepare("
+            SELECT ki.*, e.name as equipment_name, e.serial_number, e.brand, e.model,
+                   c.name as category_name
+            FROM technician_kit_items ki
+            JOIN equipment e ON ki.equipment_id = e.id
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            WHERE ki.kit_id = ?
+            ORDER BY e.name
+        ");
+        $stmt->execute([$kitId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function addKitItem(int $kitId, int $equipmentId, int $quantity = 1, ?string $notes = null): int {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO technician_kit_items (kit_id, equipment_id, quantity, notes)
+                VALUES (?, ?, ?, ?)
+            ");
+            $stmt->execute([$kitId, $equipmentId, $quantity, $notes]);
+            $itemId = (int) $this->db->lastInsertId();
+            
+            $this->updateEquipmentStatus($equipmentId, 'assigned');
+            
+            $this->db->commit();
+            return $itemId;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    
+    public function removeKitItem(int $itemId): bool {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("SELECT equipment_id FROM technician_kit_items WHERE id = ?");
+            $stmt->execute([$itemId]);
+            $equipmentId = $stmt->fetchColumn();
+            
+            $stmt = $this->db->prepare("DELETE FROM technician_kit_items WHERE id = ?");
+            $stmt->execute([$itemId]);
+            
+            if ($equipmentId) {
+                $this->updateEquipmentStatus($equipmentId, 'available');
+            }
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    
+    public function getLowStockCount(): int {
+        $stmt = $this->db->query("
+            SELECT COUNT(*) FROM (
+                SELECT c.id
+                FROM inventory_thresholds t
+                JOIN equipment_categories c ON t.category_id = c.id
+                LEFT JOIN equipment e ON e.category_id = c.id AND e.status = 'available'
+                WHERE t.notify_on_low = true
+                GROUP BY c.id, t.reorder_point
+                HAVING COUNT(e.id) <= t.reorder_point
+            ) low_stock
+        ");
+        return (int) $stmt->fetchColumn();
+    }
+    
+    // ==================== INVENTORY REPORTS ====================
+    
+    public function getStockLevelsReport(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                c.id as category_id,
+                c.name as category_name,
+                COUNT(e.id) as total_items,
+                COUNT(CASE WHEN e.status = 'available' THEN 1 END) as available,
+                COUNT(CASE WHEN e.status = 'assigned' THEN 1 END) as assigned,
+                COUNT(CASE WHEN e.status = 'on_loan' THEN 1 END) as on_loan,
+                COUNT(CASE WHEN e.status = 'faulty' THEN 1 END) as faulty,
+                COUNT(CASE WHEN e.status = 'retired' THEN 1 END) as retired,
+                COALESCE(SUM(e.purchase_price), 0) as total_value,
+                COALESCE(t.min_quantity, 0) as min_qty,
+                COALESCE(t.reorder_point, 0) as reorder_point,
+                COALESCE(t.max_quantity, 0) as max_qty
+            FROM equipment_categories c
+            LEFT JOIN equipment e ON e.category_id = c.id
+            LEFT JOIN inventory_thresholds t ON t.category_id = c.id AND t.warehouse_id IS NULL
+            GROUP BY c.id, c.name, t.min_quantity, t.reorder_point, t.max_quantity
+            ORDER BY c.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAgingReport(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                CASE 
+                    WHEN e.purchase_date IS NULL THEN 'Unknown'
+                    WHEN e.purchase_date >= CURRENT_DATE - INTERVAL '30 days' THEN '0-30 days'
+                    WHEN e.purchase_date >= CURRENT_DATE - INTERVAL '90 days' THEN '31-90 days'
+                    WHEN e.purchase_date >= CURRENT_DATE - INTERVAL '180 days' THEN '91-180 days'
+                    WHEN e.purchase_date >= CURRENT_DATE - INTERVAL '365 days' THEN '6-12 months'
+                    WHEN e.purchase_date >= CURRENT_DATE - INTERVAL '730 days' THEN '1-2 years'
+                    ELSE 'Over 2 years'
+                END as age_bracket,
+                c.name as category_name,
+                COUNT(*) as item_count,
+                COALESCE(SUM(e.purchase_price), 0) as total_value,
+                COUNT(CASE WHEN e.status = 'available' THEN 1 END) as available_count,
+                COUNT(CASE WHEN e.condition = 'poor' OR e.status = 'faulty' THEN 1 END) as needs_attention
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            GROUP BY age_bracket, c.name
+            ORDER BY 
+                CASE age_bracket
+                    WHEN '0-30 days' THEN 1
+                    WHEN '31-90 days' THEN 2
+                    WHEN '91-180 days' THEN 3
+                    WHEN '6-12 months' THEN 4
+                    WHEN '1-2 years' THEN 5
+                    WHEN 'Over 2 years' THEN 6
+                    ELSE 7
+                END,
+                c.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getConsumptionReport(string $startDate, string $endDate): array {
+        $stmt = $this->db->prepare("
+            SELECT 
+                c.name as category_name,
+                COUNT(DISTINCT CASE WHEN a.assignment_date BETWEEN ? AND ? THEN a.id END) as assigned_count,
+                COUNT(DISTINCT CASE WHEN l.loan_date BETWEEN ? AND ? THEN l.id END) as loaned_count,
+                COUNT(DISTINCT CASE WHEN a.return_date BETWEEN ? AND ? AND a.status = 'returned' THEN a.id END) as returned_from_assignment,
+                COUNT(DISTINCT CASE WHEN l.actual_return_date BETWEEN ? AND ? AND l.status = 'returned' THEN l.id END) as returned_from_loan
+            FROM equipment_categories c
+            LEFT JOIN equipment e ON e.category_id = c.id
+            LEFT JOIN equipment_assignments a ON a.equipment_id = e.id
+            LEFT JOIN equipment_loans l ON l.equipment_id = e.id
+            GROUP BY c.id, c.name
+            ORDER BY c.name
+        ");
+        $stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getRMATurnaroundReport(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                c.name as category_name,
+                COUNT(f.id) as total_faults,
+                COUNT(CASE WHEN f.repair_status = 'pending' THEN 1 END) as pending,
+                COUNT(CASE WHEN f.repair_status = 'in_progress' THEN 1 END) as in_progress,
+                COUNT(CASE WHEN f.repair_status = 'repaired' THEN 1 END) as repaired,
+                ROUND(AVG(CASE WHEN f.repair_date IS NOT NULL 
+                    THEN EXTRACT(EPOCH FROM (f.repair_date::timestamp - f.reported_date::timestamp)) / 86400 
+                END)::numeric, 1) as avg_repair_days,
+                ROUND(AVG(COALESCE(f.repair_cost, 0))::numeric, 2) as avg_repair_cost,
+                SUM(COALESCE(f.repair_cost, 0)) as total_repair_cost
+            FROM equipment_faults f
+            JOIN equipment e ON f.equipment_id = e.id
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            GROUP BY c.id, c.name
+            ORDER BY total_faults DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getWarrantyExpiryReport(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                CASE 
+                    WHEN e.warranty_expiry IS NULL THEN 'No Warranty'
+                    WHEN e.warranty_expiry < CURRENT_DATE THEN 'Expired'
+                    WHEN e.warranty_expiry <= CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring in 30 days'
+                    WHEN e.warranty_expiry <= CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring in 90 days'
+                    ELSE 'Valid (90+ days)'
+                END as warranty_status,
+                c.name as category_name,
+                COUNT(*) as item_count,
+                COALESCE(SUM(e.purchase_price), 0) as total_value
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            GROUP BY warranty_status, c.name
+            ORDER BY 
+                CASE warranty_status
+                    WHEN 'Expired' THEN 1
+                    WHEN 'Expiring in 30 days' THEN 2
+                    WHEN 'Expiring in 90 days' THEN 3
+                    WHEN 'Valid (90+ days)' THEN 4
+                    ELSE 5
+                END,
+                c.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getEquipmentValueReport(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                c.name as category_name,
+                COUNT(*) as item_count,
+                COALESCE(SUM(e.purchase_price), 0) as total_value,
+                COALESCE(AVG(e.purchase_price), 0) as avg_value,
+                COALESCE(MIN(e.purchase_price), 0) as min_value,
+                COALESCE(MAX(e.purchase_price), 0) as max_value
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            WHERE e.purchase_price IS NOT NULL AND e.purchase_price > 0
+            GROUP BY c.id, c.name
+            ORDER BY total_value DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== LOW STOCK NOTIFICATIONS ====================
+    
+    public function sendLowStockNotifications(): array {
+        $lowStockItems = $this->getLowStockItems();
+        if (empty($lowStockItems)) {
+            return ['success' => true, 'sent' => 0, 'message' => 'No low stock items to report'];
+        }
+        
+        $results = ['success' => true, 'sent' => 0, 'failed' => 0, 'errors' => []];
+        
+        $settingsStmt = $this->db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('low_stock_email', 'low_stock_phone', 'low_stock_notify_email', 'low_stock_notify_sms')");
+        $settings = [];
+        while ($row = $settingsStmt->fetch(\PDO::FETCH_ASSOC)) {
+            $settings[$row['setting_key']] = $row['setting_value'];
+        }
+        
+        $criticalItems = array_filter($lowStockItems, fn($item) => $item['alert_level'] === 'critical');
+        $lowItems = array_filter($lowStockItems, fn($item) => $item['alert_level'] === 'low');
+        
+        $message = "INVENTORY ALERT\n";
+        $message .= "================\n\n";
+        
+        if (!empty($criticalItems)) {
+            $message .= "CRITICAL STOCK:\n";
+            foreach ($criticalItems as $item) {
+                $message .= "- {$item['category_name']}: {$item['current_stock']} left (min: {$item['min_quantity']})\n";
+            }
+            $message .= "\n";
+        }
+        
+        if (!empty($lowItems)) {
+            $message .= "LOW STOCK:\n";
+            foreach ($lowItems as $item) {
+                $message .= "- {$item['category_name']}: {$item['current_stock']} left (reorder at: {$item['reorder_point']})\n";
+            }
+        }
+        
+        if (($settings['low_stock_notify_sms'] ?? 'no') === 'yes' && !empty($settings['low_stock_phone'])) {
+            try {
+                $sms = new \App\SMS($this->db);
+                $sent = $sms->send($settings['low_stock_phone'], $message);
+                if ($sent) {
+                    $results['sent']++;
+                } else {
+                    $results['failed']++;
+                    $results['errors'][] = 'SMS send failed';
+                }
+            } catch (\Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = 'SMS error: ' . $e->getMessage();
+            }
+        }
+        
+        $this->logLowStockNotification($lowStockItems);
+        
+        return $results;
+    }
+    
+    private function logLowStockNotification(array $items): void {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS inventory_notification_logs (
+                    id SERIAL PRIMARY KEY,
+                    notification_type VARCHAR(50) NOT NULL,
+                    item_count INT NOT NULL,
+                    details TEXT,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ");
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO inventory_notification_logs (notification_type, item_count, details)
+                VALUES ('low_stock', ?, ?)
+            ");
+            $stmt->execute([count($items), json_encode($items)]);
+        } catch (\Exception $e) {
+        }
+    }
+    
+    public function getNotificationLogs(int $limit = 50): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT * FROM inventory_notification_logs
+                ORDER BY sent_at DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
 }
