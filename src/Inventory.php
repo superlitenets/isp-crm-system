@@ -794,8 +794,9 @@ class Inventory {
     }
     
     private function validateStatus(string $value): string {
-        $valid = ['available', 'assigned', 'loaned', 'maintenance', 'faulty', 'retired'];
+        $valid = ['available', 'assigned', 'on_loan', 'maintenance', 'faulty', 'retired'];
         $lower = strtolower(trim($value));
+        if ($lower === 'loaned') $lower = 'on_loan';
         return in_array($lower, $valid) ? $lower : 'available';
     }
     
