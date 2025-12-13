@@ -1080,6 +1080,62 @@ function runMigrations(PDO $db): void {
                 verified_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )",
+        'inventory_thresholds' => "
+            CREATE TABLE IF NOT EXISTS inventory_thresholds (
+                id SERIAL PRIMARY KEY,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE CASCADE,
+                warehouse_id INTEGER REFERENCES inventory_warehouses(id) ON DELETE CASCADE,
+                min_quantity INTEGER NOT NULL DEFAULT 5,
+                max_quantity INTEGER DEFAULT 100,
+                reorder_point INTEGER NOT NULL DEFAULT 10,
+                reorder_quantity INTEGER DEFAULT 20,
+                notify_on_low BOOLEAN DEFAULT TRUE,
+                notify_on_excess BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(category_id, warehouse_id)
+            )",
+        'technician_kits' => "
+            CREATE TABLE IF NOT EXISTS technician_kits (
+                id SERIAL PRIMARY KEY,
+                kit_number VARCHAR(30) UNIQUE NOT NULL,
+                employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                status VARCHAR(20) DEFAULT 'active',
+                issued_date DATE,
+                issued_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                returned_date DATE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'technician_kit_items' => "
+            CREATE TABLE IF NOT EXISTS technician_kit_items (
+                id SERIAL PRIMARY KEY,
+                kit_id INTEGER REFERENCES technician_kits(id) ON DELETE CASCADE,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE SET NULL,
+                category_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL,
+                quantity INTEGER DEFAULT 1,
+                issued_quantity INTEGER DEFAULT 0,
+                returned_quantity INTEGER DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'issued',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'equipment_lifecycle_logs' => "
+            CREATE TABLE IF NOT EXISTS equipment_lifecycle_logs (
+                id SERIAL PRIMARY KEY,
+                equipment_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                from_status VARCHAR(30),
+                to_status VARCHAR(30) NOT NULL,
+                changed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                reference_type VARCHAR(30),
+                reference_id INTEGER,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
         'mobile_tokens' => "
             CREATE TABLE IF NOT EXISTS mobile_tokens (
                 id SERIAL PRIMARY KEY,
@@ -1680,7 +1736,12 @@ function runMigrations(PDO $db): void {
         ['equipment', 'barcode', 'ALTER TABLE equipment ADD COLUMN barcode VARCHAR(100)'],
         ['equipment_categories', 'parent_id', 'ALTER TABLE equipment_categories ADD COLUMN parent_id INTEGER REFERENCES equipment_categories(id) ON DELETE SET NULL'],
         ['equipment_categories', 'item_type', "ALTER TABLE equipment_categories ADD COLUMN item_type VARCHAR(30) DEFAULT 'serialized'"],
-        ['equipment_loans', 'deposit_paid', 'ALTER TABLE equipment_loans ADD COLUMN deposit_paid BOOLEAN DEFAULT FALSE']
+        ['equipment_loans', 'deposit_paid', 'ALTER TABLE equipment_loans ADD COLUMN deposit_paid BOOLEAN DEFAULT FALSE'],
+        ['equipment', 'lifecycle_status', "ALTER TABLE equipment ADD COLUMN lifecycle_status VARCHAR(30) DEFAULT 'in_stock'"],
+        ['equipment', 'last_lifecycle_change', 'ALTER TABLE equipment ADD COLUMN last_lifecycle_change TIMESTAMP'],
+        ['equipment', 'installed_customer_id', 'ALTER TABLE equipment ADD COLUMN installed_customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL'],
+        ['equipment', 'installed_at', 'ALTER TABLE equipment ADD COLUMN installed_at TIMESTAMP'],
+        ['equipment', 'installed_by', 'ALTER TABLE equipment ADD COLUMN installed_by INTEGER REFERENCES users(id) ON DELETE SET NULL']
     ];
     
     foreach ($columnMigrations as $migration) {
@@ -1710,6 +1771,7 @@ function runMigrations(PDO $db): void {
     seedRolesAndPermissions($db);
     seedSLADefaults($db);
     seedLeaveTypes($db);
+    seedISPEquipmentCategories($db);
 }
 
 function seedRolesAndPermissions(PDO $db): void {
@@ -2030,6 +2092,71 @@ function seedLeaveTypes(PDO $db): void {
             $stmt->execute($type);
         } catch (PDOException $e) {
             error_log("Error seeding leave type: " . $e->getMessage());
+        }
+    }
+}
+
+function seedISPEquipmentCategories(PDO $db): void {
+    $checkCategories = $db->query("SELECT COUNT(*) FROM equipment_categories")->fetchColumn();
+    if ($checkCategories > 0) {
+        return;
+    }
+    
+    $categories = [
+        // ONT/ONU Devices
+        ['ONT/ONU Devices', 'Optical Network Terminals and Optical Network Units for FTTH connections', 'serialized', null],
+        
+        // Routers
+        ['Routers', 'WiFi routers and indoor CPE devices', 'serialized', null],
+        
+        // Fiber Optic Materials
+        ['Fiber Optic', 'Fiber optic cables, splitters and accessories', 'consumable', null],
+        ['Fiber Splitters', 'PLC splitters (1x2, 1x4, 1x8, 1x16, 1x32)', 'serialized', 3],
+        ['Fiber Patch Cords', 'SC/APC, SC/UPC, LC patch cords', 'consumable', 3],
+        ['Drop Cables', 'FTTH drop cables with pre-terminated connectors', 'consumable', 3],
+        ['Fiber Pigtails', 'SC/APC, SC/UPC, LC pigtails for splicing', 'consumable', 3],
+        
+        // PON Equipment
+        ['PON Equipment', 'OLT cards, SFP modules and PON components', 'serialized', null],
+        ['OLT Cards', 'GPON/EPON line cards for OLT', 'serialized', 8],
+        ['SFP Modules', 'Class B+, C+ SFP modules for OLT/ONU', 'serialized', 8],
+        
+        // Network Equipment
+        ['Network Equipment', 'Switches, media converters and network devices', 'serialized', null],
+        ['Switches', 'Managed and unmanaged network switches', 'serialized', 11],
+        ['Media Converters', 'Fiber to ethernet media converters', 'serialized', 11],
+        
+        // Tools
+        ['Tools', 'Installation and testing equipment', 'reusable', null],
+        ['Fiber Cleavers', 'High precision fiber optic cleavers', 'reusable', 14],
+        ['Power Meters', 'Optical power meters for signal testing', 'reusable', 14],
+        ['Visual Fault Locators', 'VFL for fiber break detection', 'reusable', 14],
+        ['OTDR', 'Optical Time Domain Reflectometers', 'reusable', 14],
+        ['Fusion Splicers', 'Fiber optic fusion splicing machines', 'reusable', 14],
+        ['Stripping Tools', 'Fiber cable strippers and cutters', 'reusable', 14],
+        
+        // Consumables
+        ['Consumables', 'Connectors, adapters and installation materials', 'consumable', null],
+        ['Fiber Connectors', 'SC/APC, SC/UPC, LC connectors for field termination', 'consumable', 22],
+        ['Fiber Adapters', 'SC/APC, SC/UPC adapter couplers', 'consumable', 22],
+        ['Cable Ties', 'Cable ties and fasteners', 'consumable', 22],
+        ['Heat Shrink Tubes', 'Splice protection sleeves', 'consumable', 22],
+        ['Cleaning Supplies', 'Fiber cleaning wipes and swabs', 'consumable', 22],
+        
+        // Enclosures
+        ['Enclosures', 'Splice closures, distribution boxes and cabinets', 'serialized', null],
+        ['Splice Closures', 'Fiber optic splice closures (dome, inline)', 'serialized', 28],
+        ['Distribution Boxes', 'FTTH distribution and termination boxes', 'serialized', 28],
+        ['ODF Cabinets', 'Optical distribution frames', 'serialized', 28],
+        ['FAT Boxes', 'Fiber Access Terminals for multi-port distribution', 'serialized', 28]
+    ];
+    
+    $stmt = $db->prepare("INSERT INTO equipment_categories (name, description, item_type, parent_id) VALUES (?, ?, ?, ?)");
+    foreach ($categories as $cat) {
+        try {
+            $stmt->execute($cat);
+        } catch (PDOException $e) {
+            error_log("Error seeding equipment category {$cat[0]}: " . $e->getMessage());
         }
     }
 }
