@@ -3314,6 +3314,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'seed_ticket_categories':
+                try {
+                    $ticketModel = new \App\Ticket();
+                    $ticketModel->seedDefaultCategories();
+                    $message = 'Default ticket categories loaded successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error loading default categories: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_ticket_category':
+                try {
+                    $ticketModel = new \App\Ticket();
+                    $ticketModel->addCategory([
+                        'key' => $_POST['key'],
+                        'label' => $_POST['label'],
+                        'description' => $_POST['description'] ?? null,
+                        'color' => $_POST['color'] ?? 'primary',
+                        'display_order' => (int)($_POST['display_order'] ?? 0),
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Ticket category added successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error adding ticket category: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'update_ticket_category':
+                try {
+                    $ticketModel = new \App\Ticket();
+                    $ticketModel->updateCategory((int)$_POST['category_id'], [
+                        'label' => $_POST['label'],
+                        'description' => $_POST['description'] ?? null,
+                        'color' => $_POST['color'] ?? 'primary',
+                        'display_order' => (int)($_POST['display_order'] ?? 0),
+                        'is_active' => isset($_POST['is_active'])
+                    ]);
+                    $message = 'Ticket category updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating ticket category: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_ticket_category':
+                try {
+                    $ticketModel = new \App\Ticket();
+                    $ticketModel->deleteCategory((int)$_POST['category_id']);
+                    $message = 'Ticket category deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting ticket category: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_mobile_settings':
                 try {
                     $mobileData = [
