@@ -2553,4 +2553,44 @@ function initializeAccountingTables(\PDO $db) {
             try { $stmt->execute($s); } catch (PDOException $e) {}
         }
     }
+    
+    // Seed default ticket categories
+    $checkTicketCats = $db->query("SELECT COUNT(*) FROM ticket_categories")->fetchColumn();
+    if ($checkTicketCats == 0) {
+        $ticketCategories = [
+            ['connectivity', 'Connectivity Issue', 1],
+            ['speed', 'Speed Issue', 2],
+            ['installation', 'New Installation', 3],
+            ['billing', 'Billing Inquiry', 4],
+            ['equipment', 'Equipment Problem', 5],
+            ['outage', 'Service Outage', 6],
+            ['service', 'Service Quality', 7],
+            ['upgrade', 'Plan Upgrade', 8],
+            ['other', 'Other', 9]
+        ];
+        $stmt = $db->prepare("INSERT INTO ticket_categories (key, label, display_order, is_active) VALUES (?, ?, ?, true)");
+        foreach ($ticketCategories as $cat) {
+            try { $stmt->execute($cat); } catch (PDOException $e) {}
+        }
+    }
+    
+    // Seed default ticket commission rates
+    $checkCommRates = $db->query("SELECT COUNT(*) FROM ticket_commission_rates")->fetchColumn();
+    if ($checkCommRates == 0) {
+        $commissionRates = [
+            ['connectivity', 100, 'KES', 'Commission for connectivity issue tickets'],
+            ['speed', 100, 'KES', 'Commission for speed issue tickets'],
+            ['installation', 500, 'KES', 'Commission for new installation tickets'],
+            ['billing', 50, 'KES', 'Commission for billing inquiry tickets'],
+            ['equipment', 150, 'KES', 'Commission for equipment problem tickets'],
+            ['outage', 100, 'KES', 'Commission for service outage tickets'],
+            ['service', 100, 'KES', 'Commission for service quality tickets'],
+            ['upgrade', 200, 'KES', 'Commission for plan upgrade tickets'],
+            ['other', 50, 'KES', 'Commission for other tickets']
+        ];
+        $stmt = $db->prepare("INSERT INTO ticket_commission_rates (category, rate, currency, description, is_active) VALUES (?, ?, ?, ?, true)");
+        foreach ($commissionRates as $rate) {
+            try { $stmt->execute($rate); } catch (PDOException $e) {}
+        }
+    }
 }
