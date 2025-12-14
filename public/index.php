@@ -1656,6 +1656,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'bulk_generate_payroll':
+                if (!\App\Auth::isAdmin()) {
+                    $message = 'Only administrators can generate bulk payroll.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $payPeriodStart = $_POST['pay_period_start'];
+                        $payPeriodEnd = $_POST['pay_period_end'];
+                        
+                        $results = $employee->generateBulkPayroll($payPeriodStart, $payPeriodEnd);
+                        
+                        $payrollDb = Database::getConnection();
+                        $payPeriodMonth = date('Y-m', strtotime($payPeriodStart));
+                        $additionsApplied = [];
+                        
+                        foreach ($results['payroll_ids'] as $empId => $payrollId) {
+                            if (!empty($_POST['include_late_deductions'])) {
+                                $lateCalculator = new \App\LateDeductionCalculator($payrollDb);
+                                $lateCalculator->applyDeductionsToPayroll($payrollId, $empId, $payPeriodMonth);
+                            }
+                            
+                            if (!empty($_POST['include_ticket_commissions'])) {
+                                $ticketCommission = new \App\TicketCommission($payrollDb);
+                                $ticketCommission->applyToPayroll($payrollId, $empId, $payPeriodMonth);
+                            }
+                            
+                            if (!empty($_POST['include_advance_deductions'])) {
+                                $salaryAdvance = new \App\SalaryAdvance($payrollDb);
+                                $activeAdvances = $salaryAdvance->getEmployeeActiveAdvances($empId);
+                                foreach ($activeAdvances as $advance) {
+                                    if (in_array($advance['status'], ['disbursed', 'repaying']) && $advance['balance'] > 0) {
+                                        $deductionAmount = min($advance['repayment_amount'], $advance['balance']);
+                                        $salaryAdvance->recordPayment($advance['id'], [
+                                            'amount' => $deductionAmount,
+                                            'payment_type' => 'payroll_deduction',
+                                            'payment_date' => date('Y-m-d'),
+                                            'payroll_id' => $payrollId,
+                                            'recorded_by' => $currentUser['id']
+                                        ]);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (!empty($_POST['include_late_deductions'])) $additionsApplied[] = 'late deductions';
+                        if (!empty($_POST['include_ticket_commissions'])) $additionsApplied[] = 'ticket commissions';
+                        if (!empty($_POST['include_advance_deductions'])) $additionsApplied[] = 'advance deductions';
+                        
+                        $message = "Bulk payroll generated: {$results['success']} created, {$results['skipped']} skipped (already exist).";
+                        if (!empty($additionsApplied)) {
+                            $message .= ' Applied: ' . implode(', ', $additionsApplied) . '.';
+                        }
+                        if (!empty($results['errors'])) {
+                            $message .= ' Errors: ' . count($results['errors']);
+                        }
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error generating bulk payroll: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+
             case 'create_performance':
                 try {
                     $employee->createPerformanceReview($_POST);

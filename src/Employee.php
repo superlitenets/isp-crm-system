@@ -706,6 +706,78 @@ class Employee {
         return $stmt->fetch();
     }
 
+    public function generateBulkPayroll(string $payPeriodStart, string $payPeriodEnd, array $options = []): array {
+        $stmt = $this->db->prepare("
+            SELECT e.id, e.name, e.salary, e.employee_id as emp_code
+            FROM employees e
+            WHERE e.employment_status = 'active' AND e.salary > 0
+            ORDER BY e.name
+        ");
+        $stmt->execute();
+        $employees = $stmt->fetchAll();
+
+        $results = [
+            'success' => 0,
+            'skipped' => 0,
+            'errors' => [],
+            'payroll_ids' => []
+        ];
+
+        $payPeriodMonth = date('Y-m', strtotime($payPeriodStart));
+
+        foreach ($employees as $emp) {
+            $existingStmt = $this->db->prepare("
+                SELECT id FROM payroll 
+                WHERE employee_id = ? 
+                AND pay_period_start = ? 
+                AND pay_period_end = ?
+            ");
+            $existingStmt->execute([$emp['id'], $payPeriodStart, $payPeriodEnd]);
+            if ($existingStmt->fetch()) {
+                $results['skipped']++;
+                continue;
+            }
+
+            try {
+                $baseSalary = (float)$emp['salary'];
+                $overtimePay = 0;
+                $bonuses = 0;
+                $deductions = 0;
+                $tax = 0;
+                $netPay = $baseSalary + $overtimePay + $bonuses - $deductions - $tax;
+
+                $stmt = $this->db->prepare("
+                    INSERT INTO payroll (employee_id, pay_period_start, pay_period_end, base_salary, overtime_pay, bonuses, deductions, tax, net_pay, status, payment_date, payment_method, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $emp['id'],
+                    $payPeriodStart,
+                    $payPeriodEnd,
+                    $baseSalary,
+                    $overtimePay,
+                    $bonuses,
+                    $deductions,
+                    $tax,
+                    $netPay,
+                    'pending',
+                    null,
+                    null,
+                    'Bulk generated'
+                ]);
+
+                $payrollId = (int)$this->db->lastInsertId();
+                $results['payroll_ids'][$emp['id']] = $payrollId;
+                $results['success']++;
+
+            } catch (\Exception $e) {
+                $results['errors'][] = $emp['name'] . ': ' . $e->getMessage();
+            }
+        }
+
+        return $results;
+    }
+
     public function createPerformanceReview(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO performance_reviews (
