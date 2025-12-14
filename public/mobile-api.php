@@ -17,6 +17,7 @@ require_once __DIR__ . '/../src/MobileAPI.php';
 
 initializeDatabase();
 
+$db = Database::getConnection();
 $api = new \App\MobileAPI();
 
 $action = $_GET['action'] ?? '';
