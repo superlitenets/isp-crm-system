@@ -64,7 +64,12 @@ class SalaryAdvance {
     
     public function getByEmployee(int $employeeId): array {
         $stmt = $this->db->prepare("
-            SELECT sa.*
+            SELECT sa.*, 
+                COALESCE(sa.approved_amount, sa.requested_amount) as amount,
+                sa.outstanding_balance as balance,
+                sa.repayment_schedule as repayment_type,
+                sa.installments as repayment_installments,
+                CASE WHEN sa.installments > 0 THEN COALESCE(sa.approved_amount, sa.requested_amount) / sa.installments ELSE 0 END as repayment_amount
             FROM salary_advances sa
             WHERE sa.employee_id = ?
             ORDER BY sa.created_at DESC
