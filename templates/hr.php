@@ -1031,6 +1031,9 @@ function syncAllEmployeesToDevice(deviceId) {
                 </button>
             </div>
             <div class="col-md-6 text-end">
+                <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#bulkPayrollModal">
+                    <i class="bi bi-people-fill"></i> Generate All
+                </button>
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#payrollModal">
                     <i class="bi bi-plus-circle"></i> Create Payroll
                 </button>
@@ -1208,6 +1211,62 @@ function syncAllEmployeesToDevice(deviceId) {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Payroll</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="bulkPayrollModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="bulk_generate_payroll">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-people-fill"></i> Generate Payroll for All Employees</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle"></i> This will create payroll records for all active employees with a salary configured. Existing records for the same period will be skipped.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Pay Period Start *</label>
+                            <input type="date" class="form-control" name="pay_period_start" value="<?= $selectedMonth ?>-01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Pay Period End *</label>
+                            <input type="date" class="form-control" name="pay_period_end" value="<?= date('Y-m-t', strtotime($selectedMonth . '-01')) ?>" required>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_late_deductions" id="bulkIncludeLateDeductions" value="1" checked>
+                                <label class="form-check-label" for="bulkIncludeLateDeductions">
+                                    <i class="bi bi-alarm text-warning"></i> Include late arrival deductions
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_ticket_commissions" id="bulkIncludeTicketCommissions" value="1" checked>
+                                <label class="form-check-label" for="bulkIncludeTicketCommissions">
+                                    <i class="bi bi-ticket-perforated text-success"></i> Include ticket commissions
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="include_advance_deductions" id="bulkIncludeAdvanceDeductions" value="1" checked>
+                                <label class="form-check-label" for="bulkIncludeAdvanceDeductions">
+                                    <i class="bi bi-cash-coin text-danger"></i> Include salary advance deductions
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-play-fill"></i> Generate All Payroll
+                    </button>
                 </div>
             </form>
         </div>
