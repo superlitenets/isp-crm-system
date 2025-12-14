@@ -411,6 +411,18 @@ function initializeDatabase(): void {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS ticket_categories (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(50) NOT NULL UNIQUE,
+        label VARCHAR(100) NOT NULL,
+        description TEXT,
+        color VARCHAR(20) DEFAULT 'primary',
+        display_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS teams (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) NOT NULL,

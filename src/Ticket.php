@@ -681,6 +681,24 @@ class Ticket {
     }
 
     public function getCategories(): array {
+        try {
+            $stmt = $this->db->query("SELECT key, label FROM ticket_categories WHERE is_active = true ORDER BY display_order, label");
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            if (!empty($rows)) {
+                $categories = [];
+                foreach ($rows as $row) {
+                    $categories[$row['key']] = $row['label'];
+                }
+                return $categories;
+            }
+        } catch (\Exception $e) {
+        }
+        
+        return $this->getDefaultCategories();
+    }
+    
+    public function getDefaultCategories(): array {
         return [
             'connectivity' => 'Connectivity Issue',
             'speed' => 'Speed Issue',
@@ -692,6 +710,95 @@ class Ticket {
             'upgrade' => 'Plan Upgrade',
             'other' => 'Other'
         ];
+    }
+    
+    public function getAllCategories(): array {
+        $stmt = $this->db->query("SELECT * FROM ticket_categories ORDER BY display_order, label");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getCategory(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM ticket_categories WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function addCategory(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO ticket_categories (key, label, description, color, display_order, is_active)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $data['key'])),
+            $data['label'],
+            $data['description'] ?? null,
+            $data['color'] ?? 'primary',
+            $data['display_order'] ?? 0,
+            isset($data['is_active']) ? (bool)$data['is_active'] : true
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updateCategory(int $id, array $data): bool {
+        $fields = [];
+        $params = [];
+        
+        if (isset($data['key'])) {
+            $fields[] = "key = ?";
+            $params[] = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $data['key']));
+        }
+        if (isset($data['label'])) {
+            $fields[] = "label = ?";
+            $params[] = $data['label'];
+        }
+        if (array_key_exists('description', $data)) {
+            $fields[] = "description = ?";
+            $params[] = $data['description'];
+        }
+        if (isset($data['color'])) {
+            $fields[] = "color = ?";
+            $params[] = $data['color'];
+        }
+        if (isset($data['display_order'])) {
+            $fields[] = "display_order = ?";
+            $params[] = (int)$data['display_order'];
+        }
+        if (isset($data['is_active'])) {
+            $fields[] = "is_active = ?";
+            $params[] = (bool)$data['is_active'];
+        }
+        
+        if (empty($fields)) {
+            return false;
+        }
+        
+        $fields[] = "updated_at = CURRENT_TIMESTAMP";
+        $params[] = $id;
+        
+        $stmt = $this->db->prepare("UPDATE ticket_categories SET " . implode(', ', $fields) . " WHERE id = ?");
+        return $stmt->execute($params);
+    }
+    
+    public function deleteCategory(int $id): bool {
+        $stmt = $this->db->prepare("DELETE FROM ticket_categories WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+    
+    public function seedDefaultCategories(): void {
+        $defaults = $this->getDefaultCategories();
+        $order = 0;
+        foreach ($defaults as $key => $label) {
+            $order++;
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO ticket_categories (key, label, display_order) 
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (key) DO NOTHING
+                ");
+                $stmt->execute([$key, $label, $order]);
+            } catch (\Exception $e) {
+            }
+        }
     }
 
     public function getPriorities(): array {
