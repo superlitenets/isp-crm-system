@@ -113,28 +113,17 @@ class SalaryAdvance {
     }
     
     public function disburse(int $id): bool {
-        $this->db->beginTransaction();
-        try {
-            $advance = $this->getById($id);
-            if (!$advance || $advance['status'] !== 'approved') {
-                throw new \Exception('Advance must be approved before disbursement');
-            }
-            
-            $nextDeduction = $this->calculateNextDeductionDate($advance['repayment_type']);
-            
-            $stmt = $this->db->prepare("
-                UPDATE salary_advances 
-                SET status = 'disbursed', disbursed_at = CURRENT_TIMESTAMP, next_deduction_date = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ");
-            $stmt->execute([$nextDeduction, $id]);
-            
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            throw $e;
+        $advance = $this->getById($id);
+        if (!$advance || $advance['status'] !== 'approved') {
+            throw new \Exception('Advance must be approved before disbursement');
         }
+        
+        $stmt = $this->db->prepare("
+            UPDATE salary_advances 
+            SET status = 'disbursed', disbursed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        return $stmt->execute([$id]);
     }
     
     public function recordPayment(int $advanceId, array $data): int {
