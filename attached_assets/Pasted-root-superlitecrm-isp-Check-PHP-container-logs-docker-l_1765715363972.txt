@@ -1,0 +1,88 @@
+root@superlitecrm:~/isp# # Check PHP container logs
+docker logs isp_crm_php --tail 100
+
+# Check if the database seeding ran
+docker exec -it isp_crm_php php -r "
+require '/var/www/html/vendor/autoload.php';
+require '/var/www/html/config/database.php';
+\$db = Database::getConnection();
+\$cats = \$db->query('SELECT COUNT(*) FROM ticket_categories')->fetchColumn();
+\$rates = \$db->query('SELECT COUNT(*) FROM ticket_commission_rates')->fetchColumn();
+echo \"Ticket Categories: \$cats\n\";
+echo \"Commission Rates: \$rates\n\";
+"
+
+# If counts are 0, manually seed the data
+docker exec -it isp_crm_php php -r "
+require '/var/www/html/vendor/autoload.php';
+require '/var/www/html/config/database.php';
+\$db = Database::getConnection();
+
+\$db->exec(\"INSERT INTO ticket_categories (key, label, display_order, is_active) VALUES
+('connectivity', 'Connectivity Issue', 1, true),
+"cho 'Done! Data seeded.';NOTHING\");other tickets', true)ts', true),e),ue),),),
+[14-Dec-2025 15:26:13] NOTICE: fpm is running, pid 1
+[14-Dec-2025 15:26:13] NOTICE: ready to handle connections
+172.18.0.4 -  14/Dec/2025:15:26:25 +0300 "GET /index.php" 302
+172.18.0.4 -  14/Dec/2025:15:26:27 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:26:31 +0300 "POST /index.php" 302
+172.18.0.4 -  14/Dec/2025:15:26:33 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:26:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:26:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:26:37 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:26:41 +0300 "GET /index.php" 500
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "ticket_categories" does not exist
+LINE 1: SELECT * FROM ticket_categories ORDER BY display_order, labe...
+                      ^ in /var/www/html/src/Ticket.php:716
+Stack trace:
+#0 /var/www/html/src/Ticket.php(716): PDO->query()
+#1 /var/www/html/templates/settings.php(5305): App\Ticket->getAllCategories()
+#2 /var/www/html/public/index.php(4977): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Ticket.php on line 716
+172.18.0.4 -  14/Dec/2025:15:27:03 +0300 "GET /api/whatsapp-chat.php" 401
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "ticket_categories" does not exist
+LINE 1: SELECT * FROM ticket_categories ORDER BY display_order, labe...
+                      ^ in /var/www/html/src/Ticket.php:716
+Stack trace:
+#0 /var/www/html/src/Ticket.php(716): PDO->query()
+#1 /var/www/html/templates/settings.php(5305): App\Ticket->getAllCategories()
+#2 /var/www/html/public/index.php(4977): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Ticket.php on line 716
+172.18.0.4 -  14/Dec/2025:15:27:13 +0300 "GET /index.php" 500
+172.18.0.4 -  14/Dec/2025:15:27:29 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:27:33 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:27:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:27:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:27:40 +0300 "POST /index.php" 302
+172.18.0.4 -  14/Dec/2025:15:27:42 +0300 "GET /index.php" 200
+172.18.0.4 -  14/Dec/2025:15:27:46 +0300 "GET /index.php" 200
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "ticket_categories" does not exist
+LINE 1: SELECT * FROM ticket_categories ORDER BY display_order, labe...
+                      ^ in /var/www/html/src/Ticket.php:716
+Stack trace:
+#0 /var/www/html/src/Ticket.php(716): PDO->query()
+172.18.0.4 -  14/Dec/2025:15:27:53 +0300 "GET /index.php" 500
+#1 /var/www/html/templates/settings.php(5305): App\Ticket->getAllCategories()
+#2 /var/www/html/public/index.php(4977): include('...')
+#3 {main}
+  thrown in /var/www/html/src/Ticket.php on line 716
+172.18.0.4 -  14/Dec/2025:15:28:02 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:28:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:28:35 +0300 "GET /api/whatsapp-chat.php" 401
+172.18.0.4 -  14/Dec/2025:15:29:02 +0300 "GET /api/whatsapp-chat.php" 401
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "ticket_categories" does not exist
+LINE 1: SELECT COUNT(*) FROM ticket_categories
+                             ^ in Command line code:5
+Stack trace:
+#0 Command line code(5): PDO->query()
+#1 {main}
+  thrown in Command line code on line 5
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "ticket_categories" does not exist
+LINE 1: INSERT INTO ticket_categories (key, label, display_order, is...
+                    ^ in Command line code:6
+Stack trace:
+#0 Command line code(6): PDO->exec()
+#1 {main}
+  thrown in Command line code on line 6
