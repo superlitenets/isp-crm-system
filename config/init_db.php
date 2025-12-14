@@ -1783,6 +1783,7 @@ function runMigrations(PDO $db): void {
     seedRolesAndPermissions($db);
     seedSLADefaults($db);
     seedLeaveTypes($db);
+    seedHRNotificationTemplates($db);
     seedISPEquipmentCategories($db);
 }
 
@@ -2104,6 +2105,30 @@ function seedLeaveTypes(PDO $db): void {
             $stmt->execute($type);
         } catch (PDOException $e) {
             error_log("Error seeding leave type: " . $e->getMessage());
+        }
+    }
+}
+
+function seedHRNotificationTemplates(PDO $db): void {
+    $templates = [
+        ['Salary Advance Approved', 'salary_advance', 'advance_approved', 'Your salary advance has been approved', 'Dear {employee_name}, your salary advance request of {currency} {amount} has been APPROVED. It will be disbursed soon. - {company_name}', true],
+        ['Salary Advance Rejected', 'salary_advance', 'advance_rejected', 'Your salary advance has been rejected', 'Dear {employee_name}, your salary advance request of {currency} {amount} has been REJECTED. Reason: {rejection_reason}. - {company_name}', true],
+        ['Salary Advance Disbursed', 'salary_advance', 'advance_disbursed', 'Your salary advance has been disbursed', 'Dear {employee_name}, your salary advance of {currency} {amount} has been DISBURSED. Repayment: {repayment_installments} installments of {currency} {repayment_amount}. - {company_name}', true],
+        ['Leave Request Approved', 'leave', 'leave_approved', 'Your leave request has been approved', 'Dear {employee_name}, your {leave_type} request from {start_date} to {end_date} ({total_days} days) has been APPROVED. - {company_name}', true],
+        ['Leave Request Rejected', 'leave', 'leave_rejected', 'Your leave request has been rejected', 'Dear {employee_name}, your {leave_type} request from {start_date} to {end_date} has been REJECTED. Reason: {rejection_reason}. - {company_name}', true]
+    ];
+    
+    $stmt = $db->prepare("
+        INSERT INTO hr_notification_templates (name, category, event_type, subject, sms_template, send_sms)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT (event_type) DO NOTHING
+    ");
+    
+    foreach ($templates as $template) {
+        try {
+            $stmt->execute($template);
+        } catch (PDOException $e) {
+            error_log("Error seeding HR notification template: " . $e->getMessage());
         }
     }
 }
