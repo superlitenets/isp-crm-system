@@ -29,6 +29,10 @@ $departments = $employee->getAllDepartments();
 $employmentStatuses = $employee->getEmploymentStatuses();
 $hrStats = $employee->getStats();
 $allEmployees = $employee->getAll();
+
+$pendingLeaveCount = $db->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
+$pendingAdvanceCount = $db->query("SELECT COUNT(*) FROM salary_advances WHERE status = 'pending'")->fetchColumn();
+$todayLateCount = $db->query("SELECT COUNT(*) FROM attendance WHERE DATE(clock_in) = CURRENT_DATE AND is_late = true")->fetchColumn();
 $attendanceStatuses = $employee->getAttendanceStatuses();
 $payrollStatuses = $employee->getPayrollStatuses();
 $paymentMethods = $employee->getPaymentMethods();
@@ -756,6 +760,7 @@ function syncAllEmployeesToDevice(deviceId) {
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'late_arrivals' ? 'active' : '' ?>" href="?page=hr&subpage=late_arrivals">
             <i class="bi bi-alarm"></i> Late Arrivals
+            <?php if ($todayLateCount > 0): ?><span class="badge bg-warning rounded-pill ms-1"><?= $todayLateCount ?></span><?php endif; ?>
         </a>
     </li>
     <li class="nav-item">
@@ -776,11 +781,13 @@ function syncAllEmployeesToDevice(deviceId) {
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'advances' ? 'active' : '' ?>" href="?page=hr&subpage=advances">
             <i class="bi bi-cash-coin"></i> Advances
+            <?php if ($pendingAdvanceCount > 0): ?><span class="badge bg-danger rounded-pill ms-1"><?= $pendingAdvanceCount ?></span><?php endif; ?>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?= $subpage === 'leave' ? 'active' : '' ?>" href="?page=hr&subpage=leave">
             <i class="bi bi-calendar-check"></i> Leave
+            <?php if ($pendingLeaveCount > 0): ?><span class="badge bg-danger rounded-pill ms-1"><?= $pendingLeaveCount ?></span><?php endif; ?>
         </a>
     </li>
 </ul>
