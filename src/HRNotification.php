@@ -5,12 +5,30 @@ namespace App;
 class HRNotification {
     private \PDO $db;
     private SMS $sms;
+    private WhatsApp $whatsapp;
     private Settings $settings;
     
     public function __construct(\PDO $db) {
         $this->db = $db;
         $this->sms = new SMS();
+        $this->whatsapp = new WhatsApp();
         $this->settings = new Settings();
+    }
+    
+    private function sendNotification(string $phone, string $message): array {
+        $results = ['sms' => false, 'whatsapp' => false];
+        
+        if ($this->settings->get('hr_notify_sms', '1') === '1') {
+            $smsResult = $this->sms->send($phone, $message);
+            $results['sms'] = $smsResult['success'] ?? false;
+        }
+        
+        if ($this->settings->get('hr_notify_whatsapp', '1') === '1') {
+            $waResult = $this->whatsapp->send($phone, $message);
+            $results['whatsapp'] = $waResult['success'] ?? false;
+        }
+        
+        return $results;
     }
     
     public function getTemplate(string $eventType): ?array {
@@ -56,12 +74,14 @@ class HRNotification {
         if ($eventType === 'leave_request_created') {
             $adminPhone = $this->getAdminPhone();
             if ($adminPhone) {
-                return $this->sms->send($adminPhone, $message)['success'] ?? false;
+                $result = $this->sendNotification($adminPhone, $message);
+                return $result['sms'] || $result['whatsapp'];
             }
             return false;
         } else {
             if ($employee && !empty($employee['phone'])) {
-                return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+                $result = $this->sendNotification($employee['phone'], $message);
+                return $result['sms'] || $result['whatsapp'];
             }
             return false;
         }
@@ -101,12 +121,14 @@ class HRNotification {
         if ($eventType === 'advance_request_created') {
             $adminPhone = $this->getAdminPhone();
             if ($adminPhone) {
-                return $this->sms->send($adminPhone, $message)['success'] ?? false;
+                $result = $this->sendNotification($adminPhone, $message);
+                return $result['sms'] || $result['whatsapp'];
             }
             return false;
         } else {
             if ($employee && !empty($employee['phone'])) {
-                return $this->sms->send($employee['phone'], $message)['success'] ?? false;
+                $result = $this->sendNotification($employee['phone'], $message);
+                return $result['sms'] || $result['whatsapp'];
             }
             return false;
         }
