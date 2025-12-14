@@ -3316,7 +3316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'seed_ticket_categories':
                 try {
-                    $ticketModel = new \App\Ticket();
+                    $ticketModel = new \App\Ticket($db);
                     $ticketModel->seedDefaultCategories();
                     $message = 'Default ticket categories loaded successfully!';
                     $messageType = 'success';
@@ -3329,7 +3329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'add_ticket_category':
                 try {
-                    $ticketModel = new \App\Ticket();
+                    $ticketModel = new \App\Ticket($db);
                     $ticketModel->addCategory([
                         'key' => $_POST['key'],
                         'label' => $_POST['label'],
@@ -3349,7 +3349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'update_ticket_category':
                 try {
-                    $ticketModel = new \App\Ticket();
+                    $ticketModel = new \App\Ticket($db);
                     $ticketModel->updateCategory((int)$_POST['category_id'], [
                         'label' => $_POST['label'],
                         'description' => $_POST['description'] ?? null,
@@ -3368,7 +3368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'delete_ticket_category':
                 try {
-                    $ticketModel = new \App\Ticket();
+                    $ticketModel = new \App\Ticket($db);
                     $ticketModel->deleteCategory((int)$_POST['category_id']);
                     $message = 'Ticket category deleted successfully!';
                     $messageType = 'success';
