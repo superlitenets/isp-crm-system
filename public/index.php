@@ -3977,8 +3977,28 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                             $inventory->updateEquipment((int)$_POST['id'], $data);
                             $_SESSION['success_message'] = 'Equipment updated successfully!';
                         } else {
-                            $inventory->addEquipment($data);
-                            $_SESSION['success_message'] = 'Equipment added successfully!';
+                            $quantity = max(1, min(500, (int)($_POST['quantity'] ?? 1)));
+                            if ($quantity === 1) {
+                                $inventory->addEquipment($data);
+                                $_SESSION['success_message'] = 'Equipment added successfully!';
+                            } else {
+                                $baseName = $data['name'];
+                                $baseSerial = $data['serial_number'];
+                                $baseMac = $data['mac_address'];
+                                
+                                for ($i = 1; $i <= $quantity; $i++) {
+                                    $itemData = $data;
+                                    $itemData['name'] = $baseName . ' #' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                                    if (!empty($baseSerial)) {
+                                        $itemData['serial_number'] = $baseSerial . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                                    }
+                                    if (!empty($baseMac)) {
+                                        $itemData['mac_address'] = null;
+                                    }
+                                    $inventory->addEquipment($itemData);
+                                }
+                                $_SESSION['success_message'] = "{$quantity} equipment items added successfully!";
+                            }
                         }
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=equipment');

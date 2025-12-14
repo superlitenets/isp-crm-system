@@ -281,11 +281,18 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <input type="hidden" name="id" value="<?= $equipment['id'] ?? '' ?>">
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-<?= $action === 'add' ? '4' : '6' ?> mb-3">
                             <label class="form-label">Name *</label>
                             <input type="text" class="form-control" name="name" required value="<?= htmlspecialchars($equipment['name'] ?? '') ?>">
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <?php if ($action === 'add'): ?>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" class="form-control" name="quantity" value="1" min="1" max="500">
+                            <small class="text-muted">Add multiple units</small>
+                        </div>
+                        <?php endif; ?>
+                        <div class="col-md-<?= $action === 'add' ? '6' : '6' ?> mb-3">
                             <label class="form-label">Category</label>
                             <select class="form-select" name="category_id">
                                 <option value="">-- Select Category --</option>
