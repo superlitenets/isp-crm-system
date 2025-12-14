@@ -5302,8 +5302,193 @@ if ($action === 'edit_rate' && $id) {
 
 $ticketModel = new \App\Ticket($db);
 $categories = $ticketModel->getCategories();
+$allCategories = $ticketModel->getAllCategories();
+$editCategory = null;
+if ($action === 'edit_category' && $id) {
+    $editCategory = $ticketModel->getCategory((int)$id);
+}
+
+$categoryColors = [
+    'primary' => 'Primary (Blue)',
+    'secondary' => 'Secondary (Gray)',
+    'success' => 'Success (Green)',
+    'danger' => 'Danger (Red)',
+    'warning' => 'Warning (Yellow)',
+    'info' => 'Info (Cyan)',
+    'dark' => 'Dark',
+    'light' => 'Light'
+];
 ?>
 
+<!-- Ticket Categories Section -->
+<div class="row g-4 mb-4">
+    <div class="col-md-<?= ($action === 'add_category' || $editCategory) ? '7' : '12' ?>">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-tags text-primary"></i> Ticket Categories</h5>
+                <div>
+                    <?php if (empty($allCategories)): ?>
+                    <form method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                        <input type="hidden" name="action" value="seed_ticket_categories">
+                        <button type="submit" class="btn btn-sm btn-outline-success me-2">
+                            <i class="bi bi-magic"></i> Load Defaults
+                        </button>
+                    </form>
+                    <?php endif; ?>
+                    <a href="?page=settings&subpage=ticket_commissions&action=add_category" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg"></i> Add Category
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Manage ticket categories that are used throughout the system. These categories define the types of tickets your team handles.
+                </p>
+                
+                <?php if (empty($allCategories)): ?>
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-tags fs-1"></i>
+                    <p class="mb-0">No categories configured</p>
+                    <p class="small">Load default categories or add your own</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Order</th>
+                                <th>Key</th>
+                                <th>Label</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allCategories as $cat): ?>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary"><?= $cat['display_order'] ?></span>
+                                </td>
+                                <td>
+                                    <code><?= htmlspecialchars($cat['key']) ?></code>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<?= htmlspecialchars($cat['color'] ?? 'primary') ?>"><?= htmlspecialchars($cat['label']) ?></span>
+                                </td>
+                                <td class="text-muted small"><?= htmlspecialchars($cat['description'] ?? '-') ?></td>
+                                <td>
+                                    <?php if ($cat['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=ticket_commissions&action=edit_category&id=<?= $cat['id'] ?>" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete this category? This may affect existing tickets.')">
+                                        <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                        <input type="hidden" name="action" value="delete_ticket_category">
+                                        <input type="hidden" name="category_id" value="<?= $cat['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <?php if ($action === 'add_category' || $editCategory): ?>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-<?= $editCategory ? 'pencil' : 'plus-lg' ?>"></i>
+                    <?= $editCategory ? 'Edit' : 'Add' ?> Category
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editCategory ? 'update_ticket_category' : 'add_ticket_category' ?>">
+                    <?php if ($editCategory): ?>
+                    <input type="hidden" name="category_id" value="<?= $editCategory['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Key <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="key" required
+                               value="<?= htmlspecialchars($editCategory['key'] ?? '') ?>"
+                               placeholder="e.g., installation, maintenance"
+                               pattern="[a-zA-Z0-9_]+"
+                               <?= $editCategory ? 'readonly' : '' ?>>
+                        <small class="text-muted">Lowercase letters, numbers, and underscores only. Cannot be changed after creation.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Label <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="label" required
+                               value="<?= htmlspecialchars($editCategory['label'] ?? '') ?>"
+                               placeholder="e.g., New Installation">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"
+                                  placeholder="Brief description of this category"><?= htmlspecialchars($editCategory['description'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Color</label>
+                            <select class="form-select" name="color">
+                                <?php foreach ($categoryColors as $colorKey => $colorLabel): ?>
+                                <option value="<?= $colorKey ?>" <?= ($editCategory && ($editCategory['color'] ?? 'primary') === $colorKey) ? 'selected' : '' ?>>
+                                    <?= $colorLabel ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" class="form-control" name="display_order" min="0"
+                                   value="<?= $editCategory['display_order'] ?? 0 ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="category_is_active"
+                                   <?= (!$editCategory || $editCategory['is_active']) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="category_is_active">Active</label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> <?= $editCategory ? 'Update' : 'Add' ?> Category
+                        </button>
+                        <a href="?page=settings&subpage=ticket_commissions" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<!-- Commission Rates Section -->
 <div class="row g-4">
     <div class="col-md-<?= ($action === 'add_rate' || $editRate) ? '7' : '12' ?>">
         <div class="card">
