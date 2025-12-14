@@ -32,7 +32,11 @@ $allEmployees = $employee->getAll();
 
 $pendingLeaveCount = $db->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
 $pendingAdvanceCount = $db->query("SELECT COUNT(*) FROM salary_advances WHERE status = 'pending'")->fetchColumn();
-$todayLateCount = $db->query("SELECT COUNT(*) FROM attendance WHERE DATE(clock_in) = CURRENT_DATE AND is_late = true")->fetchColumn();
+try {
+    $todayLateCount = $db->query("SELECT COUNT(*) FROM attendance WHERE DATE(clock_in) = CURRENT_DATE AND is_late = true")->fetchColumn();
+} catch (Exception $e) {
+    $todayLateCount = 0;
+}
 $attendanceStatuses = $employee->getAttendanceStatuses();
 $payrollStatuses = $employee->getPayrollStatuses();
 $paymentMethods = $employee->getPaymentMethods();
