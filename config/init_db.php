@@ -2118,15 +2118,17 @@ function seedHRNotificationTemplates(PDO $db): void {
         ['Leave Request Rejected', 'leave', 'leave_rejected', 'Your leave request has been rejected', 'Dear {employee_name}, your {leave_type} request from {start_date} to {end_date} has been REJECTED. Reason: {rejection_reason}. - {company_name}', true]
     ];
     
-    $stmt = $db->prepare("
-        INSERT INTO hr_notification_templates (name, category, event_type, subject, sms_template, send_sms)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT (event_type) DO NOTHING
-    ");
-    
     foreach ($templates as $template) {
         try {
-            $stmt->execute($template);
+            $checkStmt = $db->prepare("SELECT id FROM hr_notification_templates WHERE event_type = ?");
+            $checkStmt->execute([$template[2]]);
+            if (!$checkStmt->fetch()) {
+                $stmt = $db->prepare("
+                    INSERT INTO hr_notification_templates (name, category, event_type, subject, sms_template, send_sms)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute($template);
+            }
         } catch (PDOException $e) {
             error_log("Error seeding HR notification template: " . $e->getMessage());
         }
