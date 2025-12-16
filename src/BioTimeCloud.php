@@ -316,8 +316,10 @@ class BioTimeCloud extends BiometricDevice {
             $employees = $response['data'] ?? $response['results'] ?? [];
             
             foreach ($employees as $emp) {
+                $deviceUserId = $emp['emp_code'] ?? $emp['id'] ?? '';
                 $users[] = [
-                    'user_id' => $emp['emp_code'] ?? $emp['id'] ?? '',
+                    'user_id' => $deviceUserId,
+                    'device_user_id' => $deviceUserId,
                     'name' => trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? '')),
                     'card_number' => $emp['card_no'] ?? '',
                     'department' => $emp['department'] ?? null,

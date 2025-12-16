@@ -64,6 +64,10 @@ class Branch {
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $result ?: null;
     }
+    
+    public function find(int $id): ?array {
+        return $this->get($id);
+    }
 
     public function getAll(bool $activeOnly = false): array {
         $sql = "

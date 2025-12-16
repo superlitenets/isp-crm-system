@@ -2442,9 +2442,10 @@ if ($action === 'sync_device' && $id) {
                         <select class="form-select" name="device_user_id" required>
                             <option value="">Select user from device...</option>
                             <?php foreach ($deviceUsers as $du): ?>
-                            <?php if (!in_array($du['device_user_id'], $mappedDeviceUsers)): ?>
-                            <option value="<?= htmlspecialchars($du['device_user_id']) ?>">
-                                <?= htmlspecialchars($du['device_user_id']) ?> - <?= htmlspecialchars($du['name'] ?: 'No Name') ?>
+                            <?php $duId = $du['device_user_id'] ?? $du['user_id'] ?? ''; ?>
+                            <?php if ($duId && !in_array($duId, $mappedDeviceUsers)): ?>
+                            <option value="<?= htmlspecialchars($duId) ?>">
+                                <?= htmlspecialchars($duId) ?> - <?= htmlspecialchars($du['name'] ?: 'No Name') ?>
                             </option>
                             <?php endif; ?>
                             <?php endforeach; ?>
