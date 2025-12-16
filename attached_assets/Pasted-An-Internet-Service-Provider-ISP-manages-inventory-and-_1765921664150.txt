@@ -1,0 +1,277 @@
+An Internet Service Provider (ISP) manages inventory and technician accessories effectively by combining clear processes, proper categorization, tracking systems, and accountability. Below is a practical, ISP-focused explanation based on how real networks operate in the field.
+
+1. Types of Inventory an ISP Manages
+A. Network & Core Equipment (Warehouse / NOC)
+
+These are high-value, controlled items:
+
+Routers (MikroTik CCR, Huawei, Cisco)
+
+Switches
+
+OLTs / ONTs
+
+Servers
+
+SFPs (1G, 10G, 25G)
+
+Power supplies
+
+Rack accessories
+
+📌 Management approach
+
+Stored in central warehouse
+
+Serial-number tracked
+
+Issued only via approval
+
+Linked to network assets or customers
+
+B. Field Installation Equipment (Technician Tools)
+
+Reusable items issued to technicians:
+
+Fusion splicers
+
+OTDRs
+
+Power meters
+
+Crimping tools
+
+Ladders
+
+Safety gear (helmets, belts)
+
+📌 Management approach
+
+Assigned to a technician (not consumable)
+
+Sign-in / sign-out tracking
+
+Periodic inspection & servicing logs
+
+Loss/damage accountability
+
+C. Consumables & Accessories (High-Volume Items)
+
+Used daily by technicians:
+
+Fiber patch cords
+
+Drop cables
+
+RJ45 connectors
+
+SC/APC & LC connectors
+
+Wall sockets
+
+Cable clips
+
+Screws, ties, conduits
+
+📌 Management approach
+
+Stock levels monitored
+
+Issued per job or per technician
+
+Reorder threshold alerts
+
+Bulk issuance tracked monthly
+
+2. Inventory Structure (How Items Are Organized)
+
+An effective ISP uses categories + locations + ownership:
+
+Inventory Categories
+
+Core Network
+
+Customer Premises Equipment (CPE)
+
+Tools
+
+Consumables
+
+Spares & Repairs
+
+Locations
+
+Main warehouse
+
+Branch store
+
+Technician vehicle
+
+Technician personal kit
+
+📌 Example:
+
+Item: SC/APC Patch Cord
+Category: Consumable
+Location: Nairobi Warehouse
+Issued to: Tech John
+Project: FTTH Install – Zone A
+
+3. Technician Inventory Management (Critical Part)
+A. Technician Kit Assignment
+
+Each technician gets a standard kit:
+
+Defined list of tools
+
+Monthly consumable allowance
+
+Assigned serial-tracked equipment
+
+📌 Benefits:
+
+Accountability
+
+Faster job execution
+
+Easier audits
+
+B. Job-Based Issuance
+
+Before a job:
+
+Job card created
+
+Required materials auto-suggested
+
+Technician issues items against job
+
+After job:
+
+Used quantities confirmed
+
+Remaining items returned or carried forward
+
+Installed assets linked to customer
+
+4. Inventory Flow (End-to-End)
+1️⃣ Procurement
+
+Purchase order created
+
+Supplier delivery received
+
+Items verified
+
+Stock added to system
+
+2️⃣ Storage
+
+Assigned to warehouse
+
+Rack/bin location recorded
+
+Minimum & reorder levels set
+
+3️⃣ Issuance
+
+Issued to technician / project
+
+Digital signature or approval
+
+Stock automatically reduced
+
+4️⃣ Usage & Installation
+
+Items consumed or installed
+
+Installed equipment linked to:
+
+Customer
+
+GPS location
+
+Technician
+
+Date
+
+5️⃣ Returns / Repairs
+
+Faulty items returned
+
+Repair or disposal recorded
+
+Warranty tracking if applicable
+
+5. Technology Used by ISPs
+A. Inventory Management System (IMS)
+
+Key features:
+
+Stock levels
+
+Serial number tracking
+
+Technician assignment
+
+Job linkage
+
+Reorder alerts
+
+Audit logs
+
+Examples:
+
+Custom ISP CRM (like the one you’re building)
+
+Odoo
+
+ERPNext
+
+Custom PHP/Laravel systems
+
+B. Barcode / QR Code Scanning
+
+Scan item when issuing
+
+Scan during installation
+
+Reduces errors & theft
+
+C. Mobile App for Technicians
+
+Technicians can:
+
+View assigned inventory
+
+Request items
+
+Confirm usage
+
+Upload installation photos
+
+6. Stock Control Best Practices
+
+✔ Set minimum & maximum stock levels
+✔ Use FIFO for consumables
+✔ Monthly stock reconciliation
+✔ Random audits
+✔ Separate storekeeper vs approver roles
+✔ Track loss, damage, and misuse
+✔ Link inventory to tickets & jobs
+
+7. Reporting & Visibility
+
+Good ISPs generate reports like:
+
+Stock aging
+
+Fast-moving items
+
+Technician consumption rate
+
+Loss & variance reports
+
+Cost per installation
+
+Inventory by region/branch
