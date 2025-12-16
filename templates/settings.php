@@ -2273,11 +2273,19 @@ if ($action === 'sync_device' && $id) {
                     </div>
                     
                     <div class="mb-3" id="apiBaseUrlField" style="display: none;">
-                        <label class="form-label">API Base URL (Optional)</label>
+                        <label class="form-label">API Base URL</label>
                         <input type="text" class="form-control" name="api_base_url" id="apiBaseUrl"
                                value="<?= htmlspecialchars($editDevice['api_base_url'] ?? '') ?>"
-                               placeholder="http://biotime.example.com:8090">
-                        <small class="text-muted">Leave blank to use http://IP:PORT. Use full URL for custom setups.</small>
+                               placeholder="https://companyname.biotimecloud.com or http://192.168.1.100:8090">
+                        <small class="text-muted">For hosted BioTime Cloud, use https://yourcompany.biotimecloud.com</small>
+                    </div>
+                    
+                    <div class="mb-3" id="companyNameField" style="display: none;">
+                        <label class="form-label">Company Name (for BioTime Cloud)</label>
+                        <input type="text" class="form-control" name="company_name" id="companyName"
+                               value="<?= htmlspecialchars($editDevice['company_name'] ?? '') ?>"
+                               placeholder="Your registered company name">
+                        <small class="text-muted">Required for hosted biotimecloud.com. Leave blank for on-premise BioTime.</small>
                     </div>
                     
                     <div class="mb-3" id="usernameField">
@@ -2336,16 +2344,20 @@ if ($action === 'sync_device' && $id) {
         var portHelp = document.getElementById('portHelp');
         var apiBaseUrlField = document.getElementById('apiBaseUrlField');
         
+        var companyNameField = document.getElementById('companyNameField');
+        
         if (type === 'biotime_cloud') {
             ipInput.placeholder = 'biotime.example.com or 192.168.1.100';
             ipHelp.textContent = 'BioTime Cloud server IP or hostname';
             ipInput.removeAttribute('pattern');
             apiBaseUrlField.style.display = 'block';
+            companyNameField.style.display = 'block';
         } else {
             ipInput.placeholder = '192.168.1.201';
             ipHelp.textContent = 'Device IP for direct connection';
             ipInput.setAttribute('pattern', '^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$');
             apiBaseUrlField.style.display = 'none';
+            companyNameField.style.display = 'none';
         }
     });
     

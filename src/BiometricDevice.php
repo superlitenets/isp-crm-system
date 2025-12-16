@@ -60,6 +60,9 @@ abstract class BiometricDevice {
                 if (!empty($deviceConfig['api_base_url'])) {
                     $device->setBaseUrl($deviceConfig['api_base_url']);
                 }
+                if (!empty($deviceConfig['company_name'])) {
+                    $device->setCompany($deviceConfig['company_name']);
+                }
                 return $device;
             default:
                 return null;

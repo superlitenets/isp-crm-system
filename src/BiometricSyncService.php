@@ -32,8 +32,8 @@ class BiometricSyncService {
     
     public function addDevice(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO biometric_devices (name, device_type, ip_address, port, username, password_encrypted, serial_number, sync_interval_minutes, is_active, api_base_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO biometric_devices (name, device_type, ip_address, port, username, password_encrypted, serial_number, sync_interval_minutes, is_active, api_base_url, company_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $password = !empty($data['password']) ? BiometricDevice::encryptPassword($data['password']) : null;
@@ -54,14 +54,15 @@ class BiometricSyncService {
             $data['serial_number'] ?? null,
             $data['sync_interval_minutes'] ?? 15,
             isset($data['is_active']) ? (bool)$data['is_active'] : true,
-            $data['api_base_url'] ?? null
+            $data['api_base_url'] ?? null,
+            $data['company_name'] ?? null
         ]);
         
         return (int)$this->db->lastInsertId();
     }
     
     public function updateDevice(int $id, array $data): bool {
-        $fields = ['name', 'device_type', 'ip_address', 'port', 'username', 'serial_number', 'sync_interval_minutes', 'is_active', 'api_base_url'];
+        $fields = ['name', 'device_type', 'ip_address', 'port', 'username', 'serial_number', 'sync_interval_minutes', 'is_active', 'api_base_url', 'company_name'];
         $updates = [];
         $params = [];
         

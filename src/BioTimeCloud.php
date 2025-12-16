@@ -8,6 +8,8 @@ class BioTimeCloud extends BiometricDevice {
     private string $baseUrl = '';
     private int $timeout = 30;
     private ?int $lastTransactionId = null;
+    private ?string $company = null;
+    private bool $isCloudHosted = false;
     
     public function __construct(int $deviceId, string $ip, int $port = 8090, ?string $username = null, ?string $password = null) {
         parent::__construct($deviceId, $ip, $port ?: 8090, $username, $password);
@@ -16,6 +18,11 @@ class BioTimeCloud extends BiometricDevice {
     
     public function setBaseUrl(string $url): void {
         $this->baseUrl = rtrim($url, '/');
+        $this->isCloudHosted = strpos($url, 'biotimecloud.com') !== false || strpos($url, 'https://') === 0;
+    }
+    
+    public function setCompany(string $company): void {
+        $this->company = $company;
     }
     
     public function connect(): bool {
@@ -34,14 +41,22 @@ class BioTimeCloud extends BiometricDevice {
         
         $url = $this->baseUrl . '/jwt-api-token-auth/';
         
+        $authData = [
+            'password' => $this->password
+        ];
+        
+        if ($this->isCloudHosted && $this->company) {
+            $authData['email'] = $this->username;
+            $authData['company'] = $this->company;
+        } else {
+            $authData['username'] = $this->username;
+        }
+        
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode([
-                'username' => $this->username,
-                'password' => $this->password
-            ]),
+            CURLOPT_POSTFIELDS => json_encode($authData),
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Accept: application/json'
@@ -63,7 +78,9 @@ class BioTimeCloud extends BiometricDevice {
         }
         
         if ($httpCode !== 200) {
-            $this->setError("Authentication failed: HTTP $httpCode");
+            $responseData = json_decode($response, true);
+            $errorMsg = $responseData['detail'] ?? $responseData['non_field_errors'][0] ?? "HTTP $httpCode";
+            $this->setError("Authentication failed: $errorMsg");
             return false;
         }
         
