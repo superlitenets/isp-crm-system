@@ -131,7 +131,7 @@ class Accounting {
             $data['city'] ?? null,
             $data['country'] ?? 'Kenya',
             $data['tax_pin'] ?? null,
-            $data['payment_terms'] ?? 30,
+            (string)($data['payment_terms'] ?? '30'),
             $data['notes'] ?? null
         ]);
         return (int)$this->db->lastInsertId();
@@ -152,7 +152,7 @@ class Accounting {
             $data['city'] ?? null,
             $data['country'] ?? 'Kenya',
             $data['tax_pin'] ?? null,
-            $data['payment_terms'] ?? 30,
+            (string)($data['payment_terms'] ?? '30'),
             $data['notes'] ?? null,
             $id
         ]);
