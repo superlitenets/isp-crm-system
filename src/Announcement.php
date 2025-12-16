@@ -108,22 +108,24 @@ class Announcement {
     }
     
     public function getTargetEmployees(array $announcement): array {
+        $statusCondition = "(e.employment_status = 'active' OR e.employment_status = 'Active' OR e.employment_status IS NULL)";
+        
         $sql = "SELECT e.id, e.name, e.phone, e.email 
                 FROM employees e 
-                WHERE e.employment_status = 'active'";
+                WHERE $statusCondition";
         $params = [];
         
         if ($announcement['target_audience'] === 'branch' && $announcement['target_branch_id']) {
             $sql = "SELECT DISTINCT e.id, e.name, e.phone, e.email 
                     FROM employees e 
                     JOIN employee_branches eb ON e.id = eb.employee_id
-                    WHERE e.employment_status = 'active' AND eb.branch_id = ?";
+                    WHERE $statusCondition AND eb.branch_id = ?";
             $params[] = $announcement['target_branch_id'];
         } elseif ($announcement['target_audience'] === 'team' && $announcement['target_team_id']) {
             $sql = "SELECT DISTINCT e.id, e.name, e.phone, e.email 
                     FROM employees e 
                     JOIN team_members tm ON e.id = tm.employee_id
-                    WHERE e.employment_status = 'active' AND tm.team_id = ?";
+                    WHERE $statusCondition AND tm.team_id = ?";
             $params[] = $announcement['target_team_id'];
         }
         
