@@ -951,19 +951,24 @@ class Ticket {
         if (!$customer) return;
         
         $technicianName = '';
+        $technicianPhone = '';
         $teamName = '';
+        $teamMembers = [];
         
         if ($ticket['assigned_to']) {
             $technician = $this->getUser($ticket['assigned_to']);
             $technicianName = $technician['name'] ?? 'Unknown';
+            $technicianPhone = $technician['phone'] ?? '';
         }
         
         if ($ticket['team_id']) {
             $team = $this->getTeam($ticket['team_id']);
             $teamName = $team['name'] ?? '';
+            $teamMembers = $this->getTeamMembers($ticket['team_id']);
         }
         
         $assignmentInfo = '';
+        $teamMembersList = '';
         if ($technicianName && $teamName) {
             $assignmentInfo = "Assigned to: {$technicianName} (Team: {$teamName})";
         } elseif ($technicianName) {
@@ -974,21 +979,35 @@ class Ticket {
             $assignmentInfo = "Unassigned";
         }
         
+        if (!empty($teamMembers)) {
+            $memberNames = array_map(function($m) { return $m['name'] ?? 'Unknown'; }, $teamMembers);
+            $teamMembersList = implode(', ', $memberNames);
+        }
+        
         $placeholders = [
             '{ticket_number}' => $ticket['ticket_number'],
             '{subject}' => $ticket['subject'] ?? '',
-            '{description}' => substr($ticket['description'] ?? '', 0, 100),
+            '{description}' => substr($ticket['description'] ?? '', 0, 200),
             '{category}' => ucfirst($ticket['category'] ?? 'General'),
             '{priority}' => ucfirst($ticket['priority'] ?? 'Medium'),
             '{customer_name}' => $customer['name'] ?? 'Customer',
             '{customer_phone}' => $customer['phone'] ?? '',
             '{customer_address}' => $customer['address'] ?? '',
             '{customer_email}' => $customer['email'] ?? '',
+            '{customer_account}' => $customer['account_number'] ?? '',
+            '{customer_username}' => $customer['username'] ?? '',
+            '{customer_location}' => $customer['location'] ?? '',
+            '{customer_coordinates}' => (!empty($customer['latitude']) && !empty($customer['longitude'])) 
+                ? "{$customer['latitude']}, {$customer['longitude']}" : '',
+            '{service_plan}' => $customer['service_plan'] ?? '',
             '{technician_name}' => $technicianName,
+            '{technician_phone}' => $technicianPhone,
             '{team_name}' => $teamName,
+            '{team_members}' => $teamMembersList,
             '{assignment_info}' => $assignmentInfo,
             '{branch_name}' => $branchData['name'] ?? '',
-            '{branch_code}' => $branchData['code'] ?? ''
+            '{branch_code}' => $branchData['code'] ?? '',
+            '{created_at}' => date('d M Y H:i', strtotime($ticket['created_at'] ?? 'now'))
         ];
         
         $message = $this->buildSMSFromTemplate('wa_template_branch_ticket_assigned', $placeholders);
@@ -998,13 +1017,24 @@ class Ticket {
                 . "📋 *Ticket:* #{$ticket['ticket_number']}\n"
                 . "📌 *Subject:* {$ticket['subject']}\n"
                 . "🏷️ *Category:* " . ucfirst($ticket['category'] ?? 'General') . "\n"
-                . "⚡ *Priority:* " . ucfirst($ticket['priority'] ?? 'Medium') . "\n\n"
+                . "⚡ *Priority:* " . ucfirst($ticket['priority'] ?? 'Medium') . "\n"
+                . "🕐 *Created:* " . date('d M Y H:i', strtotime($ticket['created_at'] ?? 'now')) . "\n\n"
                 . "👤 *Customer Details:*\n"
                 . "• Name: {$customer['name']}\n"
                 . "• Phone: {$customer['phone']}\n"
-                . "• Address: {$customer['address']}\n\n"
-                . "👷 *{$assignmentInfo}*\n\n"
-                . "🏢 Branch: {$branchData['name']}";
+                . (!empty($customer['email']) ? "• Email: {$customer['email']}\n" : "")
+                . (!empty($customer['account_number']) ? "• Account: {$customer['account_number']}\n" : "")
+                . (!empty($customer['username']) ? "• Username: {$customer['username']}\n" : "")
+                . "• Address: {$customer['address']}\n"
+                . (!empty($customer['location']) ? "• Location: {$customer['location']}\n" : "")
+                . (!empty($customer['latitude']) && !empty($customer['longitude']) 
+                    ? "• GPS: {$customer['latitude']}, {$customer['longitude']}\n" 
+                    : "")
+                . (!empty($customer['service_plan']) ? "• Plan: {$customer['service_plan']}\n" : "")
+                . "\n👷 *{$assignmentInfo}*\n"
+                . (!empty($technicianPhone) ? "📞 Tech Phone: {$technicianPhone}\n" : "")
+                . (!empty($teamMembersList) ? "👥 Team Members: {$teamMembersList}\n" : "")
+                . "\n🏢 Branch: {$branchData['name']}";
         }
         
         try {
