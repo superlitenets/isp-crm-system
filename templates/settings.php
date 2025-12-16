@@ -2387,7 +2387,7 @@ if ($action === 'sync_device' && $id) {
     }
     
     try {
-        $employees = (new \App\Employee($dbConn))->getAllEmployees();
+        $employees = (new \App\Employee($dbConn))->getEmployees();
     } catch (\Throwable $e) {
         // Employees might not be available
     }
