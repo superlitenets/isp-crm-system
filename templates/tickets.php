@@ -146,9 +146,9 @@ if (isset($_GET['customer_id'])) {
                 <?php endif; ?>
                 
                 <div class="col-md-6">
-                    <label class="form-label">Branch</label>
+                    <label class="form-label">Branch *</label>
                     <?php $branchClass = new \App\Branch(); $allBranches = $branchClass->getActive(); ?>
-                    <select class="form-select" name="branch_id">
+                    <select class="form-select" name="branch_id" required>
                         <option value="">Select Branch</option>
                         <?php foreach ($allBranches as $b): ?>
                         <option value="<?= $b['id'] ?>" <?= ($ticketData['branch_id'] ?? '') == $b['id'] ? 'selected' : '' ?>>
@@ -156,7 +156,7 @@ if (isset($_GET['customer_id'])) {
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <small class="text-muted">Which branch will handle this ticket</small>
+                    <small class="text-muted">Required - Which branch will handle this ticket</small>
                 </div>
                 
                 <div class="col-md-6">

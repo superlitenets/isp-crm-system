@@ -1222,8 +1222,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_POST['customer_id'] = $customerId;
                 }
                 
+                $branchId = (int)($_POST['branch_id'] ?? 0);
+                
                 if (empty($customerId) || empty($subject) || empty($description) || empty($category)) {
                     $message = 'Please fill in all required fields.';
+                    $messageType = 'danger';
+                } elseif (empty($branchId)) {
+                    $message = 'Please select a branch for this ticket.';
                     $messageType = 'danger';
                 } elseif (!$customer->find($customerId)) {
                     $message = 'Selected customer not found.';
