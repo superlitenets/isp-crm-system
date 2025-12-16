@@ -5802,6 +5802,10 @@ if ($action === 'edit_branch' && $id) {
                                        class="btn btn-sm btn-outline-info" title="Manage Employees">
                                         <i class="bi bi-people"></i>
                                     </a>
+                                    <a href="?page=settings&subpage=branches&action=manage_teams&id=<?= $branch['id'] ?>" 
+                                       class="btn btn-sm btn-outline-warning" title="Manage Teams">
+                                        <i class="bi bi-diagram-3"></i>
+                                    </a>
                                     <form method="POST" class="d-inline" onsubmit="return confirm('Delete this branch?')">
                                         <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                                         <input type="hidden" name="action" value="delete_branch">
@@ -5995,6 +5999,55 @@ if ($action === 'edit_branch' && $id) {
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg"></i> Update Employees
+                        </button>
+                        <a href="?page=settings&subpage=branches" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <?php elseif ($action === 'manage_teams' && $id): ?>
+        <?php 
+        $branch = $branchClass->get($id); 
+        $allTeams = $db->query("SELECT id, name, description FROM teams WHERE is_active = true ORDER BY name")->fetchAll(\PDO::FETCH_ASSOC);
+        $branchTeamIds = $db->prepare("SELECT id FROM teams WHERE branch_id = ?");
+        $branchTeamIds->execute([$id]);
+        $assignedTeamIds = array_column($branchTeamIds->fetchAll(\PDO::FETCH_ASSOC), 'id');
+        ?>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Teams - <?= htmlspecialchars($branch['name']) ?></h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="update_branch_teams">
+                    <input type="hidden" name="branch_id" value="<?= $id ?>">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Select Teams to Assign</label>
+                        <?php if (empty($allTeams)): ?>
+                        <div class="alert alert-warning">No teams found. Create teams first in Settings → Teams.</div>
+                        <?php else: ?>
+                        <?php foreach ($allTeams as $team): ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="team_ids[]" 
+                                   value="<?= $team['id'] ?>" id="team_<?= $team['id'] ?>"
+                                   <?= in_array($team['id'], $assignedTeamIds) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="team_<?= $team['id'] ?>">
+                                <?= htmlspecialchars($team['name']) ?>
+                                <?php if ($team['description']): ?>
+                                <small class="text-muted">- <?= htmlspecialchars($team['description']) ?></small>
+                                <?php endif; ?>
+                            </label>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Update Teams
                         </button>
                         <a href="?page=settings&subpage=branches" class="btn btn-secondary">Cancel</a>
                     </div>

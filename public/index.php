@@ -2599,6 +2599,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'update_branch_teams':
+                try {
+                    $branchId = (int)$_POST['branch_id'];
+                    $teamIds = $_POST['team_ids'] ?? [];
+                    
+                    $db->beginTransaction();
+                    $db->prepare("UPDATE teams SET branch_id = NULL WHERE branch_id = ?")->execute([$branchId]);
+                    if (!empty($teamIds)) {
+                        $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+                        $params = array_merge([$branchId], $teamIds);
+                        $db->prepare("UPDATE teams SET branch_id = ? WHERE id IN ($placeholders)")->execute($params);
+                    }
+                    $db->commit();
+                    
+                    $message = 'Branch teams updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $db->rollBack();
+                    $message = 'Error updating branch teams: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'save_billing_api':
                 try {
                     $token = trim($_POST['oneisp_api_token'] ?? '');
