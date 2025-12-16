@@ -126,6 +126,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-cloud-arrow-down"></i> Customers API
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'backup' ? 'active' : '' ?>" href="?page=settings&subpage=backup">
+            <i class="bi bi-database-down"></i> Database Backup
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -6189,5 +6194,148 @@ function toggleTokenVisibility() {
     }
 }
 </script>
+
+<?php elseif ($subpage === 'backup'): ?>
+
+<?php
+$backupDir = __DIR__ . '/../backups';
+if (!is_dir($backupDir)) {
+    @mkdir($backupDir, 0755, true);
+}
+$backups = [];
+if (is_dir($backupDir)) {
+    $files = glob($backupDir . '/*.sql');
+    foreach ($files as $file) {
+        $backups[] = [
+            'filename' => basename($file),
+            'size' => filesize($file),
+            'created' => filemtime($file)
+        ];
+    }
+    usort($backups, fn($a, $b) => $b['created'] - $a['created']);
+}
+?>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-database-down"></i> Database Backup</h4>
+        <p class="text-muted mb-0">Create and manage database backups</p>
+    </div>
+</div>
+
+<?php if (isset($_SESSION['backup_success'])): ?>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle"></i> <?= htmlspecialchars($_SESSION['backup_success']) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php unset($_SESSION['backup_success']); endif; ?>
+
+<?php if (isset($_SESSION['backup_error'])): ?>
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($_SESSION['backup_error']) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php unset($_SESSION['backup_error']); endif; ?>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-plus-circle"></i> Create Backup
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Create a new backup of your entire database including all tables and data.</p>
+                <form method="POST" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<span class=\'spinner-border spinner-border-sm\'></span> Creating...';">
+                    <input type="hidden" name="action" value="create_backup">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-database-add"></i> Create Backup Now
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-info-circle"></i> Backup Info
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><i class="bi bi-folder text-primary"></i> <strong>Location:</strong> <code>/backups/</code></li>
+                    <li class="mb-2"><i class="bi bi-file-earmark-code text-success"></i> <strong>Format:</strong> SQL dump</li>
+                    <li><i class="bi bi-clock text-warning"></i> <strong>Total Backups:</strong> <?= count($backups) ?></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list"></i> Backup History</span>
+                <small class="text-muted"><?= count($backups) ?> backup(s)</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Size</th>
+                            <th>Created</th>
+                            <th width="150">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($backups as $backup): ?>
+                        <tr>
+                            <td>
+                                <i class="bi bi-file-earmark-code text-primary"></i>
+                                <?= htmlspecialchars($backup['filename']) ?>
+                            </td>
+                            <td><?= number_format($backup['size'] / 1024, 2) ?> KB</td>
+                            <td><?= date('M j, Y g:i A', $backup['created']) ?></td>
+                            <td>
+                                <a href="?page=settings&subpage=backup&action=download_backup&file=<?= urlencode($backup['filename']) ?>" 
+                                   class="btn btn-sm btn-outline-success" title="Download">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this backup?');">
+                                    <input type="hidden" name="action" value="delete_backup">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="filename" value="<?= htmlspecialchars($backup['filename']) ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($backups)): ?>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                No backups yet. Create your first backup above.
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <i class="bi bi-exclamation-triangle"></i> Restore Instructions
+    </div>
+    <div class="card-body">
+        <p>To restore a backup, download the SQL file and run it on your database server:</p>
+        <div class="bg-light p-3 rounded">
+            <code>docker exec -i isp_crm_db psql -U crm -d isp_crm &lt; backup_file.sql</code>
+        </div>
+        <p class="mt-3 mb-0 text-muted"><i class="bi bi-info-circle"></i> Always test backups on a staging environment before restoring to production.</p>
+    </div>
+</div>
 
 <?php endif; ?>

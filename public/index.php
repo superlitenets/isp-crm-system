@@ -150,6 +150,38 @@ if ($page === 'download' && $action === 'docker') {
     exit;
 }
 
+if ($page === 'settings' && isset($_GET['subpage']) && $_GET['subpage'] === 'backup' && isset($_GET['action']) && $_GET['action'] === 'download_backup') {
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        http_response_code(403);
+        echo 'Access denied';
+        exit;
+    }
+    
+    $filename = basename($_GET['file'] ?? '');
+    if (empty($filename) || !preg_match('/^backup_.*\.sql$/', $filename)) {
+        http_response_code(400);
+        echo 'Invalid filename';
+        exit;
+    }
+    
+    $filepath = __DIR__ . '/../backups/' . $filename;
+    if (!file_exists($filepath)) {
+        http_response_code(404);
+        echo 'Backup file not found';
+        exit;
+    }
+    
+    ob_end_clean();
+    header('Content-Type: application/sql');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($filepath));
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    readfile($filepath);
+    exit;
+}
+
 if ($page === 'api' && $action === 'late_deductions') {
     header('Content-Type: application/json');
     
@@ -2997,6 +3029,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } catch (Exception $e) {
                     $message = 'Error deleting HR template: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+                break;
+
+            case 'create_backup':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can create database backups.');
+                    }
+                    
+                    $backupDir = __DIR__ . '/../backups';
+                    if (!is_dir($backupDir)) {
+                        mkdir($backupDir, 0755, true);
+                    }
+                    
+                    $filename = 'backup_' . date('Y-m-d_His') . '.sql';
+                    $filepath = $backupDir . '/' . $filename;
+                    
+                    $dbHost = getenv('PGHOST') ?: 'localhost';
+                    $dbName = getenv('PGDATABASE') ?: 'isp_crm';
+                    $dbUser = getenv('PGUSER') ?: 'crm';
+                    $dbPass = getenv('PGPASSWORD') ?: '';
+                    
+                    putenv("PGPASSWORD=$dbPass");
+                    $command = sprintf(
+                        'pg_dump -h %s -U %s -d %s -F p > %s 2>&1',
+                        escapeshellarg($dbHost),
+                        escapeshellarg($dbUser),
+                        escapeshellarg($dbName),
+                        escapeshellarg($filepath)
+                    );
+                    
+                    exec($command, $output, $returnVar);
+                    
+                    if ($returnVar !== 0) {
+                        if (file_exists($filepath)) {
+                            unlink($filepath);
+                        }
+                        throw new Exception('Backup failed: ' . implode("\n", $output));
+                    }
+                    
+                    if (!file_exists($filepath) || filesize($filepath) < 100) {
+                        if (file_exists($filepath)) {
+                            unlink($filepath);
+                        }
+                        throw new Exception('Backup file is empty or not created.');
+                    }
+                    
+                    $_SESSION['backup_success'] = 'Database backup created successfully: ' . $filename;
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
+                } catch (Exception $e) {
+                    $_SESSION['backup_error'] = $e->getMessage();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
+                }
+                break;
+
+            case 'delete_backup':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can delete backups.');
+                    }
+                    
+                    $filename = basename($_POST['filename'] ?? '');
+                    if (empty($filename) || !preg_match('/^backup_.*\.sql$/', $filename)) {
+                        throw new Exception('Invalid backup filename.');
+                    }
+                    
+                    $filepath = __DIR__ . '/../backups/' . $filename;
+                    if (!file_exists($filepath)) {
+                        throw new Exception('Backup file not found.');
+                    }
+                    
+                    unlink($filepath);
+                    $_SESSION['backup_success'] = 'Backup deleted successfully.';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
+                } catch (Exception $e) {
+                    $_SESSION['backup_error'] = $e->getMessage();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
                 }
                 break;
 

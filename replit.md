@@ -139,6 +139,14 @@ The system features a clean, responsive design. The public-facing landing page i
   - On-demand query approach keeps data fresh without duplication
   - Imports customer to local database when ticket is created
   - API endpoint at `/api/billing.php` for customer search
+- **Database Backup System (Dec 2025)**: Built-in backup management in Settings:
+  - Create manual database backups via pg_dump
+  - Download backup files (.sql format)
+  - Delete old backups
+  - Backup history with file sizes and dates
+  - Admin-only access for security
+  - Restore instructions provided in UI
+  - Backups stored in `/backups/` directory
 
 **System Design Choices:**
 The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
