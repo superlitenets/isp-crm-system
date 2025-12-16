@@ -38,7 +38,15 @@ The system features a clean, responsive design. The public-facing landing page i
   - Session status monitoring with QR code display
   - Node.js service running Puppeteer for WhatsApp Web automation
 - **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
-- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol) and Hikvision (ISAPI) for real-time attendance synchronization and late notifications.
+- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Direct/Push Protocol), Hikvision (ISAPI), and BioTime Cloud for real-time attendance synchronization and late notifications.
+  - **BioTime Cloud Integration (Dec 2025)**: REST API integration with BioTime 8.5 for ZKTeco devices:
+    - JWT-based authentication at `/jwt-api-token-auth/`
+    - Transaction polling via `/iclock/api/transactions/` with pagination
+    - Employee sync via `/personnel/api/employees/`
+    - Device listing via `/iclock/api/terminals/`
+    - Supports incremental sync using last_transaction_id tracking
+    - Configurable API base URL for hosted BioTime instances
+    - BioTimeCloud.php class extends BiometricDevice
   - **Hikvision Remote Fingerprint Enrollment**: ISAPI-based remote fingerprint capture matching IVMS-4200 functionality:
     - `captureFingerprint()` - Triggers device to enter capture mode, employee places finger on scanner
     - `setupFingerprint()` - Upload fingerprint template data directly to device

@@ -445,6 +445,7 @@ function syncAttendanceFromDevices(\PDO $db): void {
         require_once __DIR__ . '/../src/BiometricDevice.php';
         require_once __DIR__ . '/../src/HikvisionDevice.php';
         require_once __DIR__ . '/../src/ZKTecoDevice.php';
+        require_once __DIR__ . '/../src/BioTimeCloud.php';
         require_once __DIR__ . '/../src/RealTimeAttendanceProcessor.php';
         
         $stmt = $db->query("SELECT * FROM biometric_devices WHERE is_active = true");
@@ -468,29 +469,8 @@ function syncAttendanceFromDevices(\PDO $db): void {
         $deviceResult['sync_since'] = $since;
         
         try {
-            $device = null;
-            $password = null;
-            if (!empty($deviceRow['password_encrypted'])) {
-                $password = \App\BiometricDevice::decryptPassword($deviceRow['password_encrypted']);
-            }
-            
-            if (strtolower($deviceRow['device_type']) === 'hikvision') {
-                $device = new \App\HikvisionDevice(
-                    (int)$deviceRow['id'],
-                    $deviceRow['ip_address'],
-                    (int)($deviceRow['port'] ?: 80),
-                    $deviceRow['username'],
-                    $password
-                );
-            } elseif (strtolower($deviceRow['device_type']) === 'zkteco') {
-                $device = new \App\ZKTecoDevice(
-                    (int)$deviceRow['id'],
-                    $deviceRow['ip_address'],
-                    (int)($deviceRow['port'] ?: 4370),
-                    $deviceRow['username'],
-                    $password
-                );
-            }
+            // Use the factory method to create appropriate device instance
+            $device = \App\BiometricDevice::create($deviceRow);
             
             if (!$device) {
                 $deviceResult['errors'][] = 'Unknown device type: ' . $deviceRow['device_type'];
