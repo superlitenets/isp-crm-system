@@ -11,9 +11,20 @@ class ActivityLog {
         $this->db = \Database::getConnection();
     }
 
-    public function log(string $actionType, string $entityType, ?int $entityId = null, ?string $entityReference = null, ?string $details = null): bool {
+    public function log(string $actionType, string $entityType, ?int $entityId = null, ?string $entityReference = null, $details = null): bool {
         if (!Auth::isLoggedIn()) {
             return false;
+        }
+
+        $jsonDetails = null;
+        if ($details !== null) {
+            if (is_string($details)) {
+                $jsonDetails = json_encode(['message' => $details]);
+            } elseif (is_array($details)) {
+                $jsonDetails = json_encode($details);
+            } else {
+                $jsonDetails = json_encode(['data' => $details]);
+            }
         }
 
         $stmt = $this->db->prepare("
@@ -27,7 +38,7 @@ class ActivityLog {
             $entityType,
             $entityId,
             $entityReference,
-            $details,
+            $jsonDetails,
             $_SERVER['REMOTE_ADDR'] ?? null
         ]);
     }
