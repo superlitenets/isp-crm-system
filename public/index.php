@@ -3168,6 +3168,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'upload_backup':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can upload backups.');
+                    }
+                    
+                    if (!isset($_FILES['backup_file']) || $_FILES['backup_file']['error'] !== UPLOAD_ERR_OK) {
+                        $uploadErrors = [
+                            UPLOAD_ERR_INI_SIZE => 'File exceeds server upload limit.',
+                            UPLOAD_ERR_FORM_SIZE => 'File exceeds form upload limit.',
+                            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded.',
+                            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder.',
+                            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
+                            UPLOAD_ERR_EXTENSION => 'Upload stopped by extension.',
+                        ];
+                        $errorCode = $_FILES['backup_file']['error'] ?? UPLOAD_ERR_NO_FILE;
+                        throw new Exception($uploadErrors[$errorCode] ?? 'Unknown upload error.');
+                    }
+                    
+                    $file = $_FILES['backup_file'];
+                    $originalName = basename($file['name']);
+                    
+                    // Validate file extension
+                    if (pathinfo($originalName, PATHINFO_EXTENSION) !== 'sql') {
+                        throw new Exception('Only .sql files are allowed.');
+                    }
+                    
+                    // Validate file size (50MB max)
+                    if ($file['size'] > 50 * 1024 * 1024) {
+                        throw new Exception('File size exceeds 50MB limit.');
+                    }
+                    
+                    // Basic content validation - check if it looks like SQL
+                    $content = file_get_contents($file['tmp_name'], false, null, 0, 1000);
+                    if (stripos($content, 'INSERT') === false && stripos($content, 'CREATE') === false && stripos($content, '--') === false) {
+                        throw new Exception('File does not appear to be a valid SQL backup.');
+                    }
+                    
+                    $backupDir = __DIR__ . '/../backups';
+                    if (!is_dir($backupDir)) {
+                        mkdir($backupDir, 0755, true);
+                    }
+                    
+                    // Create unique filename with upload prefix
+                    $filename = 'backup_uploaded_' . date('Y-m-d_His') . '.sql';
+                    $filepath = $backupDir . '/' . $filename;
+                    
+                    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                        throw new Exception('Failed to save uploaded file.');
+                    }
+                    
+                    $_SESSION['backup_success'] = 'Backup uploaded successfully: ' . $filename . ' (' . number_format($file['size'] / 1024, 2) . ' KB)';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
+                } catch (Exception $e) {
+                    $_SESSION['backup_error'] = $e->getMessage();
+                    header('Location: ?page=settings&subpage=backup');
+                    exit;
+                }
+                break;
+
             case 'save_mpesa_settings':
                 try {
                     error_log("M-Pesa settings save started");

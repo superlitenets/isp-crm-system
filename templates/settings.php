@@ -6255,6 +6255,26 @@ if (is_dir($backupDir)) {
             </div>
         </div>
         
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-upload"></i> Upload Backup
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Upload an existing SQL backup file to restore later.</p>
+                <form method="POST" enctype="multipart/form-data" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<span class=\'spinner-border spinner-border-sm\'></span> Uploading...';">
+                    <input type="hidden" name="action" value="upload_backup">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <div class="mb-3">
+                        <input type="file" name="backup_file" class="form-control" accept=".sql" required>
+                        <small class="text-muted">Max size: 50MB. Only .sql files allowed.</small>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-upload"></i> Upload Backup
+                    </button>
+                </form>
+            </div>
+        </div>
+        
         <div class="card">
             <div class="card-header bg-info text-white">
                 <i class="bi bi-info-circle"></i> Backup Info
