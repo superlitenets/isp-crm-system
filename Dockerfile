@@ -22,6 +22,9 @@ RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "date.timezone=Africa/Nairobi" >> /usr/local/etc/php/conf.d/timezone.ini
 
+# Copy security configuration (disable dangerous functions)
+COPY docker/security.ini /usr/local/etc/php/conf.d/security.ini
+
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
