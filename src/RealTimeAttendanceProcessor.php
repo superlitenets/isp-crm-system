@@ -347,37 +347,42 @@ class RealTimeAttendanceProcessor {
     }
     
     public function getNotificationLogs(?int $employeeId = null, ?string $dateFrom = null, ?string $dateTo = null, int $limit = 100): array {
-        $sql = "
-            SELECT anl.*, e.name as employee_name, e.employee_id as employee_code, 
-                   ht.name as template_name
-            FROM attendance_notification_logs anl
-            LEFT JOIN employees e ON anl.employee_id = e.id
-            LEFT JOIN hr_notification_templates ht ON anl.notification_template_id = ht.id
-            WHERE 1=1
-        ";
-        $params = [];
-        
-        if ($employeeId) {
-            $sql .= " AND anl.employee_id = ?";
-            $params[] = $employeeId;
+        try {
+            $sql = "
+                SELECT anl.*, e.name as employee_name, e.employee_id as employee_code, 
+                       ht.name as template_name
+                FROM attendance_notification_logs anl
+                LEFT JOIN employees e ON anl.employee_id = e.id
+                LEFT JOIN hr_notification_templates ht ON anl.notification_template_id = ht.id
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            if ($employeeId) {
+                $sql .= " AND anl.employee_id = ?";
+                $params[] = $employeeId;
+            }
+            
+            if ($dateFrom) {
+                $sql .= " AND anl.attendance_date >= ?";
+                $params[] = $dateFrom;
+            }
+            
+            if ($dateTo) {
+                $sql .= " AND anl.attendance_date <= ?";
+                $params[] = $dateTo;
+            }
+            
+            $sql .= " ORDER BY anl.created_at DESC LIMIT ?";
+            $params[] = $limit;
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("getNotificationLogs error: " . $e->getMessage());
+            return [];
         }
-        
-        if ($dateFrom) {
-            $sql .= " AND anl.attendance_date >= ?";
-            $params[] = $dateFrom;
-        }
-        
-        if ($dateTo) {
-            $sql .= " AND anl.attendance_date <= ?";
-            $params[] = $dateTo;
-        }
-        
-        $sql .= " ORDER BY anl.created_at DESC LIMIT ?";
-        $params[] = $limit;
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getHRTemplates(?string $category = null, bool $activeOnly = false): array {
