@@ -106,16 +106,16 @@ class WhatsApp {
     
     public function fetchGroups(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error, 'groups' => []];
@@ -235,7 +235,7 @@ class WhatsApp {
         $formattedPhone = $this->formatPhone($phone);
         
         try {
-            $ch = curl_init();
+            $ch = \curl_init();
             $headers = [];
             $postData = null;
             
@@ -283,18 +283,18 @@ class WhatsApp {
                 ]);
             }
             
-            curl_setopt($ch, CURLOPT_URL, $this->apiUrl);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            \curl_setopt($ch, CURLOPT_URL, $this->apiUrl);
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return [
@@ -431,16 +431,16 @@ class WhatsApp {
     
     public function getSessionStatus(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/status');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/status');
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error || $httpCode !== 200) {
                 return [
@@ -472,17 +472,17 @@ class WhatsApp {
     
     public function initializeSession(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/initialize');
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/initialize');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error];
@@ -496,16 +496,16 @@ class WhatsApp {
     
     public function getSessionQR(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/qr');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/qr');
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error];
@@ -519,17 +519,17 @@ class WhatsApp {
     
     public function logoutSession(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/logout');
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/logout');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error];
@@ -543,16 +543,16 @@ class WhatsApp {
     
     public function getSessionGroups(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/groups');
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error || $httpCode !== 200) {
                 return ['success' => false, 'error' => $error ?: 'Failed to get groups', 'groups' => []];
@@ -569,21 +569,21 @@ class WhatsApp {
         $formattedPhone = $this->formatPhone($phone);
         
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send');
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'phone' => $formattedPhone,
                 'message' => $message
             ]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return [
@@ -639,21 +639,21 @@ class WhatsApp {
             $url = $this->sessionServiceUrl . '/send-group';
             error_log("WhatsApp sendToGroup - Calling URL: $url");
             
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $url);
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'groupId' => $groupId,
                 'message' => $message
             ]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             error_log("WhatsApp sendToGroup response - HTTP: $httpCode, Error: $error, Response: " . substr($response, 0, 500));
             
@@ -694,16 +694,16 @@ class WhatsApp {
      */
     public function getChats(): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chats');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chats');
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error || $httpCode !== 200) {
                 return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'chats' => []];
@@ -721,20 +721,20 @@ class WhatsApp {
      */
     public function getChatMessages(string $chatId, int $limit = 50, bool $includeMedia = true): array {
         try {
-            $ch = curl_init();
+            $ch = \curl_init();
             $url = $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/messages?limit=' . $limit;
             if ($includeMedia) {
                 $url .= '&includeMedia=true';
             }
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Longer timeout for media download
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_URL, $url);
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Longer timeout for media download
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error || $httpCode !== 200) {
                 return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'messages' => []];
@@ -752,18 +752,18 @@ class WhatsApp {
      */
     public function sendToChat(string $chatId, string $message): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/send');
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $message]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/send');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['message' => $message]));
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error];
@@ -791,17 +791,17 @@ class WhatsApp {
      */
     public function markChatAsRead(string $chatId): array {
         try {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/read');
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/chat/' . urlencode($chatId) . '/read');
+            \curl_setopt($ch, CURLOPT_POST, true);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error) {
                 return ['success' => false, 'error' => $error];
@@ -823,16 +823,16 @@ class WhatsApp {
                 $url .= '?since=' . $since;
             }
             
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
+            $ch = \curl_init();
+            \curl_setopt($ch, CURLOPT_URL, $url);
+            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            \curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            \curl_setopt($ch, CURLOPT_HTTPHEADER, $this->getSessionHeaders());
             
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = \curl_error($ch);
+            \curl_close($ch);
             
             if ($error || $httpCode !== 200) {
                 return ['success' => false, 'error' => $error ?: "HTTP $httpCode", 'messages' => []];
