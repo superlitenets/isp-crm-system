@@ -924,15 +924,28 @@ class Ticket {
     }
     
     public function notifyBranchWhatsAppGroup(int $ticketId, ?int $branchId = null): void {
+        error_log("notifyBranchWhatsAppGroup called - ticketId: $ticketId, branchId: " . ($branchId ?? 'null'));
+        
         $ticket = $this->find($ticketId);
-        if (!$ticket) return;
+        if (!$ticket) {
+            error_log("notifyBranchWhatsAppGroup - Ticket not found: $ticketId");
+            return;
+        }
         
         $branchId = $branchId ?? $ticket['branch_id'];
-        if (!$branchId) return;
+        if (!$branchId) {
+            error_log("notifyBranchWhatsAppGroup - No branch ID for ticket $ticketId");
+            return;
+        }
         
         $branch = new Branch();
         $branchData = $branch->find($branchId);
-        if (!$branchData || empty($branchData['whatsapp_group'])) return;
+        if (!$branchData || empty($branchData['whatsapp_group'])) {
+            error_log("notifyBranchWhatsAppGroup - Branch not found or no WhatsApp group. BranchId: $branchId, HasGroup: " . (isset($branchData['whatsapp_group']) ? 'yes' : 'no'));
+            return;
+        }
+        
+        error_log("notifyBranchWhatsAppGroup - Sending to group: {$branchData['whatsapp_group']} for branch: {$branchData['name']}");
         
         $customer = (new Customer())->find($ticket['customer_id']);
         if (!$customer) return;

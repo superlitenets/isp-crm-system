@@ -628,13 +628,19 @@ class WhatsApp {
     }
     
     public function sendToGroup(string $groupId, string $message): array {
+        error_log("WhatsApp sendToGroup called - Group: $groupId, Provider: {$this->provider}, URL: {$this->sessionServiceUrl}");
+        
         if ($this->provider !== 'session') {
+            error_log("WhatsApp sendToGroup failed - Provider not session: {$this->provider}");
             return ['success' => false, 'error' => 'Group messaging only available with session provider'];
         }
         
         try {
+            $url = $this->sessionServiceUrl . '/send-group';
+            error_log("WhatsApp sendToGroup - Calling URL: $url");
+            
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->sessionServiceUrl . '/send-group');
+            curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
                 'groupId' => $groupId,
@@ -649,13 +655,17 @@ class WhatsApp {
             $error = curl_error($ch);
             curl_close($ch);
             
+            error_log("WhatsApp sendToGroup response - HTTP: $httpCode, Error: $error, Response: " . substr($response, 0, 500));
+            
             if ($error) {
+                error_log("WhatsApp sendToGroup curl error: $error");
                 return ['success' => false, 'error' => $error, 'method' => 'session'];
             }
             
             $data = json_decode($response, true);
             
             if ($httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false)) {
+                error_log("WhatsApp sendToGroup SUCCESS - MessageId: " . ($data['messageId'] ?? 'N/A'));
                 return [
                     'success' => true,
                     'method' => 'session',
@@ -663,6 +673,7 @@ class WhatsApp {
                     'groupId' => $groupId
                 ];
             } else {
+                error_log("WhatsApp sendToGroup FAILED - HTTP: $httpCode, Error: " . ($data['error'] ?? 'Unknown'));
                 return [
                     'success' => false,
                     'error' => $data['error'] ?? "HTTP $httpCode",
@@ -671,6 +682,7 @@ class WhatsApp {
                 ];
             }
         } catch (\Exception $e) {
+            error_log("WhatsApp sendToGroup EXCEPTION: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'method' => 'session'];
         }
     }
