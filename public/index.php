@@ -3051,32 +3051,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dbUser = getenv('PGUSER') ?: 'crm';
                     $dbPass = getenv('PGPASSWORD') ?: '';
                     
-                    putenv("PGPASSWORD=$dbPass");
-                    $command = sprintf(
-                        'pg_dump -h %s -U %s -d %s -F p > %s 2>&1',
-                        escapeshellarg($dbHost),
-                        escapeshellarg($dbUser),
-                        escapeshellarg($dbName),
-                        escapeshellarg($filepath)
-                    );
+                    $backupSuccess = false;
+                    $output = [];
+                    $returnVar = 1;
                     
-                    exec($command, $output, $returnVar);
+                    // Method 1: Try direct pg_dump (works on native installs and Replit)
+                    exec('which pg_dump 2>/dev/null', $pgdumpCheck, $pgdumpExists);
+                    if ($pgdumpExists === 0) {
+                        putenv("PGPASSWORD=$dbPass");
+                        $command = sprintf(
+                            'pg_dump -h %s -U %s -d %s -F p > %s 2>&1',
+                            escapeshellarg($dbHost),
+                            escapeshellarg($dbUser),
+                            escapeshellarg($dbName),
+                            escapeshellarg($filepath)
+                        );
+                        exec($command, $output, $returnVar);
+                        if ($returnVar === 0 && file_exists($filepath) && filesize($filepath) > 100) {
+                            $backupSuccess = true;
+                        }
+                    }
                     
-                    if ($returnVar !== 0) {
+                    // Method 2: Try docker exec (for Docker deployments)
+                    if (!$backupSuccess) {
+                        $dockerContainer = getenv('DB_DOCKER_CONTAINER') ?: 'isp_crm_db';
+                        $command = sprintf(
+                            'docker exec %s pg_dump -U %s -d %s > %s 2>&1',
+                            escapeshellarg($dockerContainer),
+                            escapeshellarg($dbUser),
+                            escapeshellarg($dbName),
+                            escapeshellarg($filepath)
+                        );
+                        exec($command, $output, $returnVar);
+                        if ($returnVar === 0 && file_exists($filepath) && filesize($filepath) > 100) {
+                            $backupSuccess = true;
+                        }
+                    }
+                    
+                    // Method 3: PHP-based backup using PDO (fallback)
+                    if (!$backupSuccess) {
+                        $db = \Database::getConnection();
+                        $tables = $db->query("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")->fetchAll(\PDO::FETCH_COLUMN);
+                        
+                        $backupContent = "-- ISP CRM Database Backup\n";
+                        $backupContent .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+                        $backupContent .= "-- Tables: " . count($tables) . "\n\n";
+                        
+                        foreach ($tables as $table) {
+                            $backupContent .= "\n-- Table: $table\n";
+                            
+                            // Get table structure
+                            $cols = $db->query("SELECT column_name, data_type, is_nullable, column_default 
+                                FROM information_schema.columns WHERE table_name = '$table' ORDER BY ordinal_position")->fetchAll(\PDO::FETCH_ASSOC);
+                            
+                            // Export data
+                            $rows = $db->query("SELECT * FROM \"$table\"")->fetchAll(\PDO::FETCH_ASSOC);
+                            foreach ($rows as $row) {
+                                $columns = array_keys($row);
+                                $values = array_map(function($v) use ($db) {
+                                    if ($v === null) return 'NULL';
+                                    return $db->quote($v);
+                                }, array_values($row));
+                                $backupContent .= "INSERT INTO \"$table\" (\"" . implode('", "', $columns) . "\") VALUES (" . implode(', ', $values) . ");\n";
+                            }
+                        }
+                        
+                        file_put_contents($filepath, $backupContent);
+                        if (file_exists($filepath) && filesize($filepath) > 100) {
+                            $backupSuccess = true;
+                        }
+                    }
+                    
+                    if (!$backupSuccess) {
                         if (file_exists($filepath)) {
                             unlink($filepath);
                         }
-                        throw new Exception('Backup failed: ' . implode("\n", $output));
+                        throw new Exception('Backup failed. Tried pg_dump, docker exec, and PHP export. Check server configuration.');
                     }
                     
-                    if (!file_exists($filepath) || filesize($filepath) < 100) {
-                        if (file_exists($filepath)) {
-                            unlink($filepath);
-                        }
-                        throw new Exception('Backup file is empty or not created.');
-                    }
-                    
-                    $_SESSION['backup_success'] = 'Database backup created successfully: ' . $filename;
+                    $_SESSION['backup_success'] = 'Database backup created successfully: ' . $filename . ' (' . number_format(filesize($filepath) / 1024, 2) . ' KB)';
                     \App\Auth::regenerateToken();
                     header('Location: ?page=settings&subpage=backup');
                     exit;
