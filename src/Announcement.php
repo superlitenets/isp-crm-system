@@ -169,12 +169,15 @@ class Announcement {
                     if ($smsResult['success'] ?? false) {
                         $smsSent = true;
                         $result['sms_sent']++;
-                    } else {
+                    }
+                    
+                    try {
                         $waResult = $this->whatsapp->sendMessage($employee['phone'], $messageText);
                         if ($waResult['success'] ?? false) {
-                            $smsSent = true;
                             $result['whatsapp_sent']++;
                         }
+                    } catch (\Exception $e) {
+                        error_log("WhatsApp send failed for {$employee['phone']}: " . $e->getMessage());
                     }
                 }
                 
