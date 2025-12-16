@@ -3004,7 +3004,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'password' => $_POST['password'] ?? null,
                             'serial_number' => $_POST['serial_number'] ?? null,
                             'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
-                            'is_active' => isset($_POST['is_active'])
+                            'is_active' => isset($_POST['is_active']),
+                            'api_base_url' => $_POST['api_base_url'] ?? null,
+                            'company_name' => $_POST['company_name'] ?? null
                         ];
                         $biometricService->addDevice($deviceData);
                         $message = 'Biometric device added successfully!';
@@ -3032,7 +3034,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'username' => $_POST['username'] ?? null,
                             'serial_number' => $_POST['serial_number'] ?? null,
                             'sync_interval_minutes' => (int)($_POST['sync_interval_minutes'] ?? 15),
-                            'is_active' => isset($_POST['is_active'])
+                            'is_active' => isset($_POST['is_active']),
+                            'api_base_url' => $_POST['api_base_url'] ?? null,
+                            'company_name' => $_POST['company_name'] ?? null
                         ];
                         if (!empty($_POST['password'])) {
                             $deviceData['password'] = $_POST['password'];
