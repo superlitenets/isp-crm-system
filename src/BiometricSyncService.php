@@ -5,6 +5,7 @@ namespace App;
 require_once __DIR__ . '/BiometricDevice.php';
 require_once __DIR__ . '/ZKTecoDevice.php';
 require_once __DIR__ . '/HikvisionDevice.php';
+require_once __DIR__ . '/BioTimeCloud.php';
 
 class BiometricSyncService {
     private \PDO $db;
@@ -37,11 +38,17 @@ class BiometricSyncService {
         
         $password = !empty($data['password']) ? BiometricDevice::encryptPassword($data['password']) : null;
         
+        $defaultPort = match($data['device_type']) {
+            'zkteco' => 4370,
+            'biotime_cloud' => 8090,
+            default => 80
+        };
+        
         $stmt->execute([
             $data['name'],
             $data['device_type'],
             $data['ip_address'],
-            $data['port'] ?? ($data['device_type'] === 'zkteco' ? 4370 : 80),
+            $data['port'] ?? $defaultPort,
             $data['username'] ?? null,
             $password,
             $data['serial_number'] ?? null,
