@@ -794,6 +794,11 @@ function syncAllEmployeesToDevice(deviceId) {
             <?php if ($pendingLeaveCount > 0): ?><span class="badge bg-danger rounded-pill ms-1"><?= $pendingLeaveCount ?></span><?php endif; ?>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'announcements' ? 'active' : '' ?>" href="?page=hr&subpage=announcements">
+            <i class="bi bi-megaphone"></i> Announcements
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'departments'): ?>
@@ -3405,6 +3410,9 @@ $leaveTab = $_GET['tab'] ?? 'requests';
 </div>
 
 <?php endif; ?>
+
+<?php elseif ($subpage === 'announcements'): ?>
+<?php include __DIR__ . '/announcements.php'; ?>
 
 <?php endif; ?>
 

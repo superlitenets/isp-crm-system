@@ -708,6 +708,91 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
             </div>
         </div>
         
+        <?php 
+        $serviceFee = new \App\ServiceFee($db);
+        $ticketFees = $serviceFee->getTicketFees($ticketData['id']);
+        $feesTotal = $serviceFee->getTicketFeesTotal($ticketData['id']);
+        $feeTypes = $serviceFee->getFeeTypes(true);
+        ?>
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Service Fees</h5>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addServiceFeeModal">
+                    <i class="bi bi-plus"></i> Add Fee
+                </button>
+            </div>
+            <div class="card-body">
+                <?php if (!empty($ticketFees)): ?>
+                <table class="table table-sm mb-3">
+                    <thead>
+                        <tr>
+                            <th>Fee</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-center">Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($ticketFees as $fee): ?>
+                        <tr>
+                            <td>
+                                <?= htmlspecialchars($fee['fee_name']) ?>
+                                <?php if ($fee['notes']): ?>
+                                <br><small class="text-muted"><?= htmlspecialchars($fee['notes']) ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-end"><?= $fee['currency'] ?> <?= number_format($fee['amount'], 2) ?></td>
+                            <td class="text-center">
+                                <?php if ($fee['is_paid']): ?>
+                                <span class="badge bg-success">Paid</span>
+                                <?php else: ?>
+                                <span class="badge bg-warning">Unpaid</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-end">
+                                <?php if (!$fee['is_paid']): ?>
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="mark_fee_paid">
+                                    <input type="hidden" name="fee_id" value="<?= $fee['id'] ?>">
+                                    <button type="submit" class="btn btn-xs btn-success" title="Mark as Paid">
+                                        <i class="bi bi-check"></i>
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                                <form method="POST" class="d-inline" onsubmit="return confirm('Remove this fee?');">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="delete_ticket_fee">
+                                    <input type="hidden" name="fee_id" value="<?= $fee['id'] ?>">
+                                    <button type="submit" class="btn btn-xs btn-outline-danger" title="Remove">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td>Total</td>
+                            <td class="text-end">KES <?= number_format($feesTotal['total'], 2) ?></td>
+                            <td class="text-center">
+                                <?php if ($feesTotal['unpaid'] > 0): ?>
+                                <small class="text-warning">Unpaid: <?= number_format($feesTotal['unpaid'], 2) ?></small>
+                                <?php else: ?>
+                                <small class="text-success">All Paid</small>
+                                <?php endif; ?>
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <?php else: ?>
+                <p class="text-muted text-center mb-0"><small>No service fees added</small></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        
         <?php if ($ticketData['assigned_to']): ?>
         <div class="card mb-4">
             <div class="card-header bg-white">
@@ -1047,6 +1132,63 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="addServiceFeeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="add_ticket_service_fee">
+                <input type="hidden" name="ticket_id" value="<?= $ticketData['id'] ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-receipt"></i> Add Service Fee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Fee Type</label>
+                        <select class="form-select" name="fee_type_id" id="feeTypeSelect" onchange="updateFeeDefaults()">
+                            <option value="">-- Custom Fee --</option>
+                            <?php foreach ($feeTypes as $ft): ?>
+                            <option value="<?= $ft['id'] ?>" data-name="<?= htmlspecialchars($ft['name']) ?>" data-amount="<?= $ft['default_amount'] ?>">
+                                <?= htmlspecialchars($ft['name']) ?> (<?= $ft['currency'] ?> <?= number_format($ft['default_amount'], 2) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Fee Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="fee_name" id="feeNameInput" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="amount" id="feeAmountInput" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus"></i> Add Fee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function updateFeeDefaults() {
+    const select = document.getElementById('feeTypeSelect');
+    const nameInput = document.getElementById('feeNameInput');
+    const amountInput = document.getElementById('feeAmountInput');
+    const option = select.options[select.selectedIndex];
+    if (option.dataset.name) {
+        nameInput.value = option.dataset.name;
+        amountInput.value = option.dataset.amount;
+    }
+}
+</script>
 
 <?php else: ?>
 <?php 

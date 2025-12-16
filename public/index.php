@@ -1943,6 +1943,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
 
+            case 'create_announcement':
+                try {
+                    $announcementClass = new \App\Announcement($db);
+                    $status = ($_POST['save_as'] ?? 'draft') === 'send' ? 'sent' : 'draft';
+                    $announcementId = $announcementClass->create([
+                        'title' => $_POST['title'],
+                        'message' => $_POST['message'],
+                        'priority' => $_POST['priority'] ?? 'normal',
+                        'target_audience' => $_POST['target_audience'] ?? 'all',
+                        'target_branch_id' => $_POST['target_branch_id'] ?: null,
+                        'target_team_id' => $_POST['target_team_id'] ?: null,
+                        'send_sms' => isset($_POST['send_sms']),
+                        'send_notification' => isset($_POST['send_notification']),
+                        'status' => 'draft',
+                        'created_by' => $currentUser['id']
+                    ]);
+                    
+                    if ($status === 'sent') {
+                        $result = $announcementClass->send($announcementId);
+                        $message = 'Announcement created and sent! SMS: ' . $result['sms_sent'] . ', Notifications: ' . $result['notifications_sent'];
+                    } else {
+                        $message = 'Announcement saved as draft.';
+                    }
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating announcement: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'send_announcement':
+                try {
+                    $announcementClass = new \App\Announcement($db);
+                    $result = $announcementClass->send((int)$_POST['announcement_id']);
+                    if ($result['success']) {
+                        $message = 'Announcement sent! SMS: ' . $result['sms_sent'] . ', Notifications: ' . $result['notifications_sent'];
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Error sending announcement: ' . implode(', ', $result['errors']);
+                        $messageType = 'danger';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error sending announcement: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_announcement':
+                try {
+                    $announcementClass = new \App\Announcement($db);
+                    $announcementClass->delete((int)$_POST['announcement_id']);
+                    $message = 'Announcement deleted.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting announcement: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_ticket_service_fee':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->addTicketFee((int)$_POST['ticket_id'], [
+                        'fee_type_id' => $_POST['fee_type_id'] ?: null,
+                        'fee_name' => $_POST['fee_name'],
+                        'amount' => $_POST['amount'],
+                        'notes' => $_POST['notes'] ?? null,
+                        'created_by' => $currentUser['id']
+                    ]);
+                    $message = 'Service fee added to ticket.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error adding service fee: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'mark_fee_paid':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->markAsPaid((int)$_POST['fee_id'], $_POST['payment_reference'] ?? null);
+                    $message = 'Service fee marked as paid.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating fee: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_ticket_fee':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->deleteTicketFee((int)$_POST['fee_id']);
+                    $message = 'Service fee removed.';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error removing fee: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
             case 'create_invoice':
             case 'update_invoice':
                 if (!\App\Auth::can('settings.view')) {
@@ -3368,7 +3475,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'rate' => (float)$_POST['rate'],
                         'currency' => $_POST['currency'] ?? 'KES',
                         'description' => $_POST['description'] ?? null,
-                        'is_active' => isset($_POST['is_active'])
+                        'is_active' => isset($_POST['is_active']),
+                        'require_sla_compliance' => isset($_POST['require_sla_compliance'])
                     ]);
                     $message = 'Commission rate added successfully!';
                     $messageType = 'success';
@@ -3387,7 +3495,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'rate' => (float)$_POST['rate'],
                         'currency' => $_POST['currency'] ?? 'KES',
                         'description' => $_POST['description'] ?? null,
-                        'is_active' => isset($_POST['is_active'])
+                        'is_active' => isset($_POST['is_active']),
+                        'require_sla_compliance' => isset($_POST['require_sla_compliance'])
                     ]);
                     $message = 'Commission rate updated successfully!';
                     $messageType = 'success';

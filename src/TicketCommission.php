@@ -27,13 +27,14 @@ class TicketCommission {
     
     public function addRate(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO ticket_commission_rates (category, rate, currency, description, is_active)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO ticket_commission_rates (category, rate, currency, description, is_active, require_sla_compliance)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT (category) DO UPDATE SET
                 rate = EXCLUDED.rate,
                 currency = EXCLUDED.currency,
                 description = EXCLUDED.description,
                 is_active = EXCLUDED.is_active,
+                require_sla_compliance = EXCLUDED.require_sla_compliance,
                 updated_at = CURRENT_TIMESTAMP
         ");
         
@@ -42,7 +43,8 @@ class TicketCommission {
             $data['rate'] ?? 0,
             $data['currency'] ?? 'KES',
             $data['description'] ?? null,
-            isset($data['is_active']) ? (bool)$data['is_active'] : true
+            isset($data['is_active']) ? (bool)$data['is_active'] : true,
+            isset($data['require_sla_compliance']) ? (bool)$data['require_sla_compliance'] : false
         ]);
         
         return (int)$this->db->lastInsertId();
@@ -52,8 +54,8 @@ class TicketCommission {
         $fields = [];
         $params = [];
         
-        foreach (['category', 'rate', 'currency', 'description', 'is_active'] as $field) {
-            if (isset($data[$field])) {
+        foreach (['category', 'rate', 'currency', 'description', 'is_active', 'require_sla_compliance'] as $field) {
+            if (array_key_exists($field, $data)) {
                 $fields[] = "$field = ?";
                 $params[] = $data[$field];
             }
@@ -79,13 +81,17 @@ class TicketCommission {
         $result = [
             'success' => false,
             'message' => '',
-            'earnings' => []
+            'earnings' => [],
+            'sla_compliant' => true,
+            'sla_note' => null
         ];
         
         $stmt = $this->db->prepare("
             SELECT t.*, 
                    t.assigned_to as user_id,
-                   t.team_id
+                   t.team_id,
+                   t.sla_response_breached,
+                   t.sla_resolution_breached
             FROM tickets t
             WHERE t.id = ?
         ");
@@ -110,6 +116,30 @@ class TicketCommission {
             return $result;
         }
         
+        $slaCompliant = true;
+        $slaNote = null;
+        if (!empty($rate['require_sla_compliance'])) {
+            $responseBreached = $ticket['sla_response_breached'] ?? false;
+            $resolutionBreached = $ticket['sla_resolution_breached'] ?? false;
+            
+            if ($responseBreached || $resolutionBreached) {
+                $slaCompliant = false;
+                $breachTypes = [];
+                if ($responseBreached) $breachTypes[] = 'response';
+                if ($resolutionBreached) $breachTypes[] = 'resolution';
+                $slaNote = 'SLA breached: ' . implode(' and ', $breachTypes);
+                
+                $result['success'] = false;
+                $result['sla_compliant'] = false;
+                $result['sla_note'] = $slaNote;
+                $result['message'] = 'Commission denied - SLA not met. ' . $slaNote;
+                return $result;
+            }
+        }
+        
+        $result['sla_compliant'] = $slaCompliant;
+        $result['sla_note'] = $slaNote;
+        
         $fullRate = (float)$rate['rate'];
         $currency = $rate['currency'];
         
@@ -133,7 +163,9 @@ class TicketCommission {
                     'full_rate' => $fullRate,
                     'earned_amount' => $earnedAmount,
                     'share_count' => $shareCount,
-                    'currency' => $currency
+                    'currency' => $currency,
+                    'sla_compliant' => $slaCompliant,
+                    'sla_note' => $slaNote
                 ]);
                 
                 $result['earnings'][] = [
@@ -161,7 +193,9 @@ class TicketCommission {
                 'full_rate' => $fullRate,
                 'earned_amount' => $fullRate,
                 'share_count' => 1,
-                'currency' => $currency
+                'currency' => $currency,
+                'sla_compliant' => $slaCompliant,
+                'sla_note' => $slaNote
             ]);
             
             $result['success'] = true;
@@ -192,8 +226,8 @@ class TicketCommission {
     
     private function createEarning(array $data): int {
         $stmt = $this->db->prepare("
-            INSERT INTO ticket_earnings (ticket_id, employee_id, team_id, category, full_rate, earned_amount, share_count, currency, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            INSERT INTO ticket_earnings (ticket_id, employee_id, team_id, category, full_rate, earned_amount, share_count, currency, status, sla_compliant, sla_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
         ");
         
         $stmt->execute([
@@ -204,7 +238,9 @@ class TicketCommission {
             $data['full_rate'],
             $data['earned_amount'],
             $data['share_count'],
-            $data['currency']
+            $data['currency'],
+            $data['sla_compliant'] ?? true,
+            $data['sla_note'] ?? null
         ]);
         
         return (int)$this->db->lastInsertId();

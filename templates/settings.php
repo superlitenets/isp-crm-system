@@ -5591,6 +5591,7 @@ $categoryColors = [
                             <tr>
                                 <th>Category</th>
                                 <th>Rate</th>
+                                <th>SLA Required</th>
                                 <th>Description</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -5604,6 +5605,13 @@ $categoryColors = [
                                 </td>
                                 <td>
                                     <strong><?= $rate['currency'] ?> <?= number_format($rate['rate'], 2) ?></strong>
+                                </td>
+                                <td>
+                                    <?php if (!empty($rate['require_sla_compliance'])): ?>
+                                    <span class="badge bg-info"><i class="bi bi-speedometer2"></i> Yes</span>
+                                    <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-muted small"><?= htmlspecialchars($rate['description'] ?? '-') ?></td>
                                 <td>
@@ -5709,6 +5717,19 @@ $categoryColors = [
                                    <?= (!$editRate || $editRate['is_active']) ? 'checked' : '' ?>>
                             <label class="form-check-label" for="is_active">Active</label>
                         </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="require_sla_compliance" id="require_sla"
+                                   <?= ($editRate && !empty($editRate['require_sla_compliance'])) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="require_sla">
+                                Require SLA Compliance
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            If enabled, commission will only be paid if the ticket met SLA response and resolution targets.
+                        </small>
                     </div>
                     
                     <div class="d-flex gap-2">
