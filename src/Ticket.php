@@ -416,10 +416,12 @@ class Ticket {
         $this->db->beginTransaction();
         try {
             $this->db->prepare("DELETE FROM ticket_comments WHERE ticket_id = ?")->execute([$id]);
-            $this->db->prepare("DELETE FROM ticket_fees WHERE ticket_id = ?")->execute([$id]);
-            $this->db->prepare("DELETE FROM sla_logs WHERE ticket_id = ?")->execute([$id]);
-            $this->db->prepare("DELETE FROM ticket_satisfaction WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_service_fees WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_sla_logs WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_satisfaction_ratings WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_earnings WHERE ticket_id = ?")->execute([$id]);
             $this->db->prepare("DELETE FROM whatsapp_logs WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM sms_logs WHERE ticket_id = ?")->execute([$id]);
             $this->db->prepare("DELETE FROM ticket_escalations WHERE ticket_id = ?")->execute([$id]);
             
             $stmt = $this->db->prepare("DELETE FROM tickets WHERE id = ?");
