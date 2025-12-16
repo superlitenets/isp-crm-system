@@ -4100,6 +4100,28 @@ document.getElementById('commissionType').addEventListener('change', function() 
                         </div>
                     </div>
                     
+                    <hr class="my-4">
+                    <h6 class="mb-3"><i class="bi bi-geo-alt"></i> IP-Based Clock-in Restriction</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="mobile_restrict_clockin_ip" id="restrictClockInIp" value="1"
+                                       <?= ($mobileSettings['mobile_restrict_clockin_ip'] ?? '0') === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="restrictClockInIp">
+                                    <strong>Restrict Clock-in by IP Address</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Only allow clock-in from specific network IP addresses</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Allowed IP Addresses</label>
+                            <textarea name="mobile_allowed_ips" class="form-control" rows="3" 
+                                      placeholder="Enter one IP per line, e.g.&#10;102.205.239.250&#10;102.205.239.251"><?= htmlspecialchars($mobileSettings['mobile_allowed_ips'] ?? '') ?></textarea>
+                            <small class="text-muted">One IP address per line. Leave empty to allow all IPs when restriction is disabled.</small>
+                        </div>
+                    </div>
+                    
                     <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg"></i> Save Settings

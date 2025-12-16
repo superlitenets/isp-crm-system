@@ -3462,6 +3462,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'mobile_app_name' => $_POST['mobile_app_name'] ?? 'ISP Mobile',
                         'mobile_require_location' => isset($_POST['mobile_require_location']) ? '1' : '0',
                         'mobile_allow_offline' => isset($_POST['mobile_allow_offline']) ? '1' : '0',
+                        'mobile_restrict_clockin_ip' => isset($_POST['mobile_restrict_clockin_ip']) ? '1' : '0',
+                        'mobile_allowed_ips' => trim($_POST['mobile_allowed_ips'] ?? ''),
                     ];
                     $settings->saveMobileAppSettings($mobileData);
                     \App\Settings::clearCache();

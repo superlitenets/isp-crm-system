@@ -498,6 +498,11 @@ class MobileAPI {
     }
     
     public function clockIn(int $employeeId, ?float $latitude = null, ?float $longitude = null): array {
+        $ipCheck = $this->checkClockInIpRestriction();
+        if (!$ipCheck['allowed']) {
+            return ['success' => false, 'message' => $ipCheck['message']];
+        }
+        
         $today = date('Y-m-d');
         $now = date('H:i:s');
         
@@ -1598,6 +1603,62 @@ class MobileAPI {
             return $stmt->execute([$userId]);
         } catch (\Exception $e) {
             return false;
+        }
+    }
+    
+    public function getClientIp(): string {
+        $headers = [
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_REAL_IP',
+            'HTTP_CLIENT_IP',
+            'REMOTE_ADDR'
+        ];
+        
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                $ips = explode(',', $_SERVER[$header]);
+                $ip = trim($ips[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            }
+        }
+        
+        return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    }
+    
+    public function checkClockInIpRestriction(): array {
+        try {
+            $settings = new \App\Settings();
+            $restrictByIp = $settings->get('mobile_restrict_clockin_ip', '0');
+            
+            if ($restrictByIp !== '1') {
+                return ['allowed' => true, 'message' => ''];
+            }
+            
+            $allowedIpsRaw = $settings->get('mobile_allowed_ips', '');
+            if (empty(trim($allowedIpsRaw))) {
+                return ['allowed' => true, 'message' => ''];
+            }
+            
+            $allowedIps = array_filter(array_map('trim', explode("\n", $allowedIpsRaw)));
+            if (empty($allowedIps)) {
+                return ['allowed' => true, 'message' => ''];
+            }
+            
+            $clientIp = $this->getClientIp();
+            
+            if (in_array($clientIp, $allowedIps)) {
+                return ['allowed' => true, 'message' => ''];
+            }
+            
+            return [
+                'allowed' => false,
+                'message' => 'Clock-in is only allowed from the company network. Your IP: ' . $clientIp
+            ];
+            
+        } catch (\Exception $e) {
+            return ['allowed' => true, 'message' => ''];
         }
     }
 }
