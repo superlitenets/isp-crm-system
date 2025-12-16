@@ -109,7 +109,7 @@ class Ticket {
             $this->notifyTeamMembers($ticketId, $teamId);
         }
         
-        if ($branchId && ($assignedTo || $teamId)) {
+        if ($branchId) {
             try {
                 $this->notifyBranchWhatsAppGroup($ticketId, $branchId);
             } catch (\Throwable $e) {
