@@ -524,7 +524,7 @@ try {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to view available tickets']);
                 break;
             }
-            $tickets = $api->getAvailableTickets();
+            $tickets = $api->getAvailableTickets($user['id']);
             echo json_encode(['success' => true, 'data' => $tickets]);
             break;
             

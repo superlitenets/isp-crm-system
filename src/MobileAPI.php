@@ -208,7 +208,22 @@ class MobileAPI {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
+    public function getEmployeeBranchIds(int $userId): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return [];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT branch_id FROM employee_branches WHERE employee_id = ?
+        ");
+        $stmt->execute([$employee['id']]);
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'branch_id');
+    }
+    
     public function getTechnicianTickets(int $userId, string $status = '', int $limit = 50): array {
+        $branchIds = $this->getEmployeeBranchIds($userId);
+        
         $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
                        COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings,
                        COALESCE(tcr.rate, 0) as commission_rate
@@ -217,6 +232,12 @@ class MobileAPI {
                 LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
                 WHERE t.assigned_to = ?";
         $params = [$userId];
+        
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $sql .= " AND t.branch_id IN ($placeholders)";
+            $params = array_merge($params, $branchIds);
+        }
         
         if ($status) {
             $sql .= " AND t.status = ?";
@@ -1146,15 +1167,24 @@ class MobileAPI {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function getAvailableTickets(int $limit = 50): array {
-        $stmt = $this->db->prepare("
-            SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
+    public function getAvailableTickets(int $userId, int $limit = 50): array {
+        $branchIds = $this->getEmployeeBranchIds($userId);
+        
+        $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
                    COALESCE(tcr.rate, 0) as commission_rate
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
-            WHERE t.assigned_to IS NULL AND t.status NOT IN ('resolved', 'closed')
-            ORDER BY 
+            WHERE t.assigned_to IS NULL AND t.status NOT IN ('resolved', 'closed')";
+        $params = [];
+        
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $sql .= " AND t.branch_id IN ($placeholders)";
+            $params = $branchIds;
+        }
+        
+        $sql .= " ORDER BY 
                 CASE t.priority 
                     WHEN 'critical' THEN 1 
                     WHEN 'high' THEN 2 
@@ -1162,9 +1192,10 @@ class MobileAPI {
                     ELSE 4 
                 END,
                 t.created_at DESC
-            LIMIT ?
-        ");
-        $stmt->execute([$limit]);
+            LIMIT " . (int)$limit;
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
