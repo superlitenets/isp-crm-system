@@ -1,0 +1,29 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 100 | grep -i "whatsapp\|notify"
+[16-Dec-2025 12:08:32] NOTICE: fpm is running, pid 1
+[16-Dec-2025 12:08:32] NOTICE: ready to handle connections
+172.18.0.4 -  16/Dec/2025:12:08:40 +0300 "GET /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:08:43 +0300 "GET /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:08:46 +0300 "POST /index.php" 302
+172.18.0.4 -  16/Dec/2025:12:08:47 +0300 "GET /index.php" 200
+[16-Dec-2025 12:09:23] NOTICE: Finishing ...
+[16-Dec-2025 12:09:23] NOTICE: exiting, bye-bye!
+[16-Dec-2025 12:09:23] NOTICE: fpm is running, pid 1
+[16-Dec-2025 12:09:23] NOTICE: ready to handle connections
+172.18.0.4 -  16/Dec/2025:12:09:26 +0300 "GET /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:09:35 +0300 "GET /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:09:47 +0300 "POST /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:10:01 +0300 "GET /cron.php" 403
+172.18.0.4 -  16/Dec/2025:12:10:01 +0300 "GET /cron.php" 200
+172.18.0.4 -  16/Dec/2025:12:10:16 +0300 "GET /index.php" 200
+172.18.0.4 -  16/Dec/2025:12:10:31 +0300 "GET /api/billing.php" 200
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 254704088460
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+NOTICE: PHP message: notifyBranchWhatsAppGroup called - ticketId: 14, branchId: 1
+NOTICE: PHP message: notifyBranchWhatsAppGroup - Sending to group: 120363395097732236@g.us for branch: S-HURUMA
+NOTICE: PHP message: WhatsApp sendToGroup called - Group: 120363395097732236@g.us, Provider: session, URL: http://127.0.0.1:3001
+NOTICE: PHP message: WhatsApp sendToGroup - Calling URL: http://127.0.0.1:3001/send-group
+NOTICE: PHP message: WhatsApp sendToGroup response - HTTP: 200, Error: , Response: {"success":true,"messageId":"true_120363395097732236@g.us_3EB0BED88525CFEBE2A99D_210445378052171@lid","timestamp":1765876260}
+NOTICE: PHP message: WhatsApp sendToGroup SUCCESS - MessageId: true_120363395097732236@g.us_3EB0BED88525CFEBE2A99D_210445378052171@lid
+NOTICE: PHP message: WhatsApp branch group notification sent for ticket TKT-20251216-9367 to branch S-HURUMA
+172.18.0.4 -  16/Dec/2025:12:10:58 +0300 "POST /index.php" 200
+root@superlitecrm:~/isp#
