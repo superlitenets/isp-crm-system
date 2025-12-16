@@ -6,11 +6,13 @@ class Announcement {
     private \PDO $db;
     private SMS $sms;
     private SMSGateway $smsGateway;
+    private WhatsApp $whatsapp;
     
     public function __construct(\PDO $db = null) {
         $this->db = $db ?? \Database::getConnection();
         $this->sms = new SMS();
         $this->smsGateway = new SMSGateway();
+        $this->whatsapp = new WhatsApp($this->db);
     }
     
     public function create(array $data): int {
@@ -131,7 +133,7 @@ class Announcement {
     }
     
     public function send(int $id): array {
-        $result = ['success' => false, 'sms_sent' => 0, 'notifications_sent' => 0, 'errors' => []];
+        $result = ['success' => false, 'sms_sent' => 0, 'whatsapp_sent' => 0, 'notifications_sent' => 0, 'errors' => []];
         
         $announcement = $this->getById($id);
         if (!$announcement) {
@@ -158,12 +160,19 @@ class Announcement {
                 $smsSent = false;
                 $notificationSent = false;
                 
+                $messageText = "[" . strtoupper($announcement['priority']) . "] " . $announcement['title'] . "\n\n" . $announcement['message'];
+                
                 if ($announcement['send_sms'] && !empty($employee['phone'])) {
-                    $smsMessage = "[" . strtoupper($announcement['priority']) . "] " . $announcement['title'] . "\n\n" . $announcement['message'];
-                    $smsResult = $this->smsGateway->send($employee['phone'], $smsMessage);
+                    $smsResult = $this->smsGateway->send($employee['phone'], $messageText);
                     if ($smsResult['success'] ?? false) {
                         $smsSent = true;
                         $result['sms_sent']++;
+                    } else {
+                        $waResult = $this->whatsapp->sendMessage($employee['phone'], $messageText);
+                        if ($waResult['success'] ?? false) {
+                            $smsSent = true;
+                            $result['whatsapp_sent']++;
+                        }
                     }
                 }
                 
