@@ -2083,8 +2083,8 @@ if ($action === 'sync_device' && $id) {
                                     <strong><?= htmlspecialchars($device['name']) ?></strong>
                                 </td>
                                 <td>
-                                    <span class="badge bg-<?= $device['device_type'] === 'zkteco' ? 'info' : 'warning' ?>">
-                                        <?= strtoupper($device['device_type']) ?>
+                                    <span class="badge bg-<?= $device['device_type'] === 'zkteco' ? 'info' : ($device['device_type'] === 'biotime_cloud' ? 'success' : 'warning') ?>">
+                                        <?= $device['device_type'] === 'biotime_cloud' ? 'BIOTIME' : strtoupper($device['device_type']) ?>
                                     </span>
                                 </td>
                                 <td><?= htmlspecialchars($device['ip_address']) ?></td>
@@ -2249,17 +2249,19 @@ if ($action === 'sync_device' && $id) {
                     <div class="mb-3">
                         <label class="form-label">Device Type <span class="text-danger">*</span></label>
                         <select class="form-select" name="device_type" id="deviceType" required>
-                            <option value="zkteco" <?= ($editDevice['device_type'] ?? '') === 'zkteco' ? 'selected' : '' ?>>ZKTeco</option>
+                            <option value="zkteco" <?= ($editDevice['device_type'] ?? '') === 'zkteco' ? 'selected' : '' ?>>ZKTeco (Direct)</option>
                             <option value="hikvision" <?= ($editDevice['device_type'] ?? '') === 'hikvision' ? 'selected' : '' ?>>Hikvision</option>
+                            <option value="biotime_cloud" <?= ($editDevice['device_type'] ?? '') === 'biotime_cloud' ? 'selected' : '' ?>>BioTime Cloud (ZKTeco)</option>
                         </select>
+                        <small class="text-muted" id="deviceTypeHelp">Select BioTime Cloud for real-time attendance sync via BioTime API</small>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">IP Address <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="ip_address" required
+                    <div class="mb-3" id="ipAddressField">
+                        <label class="form-label">IP Address / Server <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="ip_address" id="deviceIpAddress"
                                value="<?= htmlspecialchars($editDevice['ip_address'] ?? '') ?>"
-                               placeholder="192.168.1.201"
-                               pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+                               placeholder="192.168.1.201">
+                        <small class="text-muted" id="ipHelp">Device IP for direct connection, or BioTime server IP/hostname</small>
                     </div>
                     
                     <div class="mb-3">
@@ -2267,7 +2269,7 @@ if ($action === 'sync_device' && $id) {
                         <input type="number" class="form-control" name="port" id="devicePort"
                                value="<?= $editDevice['port'] ?? '4370' ?>"
                                min="1" max="65535">
-                        <small class="text-muted">ZKTeco: 4370, Hikvision: 80</small>
+                        <small class="text-muted" id="portHelp">ZKTeco: 4370, Hikvision: 80, BioTime: 8090</small>
                     </div>
                     
                     <div class="mb-3" id="usernameField">
@@ -2317,9 +2319,26 @@ if ($action === 'sync_device' && $id) {
     
     <script>
     document.getElementById('deviceType').addEventListener('change', function() {
-        var port = this.value === 'zkteco' ? 4370 : 80;
+        var type = this.value;
+        var port = type === 'zkteco' ? 4370 : (type === 'biotime_cloud' ? 8090 : 80);
         document.getElementById('devicePort').value = port;
+        
+        var ipInput = document.getElementById('deviceIpAddress');
+        var ipHelp = document.getElementById('ipHelp');
+        var portHelp = document.getElementById('portHelp');
+        
+        if (type === 'biotime_cloud') {
+            ipInput.placeholder = 'biotime.example.com or 192.168.1.100';
+            ipHelp.textContent = 'BioTime Cloud server IP or hostname';
+            ipInput.removeAttribute('pattern');
+        } else {
+            ipInput.placeholder = '192.168.1.201';
+            ipHelp.textContent = 'Device IP for direct connection';
+            ipInput.setAttribute('pattern', '^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$');
+        }
     });
+    
+    document.getElementById('deviceType').dispatchEvent(new Event('change'));
     </script>
     <?php endif; ?>
     

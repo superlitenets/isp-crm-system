@@ -55,6 +55,12 @@ abstract class BiometricDevice {
                 return new ZKTecoDevice($id, $ip, $port, $username, $password);
             case 'hikvision':
                 return new HikvisionDevice($id, $ip, $port, $username, $password);
+            case 'biotime_cloud':
+                $device = new BioTimeCloud($id, $ip, $port ?: 8090, $username, $password);
+                if (!empty($deviceConfig['api_base_url'])) {
+                    $device->setBaseUrl($deviceConfig['api_base_url']);
+                }
+                return $device;
             default:
                 return null;
         }
