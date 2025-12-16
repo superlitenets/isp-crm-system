@@ -1,0 +1,162 @@
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# sudo crontab -l
+sudo crontab -u www-data -l
+sudo ls -la /etc/cron.d/
+# Edit this file to introduce tasks to be run by cron.
+#
+# Each task to run has to be defined through a single line
+# indicating with different fields when the task will be run
+# and what command to run for the task
+#
+# To define the time you can provide concrete values for
+# minute (m), hour (h), day of month (dom), month (mon),
+# and day of week (dow) or use '*' in these fields (for 'any').
+#
+# Notice that tasks will be started based on the cron's system
+# daemon's notion of time and timezones.
+#
+# Output of the crontab jobs (including errors) is sent through
+# email to the user the crontab file belongs to (unless redirected).
+#
+# For example, you can run a backup of all your user accounts
+# at 5 a.m every week with:
+# 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+#
+# For more information see the manual pages of crontab(5) and cron(8)
+#
+# m h  dom mon dow   command
+# Attendance sync every 5 minutes
+*/5 * * * * curl -s "https://crm.superlite.co.ke/cron.php?action=sync_attendance&secret=isp-crm-cron-2024" > /dev/null 2>&1
+
+# Daily summary at 8 AM
+*/5 * * * * curl -s 'https://crm.superlite.co.ke/cron.php?action=scheduled_summaries&secret=YOUR_SECRET'
+
+# SSL auto-renewal at 3 AM
+0 3 * * * certbot renew --quiet && docker compose -f /home/superlite/isp/docker-compose.yml restart nginx
+
+
+* * * * * docker exec isp_crm_php php /var/www/html/public/cron.php biometric_sync
+* * * * * sleep 30 && docker exec isp_crm_php php /var/www/html/public/cron.php biometric_sync
+*/5 * * * * docker exec isp_crm_php php /var/www/html/public/cron.php scheduled_summaries
+0 1 1 * * docker exec isp_crm_php php /var/www/html/public/cron.php leave_accrual
+0 0 * * * docker exec isp_crm_db pg_dump -U crm isp_crm > /root/backups/isp_crm_$(date +\%Y\%m\%d).sql 2>/dev/null
+no crontab for www-data
+total 24
+drwxr-xr-x   2 root root 4096 Dec  9 15:45 .
+drwxr-xr-x 111 root root 4096 Dec 12 06:41 ..
+-rw-r--r--   1 root root  802 Apr 16  2023 certbot
+-rw-r--r--   1 root root  201 Apr  8  2024 e2scrub_all
+-rw-r--r--   1 root root  102 Apr 23  2024 .placeholder
+-rw-r--r--   1 root root  396 Apr 23  2024 sysstat
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp# # 1. Check if the malicious process is still running
+root@superlitecrm:~/isp# # 1. Check if the malicious process is still running
+ps aux | grep lzma119947|www-data" | grep -v grep
+ps aux | grep -E "119947|www-data" | grep -v grep
+# 2. Check Docker container processes
+# 2. Check Docker container processes
+docker exec isp_crm_php ps aux
+# 3. Check for recently modified files IN the container
+# 3. Check for recently modified files IN the container" -mtime -7 2>/dev/null |docker exec isp_crm_php find /var/www/html -name "*.php" -mtime -7 2>/dev/null | head -50
+# 4. Check /tmp inside container (common malware location)
+# 4. Check /tmp inside container (common malware location)
+docker exec isp_crm_php ls -la /tmp/
+# 5. Check your local app files for suspicious code
+# 5. Check your local app files for suspicious codephp" | head -20
+grep -r "base64_decode" ~/isp/public/ --include="*.php" | head -20
+grep -r "eval(" ~/isp/src/ --include="*.php" | head -20
+# 6. Check docker logs for suspicious activity
+# 6. Check docker logs for suspicious activityp -i "error\|warning\|POST" | taildocker logs isp_crm_php --since 24h 2>&1 | grep -i "error\|warning\|POST" | tail -50
+# 7. Check network connections
+# 7. Check network connectionst -tulpn 2>/dev/null || docker exec isp_crm_php ssdocker exec isp_crm_php netstat -tulpn 2>/dev/null || docker exec isp_crm_php ss -tulpn
+root      125916  0.0  0.0   6544  2304 pts/1    S+   23:13   0:00 grep --color=auto lzma
+www-data  114186  0.0  0.4 299376 30704 ?        S    22:00   0:02 php-fpm: pool www
+www-data  114187  0.0  0.4 299372 29504 ?        S    22:00   0:02 php-fpm: pool www
+www-data  119733  0.0  0.1  15516 12172 ?        Ss   23:02   0:00 apache2 -DFOREGROUND
+www-data  119740  3.5  1.8 802116 114260 ?       Sl   23:02   0:24 php-fpm pool www
+www-data  123940  765 39.2 2457444 2417292 ?     Ssl  23:11  20:27 apache2 -DFOREGROUND
+OCI runtime exec failed: exec failed: unable to start container process: exec: "ps": executable file not found in $PATH
+/var/www/html/public/biometric-api.php
+/var/www/html/public/api/billing.php
+/var/www/html/public/api/customer-history.php
+/var/www/html/public/api/mpesa-test.php
+/var/www/html/public/api/whatsapp-chat.php
+/var/www/html/public/index.php
+/var/www/html/public/mobile-api.php
+/var/www/html/public/download.php
+/var/www/html/public/cron.php
+/var/www/html/vendor/autoload.php
+/var/www/html/vendor/composer/installed.php
+/var/www/html/vendor/composer/autoload_classmap.php
+/var/www/html/vendor/composer/InstalledVersions.php
+/var/www/html/vendor/composer/autoload_psr4.php
+/var/www/html/vendor/composer/autoload_namespaces.php
+/var/www/html/vendor/composer/autoload_real.php
+/var/www/html/vendor/composer/autoload_static.php
+/var/www/html/config/database.php
+/var/www/html/config/init_db.php
+/var/www/html/src/SmartOLT.php
+/var/www/html/src/Order.php
+/var/www/html/src/ServiceFee.php
+/var/www/html/src/InventoryWarehouse.php
+/var/www/html/src/Employee.php
+/var/www/html/src/Inventory.php
+/var/www/html/src/RealTimeAttendanceProcessor.php
+/var/www/html/src/Announcement.php
+/var/www/html/src/OneISP.php
+/var/www/html/src/SLA.php
+/var/www/html/src/LateDeductionCalculator.php
+/var/www/html/src/Salesperson.php
+/var/www/html/src/HRNotification.php
+/var/www/html/src/StockReturn.php
+/var/www/html/src/WhatsApp.php
+/var/www/html/src/DeviceMonitor.php
+/var/www/html/src/BiometricDevice.php
+/var/www/html/src/BillReminder.php
+/var/www/html/src/Ticket.php
+/var/www/html/src/SalaryAdvance.php
+/var/www/html/src/Auth.php
+/var/www/html/src/Branch.php
+/var/www/html/src/HikvisionDevice.php
+/var/www/html/src/ZKTecoDevice.php
+/var/www/html/src/MobileAPI.php
+/var/www/html/src/BiometricSyncService.php
+/var/www/html/src/SMS.php
+/var/www/html/src/Accounting.php
+/var/www/html/src/Settings.php
+/var/www/html/src/StockRequest.php
+/var/www/html/src/Reports.php
+total 36
+drwxrwxrwt 1 root     root     4096 Dec 17 02:13 .
+drwxr-xr-x 1 root     root     4096 Dec 17 01:00 ..
+-rw-r--r-- 1 www-data www-data    4 Dec 17 02:11 .apid
+drwxr-xr-x 2 www-data www-data 4096 Dec 17 02:11 .perf.c
+drwxr-xr-x 7 www-data www-data 4096 Dec 17 02:13 .xdiag
+-rw------- 1 www-data www-data    0 Dec 17 01:28 sess_5j0a7pnuki0hm9v2v2mi59n8si
+-rw------- 1 www-data www-data   83 Dec 17 01:48 sess_7elr8hasmpn5nsrcq7em22kult
+-rw------- 1 www-data www-data    0 Dec 17 02:06 sess_8pk55s9kt9i4javnnn9pil7og1
+-rw------- 1 www-data www-data    0 Dec 17 01:10 sess_enb7cv7ivkj96htr45crltrqar
+-rw------- 1 www-data www-data   83 Dec 17 01:10 sess_hni6a42kkkr34205dq4s12m47r
+-rw------- 1 www-data www-data    0 Dec 17 01:08 sess_jlb9lps17k2kkau8f7so20a3j5
+-rw------- 1 www-data www-data 2736 Dec 17 01:55 sess_km6e9q00cftssv4msvnedj1t3i
+-rw------- 1 www-data www-data    0 Dec 17 01:36 sess_oauqbepsjhcivphcubttk24lnu
+-rw------- 1 www-data www-data    0 Dec 17 01:10 sess_oh21pleda4rcddup83fv16udjc
+-rw------- 1 www-data www-data    0 Dec 17 01:05 sess_ov6qh8lk09sm3e5k2tid8ch48v
+-rw------- 1 www-data www-data    0 Dec 17 01:16 sess_t1fdnak12k3v5od9lr6edejghp
+-rw------- 1 www-data www-data    0 Dec 17 01:08 sess_v3kibjdbtbkfo30plbb3o64se5
+-rw------- 1 www-data www-data    0 Dec 17 01:57 sess_v3nc05th103vs0h80f4o2b1f3i
+-rw------- 1 www-data www-data 2736 Dec 17 02:07 sess_vbde3na9le3javojcu8udj5its
+/root/isp/public/biometric-api.php:            $templateData = base64_decode($template);
+172.18.0.4 -  17/Dec/2025:01:00:44 +0300 "POST /index.php" 302
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column f.reported_date does not exist
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column f.reported_date does not exist
+NOTICE: PHP message: PHP Fatal error:  Uncaught PDOException: SQLSTATE[42703]: Undefined column: 7 ERROR:  column k.technician_id does not exist
+211.234.111.116 -  17/Dec/2025:02:01:46 +0300 "POST /usr/local/lib/php/PEAR.php" 200
+211.234.111.116 -  17/Dec/2025:02:01:53 +0300 "POST /usr/share/php/PEAR.php" 404
+172.18.0.4 -  17/Dec/2025:02:03:47 +0300 "POST /index.php" 302
+172.18.0.4 -  17/Dec/2025:02:05:09 +0300 "POST /index.php" 200
+172.18.0.4 -  17/Dec/2025:02:07:23 +0300 "POST /index.php" 200
+OCI runtime exec failed: exec failed: unable to start container process: exec: "netstat": executable file not found in $PATH
+OCI runtime exec failed: exec failed: unable to start container process: exec: "ss": executable file not found in $PATH
