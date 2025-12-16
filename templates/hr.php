@@ -3308,6 +3308,9 @@ $leaveTab = $_GET['tab'] ?? 'requests';
 
 <?php endif; ?>
 
+<?php elseif ($subpage === 'announcements'): ?>
+<?php include __DIR__ . '/announcements.php'; ?>
+
 <?php else: ?>
 
 <div class="card mb-4">
@@ -3408,11 +3411,6 @@ $leaveTab = $_GET['tab'] ?? 'requests';
         </div>
     </div>
 </div>
-
-<?php endif; ?>
-
-<?php elseif ($subpage === 'announcements'): ?>
-<?php include __DIR__ . '/announcements.php'; ?>
 
 <?php endif; ?>
 
@@ -3569,3 +3567,5 @@ function setPasswordChangeEmployee(employeeId, employeeName) {
         </div>
     </div>
 </div>
+
+<?php endif; ?>
