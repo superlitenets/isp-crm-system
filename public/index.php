@@ -1273,6 +1273,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 break;
+            
+            case 'delete_ticket':
+                if (!\App\Auth::can('tickets.delete')) {
+                    $message = 'You do not have permission to delete tickets.';
+                    $messageType = 'danger';
+                    break;
+                }
+                $ticketId = (int)($_POST['id'] ?? 0);
+                if ($ticketId) {
+                    try {
+                        if ($ticket->delete($ticketId)) {
+                            $message = 'Ticket deleted successfully.';
+                            $messageType = 'success';
+                            header('Location: ?page=tickets&deleted=1');
+                            exit;
+                        } else {
+                            $message = 'Failed to delete ticket.';
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting ticket: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
                 
             case 'add_comment':
                 $comment = trim($_POST['comment'] ?? '');

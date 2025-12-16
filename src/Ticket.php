@@ -405,8 +405,88 @@ class Ticket {
     }
 
     public function delete(int $id): bool {
-        $stmt = $this->db->prepare("DELETE FROM tickets WHERE id = ?");
-        return $stmt->execute([$id]);
+        $ticket = $this->find($id);
+        if (!$ticket) {
+            $this->activityLog->log('delete_failed', 'ticket', $id, 'Unknown', "Delete failed - ticket not found");
+            return false;
+        }
+        
+        $ticketNumber = $ticket['ticket_number'];
+        
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM ticket_comments WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_fees WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM sla_logs WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_satisfaction WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM whatsapp_logs WHERE ticket_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ticket_escalations WHERE ticket_id = ?")->execute([$id]);
+            
+            $stmt = $this->db->prepare("DELETE FROM tickets WHERE id = ?");
+            $result = $stmt->execute([$id]);
+            
+            if ($result) {
+                $this->db->commit();
+                $this->activityLog->log('delete', 'ticket', $id, $ticketNumber, "Ticket deleted");
+                return true;
+            }
+            
+            $this->db->rollBack();
+            $this->activityLog->log('delete_failed', 'ticket', $id, $ticketNumber, "Delete failed - database error");
+            return false;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            error_log("Failed to delete ticket $id: " . $e->getMessage());
+            try {
+                $this->activityLog->log('delete_failed', 'ticket', $id, $ticketNumber, "Delete failed: " . $e->getMessage());
+            } catch (\Throwable $logError) {
+                error_log("Failed to log delete failure: " . $logError->getMessage());
+            }
+            return false;
+        }
+    }
+    
+    public function getCustomerAssignmentHistory(int $customerId): ?array {
+        $stmt = $this->db->prepare("
+            SELECT 
+                t.assigned_to,
+                t.team_id,
+                u.name as technician_name,
+                u.phone as technician_phone,
+                tm.name as team_name,
+                COUNT(*) as ticket_count,
+                MAX(t.resolved_at) as last_resolved
+            FROM tickets t
+            LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN teams tm ON t.team_id = tm.id
+            WHERE t.customer_id = ?
+              AND t.status IN ('resolved', 'closed')
+              AND (t.assigned_to IS NOT NULL OR t.team_id IS NOT NULL)
+            GROUP BY t.assigned_to, t.team_id, u.name, u.phone, tm.name
+            ORDER BY ticket_count DESC, last_resolved DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$customerId]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+    
+    public function getCustomerTicketHistory(int $customerId, int $limit = 10): array {
+        $stmt = $this->db->prepare("
+            SELECT 
+                t.id, t.ticket_number, t.subject, t.category, t.status, t.priority,
+                t.created_at, t.resolved_at,
+                u.name as technician_name,
+                tm.name as team_name
+            FROM tickets t
+            LEFT JOIN users u ON t.assigned_to = u.id
+            LEFT JOIN teams tm ON t.team_id = tm.id
+            WHERE t.customer_id = ?
+            ORDER BY t.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$customerId, $limit]);
+        return $stmt->fetchAll();
     }
 
     public function find(int $id): ?array {

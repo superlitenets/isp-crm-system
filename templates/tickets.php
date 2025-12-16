@@ -159,10 +159,36 @@ if (isset($_GET['customer_id'])) {
                     <small class="text-muted">Required - Which branch will handle this ticket</small>
                 </div>
                 
+                <?php if ($action === 'create'): ?>
+                <div class="col-12" id="assignmentSuggestion" style="display: none;">
+                    <div class="alert alert-info mb-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <i class="bi bi-lightbulb"></i> <strong>Suggested Assignment:</strong>
+                                <span id="suggestionText"></span>
+                                <br><small class="text-muted" id="suggestionReason"></small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-info" onclick="applySuggestedAssignment()">
+                                <i class="bi bi-check2"></i> Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-12" id="customerHistorySection" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-header py-2">
+                            <i class="bi bi-clock-history"></i> Recent Tickets for this Customer
+                        </div>
+                        <div class="card-body p-2" id="customerHistoryList"></div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
                 <div class="col-md-6">
                     <label class="form-label">Assign To Team</label>
                     <?php $teams = $ticket->getAllTeams(); ?>
-                    <select class="form-select" name="team_id">
+                    <select class="form-select" name="team_id" id="teamSelect">
                         <option value="">No Team</option>
                         <?php foreach ($teams as $t): ?>
                         <option value="<?= $t['id'] ?>" <?= ($ticketData['team_id'] ?? '') == $t['id'] ? 'selected' : '' ?>>
@@ -175,7 +201,7 @@ if (isset($_GET['customer_id'])) {
                 
                 <div class="col-md-6">
                     <label class="form-label">Assign To Individual</label>
-                    <select class="form-select" name="assigned_to">
+                    <select class="form-select" name="assigned_to" id="assignedToSelect">
                         <option value="">Unassigned</option>
                         <?php foreach ($users as $u): ?>
                         <option value="<?= $u['id'] ?>" <?= ($ticketData['assigned_to'] ?? '') == $u['id'] ? 'selected' : '' ?>>
@@ -360,6 +386,85 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedBillingCustomer.style.display = 'none';
         billingCustomerData.value = '';
     };
+    
+    let suggestedAssignment = null;
+    
+    function fetchCustomerHistory(customerId) {
+        if (!customerId) {
+            document.getElementById('assignmentSuggestion').style.display = 'none';
+            document.getElementById('customerHistorySection').style.display = 'none';
+            return;
+        }
+        
+        fetch('/api/customer-history.php?customer_id=' + customerId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.suggested_assignment && (data.suggested_assignment.assigned_to || data.suggested_assignment.team_id)) {
+                        suggestedAssignment = data.suggested_assignment;
+                        let suggestionText = '';
+                        if (suggestedAssignment.technician_name) {
+                            suggestionText = suggestedAssignment.technician_name;
+                            if (suggestedAssignment.team_name) {
+                                suggestionText += ' (Team: ' + suggestedAssignment.team_name + ')';
+                            }
+                        } else if (suggestedAssignment.team_name) {
+                            suggestionText = 'Team: ' + suggestedAssignment.team_name;
+                        }
+                        document.getElementById('suggestionText').textContent = suggestionText;
+                        document.getElementById('suggestionReason').textContent = 
+                            'Previously handled ' + suggestedAssignment.ticket_count + ' ticket(s) for this customer successfully';
+                        document.getElementById('assignmentSuggestion').style.display = 'block';
+                    } else {
+                        document.getElementById('assignmentSuggestion').style.display = 'none';
+                    }
+                    
+                    if (data.recent_tickets && data.recent_tickets.length > 0) {
+                        let html = '<div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead><tr>' +
+                            '<th>Ticket</th><th>Subject</th><th>Status</th><th>Handled By</th><th>Date</th></tr></thead><tbody>';
+                        data.recent_tickets.forEach(t => {
+                            const handler = t.technician_name || t.team_name || '-';
+                            const statusClass = t.status === 'resolved' || t.status === 'closed' ? 'success' : 
+                                               (t.status === 'in_progress' ? 'info' : 'secondary');
+                            html += '<tr>' +
+                                '<td><a href="?page=tickets&action=view&id=' + t.id + '">' + t.ticket_number + '</a></td>' +
+                                '<td>' + (t.subject || '').substring(0, 30) + '</td>' +
+                                '<td><span class="badge bg-' + statusClass + '">' + t.status + '</span></td>' +
+                                '<td>' + handler + '</td>' +
+                                '<td>' + new Date(t.created_at).toLocaleDateString() + '</td>' +
+                                '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                        document.getElementById('customerHistoryList').innerHTML = html;
+                        document.getElementById('customerHistorySection').style.display = 'block';
+                    } else {
+                        document.getElementById('customerHistorySection').style.display = 'none';
+                    }
+                }
+            })
+            .catch(err => console.log('Error fetching customer history:', err));
+    }
+    
+    window.applySuggestedAssignment = function() {
+        if (!suggestedAssignment) return;
+        
+        if (suggestedAssignment.assigned_to) {
+            document.getElementById('assignedToSelect').value = suggestedAssignment.assigned_to;
+        }
+        if (suggestedAssignment.team_id) {
+            document.getElementById('teamSelect').value = suggestedAssignment.team_id;
+        }
+        
+        document.getElementById('assignmentSuggestion').style.display = 'none';
+    };
+    
+    customerIdSelect.addEventListener('change', function() {
+        fetchCustomerHistory(this.value);
+    });
+    
+    if (customerIdSelect.value) {
+        fetchCustomerHistory(customerIdSelect.value);
+    }
 });
 </script>
 <?php endif; ?>
@@ -405,6 +510,11 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
         <a href="?page=tickets&action=edit&id=<?= $ticketData['id'] ?>" class="btn btn-primary">
             <i class="bi bi-pencil"></i> Edit
         </a>
+        <?php if (\App\Auth::can('tickets.delete')): ?>
+        <button type="button" class="btn btn-danger" onclick="confirmDeleteTicket(<?= $ticketData['id'] ?>, '<?= htmlspecialchars($ticketData['ticket_number']) ?>')">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -1190,6 +1300,39 @@ function updateFeeDefaults() {
 }
 </script>
 
+<?php if (\App\Auth::can('tickets.delete')): ?>
+<div class="modal fade" id="deleteTicketModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Delete Ticket</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="delete_ticket">
+                    <input type="hidden" name="id" id="deleteTicketId">
+                    <p>Are you sure you want to delete ticket <strong id="deleteTicketNumber"></strong>?</p>
+                    <p class="text-danger mb-0"><i class="bi bi-exclamation-circle"></i> This action cannot be undone. All comments, fees, and related data will be permanently deleted.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Delete Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function confirmDeleteTicket(ticketId, ticketNumber) {
+    document.getElementById('deleteTicketId').value = ticketId;
+    document.getElementById('deleteTicketNumber').textContent = ticketNumber;
+    new bootstrap.Modal(document.getElementById('deleteTicketModal')).show();
+}
+</script>
+<?php endif; ?>
+
 <?php else: ?>
 <?php 
 $dashboardStats = $ticket->getDashboardStats();
@@ -1390,6 +1533,12 @@ $escalatedFilter = $_GET['escalated'] ?? '';
                             <a href="?page=tickets&action=edit&id=<?= $t['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            <?php if (\App\Auth::can('tickets.delete')): ?>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" 
+                                    onclick="confirmDeleteTicket(<?= $t['id'] ?>, '<?= htmlspecialchars($t['ticket_number']) ?>')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -1405,4 +1554,36 @@ $escalatedFilter = $_GET['escalated'] ?? '';
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="deleteTicketModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Delete Ticket</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="delete_ticket">
+                    <input type="hidden" name="id" id="deleteTicketId">
+                    <p>Are you sure you want to delete ticket <strong id="deleteTicketNumber"></strong>?</p>
+                    <p class="text-danger mb-0"><i class="bi bi-exclamation-circle"></i> This action cannot be undone. All comments, fees, and related data will be permanently deleted.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Delete Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDeleteTicket(ticketId, ticketNumber) {
+    document.getElementById('deleteTicketId').value = ticketId;
+    document.getElementById('deleteTicketNumber').textContent = ticketNumber;
+    new bootstrap.Modal(document.getElementById('deleteTicketModal')).show();
+}
+</script>
 <?php endif; ?>
