@@ -1046,7 +1046,7 @@ function handleZKTecoPush($db, $processor, $settings) {
     if (!$device && !empty($sn)) {
         $autoRegister = $settings->get('zkteco_auto_register', '0');
         if ($autoRegister === '1') {
-            $insertStmt = $db->prepare("INSERT INTO biometric_devices (name, type, ip_address, serial_number, enabled) VALUES (?, 'zkteco', '', ?, true) RETURNING id");
+            $insertStmt = $db->prepare("INSERT INTO biometric_devices (name, device_type, ip_address, serial_number, is_active) VALUES (?, 'zkteco', '', ?, true) RETURNING id");
             $insertStmt->execute(["ZKTeco $sn", $sn]);
             $device = $insertStmt->fetch(\PDO::FETCH_ASSOC);
             $device['name'] = "ZKTeco $sn";
@@ -1062,7 +1062,7 @@ function handleZKTecoPush($db, $processor, $settings) {
         
         if ($device) {
             // Update last seen timestamp
-            $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync = NOW() WHERE id = ?");
+            $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync_at = NOW() WHERE id = ?");
             $updateStmt->execute([$device['id']]);
         }
         
@@ -1143,7 +1143,7 @@ function handleZKTecoPush($db, $processor, $settings) {
         error_log("ZKTeco Push: Processed $processed records, $errors errors");
         
         // Update device last sync
-        $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync = NOW() WHERE id = ?");
+        $updateStmt = $db->prepare("UPDATE biometric_devices SET last_sync_at = NOW() WHERE id = ?");
         $updateStmt->execute([$device['id']]);
         
         header('Content-Type: text/plain');
@@ -1173,7 +1173,7 @@ function handleZKTecoRawPush($db, $processor, $settings, $rawInput) {
     
     // If no device ID, try to find the first active ZKTeco device
     if (!$deviceId) {
-        $stmt = $db->query("SELECT id FROM biometric_devices WHERE type = 'zkteco' AND enabled = true ORDER BY id LIMIT 1");
+        $stmt = $db->query("SELECT id FROM biometric_devices WHERE device_type = 'zkteco' AND is_active = true ORDER BY id LIMIT 1");
         $device = $stmt->fetch(\PDO::FETCH_ASSOC);
         if ($device) {
             $deviceId = $device['id'];
