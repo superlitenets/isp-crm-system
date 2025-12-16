@@ -1,20 +1,7 @@
 # ISP CRM & Ticketing System
 
 ## Overview
-This project is a PHP-based Customer Relationship Management (CRM) and ticketing system specifically designed for Internet Service Providers (ISPs). Its core purpose is to streamline customer interactions, manage support tickets efficiently, and automate various operational tasks. The system aims to provide a comprehensive solution for ISPs to manage their customer base, track equipment, process orders, handle HR functions including employee attendance and payroll, and facilitate communication through integrated SMS and WhatsApp messaging.
-
-Key capabilities include:
-- End-to-end customer and ticket management with SLA, team-based assignment, and a complaints approval workflow.
-- Robust Human Resources module with biometric attendance, automated late deductions, and unified user/employee management.
-- Inventory management for ISP equipment with tracking and fault reporting.
-- Sales and marketing tools, including salesperson commission tracking, mobile lead capture, and an online order system.
-- Public-facing landing page with dynamic service packages and M-Pesa integration for payments.
-- Secure authentication and communication features like SMS notifications and WhatsApp Web integration.
-- SmartOLT integration for real-time network monitoring and ONU provisioning.
-- Comprehensive reporting and activity logging.
-- Enhanced mobile PWA for salespersons and technicians with performance tracking, offline support, dark mode, customer search, GPS navigation, notifications center, attendance history, leave requests, and salary advance requests.
-
-The business vision is to offer a powerful, all-in-one platform that enhances operational efficiency, improves customer satisfaction, and supports the growth of ISPs by automating critical business processes.
+This project is a PHP-based Customer Relationship Management (CRM) and ticketing system for Internet Service Providers (ISPs). Its primary goal is to streamline customer interactions, manage support tickets efficiently, and automate operational tasks. The system provides a comprehensive solution for managing customer bases, tracking equipment, processing orders, handling HR functions (attendance, payroll), and facilitating communication via SMS and WhatsApp. Key capabilities include end-to-end customer and ticket management, robust HR and inventory modules, sales and marketing tools, a public-facing landing page with M-Pesa integration, secure authentication, SmartOLT integration, comprehensive reporting, and an enhanced mobile PWA for field personnel. The business vision is to offer an all-in-one platform to enhance operational efficiency, improve customer satisfaction, and support ISP growth.
 
 ## User Preferences
 I prefer detailed explanations and expect the agent to ask for confirmation before making major changes. I appreciate clean, well-structured code.
@@ -23,142 +10,43 @@ I prefer detailed explanations and expect the agent to ask for confirmation befo
 The system is built on PHP, utilizing a modular architecture to separate concerns.
 
 **UI/UX Decisions:**
-The system features a clean, responsive design. The public-facing landing page is designed to be modern with dynamic content, customizable hero sections, and package cards. Internal CRM interfaces prioritize clarity and ease of use for administrative and technical staff, including a mobile PWA for field personnel.
+The system features a clean, responsive design. The public-facing landing page is modern with dynamic content, customizable hero sections, and package cards. Internal CRM interfaces prioritize clarity and ease of use for administrative and technical staff, including a mobile PWA for field personnel.
 
 **Technical Implementations:**
-- **Authentication**: Session-based authentication with password hashing, CSRF protection, SQL injection prevention (prepared statements), XSS protection, and a flexible role-based access control (RBAC) system with granular permissions.
-- **Database**: PostgreSQL is used as the primary database with a clearly defined schema for modules like customers, tickets, employees, inventory, transactions, and HR.
-- **SMS Integration**: Supports custom SMS gateways (any POST/GET API) and Twilio. SMS notifications use configurable templates.
-- **WhatsApp Integration**: Full-featured WhatsApp Web integration with:
-  - Real-time chat interface with conversation list and message history
-  - Automatic customer linking based on phone number matching
-  - Database storage for conversations and messages (whatsapp_conversations, whatsapp_messages)
-  - Unread message tracking and conversation previews
-  - Media message support (images, audio, documents)
-  - Session status monitoring with QR code display
-  - Node.js service running Puppeteer for WhatsApp Web automation
-- **Template Engine**: A custom `TemplateEngine.php` class provides rich placeholder replacement for dynamic content in messages and templates.
-- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Direct/Push Protocol), Hikvision (ISAPI), and BioTime Cloud for real-time attendance synchronization and late notifications.
-  - **BioTime Cloud Integration (Dec 2025)**: REST API integration with BioTime 8.5 for ZKTeco devices:
-    - JWT-based authentication at `/jwt-api-token-auth/`
-    - Transaction polling via `/iclock/api/transactions/` with pagination
-    - Employee sync via `/personnel/api/employees/`
-    - Device listing via `/iclock/api/terminals/`
-    - Supports incremental sync using last_transaction_id tracking
-    - Configurable API base URL for hosted BioTime instances
-    - BioTimeCloud.php class extends BiometricDevice
-  - **Hikvision Remote Fingerprint Enrollment**: ISAPI-based remote fingerprint capture matching IVMS-4200 functionality:
-    - `captureFingerprint()` - Triggers device to enter capture mode, employee places finger on scanner
-    - `setupFingerprint()` - Upload fingerprint template data directly to device
-    - `getFingerprints()` - Retrieve enrolled fingerprints for an employee
-    - `deleteFingerprint()` - Remove fingerprints from device
-    - `getFingerprintCapabilities()` - Check device remote capture support
-  - **ZKTeco K40 (Push Protocol Only)**: The ZKTeco K40 uses Push Protocol where the device pushes attendance logs TO the server. Remote user/fingerprint management via UDP requires direct network access to the device (same LAN or VPN), which is not available when the CRM runs in a datacenter. Users and fingerprints must be enrolled directly on the device.
-    - Attendance logs sync automatically via Push Protocol (device → server)
-    - The ZKTecoDevice.php class contains UDP protocol implementation for future use if VPN is configured
-- **M-Pesa Integration**: Handles STK Push for customer payments, C2B payments, and real-time callback processing.
+- **Authentication**: Session-based with password hashing, CSRF/SQL injection/XSS protection, and granular role-based access control (RBAC).
+- **Database**: PostgreSQL is the primary database with a defined schema for all modules.
+- **SMS Integration**: Supports custom gateways (any POST/GET API) and Twilio, using configurable templates.
+- **WhatsApp Integration**: Full-featured WhatsApp Web integration with real-time chat, automatic customer linking, message history storage, media support, and a Node.js Puppeteer service.
+- **Template Engine**: A custom `TemplateEngine.php` class for dynamic content replacement.
+- **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco (Push Protocol), Hikvision (ISAPI for remote fingerprint enrollment), and BioTime Cloud (REST API for attendance sync).
+- **M-Pesa Integration**: Handles STK Push for payments, C2B payments, and real-time callback processing.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
-- **Inventory Management**: Features bulk import/export (Excel/CSV), smart column header detection, and comprehensive equipment lifecycle tracking.
-- **Enhanced Inventory System (Dec 2025)**: Complete warehouse and stock management:
-  - **Warehouse Management**: Multi-warehouse/depot structure with location hierarchy (shelves, bins, racks, zones)
-  - **Stock Intake**: Purchase orders, goods receipts with serial/MAC tracking, automatic stock level updates
-  - **Disbursement Workflow**: Stock requests with approval → pick → handover flow, technician kit management
-  - **Field Usage Tracking**: Record equipment usage at job sites, link to tickets/customers, real-time stock deduction
-  - **Returns & RMA**: Stock returns processing, vendor RMA tracking, equipment condition assessment
-  - **Loss Reporting**: Track lost/stolen/damaged equipment with investigation workflow
-  - **Stock Movements**: Complete audit trail of all equipment transfers between locations
-  - New tables: inventory_warehouses, inventory_locations, inventory_purchase_orders, inventory_po_items, inventory_receipts, inventory_receipt_items, inventory_stock_requests, inventory_stock_request_items, inventory_usage, inventory_returns, inventory_return_items, inventory_rma, inventory_loss_reports, inventory_stock_movements, inventory_stock_levels, inventory_audits, inventory_audit_items
-  - New classes: InventoryWarehouse.php, StockRequest.php, StockReturn.php
-- **SLA Management**: Auto-applies policies based on ticket priority, considering business hours and holidays for accurate timer calculations.
-- **Complaints Module**: Implements an approval workflow for public complaints before conversion to tickets.
-- **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning capabilities.
-- **Reporting & Activity Logs**: Comprehensive reports for tickets, orders, complaints, and user performance, with detailed activity logging for key system actions.
-- **Ticket Commission System**: Auto-calculates employee earnings when tickets are resolved/closed. Supports configurable rates per ticket category, individual assignment, and team-based split (equal share among active members). Integrates with payroll processing.
-- **Ticket Enhancements (Dec 2025)**: Comprehensive improvements including:
-  - Timeline/activity history showing chronological ticket events (comments, status changes, SLA logs, escalations)
-  - Quick status change buttons with automatic commission calculation
-  - Customer satisfaction rating system (5-star with feedback) after ticket closure
-  - Statistics dashboard cards (open, in-progress, resolved, SLA breached, escalated, avg satisfaction)
-  - Ticket escalation feature with reason, reassignment, priority change, and notifications
-  - Advanced filters for escalated tickets and SLA breached tickets
-- **Multi-Branch Support (Dec 2025)**: Organize operations across multiple physical locations:
-  - Branch management with code, address, phone, email, manager assignment
-  - Each branch can have its own WhatsApp group for daily summaries
-  - Employees can be attached/detached to branches (many-to-many relationship)
-  - Tickets can be assigned to specific branches
-  - Teams can be linked to branches
-  - Branch-specific daily summary reports sent to WhatsApp groups via cron job
-  - Settings UI for branch CRUD and employee assignment
-- **Salary Advance System (Dec 2025)**: Employee salary advance management:
-  - Request, approve, reject, and disburse salary advances
-  - Flexible repayment schedules (weekly, bi-weekly, monthly)
-  - Track repayments and outstanding balances
-  - Automatic integration with payroll as deductions
-  - Mobile API for employees to request advances
-  - SMS notifications on request creation, approval, rejection, and disbursement
-  - In-app notifications for admins and employees
-- **Leave Management System (Dec 2025)**: Comprehensive leave tracking:
-  - Multiple leave types (Annual, Sick, Unpaid, Maternity, Paternity, Compassionate)
-  - 21 days annual leave limit enforced with validation (defaults to 21 if not configured)
-  - Monthly accrual (trickle-down: 1.75 days/month)
-  - Leave request and approval workflow with balance validation
-  - Balance tracking with carryover support
-  - Public holidays calendar
-  - Mobile API for leave requests from PWA with try/catch error handling
-  - Cron job for monthly leave accrual
-  - SMS notifications on request creation, approval, and rejection
-  - In-app notifications for admins and employees
-  - HR navigation badge showing pending leave + salary advance requests count
-- **HR Notification System (Dec 2025)**: Configurable SMS templates for HR events:
-  - Template management in hr_notification_templates table
-  - Supports leave and salary advance events
-  - Customizable message placeholders for employee name, dates, amounts, etc.
-  - Admin phone notification for new requests
-  - Employee phone notification for approvals/rejections
-- **Accounting Module (Dec 2025)**: Comprehensive financial management:
-  - Dashboard with receivables, payables, and monthly summaries
-  - Chart of Accounts with predefined categories
-  - Products/Services catalog for invoices
-  - Customer Invoices: create, edit, view with line items, VAT calculation
-  - Invoice payment recording with balance tracking
-  - Vendors/Suppliers management
-  - Expense tracking by category
-  - Customer payments with M-Pesa integration
-  - Reports: Profit & Loss, AR Aging, AP Aging
-  - Configurable tax rates (16% VAT default)
-  - Auto-generated invoice/quote/payment numbers
-  - **Quotes Module**: Create, edit, view quotes with convert-to-invoice functionality
-  - **Bills/Purchase Orders**: Track vendor bills with line items and due dates
-  - **M-Pesa Invoice Payments**: Direct STK Push integration from invoice view for quick payment collection
-  - **Unified Payments Subpage**: M-Pesa STK Push form with customer selection, transaction history, and invoice linking all consolidated under Accounting → Payments
-- **Billing System Integration (Dec 2025)**: One-ISP API integration for customer data:
-  - Configurable API token in Settings → Billing API
-  - Search billing customers when creating tickets ("From Billing" option)
-  - Auto-fill customer details (name, phone, email, address, service plan)
-  - Username field added to customers table for billing system usernames
-  - On-demand query approach keeps data fresh without duplication
-  - Imports customer to local database when ticket is created
-  - API endpoint at `/api/billing.php` for customer search
-- **Database Backup System (Dec 2025)**: Built-in backup management in Settings:
-  - Create manual database backups via pg_dump
-  - Download backup files (.sql format)
-  - Delete old backups
-  - Backup history with file sizes and dates
-  - Admin-only access for security
-  - Restore instructions provided in UI
-  - Backups stored in `/backups/` directory
+- **Inventory Management**: Comprehensive warehouse and stock management, including multi-warehouse support, stock intake (PO, receipts with serial/MAC), disbursement workflow (requests, pick, handover), field usage tracking, returns/RMA, loss reporting, stock movements audit, and ISP-specific equipment categories with low stock alerts and various reports.
+- **SLA Management**: Automatic policy application based on ticket priority, considering business hours.
+- **Complaints Module**: Approval workflow for public complaints before ticket conversion.
+- **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning.
+- **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging for key system actions.
+- **Ticket Commission System**: Auto-calculates employee earnings based on resolved/closed tickets, configurable rates, and payroll integration.
+- **Ticket Enhancements**: Includes timeline/activity history, quick status changes, customer satisfaction ratings, escalation features, and a statistics dashboard.
+- **Multi-Branch Support**: Manages operations across multiple physical locations, including branch-specific assignments for employees, tickets, and teams, with daily summary reports.
+- **Salary Advance System**: Employee request, approval, and disbursement workflow with flexible repayment schedules and payroll integration. Mobile API available.
+- **Leave Management System**: Comprehensive tracking of multiple leave types, monthly accrual, request/approval workflow with balance validation, public holidays, and mobile API support.
+- **HR Notification System**: Configurable SMS templates for HR events (leave, salary advance) with placeholders.
+- **Accounting Module**: Dashboard, Chart of Accounts, Products/Services catalog, Customer Invoices (create, track payments, M-Pesa integration), Vendors/Suppliers, Expense tracking, Quotes, Bills/Purchase Orders, and reports (P&L, AR/AP Aging).
+- **Billing System Integration**: One-ISP API integration for customer data lookup, auto-filling details during ticket creation, and importing customers.
+- **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump), download, deletion, and history tracking.
 
 **System Design Choices:**
-The system adopts a modular design allowing for extensibility. Configuration is managed through a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes (e.g., `Auth.php`, `Customer.php`, `Ticket.php`, `SMS.php`, `Inventory.php`, `BiometricDevice.php`, `SLA.php`, `SmartOLT.php`, `ActivityLog.php`, `Reports.php`). Users and employees are unified, and roles are managed centrally via HR.
+The system features a modular and extensible design. Configuration is managed via a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes, and users/employees are unified with central role management via HR.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
-- **Twilio**: Optional fallback for SMS notifications.
-- **Advanta SMS (Kenya)**: Recommended SMS gateway integration.
-- **Custom SMS Gateways**: Supports integration with any REST API (POST/GET) for SMS.
-- **WhatsApp Web**: Used for direct messaging.
-- **ZKTeco Biometric Devices**: Integrated for attendance tracking via Push Protocol.
-- **Hikvision Biometric Devices**: Integrated for attendance tracking via ISAPI.
-- **M-Pesa**: Integrated for mobile money payments (STK Push, C2B).
-- **SmartOLT API**: Integrated for network monitoring and ONU management.
-- **One-ISP Billing API**: Integrated for customer data lookup and import.
+- **Twilio**: Optional SMS gateway.
+- **Advanta SMS (Kenya)**: Recommended SMS gateway.
+- **Custom SMS Gateways**: For integrating any REST API for SMS.
+- **WhatsApp Web**: For direct messaging.
+- **ZKTeco Biometric Devices**: For attendance tracking.
+- **Hikvision Biometric Devices**: For attendance tracking and remote fingerprint enrollment.
+- **M-Pesa**: For mobile money payments.
+- **SmartOLT API**: For network monitoring and ONU management.
+- **One-ISP Billing API**: For customer data lookup and import.

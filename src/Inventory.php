@@ -97,8 +97,9 @@ class Inventory {
     public function addEquipment(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO equipment (category_id, name, brand, model, serial_number, mac_address, 
-                purchase_date, purchase_price, warranty_expiry, condition, status, location, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                purchase_date, purchase_price, warranty_expiry, condition, status, location, notes,
+                quantity, min_stock_level, max_stock_level, reorder_point, unit_cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['category_id'] ?: null,
@@ -113,7 +114,12 @@ class Inventory {
             $data['condition'] ?? 'new',
             $data['status'] ?? 'available',
             $data['location'] ?? null,
-            $data['notes'] ?? null
+            $data['notes'] ?? null,
+            $data['quantity'] ?? 1,
+            $data['min_stock_level'] ?? 0,
+            $data['max_stock_level'] ?? 0,
+            $data['reorder_point'] ?? 0,
+            $data['unit_cost'] ?? 0
         ]);
         return (int) $this->db->lastInsertId();
     }
@@ -123,7 +129,9 @@ class Inventory {
             UPDATE equipment SET 
                 category_id = ?, name = ?, brand = ?, model = ?, serial_number = ?, mac_address = ?,
                 purchase_date = ?, purchase_price = ?, warranty_expiry = ?, condition = ?, 
-                status = ?, location = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                status = ?, location = ?, notes = ?, quantity = ?, 
+                min_stock_level = ?, max_stock_level = ?, reorder_point = ?, unit_cost = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
         return $stmt->execute([
@@ -140,6 +148,11 @@ class Inventory {
             $data['status'] ?? 'available',
             $data['location'] ?? null,
             $data['notes'] ?? null,
+            $data['quantity'] ?? 1,
+            $data['min_stock_level'] ?? 0,
+            $data['max_stock_level'] ?? 0,
+            $data['reorder_point'] ?? 0,
+            $data['unit_cost'] ?? 0,
             $id
         ]);
     }
@@ -508,7 +521,124 @@ class Inventory {
         $stmt = $this->db->query("SELECT COALESCE(SUM(purchase_price), 0) FROM equipment");
         $stats['total_value'] = $stmt->fetchColumn();
         
+        // Low stock count - items where quantity is at or below reorder point
+        $stmt = $this->db->query("SELECT COUNT(*) FROM equipment WHERE reorder_point > 0 AND quantity <= reorder_point");
+        $stats['low_stock'] = $stmt->fetchColumn();
+        
+        // Total stock value using unit_cost
+        $stmt = $this->db->query("SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM equipment WHERE unit_cost > 0");
+        $stats['stock_value'] = $stmt->fetchColumn();
+        
         return $stats;
+    }
+    
+    public function getLowStockItems(): array {
+        $stmt = $this->db->query("
+            SELECT e.*, c.name as category_name,
+                   (e.reorder_point - e.quantity) as shortage,
+                   (e.quantity * e.unit_cost) as stock_value
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            WHERE e.reorder_point > 0 AND e.quantity <= e.reorder_point
+            ORDER BY (e.reorder_point - e.quantity) DESC, e.name
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getStockAlerts(): array {
+        $alerts = [];
+        
+        // Low stock items
+        $lowStock = $this->getLowStockItems();
+        foreach ($lowStock as $item) {
+            $alerts[] = [
+                'type' => 'low_stock',
+                'severity' => $item['quantity'] <= 0 ? 'critical' : 'warning',
+                'item_id' => $item['id'],
+                'item_name' => $item['name'],
+                'message' => "{$item['name']} is low on stock ({$item['quantity']} remaining, reorder at {$item['reorder_point']})",
+                'quantity' => $item['quantity'],
+                'reorder_point' => $item['reorder_point']
+            ];
+        }
+        
+        return $alerts;
+    }
+    
+    public function getTechnicianConsumption(?int $technicianId = null, ?string $dateFrom = null, ?string $dateTo = null): array {
+        $where = ['1=1'];
+        $params = [];
+        
+        if ($technicianId) {
+            $where[] = 'sr.requested_by = ?';
+            $params[] = $technicianId;
+        }
+        
+        if ($dateFrom) {
+            $where[] = 'sr.created_at >= ?';
+            $params[] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $where[] = 'sr.created_at <= ?';
+            $params[] = $dateTo . ' 23:59:59';
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT u.name as technician_name, u.id as technician_id,
+                   COUNT(DISTINCT sr.id) as request_count,
+                   SUM(sri.quantity_picked) as total_items_used,
+                   COALESCE(SUM(sri.quantity_picked * e.unit_cost), 0) as total_cost
+            FROM inventory_stock_requests sr
+            JOIN users u ON sr.requested_by = u.id
+            LEFT JOIN inventory_stock_request_items sri ON sr.id = sri.request_id
+            LEFT JOIN equipment e ON sri.item_name = e.name
+            WHERE sr.status IN ('completed', 'handed_over') AND " . implode(' AND ', $where) . "
+            GROUP BY u.id, u.name
+            ORDER BY total_items_used DESC
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getStockAgingReport(): array {
+        $stmt = $this->db->query("
+            SELECT e.*, c.name as category_name,
+                   EXTRACT(DAY FROM (CURRENT_TIMESTAMP - e.created_at)) as days_in_stock,
+                   CASE 
+                       WHEN e.created_at > CURRENT_DATE - INTERVAL '30 days' THEN '0-30 days'
+                       WHEN e.created_at > CURRENT_DATE - INTERVAL '60 days' THEN '31-60 days'
+                       WHEN e.created_at > CURRENT_DATE - INTERVAL '90 days' THEN '61-90 days'
+                       ELSE '90+ days'
+                   END as age_bracket,
+                   (e.quantity * e.unit_cost) as stock_value
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON e.category_id = c.id
+            WHERE e.status = 'available' AND e.quantity > 0
+            ORDER BY e.created_at ASC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getFastMovingItems(int $limit = 20, ?string $dateFrom = null): array {
+        $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
+        
+        $stmt = $this->db->prepare("
+            SELECT sri.item_name,
+                   COUNT(*) as times_requested,
+                   SUM(sri.quantity_picked) as total_quantity,
+                   COALESCE(MAX(e.unit_cost), 0) as unit_cost,
+                   COALESCE(SUM(sri.quantity_picked * e.unit_cost), 0) as total_value
+            FROM inventory_stock_request_items sri
+            JOIN inventory_stock_requests sr ON sri.request_id = sr.id
+            LEFT JOIN equipment e ON sri.item_name = e.name
+            WHERE sr.status IN ('completed', 'handed_over') AND sr.created_at >= ?
+            GROUP BY sri.item_name
+            ORDER BY total_quantity DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$dateFrom, $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getEquipmentHistory(int $equipmentId): array {
@@ -869,33 +999,6 @@ class Inventory {
     public function deleteThreshold(int $id): bool {
         $stmt = $this->db->prepare("DELETE FROM inventory_thresholds WHERE id = ?");
         return $stmt->execute([$id]);
-    }
-    
-    public function getLowStockItems(): array {
-        $stmt = $this->db->query("
-            SELECT 
-                c.id as category_id,
-                c.name as category_name,
-                t.min_quantity,
-                t.reorder_point,
-                t.reorder_quantity,
-                COUNT(e.id) as current_stock,
-                CASE 
-                    WHEN COUNT(e.id) <= t.min_quantity THEN 'critical'
-                    WHEN COUNT(e.id) <= t.reorder_point THEN 'low'
-                    ELSE 'ok'
-                END as alert_level
-            FROM inventory_thresholds t
-            JOIN equipment_categories c ON t.category_id = c.id
-            LEFT JOIN equipment e ON e.category_id = c.id AND e.status = 'available'
-            WHERE t.notify_on_low = true
-            GROUP BY c.id, c.name, t.min_quantity, t.reorder_point, t.reorder_quantity
-            HAVING COUNT(e.id) <= t.reorder_point
-            ORDER BY 
-                CASE WHEN COUNT(e.id) <= t.min_quantity THEN 0 ELSE 1 END,
-                c.name
-        ");
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getStockLevelsByCategory(): array {

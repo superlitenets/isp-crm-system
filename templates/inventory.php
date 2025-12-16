@@ -346,6 +346,30 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         </div>
                     </div>
                     
+                    <h6 class="text-muted mt-3"><i class="bi bi-box-seam"></i> Stock Management</h6>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Unit Cost (KES)</label>
+                            <input type="number" step="0.01" class="form-control" name="unit_cost" value="<?= $equipment['unit_cost'] ?? '' ?>">
+                            <small class="text-muted">Cost per unit for inventory valuation</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Min Stock Level</label>
+                            <input type="number" class="form-control" name="min_stock_level" value="<?= $equipment['min_stock_level'] ?? '' ?>" min="0">
+                            <small class="text-muted">Critical low stock threshold</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Max Stock Level</label>
+                            <input type="number" class="form-control" name="max_stock_level" value="<?= $equipment['max_stock_level'] ?? '' ?>" min="0">
+                            <small class="text-muted">Maximum stock capacity</small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Reorder Point</label>
+                            <input type="number" class="form-control" name="reorder_point" value="<?= $equipment['reorder_point'] ?? '' ?>" min="0">
+                            <small class="text-muted">Trigger for reordering</small>
+                        </div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Condition</label>
@@ -1760,7 +1784,10 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             <div class="btn-group flex-wrap" role="group">
                 <?php $reportType = $_GET['report'] ?? 'stock_levels'; ?>
                 <a href="?page=inventory&tab=reports&report=stock_levels" class="btn btn-<?= $reportType === 'stock_levels' ? 'primary' : 'outline-primary' ?>">Stock Levels</a>
+                <a href="?page=inventory&tab=reports&report=low_stock" class="btn btn-<?= $reportType === 'low_stock' ? 'primary' : 'outline-primary' ?>">Low Stock Alerts</a>
                 <a href="?page=inventory&tab=reports&report=aging" class="btn btn-<?= $reportType === 'aging' ? 'primary' : 'outline-primary' ?>">Equipment Aging</a>
+                <a href="?page=inventory&tab=reports&report=technician_consumption" class="btn btn-<?= $reportType === 'technician_consumption' ? 'primary' : 'outline-primary' ?>">Technician Usage</a>
+                <a href="?page=inventory&tab=reports&report=fast_moving" class="btn btn-<?= $reportType === 'fast_moving' ? 'primary' : 'outline-primary' ?>">Fast Moving Items</a>
                 <a href="?page=inventory&tab=reports&report=consumption" class="btn btn-<?= $reportType === 'consumption' ? 'primary' : 'outline-primary' ?>">Consumption</a>
                 <a href="?page=inventory&tab=reports&report=rma" class="btn btn-<?= $reportType === 'rma' ? 'primary' : 'outline-primary' ?>">RMA Turnaround</a>
                 <a href="?page=inventory&tab=reports&report=warranty" class="btn btn-<?= $reportType === 'warranty' ? 'primary' : 'outline-primary' ?>">Warranty Status</a>
@@ -1829,6 +1856,106 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'low_stock'): ?>
+    <div class="card">
+        <div class="card-header bg-warning text-dark"><h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Low Stock Alerts Report</h5></div>
+        <div class="card-body">
+            <?php $stockAlerts = $inventory->getStockAlerts(); ?>
+            <?php if (empty($stockAlerts)): ?>
+            <div class="alert alert-success"><i class="bi bi-check-circle"></i> All stock levels are healthy. No items need reordering.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Item</th><th>Category</th><th>Available</th><th>Min Level</th><th>Reorder Point</th><th>Unit Cost</th><th>Alert</th><th>Action</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($stockAlerts as $alert): ?>
+                        <tr class="<?= $alert['alert_type'] === 'critical' ? 'table-danger' : 'table-warning' ?>">
+                            <td><strong><?= htmlspecialchars($alert['name']) ?></strong><br><small class="text-muted"><?= htmlspecialchars($alert['brand'] ?? '') ?> <?= htmlspecialchars($alert['model'] ?? '') ?></small></td>
+                            <td><?= htmlspecialchars($alert['category_name'] ?? 'Uncategorized') ?></td>
+                            <td><span class="badge bg-<?= $alert['alert_type'] === 'critical' ? 'danger' : 'warning' ?>"><?= $alert['available_count'] ?></span></td>
+                            <td><?= $alert['min_stock_level'] ?></td>
+                            <td><?= $alert['reorder_point'] ?></td>
+                            <td>KES <?= number_format($alert['unit_cost'], 2) ?></td>
+                            <td><span class="badge bg-<?= $alert['alert_type'] === 'critical' ? 'danger' : 'warning' ?> text-<?= $alert['alert_type'] === 'critical' ? 'white' : 'dark' ?>"><?= ucfirst($alert['alert_type']) ?></span></td>
+                            <td><a href="?page=inventory&tab=equipment&action=view&id=<?= $alert['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'technician_consumption'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-person-gear"></i> Technician Material Usage Report</h5></div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3">
+                <input type="hidden" name="page" value="inventory">
+                <input type="hidden" name="tab" value="reports">
+                <input type="hidden" name="report" value="technician_consumption">
+                <div class="col-md-4"><label class="form-label">From Date</label><input type="date" class="form-control" name="date_from" value="<?= $_GET['date_from'] ?? date('Y-m-01') ?>"></div>
+                <div class="col-md-4"><label class="form-label">To Date</label><input type="date" class="form-control" name="date_to" value="<?= $_GET['date_to'] ?? date('Y-m-d') ?>"></div>
+                <div class="col-md-4"><label class="form-label">&nbsp;</label><button type="submit" class="btn btn-primary d-block">Generate Report</button></div>
+            </form>
+            <?php 
+            $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+            $dateTo = $_GET['date_to'] ?? date('Y-m-d');
+            $techReport = $inventory->getTechnicianConsumption(null, $dateFrom, $dateTo); 
+            ?>
+            <?php if (empty($techReport)): ?>
+            <div class="alert alert-info"><i class="bi bi-info-circle"></i> No material usage recorded for this period.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>Technician</th><th>Items Used</th><th>Total Value</th><th>Tickets Handled</th><th>Avg Value/Ticket</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($techReport as $row): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($row['technician_name']) ?></strong></td>
+                            <td><?= $row['items_used'] ?></td>
+                            <td>KES <?= number_format($row['total_value'], 2) ?></td>
+                            <td><?= $row['tickets_handled'] ?></td>
+                            <td>KES <?= $row['tickets_handled'] > 0 ? number_format($row['total_value'] / $row['tickets_handled'], 2) : '0.00' ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php elseif ($reportType === 'fast_moving'): ?>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-lightning-charge"></i> Fast Moving Items Report</h5></div>
+        <div class="card-body">
+            <p class="text-muted">Shows the most frequently requested items in the last 30 days. Use this to plan reordering.</p>
+            <?php $fastMoving = $inventory->getFastMovingItems(20); ?>
+            <?php if (empty($fastMoving)): ?>
+            <div class="alert alert-info"><i class="bi bi-info-circle"></i> No stock request data available for the last 30 days.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead><tr><th>#</th><th>Item</th><th>Times Requested</th><th>Qty Requested</th><th>Avg Qty/Request</th></tr></thead>
+                    <tbody>
+                        <?php $rank = 1; foreach ($fastMoving as $item): ?>
+                        <tr>
+                            <td><span class="badge bg-primary"><?= $rank++ ?></span></td>
+                            <td><strong><?= htmlspecialchars($item['item_name']) ?></strong></td>
+                            <td><?= $item['request_count'] ?></td>
+                            <td><?= $item['total_qty'] ?></td>
+                            <td><?= number_format($item['avg_qty'], 1) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
