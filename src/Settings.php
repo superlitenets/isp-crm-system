@@ -625,17 +625,20 @@ class Settings {
             'mobile_app_name' => $this->get('mobile_app_name', 'ISP Mobile'),
             'mobile_require_location' => $this->get('mobile_require_location', '0'),
             'mobile_allow_offline' => $this->get('mobile_allow_offline', '1'),
+            'mobile_restrict_clockin_ip' => $this->get('mobile_restrict_clockin_ip', '0'),
+            'mobile_allowed_ips' => $this->get('mobile_allowed_ips', ''),
         ];
     }
 
     public function saveMobileAppSettings(array $data): bool {
         $fields = [
             'mobile_enabled', 'mobile_salesperson_enabled', 'mobile_technician_enabled',
-            'mobile_token_expiry_days', 'mobile_app_name', 'mobile_require_location', 'mobile_allow_offline'
+            'mobile_token_expiry_days', 'mobile_app_name', 'mobile_require_location', 'mobile_allow_offline',
+            'mobile_restrict_clockin_ip', 'mobile_allowed_ips'
         ];
         
         foreach ($fields as $field) {
-            if (isset($data[$field])) {
+            if (array_key_exists($field, $data)) {
                 $this->set($field, $data[$field]);
             }
         }
