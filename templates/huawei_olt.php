@@ -268,6 +268,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'refresh_all_optical':
+                $result = $huaweiOLT->refreshAllONUOptical((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Refreshed optical data for {$result['refreshed']}/{$result['total']} ONUs";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed to refresh optical data';
+                    $messageType = 'danger';
+                }
+                break;
             default:
                 break;
         }
@@ -691,6 +701,13 @@ try {
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Sync all authorized ONUs from OLT via SNMP?')">
                                 <i class="bi bi-arrow-repeat me-1"></i> Sync ONUs
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="refresh_all_optical">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Refresh optical power for all ONUs? This may take a while.')">
+                                <i class="bi bi-reception-4 me-1"></i> Refresh Power
                             </button>
                         </form>
                         <form method="post" class="d-inline">

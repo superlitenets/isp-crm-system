@@ -491,6 +491,30 @@ class HuaweiOLT {
         ];
     }
     
+    public function refreshAllONUOptical(int $oltId): array {
+        $onus = $this->getONUs(['olt_id' => $oltId]);
+        $refreshed = 0;
+        $failed = 0;
+        
+        foreach ($onus as $onu) {
+            if ($onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id'] !== null) {
+                $result = $this->refreshONUOptical($onu['id']);
+                if ($result['success']) {
+                    $refreshed++;
+                } else {
+                    $failed++;
+                }
+            }
+        }
+        
+        return [
+            'success' => true,
+            'refreshed' => $refreshed,
+            'failed' => $failed,
+            'total' => count($onus)
+        ];
+    }
+    
     public function refreshONUOptical(int $onuId): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
