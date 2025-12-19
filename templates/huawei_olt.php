@@ -401,11 +401,11 @@ try {
                 <a class="nav-link <?= $view === 'olts' ? 'active' : '' ?>" href="?page=huawei-olt&view=olts">
                     <i class="bi bi-hdd-rack me-2"></i> OLT Devices
                 </a>
-                <a class="nav-link <?= $view === 'onus' ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
-                    <i class="bi bi-diagram-3 me-2"></i> ONU Inventory
+                <a class="nav-link <?= ($view === 'onus' && !isset($_GET['unconfigured'])) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
+                    <i class="bi bi-check-circle me-2"></i> Authorized ONUs
                 </a>
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
-                    <i class="bi bi-clock-history me-2"></i> Pending Authorization
+                    <i class="bi bi-hourglass-split me-2"></i> Pending Authorization
                     <?php if ($stats['unconfigured_onus'] > 0): ?>
                     <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
                     <?php endif; ?>
@@ -694,8 +694,8 @@ try {
             <?php elseif ($view === 'onus'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
-                    <i class="bi bi-diagram-3 me-2"></i>
-                    <?= isset($_GET['unconfigured']) ? 'Pending Authorization' : 'ONU Inventory' ?>
+                    <i class="bi bi-<?= isset($_GET['unconfigured']) ? 'hourglass-split' : 'check-circle' ?> me-2"></i>
+                    <?= isset($_GET['unconfigured']) ? 'Pending Authorization' : 'Authorized ONUs' ?>
                 </h4>
                 <div class="d-flex gap-2">
                     <form class="d-flex gap-2" method="get">
@@ -763,9 +763,9 @@ try {
                                     <th>Name</th>
                                     <th>OLT / Port</th>
                                     <th>Status</th>
+                                    <th>Sync</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Customer</th>
-                                    <th>Profile</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -785,8 +785,12 @@ try {
                                         <span class="badge bg-<?= $statusClass[$onu['status']] ?? 'secondary' ?>">
                                             <?= ucfirst($onu['status']) ?>
                                         </span>
-                                        <?php if (!$onu['is_authorized']): ?>
-                                        <span class="badge bg-warning">Pending</span>
+                                    </td>
+                                    <td>
+                                        <?php if ($onu['is_authorized']): ?>
+                                        <span class="badge bg-success" title="Synced with OLT"><i class="bi bi-check-circle me-1"></i>Synced</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-warning" title="Not synced with OLT"><i class="bi bi-exclamation-circle me-1"></i>Pending</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -799,11 +803,13 @@ try {
                                             elseif ($rx <= -25) $rxClass = 'warning';
                                         }
                                         ?>
-                                        <span class="signal-<?= $rxClass ?>"><?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
-                                        / <?= $tx !== null ? number_format($tx, 1) : '-' ?> dBm
+                                        <span class="signal-<?= $rxClass ?>" title="RX Power"><?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
+                                        / <span title="TX Power"><?= $tx !== null ? number_format($tx, 1) : '-' ?></span> dBm
+                                        <?php if ($onu['optical_updated_at']): ?>
+                                        <br><small class="text-muted"><?= date('M j H:i', strtotime($onu['optical_updated_at'])) ?></small>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?= htmlspecialchars($onu['customer_name'] ?? '-') ?></td>
-                                    <td><small><?= htmlspecialchars($onu['profile_name'] ?? '-') ?></small></td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <?php if (!$onu['is_authorized']): ?>
@@ -811,6 +817,13 @@ try {
                                                 <i class="bi bi-check-circle"></i>
                                             </button>
                                             <?php else: ?>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="refresh_onu_optical">
+                                                <input type="hidden" name="onu_id" value="<?= $onu['id'] ?>">
+                                                <button type="submit" class="btn btn-outline-info" title="Refresh Optical Power">
+                                                    <i class="bi bi-reception-4"></i>
+                                                </button>
+                                            </form>
                                             <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
@@ -842,7 +855,7 @@ try {
                     ONU Configuration: <?= htmlspecialchars($currentOnu['sn']) ?>
                 </h4>
                 <a href="?page=huawei-olt&view=onus" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i> Back to Inventory
+                    <i class="bi bi-arrow-left me-1"></i> Back to Authorized ONUs
                 </a>
             </div>
             

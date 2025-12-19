@@ -1339,34 +1339,64 @@ class HuaweiOLT {
         
         $vlans = [];
         $lines = explode("\n", $result['output'] ?? '');
+        $currentVlan = null;
         
         foreach ($lines as $line) {
             $line = trim($line);
             
             if (empty($line) || preg_match('/^[-=]+$/', $line) || 
-                stripos($line, 'VLANID') !== false || 
-                stripos($line, 'VID') !== false ||
                 stripos($line, 'display') !== false ||
-                stripos($line, 'Total') !== false) {
+                stripos($line, 'Total') !== false ||
+                stripos($line, 'Command') !== false) {
                 continue;
             }
             
-            if (preg_match('/^\s*(\d{1,4})\s+(\w+)\s*(.*)/i', $line, $matches)) {
+            if (preg_match('/VLAN\s*ID\s*[:\s]+(\d{1,4})/i', $line, $matches)) {
+                if ($currentVlan !== null) {
+                    $vlans[] = $currentVlan;
+                }
+                $currentVlan = [
+                    'vlan_id' => (int)$matches[1],
+                    'type' => 'smart',
+                    'description' => ''
+                ];
+                continue;
+            }
+            
+            if ($currentVlan !== null) {
+                if (preg_match('/Type\s*[:\s]+(\w+)/i', $line, $matches)) {
+                    $currentVlan['type'] = strtolower($matches[1]);
+                } elseif (preg_match('/Description\s*[:\s]+(.+)/i', $line, $matches)) {
+                    $currentVlan['description'] = trim($matches[1]);
+                }
+            }
+            
+            if (preg_match('/^\s*(\d{1,4})\s+(smart|common|mux|standard|super|stacking)\s*(.*)/i', $line, $matches)) {
                 $vlanId = (int)$matches[1];
                 if ($vlanId > 0 && $vlanId < 4095) {
-                    $type = strtolower($matches[2]);
-                    if (in_array($type, ['smart', 'common', 'mux', 'standard', 'super', 'stacking'])) {
-                        $vlans[] = [
-                            'vlan_id' => $vlanId,
-                            'type' => $type,
-                            'description' => trim($matches[3] ?? '')
-                        ];
-                    }
+                    $vlans[] = [
+                        'vlan_id' => $vlanId,
+                        'type' => strtolower($matches[2]),
+                        'description' => trim($matches[3] ?? '')
+                    ];
                 }
             }
         }
         
-        return ['success' => true, 'vlans' => $vlans, 'raw' => $result['output']];
+        if ($currentVlan !== null) {
+            $vlans[] = $currentVlan;
+        }
+        
+        $uniqueVlans = [];
+        $seenIds = [];
+        foreach ($vlans as $vlan) {
+            if (!in_array($vlan['vlan_id'], $seenIds)) {
+                $seenIds[] = $vlan['vlan_id'];
+                $uniqueVlans[] = $vlan;
+            }
+        }
+        
+        return ['success' => true, 'vlans' => $uniqueVlans, 'raw' => $result['output']];
     }
     
     public function createVLAN(int $oltId, int $vlanId, string $description = '', string $type = 'smart'): array {
