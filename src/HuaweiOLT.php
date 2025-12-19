@@ -670,7 +670,7 @@ class HuaweiOLT {
             $data['service_profile_id'] ?? null,
             $data['line_profile'] ?? '',
             $data['srv_profile'] ?? '',
-            $data['is_authorized'] ?? false,
+            isset($data['is_authorized']) ? (bool)$data['is_authorized'] : false,
             $data['auth_type'] ?? 'sn',
             $data['password'] ?? ''
         ]);
