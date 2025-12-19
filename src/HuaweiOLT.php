@@ -34,17 +34,17 @@ class HuaweiOLT {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv) ?: '';
     }
     
-    private function castBoolean($value): bool {
-        if (is_bool($value)) {
-            return $value;
+    private function castBoolean($value): string {
+        if ($value === '' || $value === null || $value === false || $value === 0 || $value === '0') {
+            return 'false';
         }
-        if ($value === '' || $value === null) {
-            return false;
+        if ($value === true || $value === 1) {
+            return 'true';
         }
         if (is_string($value)) {
-            return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+            return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true) ? 'true' : 'false';
         }
-        return (bool)$value;
+        return $value ? 'true' : 'false';
     }
     
     // ==================== OLT Management ====================
