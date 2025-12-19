@@ -1526,22 +1526,36 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                     <th>Slot</th>
                                     <th>Board Name</th>
                                     <th>Status</th>
-                                    <th>Subtype</th>
-                                    <th>Ports</th>
+                                    <th>Online/Offline</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($boardInfo['boards'] as $board): ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($board['slot']) ?></strong></td>
-                                    <td><?= htmlspecialchars($board['board_name']) ?></td>
+                                    <td><code><?= htmlspecialchars($board['board_name']) ?></code></td>
                                     <td>
-                                        <span class="badge bg-<?= strtolower($board['status']) === 'normal' ? 'success' : 'warning' ?>">
+                                        <?php
+                                        $status = strtolower($board['status']);
+                                        $statusClass = 'secondary';
+                                        if (strpos($status, 'normal') !== false) $statusClass = 'success';
+                                        elseif (strpos($status, 'active') !== false) $statusClass = 'primary';
+                                        elseif (strpos($status, 'standby') !== false) $statusClass = 'info';
+                                        elseif (strpos($status, 'failed') !== false) $statusClass = 'danger';
+                                        ?>
+                                        <span class="badge bg-<?= $statusClass ?>">
                                             <?= htmlspecialchars($board['status']) ?>
                                         </span>
                                     </td>
-                                    <td><?= htmlspecialchars($board['subtype']) ?></td>
-                                    <td><?= htmlspecialchars($board['ports']) ?></td>
+                                    <td>
+                                        <?php if (!empty($board['online'])): ?>
+                                        <span class="badge bg-<?= strtolower($board['online']) === 'online' ? 'success' : 'danger' ?>">
+                                            <?= htmlspecialchars($board['online']) ?>
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>

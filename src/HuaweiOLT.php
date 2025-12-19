@@ -1285,13 +1285,19 @@ class HuaweiOLT {
         $lines = explode("\n", $result['output'] ?? '');
         
         foreach ($lines as $line) {
-            if (preg_match('/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+            $line = trim($line);
+            if (preg_match('/^(\d{1,2})\s+(H\d{3}[A-Z0-9]+)\s+(\S+)/i', $line, $matches)) {
+                $status = $matches[3];
+                $online = '';
+                if (preg_match('/(Online|Offline)\s*$/i', $line, $onlineMatch)) {
+                    $online = $onlineMatch[1];
+                }
                 $boards[] = [
                     'slot' => $matches[1],
-                    'board_name' => $matches[3],
-                    'status' => $matches[4],
-                    'subtype' => $matches[5] ?? '',
-                    'ports' => $matches[6] ?? ''
+                    'board_name' => $matches[2],
+                    'status' => $status,
+                    'subtype' => '',
+                    'online' => $online
                 ];
             }
         }
