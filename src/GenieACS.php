@@ -219,7 +219,7 @@ class GenieACS {
     public function setWiFiSettings(string $deviceId, string $ssid, string $password, bool $enabled = true, int $channel = 0): array {
         $params = [
             ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey', $password, 'xsd:string'],
+            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'],
             ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable', $enabled, 'xsd:boolean']
         ];
         
@@ -233,7 +233,7 @@ class GenieACS {
     public function setWiFi5GSettings(string $deviceId, string $ssid, string $password, bool $enabled = true): array {
         $params = [
             ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID', $ssid, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.PreSharedKey', $password, 'xsd:string'],
+            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'],
             ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable', $enabled, 'xsd:boolean']
         ];
         

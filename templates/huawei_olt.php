@@ -141,10 +141,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $settings = [
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
                     'genieacs_username' => $_POST['genieacs_username'] ?? '',
-                    'genieacs_password' => $_POST['genieacs_password'] ?? '',
                     'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
                     'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0'
                 ];
+                if (!empty($_POST['genieacs_password'])) {
+                    $settings['genieacs_password'] = $_POST['genieacs_password'];
+                }
                 foreach ($settings as $key => $value) {
                     $stmt = $db->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
                     $stmt->execute([$value, $key]);
