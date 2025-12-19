@@ -5707,6 +5707,11 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-hdd-network"></i> Network Devices
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="?page=huawei-olt" target="_blank">
+                    <i class="bi bi-router text-primary"></i> Huawei OLT <i class="bi bi-box-arrow-up-right small"></i>
+                </a>
+            </li>
             <?php endif; ?>
             <?php if (\App\Auth::can('reports.view')): ?>
             <li class="nav-item">
@@ -5913,6 +5918,14 @@ $csrfToken = \App\Auth::generateToken();
                         $onus = $deviceMonitor->getOnus((int)$_GET['device'], ['status' => $_GET['status'] ?? '']);
                     }
                     include __DIR__ . '/../templates/devices.php';
+                }
+                break;
+            case 'huawei-olt':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/huawei_olt.php';
+                    exit;
                 }
                 break;
             case 'reports':
