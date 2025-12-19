@@ -1,0 +1,39 @@
+ont-srvprofile-id 2 desc "SNS001111_zone_Huruma_Johnsagga_authd_20241218" 
+ ont ipconfig 1 9 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 9 profile-id 2
+ ont add 1 10 sn-auth "4857544338722E9B" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS001135_zone_Huruma_Johnsagga_authd_20241230" 
+ ont ipconfig 1 10 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 10 profile-id 2
+ ont add 1 11 sn-auth "48575443396D669B" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS000357_zone_Huruma_Johnsagga_authd_20250108" 
+ ont ipconfig 1 11 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 11 profile-id 2
+ ont add 1 12 sn-auth "48575443F2D9042B" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS001471_zone_HURUMA_ROUNDA_descr_James_Githinji_authd_20250804" 
+ ont ipconfig 1 12 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 12 profile-id 2
+ ont add 1 13 sn-auth "485754433A3CC19B" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS000635_zone_Huruma_Johnsagga_descr_Club_Tavab_authd_20250114" 
+ ont ipconfig 1 13 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 13 profile-id 2
+ ont add 1 14 sn-auth "485754433A654A9B" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS000462-01_zone_HURUMA_ROUNDA_authd_20250115" 
+ ont ipconfig 1 14 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 14 profile-id 2
+ ont add 1 15 sn-auth "48575443F2D90AFB" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS001540_zone_Huruma_Johnsagga_descr_Fauzia_Awino_authd_20250924" 
+ ont ipconfig 1 15 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 15 profile-id 2
+ ont add 1 16 sn-auth "48575443F2D53B53" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "SNS001232_zone_Huruma_Johnsagga_authd_20250318" 
+ ont ipconfig 1 16 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 16 profile-id 2
+ ont add 1 17 sn-auth "48575443E4E6939E" omci ont-lineprofile-id 2 
+ont-srvprofile-id 4 desc "SNS000626_zone_Huruma_Johnsagga_authd_20250324" 
+ ont ipconfig 1 17 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 17 profile-id 2
+ ont add 1 18 sn-auth "485754432C67BD7D" omci ont-lineprofile-id 2 
+ont-srvprofile-id 2 desc "Grogon_zone_Huruma_Johnsagga_authd_20250329" 
+ ont ipconfig 1 18 dhcp vlan 69 priority 2
+ ont tr069-server-config 1 18 profile-id 2

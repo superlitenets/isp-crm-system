@@ -731,12 +731,18 @@ class HuaweiOLT {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_onus (olt_id, customer_id, sn, name, description, frame, slot, port, onu_id,
                                      onu_type, mac_address, status, service_profile_id, line_profile, srv_profile,
-                                     is_authorized, auth_type, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     is_authorized, auth_type, password, vlan_id, vlan_priority, ip_mode,
+                                     line_profile_id, srv_profile_id, tr069_profile_id, zone, area, customer_name, auth_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (olt_id, sn) DO UPDATE SET
                 name = EXCLUDED.name, description = EXCLUDED.description, frame = EXCLUDED.frame,
                 slot = EXCLUDED.slot, port = EXCLUDED.port, onu_id = EXCLUDED.onu_id,
-                onu_type = EXCLUDED.onu_type, status = EXCLUDED.status, updated_at = CURRENT_TIMESTAMP
+                onu_type = EXCLUDED.onu_type, status = EXCLUDED.status, vlan_id = EXCLUDED.vlan_id,
+                vlan_priority = EXCLUDED.vlan_priority, ip_mode = EXCLUDED.ip_mode,
+                line_profile_id = EXCLUDED.line_profile_id, srv_profile_id = EXCLUDED.srv_profile_id,
+                tr069_profile_id = EXCLUDED.tr069_profile_id, zone = EXCLUDED.zone, area = EXCLUDED.area,
+                customer_name = EXCLUDED.customer_name, auth_date = EXCLUDED.auth_date,
+                updated_at = CURRENT_TIMESTAMP
             RETURNING id
         ");
         $stmt->execute([
@@ -757,16 +763,102 @@ class HuaweiOLT {
             $data['srv_profile'] ?? '',
             $this->castBoolean($data['is_authorized'] ?? false),
             $data['auth_type'] ?? 'sn',
-            $data['password'] ?? ''
+            $data['password'] ?? '',
+            $data['vlan_id'] ?? null,
+            $data['vlan_priority'] ?? 0,
+            $data['ip_mode'] ?? 'dhcp',
+            $data['line_profile_id'] ?? null,
+            $data['srv_profile_id'] ?? null,
+            $data['tr069_profile_id'] ?? null,
+            $data['zone'] ?? null,
+            $data['area'] ?? null,
+            $data['customer_name'] ?? null,
+            $data['auth_date'] ?? null
         ]);
         return (int)$stmt->fetchColumn();
+    }
+    
+    public function parseONUDescription(string $description): array {
+        $result = [
+            'customer_name' => null,
+            'zone' => null,
+            'area' => null,
+            'auth_date' => null
+        ];
+        
+        if (preg_match('/^([^_]+)_zone_([^_]+)_([^_]+)(?:_descr_([^_]+))?_authd_(\d{8})$/i', $description, $matches)) {
+            $result['customer_name'] = $matches[1];
+            $result['zone'] = $matches[2];
+            $result['area'] = $matches[3];
+            if (!empty($matches[4])) {
+                $result['customer_name'] = $matches[4];
+            }
+            $dateStr = $matches[5];
+            $result['auth_date'] = substr($dateStr, 0, 4) . '-' . substr($dateStr, 4, 2) . '-' . substr($dateStr, 6, 2);
+        }
+        
+        return $result;
+    }
+    
+    public function parseONUConfigFromCLI(string $cliOutput): array {
+        $onus = [];
+        $lines = explode("\n", $cliOutput);
+        $currentOnu = null;
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            if (preg_match('/ont add (\d+) (\d+) sn-auth "([^"]+)" omci ont-lineprofile-id (\d+)/', $line, $m)) {
+                if ($currentOnu) {
+                    $onus[] = $currentOnu;
+                }
+                $currentOnu = [
+                    'port' => (int)$m[1],
+                    'onu_id' => (int)$m[2],
+                    'sn' => $m[3],
+                    'line_profile_id' => (int)$m[4],
+                    'auth_type' => 'sn'
+                ];
+            }
+            
+            if (preg_match('/ont-srvprofile-id (\d+) desc "([^"]+)"/', $line, $m)) {
+                if ($currentOnu) {
+                    $currentOnu['srv_profile_id'] = (int)$m[1];
+                    $currentOnu['description'] = $m[2];
+                    $parsed = $this->parseONUDescription($m[2]);
+                    $currentOnu = array_merge($currentOnu, $parsed);
+                }
+            }
+            
+            if (preg_match('/ont ipconfig (\d+) (\d+) (dhcp|static) vlan (\d+) priority (\d+)/', $line, $m)) {
+                if ($currentOnu && (int)$m[2] === $currentOnu['onu_id']) {
+                    $currentOnu['ip_mode'] = $m[3];
+                    $currentOnu['vlan_id'] = (int)$m[4];
+                    $currentOnu['vlan_priority'] = (int)$m[5];
+                }
+            }
+            
+            if (preg_match('/ont tr069-server-config (\d+) (\d+) profile-id (\d+)/', $line, $m)) {
+                if ($currentOnu && (int)$m[2] === $currentOnu['onu_id']) {
+                    $currentOnu['tr069_profile_id'] = (int)$m[3];
+                }
+            }
+        }
+        
+        if ($currentOnu) {
+            $onus[] = $currentOnu;
+        }
+        
+        return $onus;
     }
     
     public function updateONU(int $id, array $data): bool {
         $fields = ['customer_id', 'name', 'description', 'frame', 'slot', 'port', 'onu_id', 'onu_type',
                    'mac_address', 'status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
                    'line_profile', 'srv_profile', 'firmware_version', 'ip_address',
-                   'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause'];
+                   'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause',
+                   'vlan_id', 'vlan_priority', 'ip_mode', 'line_profile_id', 'srv_profile_id',
+                   'tr069_profile_id', 'zone', 'area', 'customer_name', 'auth_date'];
         $booleanFields = ['is_authorized'];
         $updates = [];
         $params = [];
