@@ -437,14 +437,21 @@ class HuaweiOLT {
                 'description' => $onu['description'],
             ];
             
-            if ($existing) {
-                $this->updateONU($existing['id'], $data);
-                $updated++;
-            } else {
-                $this->addONU($data);
-                $added++;
+            try {
+                if ($existing) {
+                    $this->updateONU($existing['id'], $data);
+                    $updated++;
+                } else {
+                    $this->addONU($data);
+                    $added++;
+                }
+                $synced++;
+            } catch (\Exception $e) {
+                error_log("SYNC ERROR - ONU Data: " . json_encode($data));
+                error_log("SYNC ERROR - Raw ONU: " . json_encode($onu));
+                error_log("SYNC ERROR - Exception: " . $e->getMessage());
+                throw $e;
             }
-            $synced++;
         }
         
         $this->addLog([
