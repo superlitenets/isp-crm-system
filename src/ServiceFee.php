@@ -148,6 +148,35 @@ class ServiceFee {
         return $stmt->execute([$feeId]);
     }
     
+    public function clearTicketFees(int $ticketId): bool {
+        $stmt = $this->db->prepare("DELETE FROM ticket_service_fees WHERE ticket_id = ?");
+        return $stmt->execute([$ticketId]);
+    }
+    
+    public function syncTicketFees(int $ticketId, array $feeData, ?int $createdBy = null): void {
+        $this->clearTicketFees($ticketId);
+        
+        foreach ($feeData as $data) {
+            $feeTypeId = (int)($data['fee_type_id'] ?? 0);
+            if ($feeTypeId <= 0) continue;
+            
+            $feeType = $this->getFeeType($feeTypeId);
+            if (!$feeType) continue;
+            
+            $amount = isset($data['amount']) && $data['amount'] > 0 
+                ? (float)$data['amount'] 
+                : $feeType['default_amount'];
+            
+            $this->addTicketFee($ticketId, [
+                'fee_type_id' => $feeTypeId,
+                'fee_name' => $feeType['name'],
+                'amount' => $amount,
+                'currency' => $feeType['currency'] ?? 'KES',
+                'created_by' => $createdBy
+            ]);
+        }
+    }
+    
     public function getUnpaidFeesByCustomer(int $customerId): array {
         $stmt = $this->db->prepare("
             SELECT tsf.*, t.ticket_number, t.subject

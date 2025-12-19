@@ -884,6 +884,121 @@ if ($page === 'api' && $action === 'attendance_status') {
     exit;
 }
 
+if ($page === 'api' && $action === 'repost_single_ticket') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    if (!\App\Auth::can('tickets.view')) {
+        echo json_encode(['success' => false, 'error' => 'Not authorized']);
+        exit;
+    }
+    
+    $ticketId = (int)($_GET['ticket_id'] ?? 0);
+    if ($ticketId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid ticket ID']);
+        exit;
+    }
+    
+    try {
+        $ticket = new \App\Ticket($db);
+        $ticketData = $ticket->find($ticketId);
+        if (!$ticketData) {
+            throw new Exception('Ticket not found');
+        }
+        
+        $whatsapp = new \App\WhatsApp();
+        if (!$whatsapp->isEnabled() || $whatsapp->getProvider() !== 'session') {
+            throw new Exception('WhatsApp session provider is required for group messaging');
+        }
+        
+        $customer = new \App\Customer($db);
+        $customerData = $customer->find($ticketData['customer_id']);
+        $assignedName = $ticketData['assigned_to'] ? (\App\User::find($ticketData['assigned_to'])['name'] ?? 'Unassigned') : 'Unassigned';
+        $age = floor((time() - strtotime($ticketData['created_at'])) / 86400);
+        
+        $serviceFeeModel = new \App\ServiceFee($db);
+        $ticketFees = $serviceFeeModel->getTicketFees($ticketId);
+        $feesTotal = $serviceFeeModel->getTicketFeesTotal($ticketId);
+        
+        $priorityEmoji = match($ticketData['priority']) {
+            'critical' => '🔴',
+            'high' => '🟠',
+            'medium' => '🟡',
+            default => '🟢'
+        };
+        
+        $repostMessage = "*{$priorityEmoji} TICKET REPOST*\n\n";
+        $repostMessage .= "*#{$ticketData['ticket_number']}*: {$ticketData['subject']}\n";
+        $repostMessage .= "Priority: " . ucfirst($ticketData['priority']) . " | Status: " . ucwords(str_replace('_', ' ', $ticketData['status'])) . "\n";
+        $repostMessage .= "Category: " . ucfirst($ticketData['category']) . "\n";
+        $repostMessage .= "Customer: " . ($customerData['name'] ?? 'Unknown') . "\n";
+        if (!empty($customerData['phone'])) {
+            $repostMessage .= "Phone: {$customerData['phone']}\n";
+        }
+        $repostMessage .= "Assigned: {$assignedName}\n";
+        $repostMessage .= "Age: {$age} days\n";
+        
+        if (count($ticketFees) > 0) {
+            $repostMessage .= "\n*Service Fees:*\n";
+            foreach ($ticketFees as $fee) {
+                $paidStatus = $fee['is_paid'] ? '✅' : '⏳';
+                $repostMessage .= "• {$fee['fee_name']}: " . number_format($fee['amount'], 2) . " {$fee['currency']} {$paidStatus}\n";
+            }
+            $repostMessage .= "Total: " . number_format($feesTotal['total'], 2) . " (Paid: " . number_format($feesTotal['paid'], 2) . ")\n";
+        }
+        
+        $repostMessage .= "\n_Reposted at " . date('h:i A, M j') . "_";
+        
+        $results = [];
+        $errors = [];
+        $groupsSent = 0;
+        
+        if (!empty($ticketData['branch_id'])) {
+            $branchClass = new \App\Branch();
+            $branch = $branchClass->find($ticketData['branch_id']);
+            if ($branch && !empty($branch['whatsapp_group_id'])) {
+                $result = $whatsapp->sendToGroup($branch['whatsapp_group_id'], $repostMessage);
+                $results['branch'] = $result;
+                if ($result['success']) {
+                    $groupsSent++;
+                } else {
+                    $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
+                }
+            }
+        }
+        
+        $settings = new \App\Settings($db);
+        $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
+        if (!empty($operationsGroupId)) {
+            $result = $whatsapp->sendToGroup($operationsGroupId, $repostMessage);
+            $results['operations'] = $result;
+            if ($result['success']) {
+                $groupsSent++;
+            } else {
+                $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
+            }
+        }
+        
+        if (empty($results)) {
+            throw new Exception('No WhatsApp groups configured for this ticket');
+        }
+        
+        echo json_encode([
+            'success' => count($errors) === 0,
+            'groups_sent' => $groupsSent,
+            'errors' => $errors
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     
@@ -1389,29 +1504,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ticketId = (int)$_POST['id'];
                         $ticket->update($ticketId, $_POST);
                         
-                        if (isset($_POST['service_fees']) && is_array($_POST['service_fees'])) {
-                            $serviceFeeModel = new \App\ServiceFee($db);
-                            $existingFees = $serviceFeeModel->getTicketFees($ticketId);
-                            $existingFeeTypeIds = array_column($existingFees, 'fee_type_id');
-                            $newFeeTypeIds = array_map('intval', $_POST['service_fees']);
-                            $feeAmounts = $_POST['fee_amounts'] ?? [];
-                            
-                            foreach ($newFeeTypeIds as $feeTypeId) {
-                                if (!in_array($feeTypeId, $existingFeeTypeIds)) {
-                                    $feeType = $serviceFeeModel->getFeeType($feeTypeId);
-                                    if ($feeType) {
-                                        $amount = isset($feeAmounts[$feeTypeId]) ? (float)$feeAmounts[$feeTypeId] : $feeType['default_amount'];
-                                        $serviceFeeModel->addTicketFee($ticketId, [
-                                            'fee_type_id' => $feeTypeId,
-                                            'fee_name' => $feeType['name'],
-                                            'amount' => $amount,
-                                            'currency' => $feeType['currency'] ?? 'KES',
-                                            'created_by' => $currentUser['id'] ?? null
-                                        ]);
-                                    }
-                                }
+                        $serviceFeeModel = new \App\ServiceFee($db);
+                        $feeAmounts = $_POST['fee_amounts'] ?? [];
+                        $feeData = [];
+                        
+                        if (!empty($_POST['service_fees']) && is_array($_POST['service_fees'])) {
+                            foreach ($_POST['service_fees'] as $feeTypeId) {
+                                $feeData[] = [
+                                    'fee_type_id' => (int)$feeTypeId,
+                                    'amount' => isset($feeAmounts[$feeTypeId]) ? (float)$feeAmounts[$feeTypeId] : 0
+                                ];
                             }
                         }
+                        $serviceFeeModel->syncTicketFees($ticketId, $feeData, $currentUser['id'] ?? null);
                         
                         $message = 'Ticket updated successfully! SMS notification sent to customer.';
                         $messageType = 'success';
@@ -1469,6 +1574,109 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $message = 'Error adding comment: ' . $e->getMessage();
                         $messageType = 'danger';
                     }
+                }
+                break;
+            
+            case 'repost_to_whatsapp':
+                if (!\App\Auth::can('tickets.view')) {
+                    $message = 'You do not have permission to repost tickets.';
+                    $messageType = 'danger';
+                    break;
+                }
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                if ($ticketId <= 0) {
+                    $message = 'Invalid ticket ID.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $ticketData = $ticket->find($ticketId);
+                    if (!$ticketData) {
+                        throw new Exception('Ticket not found.');
+                    }
+                    
+                    $whatsapp = new \App\WhatsApp();
+                    if (!$whatsapp->isEnabled() || $whatsapp->getProvider() !== 'session') {
+                        throw new Exception('WhatsApp session provider is required for group messaging.');
+                    }
+                    
+                    $customerData = $customer->find($ticketData['customer_id']);
+                    $assignedName = $ticketData['assigned_to'] ? (\App\User::find($ticketData['assigned_to'])['name'] ?? 'Unassigned') : 'Unassigned';
+                    $age = floor((time() - strtotime($ticketData['created_at'])) / 86400);
+                    
+                    $serviceFeeModel = new \App\ServiceFee($db);
+                    $ticketFees = $serviceFeeModel->getTicketFees($ticketId);
+                    $feesTotal = $serviceFeeModel->getTicketFeesTotal($ticketId);
+                    
+                    $priorityEmoji = match($ticketData['priority']) {
+                        'critical' => '🔴',
+                        'high' => '🟠',
+                        'medium' => '🟡',
+                        default => '🟢'
+                    };
+                    
+                    $repostMessage = "*{$priorityEmoji} TICKET REPOST*\n\n";
+                    $repostMessage .= "*#{$ticketData['ticket_number']}*: {$ticketData['subject']}\n";
+                    $repostMessage .= "Priority: " . ucfirst($ticketData['priority']) . " | Status: " . ucwords(str_replace('_', ' ', $ticketData['status'])) . "\n";
+                    $repostMessage .= "Category: " . ucfirst($ticketData['category']) . "\n";
+                    $repostMessage .= "Customer: " . ($customerData['name'] ?? 'Unknown') . "\n";
+                    if (!empty($customerData['phone'])) {
+                        $repostMessage .= "Phone: {$customerData['phone']}\n";
+                    }
+                    $repostMessage .= "Assigned: {$assignedName}\n";
+                    $repostMessage .= "Age: {$age} days\n";
+                    
+                    if (count($ticketFees) > 0) {
+                        $repostMessage .= "\n*Service Fees:*\n";
+                        foreach ($ticketFees as $fee) {
+                            $paidStatus = $fee['is_paid'] ? '✅' : '⏳';
+                            $repostMessage .= "• {$fee['fee_name']}: " . number_format($fee['amount'], 2) . " {$fee['currency']} {$paidStatus}\n";
+                        }
+                        $repostMessage .= "Total: " . number_format($feesTotal['total'], 2) . " (Paid: " . number_format($feesTotal['paid'], 2) . ")\n";
+                    }
+                    
+                    $repostMessage .= "\n_Reposted at " . date('h:i A, M j') . "_";
+                    
+                    $results = [];
+                    $errors = [];
+                    
+                    if (!empty($ticketData['branch_id'])) {
+                        $branchClass = new \App\Branch();
+                        $branch = $branchClass->find($ticketData['branch_id']);
+                        if ($branch && !empty($branch['whatsapp_group_id'])) {
+                            $result = $whatsapp->sendToGroup($branch['whatsapp_group_id'], $repostMessage);
+                            $results['branch'] = $result;
+                            if (!$result['success']) {
+                                $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
+                            }
+                        }
+                    }
+                    
+                    $settings = new \App\Settings($db);
+                    $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
+                    if (!empty($operationsGroupId)) {
+                        $result = $whatsapp->sendToGroup($operationsGroupId, $repostMessage);
+                        $results['operations'] = $result;
+                        if (!$result['success']) {
+                            $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
+                        }
+                    }
+                    
+                    if (empty($results)) {
+                        throw new Exception('No WhatsApp groups configured for this ticket.');
+                    }
+                    
+                    if (count($errors) > 0) {
+                        $message = 'Ticket reposted with some errors: ' . implode('; ', $errors);
+                        $messageType = 'warning';
+                    } else {
+                        $message = 'Ticket reposted to WhatsApp successfully!';
+                        $messageType = 'success';
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error reposting ticket: ' . $e->getMessage();
+                    $messageType = 'danger';
                 }
                 break;
             
@@ -3099,6 +3307,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error removing holiday: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'create_service_fee':
+                if (!\App\Auth::can('settings.edit')) {
+                    $message = 'You do not have permission to add fee types.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->createFeeType([
+                        'name' => trim($_POST['name'] ?? ''),
+                        'description' => trim($_POST['description'] ?? ''),
+                        'default_amount' => (float)($_POST['default_amount'] ?? 0),
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'is_active' => isset($_POST['is_active']),
+                        'display_order' => (int)($_POST['display_order'] ?? 0)
+                    ]);
+                    $message = 'Service fee type added successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=service_fees');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error adding fee type: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'update_service_fee':
+                if (!\App\Auth::can('settings.edit')) {
+                    $message = 'You do not have permission to update fee types.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
+                    if ($feeTypeId <= 0) throw new Exception('Invalid fee type ID');
+                    $serviceFee->updateFeeType($feeTypeId, [
+                        'name' => trim($_POST['name'] ?? ''),
+                        'description' => trim($_POST['description'] ?? ''),
+                        'default_amount' => (float)($_POST['default_amount'] ?? 0),
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'is_active' => isset($_POST['is_active']),
+                        'display_order' => (int)($_POST['display_order'] ?? 0)
+                    ]);
+                    $message = 'Service fee type updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=service_fees');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error updating fee type: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'delete_service_fee':
+                if (!\App\Auth::can('settings.edit')) {
+                    $message = 'You do not have permission to delete fee types.';
+                    $messageType = 'danger';
+                    break;
+                }
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
+                    if ($feeTypeId <= 0) throw new Exception('Invalid fee type ID');
+                    $serviceFee->deleteFeeType($feeTypeId);
+                    $message = 'Service fee type deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting fee type: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

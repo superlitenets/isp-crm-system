@@ -264,6 +264,10 @@ if (isset($_GET['customer_id'])) {
             $availableFees = $serviceFeeModel->getFeeTypes(true);
             $existingTicketFees = ($action === 'edit' && $ticketData) ? $serviceFeeModel->getTicketFees($ticketData['id']) : [];
             $existingFeeTypeIds = array_column($existingTicketFees, 'fee_type_id');
+            $existingFeeAmounts = [];
+            foreach ($existingTicketFees as $etf) {
+                $existingFeeAmounts[$etf['fee_type_id']] = $etf['amount'];
+            }
             ?>
             <?php if (!empty($availableFees)): ?>
             <div class="row g-3 mt-3">
@@ -275,14 +279,17 @@ if (isset($_GET['customer_id'])) {
                         <div class="card-body">
                             <p class="text-muted small mb-3">Select one or more fees to add to this ticket. You can adjust amounts after selection.</p>
                             <div class="row">
-                                <?php foreach ($availableFees as $fee): ?>
+                                <?php foreach ($availableFees as $fee): 
+                                    $existingAmount = $existingFeeAmounts[$fee['id']] ?? $fee['default_amount'];
+                                ?>
                                 <div class="col-md-4 mb-2">
                                     <div class="form-check">
                                         <input class="form-check-input service-fee-checkbox" type="checkbox" 
                                                name="service_fees[]" 
                                                value="<?= $fee['id'] ?>" 
                                                id="fee_<?= $fee['id'] ?>"
-                                               data-amount="<?= $fee['default_amount'] ?>"
+                                               data-amount="<?= $existingAmount ?>"
+                                               data-default-amount="<?= $fee['default_amount'] ?>"
                                                data-name="<?= htmlspecialchars($fee['name']) ?>"
                                                <?= in_array($fee['id'], $existingFeeTypeIds) ? 'checked' : '' ?>>
                                         <label class="form-check-label" for="fee_<?= $fee['id'] ?>">
@@ -518,22 +525,40 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedFeesAmounts = document.getElementById('selectedFeesAmounts');
     const feeAmountInputs = document.getElementById('feeAmountInputs');
     const feesTotal = document.getElementById('feesTotal');
+    const feeAmounts = {};
+    
+    feeCheckboxes.forEach(cb => {
+        feeAmounts[cb.value] = parseFloat(cb.dataset.amount) || 0;
+    });
+    
+    function captureCurrentAmounts() {
+        document.querySelectorAll('.fee-amount-input').forEach(input => {
+            const feeId = input.dataset.feeId;
+            if (feeId) {
+                feeAmounts[feeId] = parseFloat(input.value) || 0;
+            }
+        });
+    }
     
     function updateFeeInputs() {
         if (!feeAmountInputs) return;
+        
+        captureCurrentAmounts();
+        
         let html = '';
         let total = 0;
         
         feeCheckboxes.forEach(cb => {
             if (cb.checked) {
-                const amount = parseFloat(cb.dataset.amount) || 0;
+                const feeId = cb.value;
+                const amount = feeAmounts[feeId] || 0;
                 total += amount;
                 html += '<div class="row mb-2 align-items-center">' +
                     '<div class="col-md-6">' + cb.dataset.name + '</div>' +
                     '<div class="col-md-6">' +
                     '<input type="number" class="form-control form-control-sm fee-amount-input" ' +
-                    'name="fee_amounts[' + cb.value + ']" value="' + amount + '" step="0.01" min="0" ' +
-                    'data-fee-id="' + cb.value + '">' +
+                    'name="fee_amounts[' + feeId + ']" value="' + amount + '" step="0.01" min="0" ' +
+                    'data-fee-id="' + feeId + '">' +
                     '</div></div>';
             }
         });
@@ -543,11 +568,14 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedFeesAmounts.style.display = html ? 'block' : 'none';
         }
         if (feesTotal) {
-            feesTotal.textContent = 'KES ' + total.toLocaleString();
+            feesTotal.textContent = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
         
         document.querySelectorAll('.fee-amount-input').forEach(input => {
-            input.addEventListener('input', updateFeesTotal);
+            input.addEventListener('input', function() {
+                feeAmounts[this.dataset.feeId] = parseFloat(this.value) || 0;
+                updateFeesTotal();
+            });
         });
     }
     
@@ -557,7 +585,7 @@ document.addEventListener('DOMContentLoaded', function() {
             total += parseFloat(input.value) || 0;
         });
         if (feesTotal) {
-            feesTotal.textContent = 'KES ' + total.toLocaleString();
+            feesTotal.textContent = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
     }
     
