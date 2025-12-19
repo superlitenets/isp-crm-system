@@ -259,6 +259,54 @@ if (isset($_GET['customer_id'])) {
                 <?php endif; ?>
             </div>
             
+            <?php
+            $serviceFeeModel = new \App\ServiceFee($db);
+            $availableFees = $serviceFeeModel->getFeeTypes(true);
+            $existingTicketFees = ($action === 'edit' && $ticketData) ? $serviceFeeModel->getTicketFees($ticketData['id']) : [];
+            $existingFeeTypeIds = array_column($existingTicketFees, 'fee_type_id');
+            ?>
+            <?php if (!empty($availableFees)): ?>
+            <div class="row g-3 mt-3">
+                <div class="col-12">
+                    <div class="card bg-light">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-cash-coin"></i> Service Fees (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Select one or more fees to add to this ticket. You can adjust amounts after selection.</p>
+                            <div class="row">
+                                <?php foreach ($availableFees as $fee): ?>
+                                <div class="col-md-4 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input service-fee-checkbox" type="checkbox" 
+                                               name="service_fees[]" 
+                                               value="<?= $fee['id'] ?>" 
+                                               id="fee_<?= $fee['id'] ?>"
+                                               data-amount="<?= $fee['default_amount'] ?>"
+                                               data-name="<?= htmlspecialchars($fee['name']) ?>"
+                                               <?= in_array($fee['id'], $existingFeeTypeIds) ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="fee_<?= $fee['id'] ?>">
+                                            <?= htmlspecialchars($fee['name']) ?>
+                                            <span class="badge bg-secondary"><?= htmlspecialchars($fee['currency'] ?? 'KES') ?> <?= number_format($fee['default_amount'], 0) ?></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div id="selectedFeesAmounts" class="mt-3" style="display: none;">
+                                <hr>
+                                <h6>Adjust Amounts:</h6>
+                                <div id="feeAmountInputs"></div>
+                                <div class="mt-2">
+                                    <strong>Total: <span id="feesTotal">0</span></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
             <div class="mt-4">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-lg"></i> <?= $action === 'create' ? 'Create Ticket' : 'Update Ticket' ?>
@@ -465,6 +513,59 @@ document.addEventListener('DOMContentLoaded', function() {
     if (customerIdSelect.value) {
         fetchCustomerHistory(customerIdSelect.value);
     }
+    
+    const feeCheckboxes = document.querySelectorAll('.service-fee-checkbox');
+    const selectedFeesAmounts = document.getElementById('selectedFeesAmounts');
+    const feeAmountInputs = document.getElementById('feeAmountInputs');
+    const feesTotal = document.getElementById('feesTotal');
+    
+    function updateFeeInputs() {
+        if (!feeAmountInputs) return;
+        let html = '';
+        let total = 0;
+        
+        feeCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                const amount = parseFloat(cb.dataset.amount) || 0;
+                total += amount;
+                html += '<div class="row mb-2 align-items-center">' +
+                    '<div class="col-md-6">' + cb.dataset.name + '</div>' +
+                    '<div class="col-md-6">' +
+                    '<input type="number" class="form-control form-control-sm fee-amount-input" ' +
+                    'name="fee_amounts[' + cb.value + ']" value="' + amount + '" step="0.01" min="0" ' +
+                    'data-fee-id="' + cb.value + '">' +
+                    '</div></div>';
+            }
+        });
+        
+        feeAmountInputs.innerHTML = html;
+        if (selectedFeesAmounts) {
+            selectedFeesAmounts.style.display = html ? 'block' : 'none';
+        }
+        if (feesTotal) {
+            feesTotal.textContent = 'KES ' + total.toLocaleString();
+        }
+        
+        document.querySelectorAll('.fee-amount-input').forEach(input => {
+            input.addEventListener('input', updateFeesTotal);
+        });
+    }
+    
+    function updateFeesTotal() {
+        let total = 0;
+        document.querySelectorAll('.fee-amount-input').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        if (feesTotal) {
+            feesTotal.textContent = 'KES ' + total.toLocaleString();
+        }
+    }
+    
+    feeCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateFeeInputs);
+    });
+    
+    updateFeeInputs();
 });
 </script>
 <?php endif; ?>
@@ -1533,6 +1634,10 @@ $escalatedFilter = $_GET['escalated'] ?? '';
                             <a href="?page=tickets&action=edit&id=<?= $t['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            <button type="button" class="btn btn-sm btn-outline-success" title="Repost to WhatsApp" 
+                                    onclick="repostTicketToWhatsApp(<?= $t['id'] ?>, '<?= htmlspecialchars($t['ticket_number']) ?>')">
+                                <i class="bi bi-whatsapp"></i>
+                            </button>
                             <?php if (\App\Auth::can('tickets.delete')): ?>
                             <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" 
                                     onclick="confirmDeleteTicket(<?= $t['id'] ?>, '<?= htmlspecialchars($t['ticket_number']) ?>')">
@@ -1584,6 +1689,32 @@ function confirmDeleteTicket(ticketId, ticketNumber) {
     document.getElementById('deleteTicketId').value = ticketId;
     document.getElementById('deleteTicketNumber').textContent = ticketNumber;
     new bootstrap.Modal(document.getElementById('deleteTicketModal')).show();
+}
+
+function repostTicketToWhatsApp(ticketId, ticketNumber) {
+    if (!confirm('Repost ticket ' + ticketNumber + ' to WhatsApp groups?')) return;
+    
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    fetch('?page=api&action=repost_single_ticket&ticket_id=' + ticketId)
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            if (data.success) {
+                alert('Ticket ' + ticketNumber + ' reposted to WhatsApp successfully!\\nGroups notified: ' + (data.groups_sent || 0));
+            } else {
+                alert('Failed to repost: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            alert('Error: ' + err.message);
+        });
 }
 </script>
 <?php endif; ?>

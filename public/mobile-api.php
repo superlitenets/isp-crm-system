@@ -493,10 +493,37 @@ try {
             
             $ticketId = $api->createTicket($user['id'], $input);
             if ($ticketId) {
+                if (!empty($input['service_fees']) && is_array($input['service_fees'])) {
+                    $serviceFeeModel = new \App\ServiceFee($db);
+                    foreach ($input['service_fees'] as $feeData) {
+                        $feeTypeId = (int)($feeData['fee_type_id'] ?? 0);
+                        $amount = (float)($feeData['amount'] ?? 0);
+                        
+                        if ($feeTypeId > 0) {
+                            $feeType = $serviceFeeModel->getFeeType($feeTypeId);
+                            if ($feeType) {
+                                $serviceFeeModel->addTicketFee($ticketId, [
+                                    'fee_type_id' => $feeTypeId,
+                                    'fee_name' => $feeType['name'],
+                                    'amount' => $amount > 0 ? $amount : $feeType['default_amount'],
+                                    'currency' => $feeType['currency'] ?? 'KES',
+                                    'created_by' => $user['id']
+                                ]);
+                            }
+                        }
+                    }
+                }
                 echo json_encode(['success' => true, 'ticket_id' => $ticketId]);
             } else {
                 echo json_encode(['success' => false, 'error' => 'Failed to create ticket']);
             }
+            break;
+        
+        case 'service-fees':
+            requireAuth();
+            $serviceFeeModel = new \App\ServiceFee($db);
+            $fees = $serviceFeeModel->getFeeTypes(true);
+            echo json_encode(['success' => true, 'data' => $fees]);
             break;
             
         case 'ticket-categories':

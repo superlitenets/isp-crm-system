@@ -330,6 +330,77 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
     exit;
 }
 
+if ($page === 'api' && $action === 'repost_single_ticket') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $ticketId = isset($_GET['ticket_id']) ? (int)$_GET['ticket_id'] : 0;
+    
+    if (!$ticketId) {
+        echo json_encode(['success' => false, 'error' => 'Ticket ID required']);
+        exit;
+    }
+    
+    try {
+        $ticketModel = new \App\Ticket();
+        $ticketData = $ticketModel->find($ticketId);
+        
+        if (!$ticketData) {
+            echo json_encode(['success' => false, 'error' => 'Ticket not found']);
+            exit;
+        }
+        
+        $settings = new \App\Settings();
+        $whatsapp = new \App\WhatsApp($db);
+        
+        $customer = new \App\Customer();
+        $customerData = $ticketData['customer_id'] ? $customer->find($ticketData['customer_id']) : null;
+        
+        $message = $whatsapp->formatTicketAssignmentMessage($ticketData, $customerData, $settings);
+        
+        $groupsSent = 0;
+        $errors = [];
+        
+        if (!empty($ticketData['branch_id'])) {
+            $branchModel = new \App\Branch();
+            $branch = $branchModel->find($ticketData['branch_id']);
+            if ($branch && !empty($branch['whatsapp_group_id'])) {
+                $result = $whatsapp->sendToGroup($branch['whatsapp_group_id'], $message);
+                if ($result['success']) {
+                    $groupsSent++;
+                } else {
+                    $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
+                }
+            }
+        }
+        
+        $operationsGroupId = $settings->get('whatsapp_operations_group_id');
+        if (!empty($operationsGroupId)) {
+            $result = $whatsapp->sendToGroup($operationsGroupId, $message);
+            if ($result['success']) {
+                $groupsSent++;
+            } else {
+                $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
+            }
+        }
+        
+        echo json_encode([
+            'success' => count($errors) === 0,
+            'groups_sent' => $groupsSent,
+            'ticket_number' => $ticketData['ticket_number'],
+            'errors' => $errors
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'branch_employees') {
     ob_clean();
     header('Content-Type: application/json');
@@ -1268,6 +1339,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     try {
                         $ticketId = $ticket->create($_POST);
+                        
+                        if (!empty($_POST['service_fees']) && is_array($_POST['service_fees'])) {
+                            $serviceFeeModel = new \App\ServiceFee($db);
+                            $feeAmounts = $_POST['fee_amounts'] ?? [];
+                            
+                            foreach ($_POST['service_fees'] as $feeTypeId) {
+                                $feeType = $serviceFeeModel->getFeeType((int)$feeTypeId);
+                                if ($feeType) {
+                                    $amount = isset($feeAmounts[$feeTypeId]) ? (float)$feeAmounts[$feeTypeId] : $feeType['default_amount'];
+                                    $serviceFeeModel->addTicketFee($ticketId, [
+                                        'fee_type_id' => $feeTypeId,
+                                        'fee_name' => $feeType['name'],
+                                        'amount' => $amount,
+                                        'currency' => $feeType['currency'] ?? 'KES',
+                                        'created_by' => $currentUser['id'] ?? null
+                                    ]);
+                                }
+                            }
+                        }
+                        
                         $customerCreatedMsg = ($customerType === 'new') ? ' New customer created.' : (($customerType === 'billing') ? ' Customer imported from billing.' : '');
                         $message = 'Ticket created successfully!' . $customerCreatedMsg . ' SMS notifications sent.';
                         $messageType = 'success';
@@ -1295,7 +1386,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 } else {
                     try {
-                        $ticket->update((int)$_POST['id'], $_POST);
+                        $ticketId = (int)$_POST['id'];
+                        $ticket->update($ticketId, $_POST);
+                        
+                        if (isset($_POST['service_fees']) && is_array($_POST['service_fees'])) {
+                            $serviceFeeModel = new \App\ServiceFee($db);
+                            $existingFees = $serviceFeeModel->getTicketFees($ticketId);
+                            $existingFeeTypeIds = array_column($existingFees, 'fee_type_id');
+                            $newFeeTypeIds = array_map('intval', $_POST['service_fees']);
+                            $feeAmounts = $_POST['fee_amounts'] ?? [];
+                            
+                            foreach ($newFeeTypeIds as $feeTypeId) {
+                                if (!in_array($feeTypeId, $existingFeeTypeIds)) {
+                                    $feeType = $serviceFeeModel->getFeeType($feeTypeId);
+                                    if ($feeType) {
+                                        $amount = isset($feeAmounts[$feeTypeId]) ? (float)$feeAmounts[$feeTypeId] : $feeType['default_amount'];
+                                        $serviceFeeModel->addTicketFee($ticketId, [
+                                            'fee_type_id' => $feeTypeId,
+                                            'fee_name' => $feeType['name'],
+                                            'amount' => $amount,
+                                            'currency' => $feeType['currency'] ?? 'KES',
+                                            'created_by' => $currentUser['id'] ?? null
+                                        ]);
+                                    }
+                                }
+                            }
+                        }
+                        
                         $message = 'Ticket updated successfully! SMS notification sent to customer.';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
@@ -3838,6 +3955,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error deleting ticket category: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'create_service_fee':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->createFeeType([
+                        'name' => $_POST['name'],
+                        'description' => $_POST['description'] ?? null,
+                        'default_amount' => $_POST['default_amount'] ?? 0,
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'is_active' => isset($_POST['is_active']),
+                        'display_order' => $_POST['display_order'] ?? 0
+                    ]);
+                    $message = 'Service fee created successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating service fee: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'update_service_fee':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->updateFeeType((int)$_POST['fee_id'], [
+                        'name' => $_POST['name'],
+                        'description' => $_POST['description'] ?? null,
+                        'default_amount' => $_POST['default_amount'] ?? 0,
+                        'currency' => $_POST['currency'] ?? 'KES',
+                        'is_active' => isset($_POST['is_active']),
+                        'display_order' => $_POST['display_order'] ?? 0
+                    ]);
+                    $message = 'Service fee updated successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                    header('Location: ?page=settings&subpage=service_fees');
+                    exit;
+                } catch (Exception $e) {
+                    $message = 'Error updating service fee: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'delete_service_fee':
+                try {
+                    $serviceFee = new \App\ServiceFee($db);
+                    $serviceFee->deleteFeeType((int)$_POST['fee_id']);
+                    $message = 'Service fee deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting service fee: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;

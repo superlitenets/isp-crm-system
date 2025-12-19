@@ -92,6 +92,11 @@ if ($action === 'edit_template' && $id) {
         </a>
     </li>
     <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'service_fees' ? 'active' : '' ?>" href="?page=settings&subpage=service_fees">
+            <i class="bi bi-cash-coin"></i> Service Fees
+        </a>
+    </li>
+    <li class="nav-item">
         <a class="nav-link <?= $subpage === 'mobile' ? 'active' : '' ?>" href="?page=settings&subpage=mobile">
             <i class="bi bi-phone"></i> Mobile App
         </a>
@@ -4024,6 +4029,194 @@ $commissionSettings = [
 document.getElementById('commissionType').addEventListener('change', function() {
     document.getElementById('commissionPrefix').textContent = this.value === 'percentage' ? '%' : 'KES';
 });
+</script>
+
+<?php elseif ($subpage === 'service_fees'): ?>
+
+<?php
+$serviceFee = new \App\ServiceFee($db);
+$feeTypes = $serviceFee->getFeeTypes(false);
+$editFeeId = isset($_GET['edit_fee']) ? (int)$_GET['edit_fee'] : 0;
+$editFee = $editFeeId ? $serviceFee->getFeeType($editFeeId) : null;
+?>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Service Fee Types</h5>
+                <span class="badge bg-primary"><?= count($feeTypes) ?> fees configured</span>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Service fees can be added to tickets during creation or editing. Configure your common fees here for quick selection.
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Default Amount</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($feeTypes as $fee): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($fee['name']) ?></strong></td>
+                                <td><?= htmlspecialchars($fee['description'] ?? '-') ?></td>
+                                <td><?= htmlspecialchars($fee['currency'] ?? 'KES') ?> <?= number_format($fee['default_amount'] ?? 0, 2) ?></td>
+                                <td>
+                                    <?php if ($fee['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <a href="?page=settings&subpage=service_fees&edit_fee=<?= $fee['id'] ?>" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                            onclick="confirmDeleteFee(<?= $fee['id'] ?>, '<?= htmlspecialchars(addslashes($fee['name'])) ?>')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($feeTypes)): ?>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    No service fees configured. Add your first fee type using the form.
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><?= $editFee ? 'Edit' : 'Add' ?> Service Fee</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="<?= $editFee ? 'update_service_fee' : 'create_service_fee' ?>">
+                    <?php if ($editFee): ?>
+                    <input type="hidden" name="fee_id" value="<?= $editFee['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Fee Name *</label>
+                        <input type="text" class="form-control" name="name" required
+                               value="<?= htmlspecialchars($editFee['name'] ?? '') ?>"
+                               placeholder="e.g., Installation Fee">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"
+                                  placeholder="Optional description"><?= htmlspecialchars($editFee['description'] ?? '') ?></textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-8">
+                            <label class="form-label">Default Amount</label>
+                            <input type="number" class="form-control" name="default_amount" step="0.01" min="0"
+                                   value="<?= htmlspecialchars($editFee['default_amount'] ?? '0') ?>">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Currency</label>
+                            <select class="form-select" name="currency">
+                                <option value="KES" <?= ($editFee['currency'] ?? 'KES') === 'KES' ? 'selected' : '' ?>>KES</option>
+                                <option value="USD" <?= ($editFee['currency'] ?? '') === 'USD' ? 'selected' : '' ?>>USD</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Display Order</label>
+                        <input type="number" class="form-control" name="display_order" min="0"
+                               value="<?= htmlspecialchars($editFee['display_order'] ?? '0') ?>">
+                        <small class="text-muted">Lower numbers appear first</small>
+                    </div>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="feeActive" value="1"
+                               <?= ($editFee['is_active'] ?? true) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="feeActive">Active</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-<?= $editFee ? 'check-lg' : 'plus-lg' ?>"></i> 
+                            <?= $editFee ? 'Update Fee' : 'Add Fee' ?>
+                        </button>
+                        <?php if ($editFee): ?>
+                        <a href="?page=settings&subpage=service_fees" class="btn btn-outline-secondary">Cancel</a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Common Service Fees</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0 ps-3">
+                    <li>Installation Fee</li>
+                    <li>Router/Equipment Fee</li>
+                    <li>Service Call Fee</li>
+                    <li>Reconnection Fee</li>
+                    <li>Cable Extension Fee</li>
+                    <li>Relocation Fee</li>
+                    <li>Diagnostics Fee</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteFeeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Delete Service Fee</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="delete_service_fee">
+                    <input type="hidden" name="fee_id" id="deleteFeeId">
+                    <p>Are you sure you want to delete the fee "<strong id="deleteFeeName"></strong>"?</p>
+                    <p class="text-warning mb-0"><i class="bi bi-exclamation-circle"></i> This will not affect fees already added to existing tickets.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDeleteFee(feeId, feeName) {
+    document.getElementById('deleteFeeId').value = feeId;
+    document.getElementById('deleteFeeName').textContent = feeName;
+    new bootstrap.Modal(document.getElementById('deleteFeeModal')).show();
+}
 </script>
 
 <?php elseif ($subpage === 'mobile'): ?>
