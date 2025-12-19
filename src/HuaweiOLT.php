@@ -1702,6 +1702,7 @@ class HuaweiOLT {
     
     public function syncAllFromOLT(int $oltId): array {
         $results = [
+            'system' => $this->syncSystemInfoFromOLT($oltId),
             'boards' => $this->syncBoardsFromOLT($oltId),
             'vlans' => $this->syncVLANsFromOLT($oltId),
             'ports' => $this->syncPONPortsFromOLT($oltId),
@@ -1712,7 +1713,8 @@ class HuaweiOLT {
         $message = [];
         foreach ($results as $type => $result) {
             if ($result['success']) {
-                $message[] = ucfirst($type) . ": {$result['count']}";
+                $count = $result['count'] ?? 1;
+                $message[] = ucfirst($type) . ": {$count}";
             } else {
                 $success = false;
                 $message[] = ucfirst($type) . ": Failed";
@@ -1720,5 +1722,273 @@ class HuaweiOLT {
         }
         
         return ['success' => $success, 'message' => implode(', ', $message), 'details' => $results];
+    }
+    
+    public function syncSystemInfoFromOLT(int $oltId): array {
+        $command = "display version";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $firmware = '';
+        $hardware = '';
+        $software = '';
+        $uptime = '';
+        
+        $lines = explode("\n", $result['output'] ?? '');
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (preg_match('/VERSION\s*[:\s]+(.+)/i', $line, $m)) {
+                $software = trim($m[1]);
+            } elseif (preg_match('/PATCH\s*[:\s]+(.+)/i', $line, $m)) {
+                $firmware = trim($m[1]);
+            } elseif (preg_match('/PRODUCT\s*[:\s]+(.+)/i', $line, $m)) {
+                $hardware = trim($m[1]);
+            } elseif (preg_match('/Uptime\s*[:\s]+(.+)/i', $line, $m)) {
+                $uptime = trim($m[1]);
+            } elseif (preg_match('/MA\d{4}[A-Z]?/i', $line, $m)) {
+                if (empty($hardware)) $hardware = $m[0];
+            }
+        }
+        
+        $stmt = $this->db->prepare("
+            UPDATE huawei_olts SET 
+                firmware_version = ?,
+                hardware_model = ?,
+                software_version = ?,
+                uptime = ?,
+                system_synced_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([$firmware, $hardware, $software, $uptime, $oltId]);
+        
+        return ['success' => true, 'count' => 1, 'raw' => $result['output']];
+    }
+    
+    // ==================== Service Templates ====================
+    
+    public function getServiceTemplates(): array {
+        $stmt = $this->db->query("SELECT * FROM huawei_service_templates ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getServiceTemplate(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_service_templates WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function createServiceTemplate(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_service_templates 
+                (name, description, downstream_bandwidth, upstream_bandwidth, bandwidth_unit, 
+                 vlan_id, vlan_mode, qos_profile, iptv_enabled, voip_enabled, tr069_enabled, is_default)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? '',
+                $data['downstream_bandwidth'] ?? 100,
+                $data['upstream_bandwidth'] ?? 50,
+                $data['bandwidth_unit'] ?? 'mbps',
+                $data['vlan_id'] ?? null,
+                $data['vlan_mode'] ?? 'tag',
+                $data['qos_profile'] ?? '',
+                $data['iptv_enabled'] ?? false,
+                $data['voip_enabled'] ?? false,
+                $data['tr069_enabled'] ?? false,
+                $data['is_default'] ?? false
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function updateServiceTemplate(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_service_templates SET
+                    name = ?, description = ?, downstream_bandwidth = ?, upstream_bandwidth = ?,
+                    bandwidth_unit = ?, vlan_id = ?, vlan_mode = ?, qos_profile = ?,
+                    iptv_enabled = ?, voip_enabled = ?, tr069_enabled = ?, is_default = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? '',
+                $data['downstream_bandwidth'] ?? 100,
+                $data['upstream_bandwidth'] ?? 50,
+                $data['bandwidth_unit'] ?? 'mbps',
+                $data['vlan_id'] ?? null,
+                $data['vlan_mode'] ?? 'tag',
+                $data['qos_profile'] ?? '',
+                $data['iptv_enabled'] ?? false,
+                $data['voip_enabled'] ?? false,
+                $data['tr069_enabled'] ?? false,
+                $data['is_default'] ?? false,
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteServiceTemplate(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_service_templates WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    // ==================== Port Configuration ====================
+    
+    public function enablePort(int $oltId, string $portName, bool $enable = true): array {
+        $command = $enable ? "undo shutdown" : "shutdown";
+        
+        if (preg_match('/^(\d+)\/(\d+)\/(\d+)$/', $portName, $m)) {
+            $fullCommand = "interface gpon {$portName}\n{$command}\nquit";
+        } else {
+            return ['success' => false, 'message' => 'Invalid port name'];
+        }
+        
+        $result = $this->executeCommand($oltId, $fullCommand);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => $enable ? 'enable_port' : 'disable_port',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => ($enable ? 'Enabled' : 'Disabled') . " port {$portName}",
+            'command_sent' => $fullCommand,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function assignPortVLAN(int $oltId, string $portName, int $vlanId, string $mode = 'tag'): array {
+        $command = "interface gpon {$portName}\nport vlan {$vlanId} {$mode}\nquit";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if ($result['success']) {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_port_vlans (olt_id, port_name, port_type, vlan_id, vlan_mode)
+                VALUES (?, ?, 'pon', ?, ?)
+                ON CONFLICT (olt_id, port_name, vlan_id) DO UPDATE SET vlan_mode = EXCLUDED.vlan_mode
+            ");
+            try {
+                $stmt->execute([$oltId, $portName, $vlanId, $mode]);
+            } catch (\Exception $e) {
+                $stmt = $this->db->prepare("
+                    INSERT INTO huawei_port_vlans (olt_id, port_name, port_type, vlan_id, vlan_mode)
+                    VALUES (?, ?, 'pon', ?, ?)
+                ");
+                $stmt->execute([$oltId, $portName, $vlanId, $mode]);
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'assign_port_vlan',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => "Assigned VLAN {$vlanId} to port {$portName}",
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function getPortVLANs(int $oltId, string $portName): array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_port_vlans WHERE olt_id = ? AND port_name = ?");
+        $stmt->execute([$oltId, $portName]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Uplink Configuration ====================
+    
+    public function configureUplink(int $oltId, string $portName, array $config): array {
+        $commands = ["interface eth {$portName}"];
+        
+        if (isset($config['vlan_mode'])) {
+            $commands[] = "port link-type {$config['vlan_mode']}";
+        }
+        if (isset($config['pvid'])) {
+            $commands[] = "port default vlan {$config['pvid']}";
+        }
+        if (isset($config['allowed_vlans']) && $config['vlan_mode'] === 'trunk') {
+            $commands[] = "port trunk allow-pass vlan {$config['allowed_vlans']}";
+        }
+        if (isset($config['description'])) {
+            $commands[] = "description {$config['description']}";
+        }
+        
+        $commands[] = "quit";
+        $fullCommand = implode("\n", $commands);
+        
+        $result = $this->executeCommand($oltId, $fullCommand);
+        
+        if ($result['success']) {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_olt_uplinks SET 
+                    vlan_mode = COALESCE(?, vlan_mode),
+                    pvid = COALESCE(?, pvid),
+                    allowed_vlans = COALESCE(?, allowed_vlans),
+                    description = COALESCE(?, description)
+                WHERE olt_id = ? AND port_name = ?
+            ");
+            $stmt->execute([
+                $config['vlan_mode'] ?? null,
+                $config['pvid'] ?? null,
+                $config['allowed_vlans'] ?? null,
+                $config['description'] ?? null,
+                $oltId,
+                $portName
+            ]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'configure_uplink',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => "Configured uplink {$portName}",
+            'command_sent' => $fullCommand,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function getONUsBySlotPort(int $oltId): array {
+        $stmt = $this->db->prepare("
+            SELECT frame, slot, port, COUNT(*) as count, 
+                   SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online
+            FROM huawei_onus WHERE olt_id = ?
+            GROUP BY frame, slot, port
+            ORDER BY frame, slot, port
+        ");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getBoardTypeCategory(string $boardName): string {
+        $boardName = strtoupper($boardName);
+        if (preg_match('/GP[A-Z0-9]*[DF]/', $boardName)) return 'gpon';
+        if (preg_match('/EP[A-Z0-9]*/', $boardName)) return 'epon';
+        if (preg_match('/(GI|XG|GE|X2|X4|X8)/', $boardName)) return 'uplink';
+        if (preg_match('/(SCUN|SCUK|SCUA|MCUD)/', $boardName)) return 'control';
+        if (preg_match('/(PRTE|PILA|PRAM)/', $boardName)) return 'power';
+        return 'other';
     }
 }

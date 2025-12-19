@@ -303,6 +303,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? "Full sync complete: {$result['message']}" : "Sync partially failed: {$result['message']}";
                 $messageType = $result['success'] ? 'success' : 'warning';
                 break;
+            case 'toggle_port':
+                $enable = (bool)$_POST['enable'];
+                $result = $huaweiOLT->enablePort((int)$_POST['olt_id'], $_POST['port_name'], $enable);
+                $action = $enable ? 'enabled' : 'disabled';
+                $message = $result['success'] ? "Port {$_POST['port_name']} has been {$action}" : ($result['message'] ?? 'Failed to toggle port');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'assign_port_vlan':
+                $result = $huaweiOLT->assignPortVLAN((int)$_POST['olt_id'], $_POST['port_name'], (int)$_POST['vlan_id'], $_POST['vlan_mode'] ?? 'tag');
+                $message = $result['success'] ? "VLAN {$_POST['vlan_id']} assigned to port {$_POST['port_name']}" : ($result['message'] ?? 'Failed to assign VLAN');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'bulk_port_vlan':
+                $ports = $huaweiOLT->getCachedPONPorts((int)$_POST['olt_id']);
+                $success = 0;
+                foreach ($ports as $port) {
+                    $r = $huaweiOLT->assignPortVLAN((int)$_POST['olt_id'], $port['port_name'], (int)$_POST['vlan_id'], 'tag');
+                    if ($r['success']) $success++;
+                }
+                $message = "VLAN {$_POST['vlan_id']} assigned to {$success}/" . count($ports) . " ports";
+                $messageType = $success > 0 ? 'success' : 'danger';
+                break;
+            case 'configure_uplink':
+                $config = [
+                    'vlan_mode' => $_POST['vlan_mode'] ?? null,
+                    'pvid' => !empty($_POST['pvid']) ? (int)$_POST['pvid'] : null,
+                    'allowed_vlans' => $_POST['allowed_vlans'] ?? null,
+                    'description' => $_POST['description'] ?? null
+                ];
+                $result = $huaweiOLT->configureUplink((int)$_POST['olt_id'], $_POST['port_name'], $config);
+                $message = $result['success'] ? "Uplink {$_POST['port_name']} configured successfully" : ($result['message'] ?? 'Failed to configure uplink');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'create_template':
+                $templateData = [
+                    'name' => $_POST['name'],
+                    'description' => $_POST['description'] ?? '',
+                    'downstream_bandwidth' => (int)$_POST['downstream_bandwidth'],
+                    'upstream_bandwidth' => (int)$_POST['upstream_bandwidth'],
+                    'bandwidth_unit' => $_POST['bandwidth_unit'] ?? 'mbps',
+                    'vlan_id' => !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null,
+                    'vlan_mode' => $_POST['vlan_mode'] ?? 'tag',
+                    'qos_profile' => $_POST['qos_profile'] ?? '',
+                    'iptv_enabled' => isset($_POST['iptv_enabled']),
+                    'voip_enabled' => isset($_POST['voip_enabled']),
+                    'tr069_enabled' => isset($_POST['tr069_enabled']),
+                    'is_default' => isset($_POST['is_default'])
+                ];
+                $result = $huaweiOLT->createServiceTemplate($templateData);
+                $message = $result['success'] ? "Service template '{$_POST['name']}' created successfully" : ($result['message'] ?? 'Failed to create template');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_template':
+                $templateData = [
+                    'name' => $_POST['name'],
+                    'description' => $_POST['description'] ?? '',
+                    'downstream_bandwidth' => (int)$_POST['downstream_bandwidth'],
+                    'upstream_bandwidth' => (int)$_POST['upstream_bandwidth'],
+                    'bandwidth_unit' => $_POST['bandwidth_unit'] ?? 'mbps',
+                    'vlan_id' => !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null,
+                    'vlan_mode' => $_POST['vlan_mode'] ?? 'tag',
+                    'qos_profile' => $_POST['qos_profile'] ?? '',
+                    'iptv_enabled' => isset($_POST['iptv_enabled']),
+                    'voip_enabled' => isset($_POST['voip_enabled']),
+                    'tr069_enabled' => isset($_POST['tr069_enabled']),
+                    'is_default' => isset($_POST['is_default'])
+                ];
+                $result = $huaweiOLT->updateServiceTemplate((int)$_POST['template_id'], $templateData);
+                $message = $result['success'] ? "Service template updated successfully" : ($result['message'] ?? 'Failed to update template');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_template':
+                $result = $huaweiOLT->deleteServiceTemplate((int)$_POST['template_id']);
+                $message = $result['success'] ? "Service template deleted" : ($result['message'] ?? 'Failed to delete template');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             default:
                 break;
         }
@@ -424,6 +500,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'terminal' ? 'active' : '' ?>" href="?page=huawei-olt&view=terminal">
                     <i class="bi bi-terminal me-2"></i> CLI Terminal
+                </a>
+                <a class="nav-link <?= $view === 'templates' ? 'active' : '' ?>" href="?page=huawei-olt&view=templates">
+                    <i class="bi bi-file-earmark-code me-2"></i> Service Templates
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
@@ -1270,6 +1349,296 @@ quit</pre>
                 </div>
             </div>
             
+            <?php elseif ($view === 'templates'): ?>
+            <?php $serviceTemplates = $huaweiOLT->getServiceTemplates(); ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-file-earmark-code me-2"></i>Service Templates</h4>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Template
+                </button>
+            </div>
+            
+            <p class="text-muted mb-4">Pre-define service profiles (bandwidth, VLAN, QoS) for fast ONU provisioning.</p>
+            
+            <div class="row g-4">
+                <?php if (empty($serviceTemplates)): ?>
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>No service templates defined yet. Create your first template to speed up ONU provisioning.
+                    </div>
+                </div>
+                <?php else: ?>
+                <?php foreach ($serviceTemplates as $template): ?>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm <?= $template['is_default'] ? 'border-primary' : '' ?>">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong><?= htmlspecialchars($template['name']) ?></strong>
+                            <?php if ($template['is_default']): ?>
+                            <span class="badge bg-primary">Default</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body">
+                            <?php if ($template['description']): ?>
+                            <p class="text-muted small"><?= htmlspecialchars($template['description']) ?></p>
+                            <?php endif; ?>
+                            
+                            <div class="row g-2 text-center mb-3">
+                                <div class="col-6">
+                                    <div class="bg-success bg-opacity-10 rounded p-2">
+                                        <div class="small text-muted">Download</div>
+                                        <strong class="text-success"><?= $template['downstream_bandwidth'] ?> <?= $template['bandwidth_unit'] ?></strong>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="bg-info bg-opacity-10 rounded p-2">
+                                        <div class="small text-muted">Upload</div>
+                                        <strong class="text-info"><?= $template['upstream_bandwidth'] ?> <?= $template['bandwidth_unit'] ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="small">
+                                <?php if ($template['vlan_id']): ?>
+                                <div><i class="bi bi-diagram-2 me-1"></i> VLAN: <?= $template['vlan_id'] ?> (<?= $template['vlan_mode'] ?>)</div>
+                                <?php endif; ?>
+                                <?php if ($template['qos_profile']): ?>
+                                <div><i class="bi bi-speedometer me-1"></i> QoS: <?= htmlspecialchars($template['qos_profile']) ?></div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="d-flex gap-1 mt-2">
+                                <?php if ($template['iptv_enabled']): ?>
+                                <span class="badge bg-warning">IPTV</span>
+                                <?php endif; ?>
+                                <?php if ($template['voip_enabled']): ?>
+                                <span class="badge bg-info">VoIP</span>
+                                <?php endif; ?>
+                                <?php if ($template['tr069_enabled']): ?>
+                                <span class="badge bg-secondary">TR-069</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white d-flex justify-content-between">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTemplateModal<?= $template['id'] ?>">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this template?')">
+                                <input type="hidden" name="action" value="delete_template">
+                                <input type="hidden" name="template_id" value="<?= $template['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal fade" id="editTemplateModal<?= $template['id'] ?>" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Template: <?= htmlspecialchars($template['name']) ?></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="post">
+                                <div class="modal-body">
+                                    <input type="hidden" name="action" value="update_template">
+                                    <input type="hidden" name="template_id" value="<?= $template['id'] ?>">
+                                    
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Template Name</label>
+                                            <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($template['name']) ?>" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Description</label>
+                                            <input type="text" name="description" class="form-control" value="<?= htmlspecialchars($template['description'] ?? '') ?>">
+                                        </div>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6>Bandwidth</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Download</label>
+                                            <input type="number" name="downstream_bandwidth" class="form-control" value="<?= $template['downstream_bandwidth'] ?>" min="1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Upload</label>
+                                            <input type="number" name="upstream_bandwidth" class="form-control" value="<?= $template['upstream_bandwidth'] ?>" min="1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Unit</label>
+                                            <select name="bandwidth_unit" class="form-select">
+                                                <option value="mbps" <?= $template['bandwidth_unit'] === 'mbps' ? 'selected' : '' ?>>Mbps</option>
+                                                <option value="kbps" <?= $template['bandwidth_unit'] === 'kbps' ? 'selected' : '' ?>>Kbps</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6>VLAN & QoS</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">VLAN ID</label>
+                                            <input type="number" name="vlan_id" class="form-control" value="<?= $template['vlan_id'] ?>" min="1" max="4094">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">VLAN Mode</label>
+                                            <select name="vlan_mode" class="form-select">
+                                                <option value="tag" <?= $template['vlan_mode'] === 'tag' ? 'selected' : '' ?>>Tagged</option>
+                                                <option value="untag" <?= $template['vlan_mode'] === 'untag' ? 'selected' : '' ?>>Untagged</option>
+                                                <option value="transparent" <?= $template['vlan_mode'] === 'transparent' ? 'selected' : '' ?>>Transparent</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">QoS Profile</label>
+                                            <input type="text" name="qos_profile" class="form-control" value="<?= htmlspecialchars($template['qos_profile'] ?? '') ?>">
+                                        </div>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6>Services</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" name="iptv_enabled" class="form-check-input" <?= $template['iptv_enabled'] ? 'checked' : '' ?>>
+                                                <label class="form-check-label">IPTV</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" name="voip_enabled" class="form-check-input" <?= $template['voip_enabled'] ? 'checked' : '' ?>>
+                                                <label class="form-check-label">VoIP</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" name="tr069_enabled" class="form-check-input" <?= $template['tr069_enabled'] ? 'checked' : '' ?>>
+                                                <label class="form-check-label">TR-069</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" name="is_default" class="form-check-input" <?= $template['is_default'] ? 'checked' : '' ?>>
+                                                <label class="form-check-label">Default</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            
+            <div class="modal fade" id="addTemplateModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Create Service Template</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post">
+                            <div class="modal-body">
+                                <input type="hidden" name="action" value="create_template">
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Template Name</label>
+                                        <input type="text" name="name" class="form-control" placeholder="e.g., Basic 20Mbps" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Description</label>
+                                        <input type="text" name="description" class="form-control" placeholder="Optional description">
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6>Bandwidth</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Download Speed</label>
+                                        <input type="number" name="downstream_bandwidth" class="form-control" value="100" min="1">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Upload Speed</label>
+                                        <input type="number" name="upstream_bandwidth" class="form-control" value="50" min="1">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Unit</label>
+                                        <select name="bandwidth_unit" class="form-select">
+                                            <option value="mbps" selected>Mbps</option>
+                                            <option value="kbps">Kbps</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6>VLAN & QoS</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">VLAN ID</label>
+                                        <input type="number" name="vlan_id" class="form-control" placeholder="e.g., 100" min="1" max="4094">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">VLAN Mode</label>
+                                        <select name="vlan_mode" class="form-select">
+                                            <option value="tag" selected>Tagged</option>
+                                            <option value="untag">Untagged</option>
+                                            <option value="transparent">Transparent</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">QoS Profile</label>
+                                        <input type="text" name="qos_profile" class="form-control" placeholder="e.g., profile_100m">
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6>Services</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="iptv_enabled" class="form-check-input">
+                                            <label class="form-check-label">IPTV</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="voip_enabled" class="form-check-input">
+                                            <label class="form-check-label">VoIP</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="tr069_enabled" class="form-check-input">
+                                            <label class="form-check-label">TR-069</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="is_default" class="form-check-input">
+                                            <label class="form-check-label">Default</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Create Template</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
             <?php elseif ($view === 'tr069'): ?>
             <?php
             require_once __DIR__ . '/../src/GenieACS.php';
@@ -1580,20 +1949,21 @@ ont tr069-server-config 1 all profile-id 1</pre>
             </ul>
             
             <?php if ($detailTab === 'overview'): ?>
-            <div class="row g-4">
+            <?php $onusByPort = $huaweiOLT->getONUsBySlotPort($oltId); ?>
+            <div class="row g-4 mb-4">
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-primary text-white">
-                            <i class="bi bi-info-circle me-2"></i>OLT Details
+                            <i class="bi bi-hdd-rack me-2"></i>Device Information
                         </div>
                         <div class="card-body">
                             <table class="table table-sm mb-0">
-                                <tr><td class="text-muted">Name</td><td><strong><?= htmlspecialchars($currentOlt['name']) ?></strong></td></tr>
+                                <tr><td class="text-muted" width="40%">Name</td><td><strong><?= htmlspecialchars($currentOlt['name']) ?></strong></td></tr>
                                 <tr><td class="text-muted">IP Address</td><td><code><?= htmlspecialchars($currentOlt['ip_address']) ?></code></td></tr>
-                                <tr><td class="text-muted">Port</td><td><?= $currentOlt['port'] ?></td></tr>
-                                <tr><td class="text-muted">Connection</td><td><?= ucfirst($currentOlt['connection_type']) ?></td></tr>
-                                <tr><td class="text-muted">Vendor</td><td><?= htmlspecialchars($currentOlt['vendor'] ?: 'Huawei') ?></td></tr>
-                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($currentOlt['model'] ?: '-') ?></td></tr>
+                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($currentOlt['hardware_model'] ?: $currentOlt['model'] ?: '-') ?></td></tr>
+                                <tr><td class="text-muted">Software</td><td><small><?= htmlspecialchars($currentOlt['software_version'] ?: '-') ?></small></td></tr>
+                                <tr><td class="text-muted">Firmware</td><td><small><?= htmlspecialchars($currentOlt['firmware_version'] ?: '-') ?></small></td></tr>
+                                <tr><td class="text-muted">Uptime</td><td><?= htmlspecialchars($currentOlt['uptime'] ?: '-') ?></td></tr>
                             </table>
                         </div>
                     </div>
@@ -1601,7 +1971,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-success text-white">
-                            <i class="bi bi-bar-chart me-2"></i>Statistics
+                            <i class="bi bi-bar-chart me-2"></i>Inventory
                         </div>
                         <div class="card-body">
                             <div class="row text-center">
@@ -1610,8 +1980,12 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                     <div class="small text-muted">Cards</div>
                                 </div>
                                 <div class="col-6 mb-3">
-                                    <div class="fs-3 fw-bold text-success"><?= count($cachedPorts) ?></div>
-                                    <div class="small text-muted">PON Ports</div>
+                                    <?php 
+                                    $totalOnus = array_sum(array_column($onusByPort, 'count'));
+                                    $onlineOnus = array_sum(array_column($onusByPort, 'online'));
+                                    ?>
+                                    <div class="fs-3 fw-bold text-success"><?= $totalOnus ?></div>
+                                    <div class="small text-muted">ONUs (<?= $onlineOnus ?> online)</div>
                                 </div>
                                 <div class="col-6">
                                     <div class="fs-3 fw-bold text-info"><?= count($cachedVLANs) ?></div>
@@ -1633,24 +2007,107 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         <div class="card-body">
                             <table class="table table-sm mb-0">
                                 <tr>
+                                    <td class="text-muted">System</td>
+                                    <td><?= !empty($currentOlt['system_synced_at']) ? date('M j, H:i', strtotime($currentOlt['system_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                </tr>
+                                <tr>
                                     <td class="text-muted">Boards</td>
-                                    <td><?= $currentOlt['boards_synced_at'] ? date('M j, H:i', strtotime($currentOlt['boards_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                    <td><?= !empty($currentOlt['boards_synced_at']) ? date('M j, H:i', strtotime($currentOlt['boards_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
                                 </tr>
                                 <tr>
                                     <td class="text-muted">VLANs</td>
-                                    <td><?= $currentOlt['vlans_synced_at'] ? date('M j, H:i', strtotime($currentOlt['vlans_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                    <td><?= !empty($currentOlt['vlans_synced_at']) ? date('M j, H:i', strtotime($currentOlt['vlans_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
                                 </tr>
                                 <tr>
                                     <td class="text-muted">Ports</td>
-                                    <td><?= $currentOlt['ports_synced_at'] ? date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted">Uplinks</td>
-                                    <td><?= $currentOlt['uplinks_synced_at'] ? date('M j, H:i', strtotime($currentOlt['uplinks_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                    <td><?= !empty($currentOlt['ports_synced_at']) ? date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
                                 </tr>
                             </table>
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <i class="bi bi-grid-3x3 me-2"></i>Chassis Layout - Board/Slot Map
+                </div>
+                <div class="card-body">
+                    <?php if (empty($cachedBoards)): ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>No board data cached. Click "Sync All from OLT" to fetch chassis information.
+                    </div>
+                    <?php else: ?>
+                    <div class="row g-2">
+                        <?php 
+                        $boardsBySlot = [];
+                        foreach ($cachedBoards as $board) {
+                            $boardsBySlot[$board['slot']] = $board;
+                        }
+                        
+                        $onuCountBySlot = [];
+                        foreach ($onusByPort as $p) {
+                            $slot = $p['slot'];
+                            if (!isset($onuCountBySlot[$slot])) {
+                                $onuCountBySlot[$slot] = ['count' => 0, 'online' => 0];
+                            }
+                            $onuCountBySlot[$slot]['count'] += $p['count'];
+                            $onuCountBySlot[$slot]['online'] += $p['online'];
+                        }
+                        
+                        for ($slot = 0; $slot <= 21; $slot++): 
+                            $board = $boardsBySlot[$slot] ?? null;
+                            $boardType = $board ? $huaweiOLT->getBoardTypeCategory($board['board_name'] ?? '') : 'empty';
+                            $slotOnus = $onuCountBySlot[$slot] ?? ['count' => 0, 'online' => 0];
+                            
+                            $bgColor = 'bg-light border';
+                            $textColor = 'text-muted';
+                            if ($board) {
+                                switch ($boardType) {
+                                    case 'gpon': $bgColor = 'bg-success bg-opacity-25 border-success'; $textColor = 'text-success'; break;
+                                    case 'epon': $bgColor = 'bg-info bg-opacity-25 border-info'; $textColor = 'text-info'; break;
+                                    case 'uplink': $bgColor = 'bg-warning bg-opacity-25 border-warning'; $textColor = 'text-warning'; break;
+                                    case 'control': $bgColor = 'bg-primary bg-opacity-25 border-primary'; $textColor = 'text-primary'; break;
+                                    case 'power': $bgColor = 'bg-danger bg-opacity-25 border-danger'; $textColor = 'text-danger'; break;
+                                    default: $bgColor = 'bg-secondary bg-opacity-25 border-secondary'; $textColor = 'text-secondary';
+                                }
+                            }
+                        ?>
+                        <div class="col-6 col-md-3 col-lg-2">
+                            <div class="card <?= $bgColor ?> h-100" style="min-height: 100px;">
+                                <div class="card-body p-2 text-center">
+                                    <div class="small text-muted">Slot <?= $slot ?></div>
+                                    <?php if ($board): ?>
+                                    <div class="fw-bold <?= $textColor ?>" style="font-size: 0.75rem;"><?= htmlspecialchars($board['board_name']) ?></div>
+                                    <div class="small">
+                                        <span class="badge bg-<?= strtolower($board['status'] ?? '') === 'normal' ? 'success' : 'secondary' ?>" style="font-size: 0.65rem;">
+                                            <?= htmlspecialchars($board['status'] ?? '-') ?>
+                                        </span>
+                                    </div>
+                                    <?php if ($boardType === 'gpon' && $slotOnus['count'] > 0): ?>
+                                    <div class="mt-1 small">
+                                        <i class="bi bi-diagram-3"></i> <?= $slotOnus['count'] ?> ONUs
+                                        <span class="text-success">(<?= $slotOnus['online'] ?> on)</span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <div class="text-muted small mt-2"><i class="bi bi-dash-lg"></i> Empty</div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endfor; ?>
+                    </div>
+                    
+                    <div class="mt-3 d-flex flex-wrap gap-3 justify-content-center">
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success px-3">GPON</span>
+                        <span class="badge bg-info bg-opacity-25 text-info border border-info px-3">EPON</span>
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning px-3">Uplink</span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary px-3">Control</span>
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger px-3">Power</span>
+                        <span class="badge bg-light text-muted border px-3">Empty</span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             
@@ -1672,22 +2129,47 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     </form>
                 </div>
                 <div class="card-body">
-                    <?php if (!empty($cachedBoards)): ?>
+                    <?php if (!empty($cachedBoards)): 
+                        $onusBySlot = [];
+                        foreach ($huaweiOLT->getONUsBySlotPort($oltId) as $p) {
+                            $slot = $p['slot'];
+                            if (!isset($onusBySlot[$slot])) $onusBySlot[$slot] = ['count' => 0, 'online' => 0];
+                            $onusBySlot[$slot]['count'] += $p['count'];
+                            $onusBySlot[$slot]['online'] += $p['online'];
+                        }
+                    ?>
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
                                 <tr>
                                     <th>Slot</th>
                                     <th>Board Name</th>
+                                    <th>Type</th>
                                     <th>Status</th>
-                                    <th>Online/Offline</th>
+                                    <th>ONUs</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($cachedBoards as $board): ?>
+                                <?php foreach ($cachedBoards as $board): 
+                                    $boardType = $huaweiOLT->getBoardTypeCategory($board['board_name'] ?? '');
+                                    $slotOnus = $onusBySlot[$board['slot']] ?? ['count' => 0, 'online' => 0];
+                                    
+                                    $typeColors = [
+                                        'gpon' => 'success',
+                                        'epon' => 'info',
+                                        'uplink' => 'warning',
+                                        'control' => 'primary',
+                                        'power' => 'danger',
+                                        'other' => 'secondary'
+                                    ];
+                                    $typeColor = $typeColors[$boardType] ?? 'secondary';
+                                ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($board['slot']) ?></strong></td>
                                     <td><code><?= htmlspecialchars($board['board_name']) ?></code></td>
+                                    <td>
+                                        <span class="badge bg-<?= $typeColor ?>"><?= strtoupper($boardType) ?></span>
+                                    </td>
                                     <td>
                                         <?php
                                         $status = strtolower($board['status'] ?? '');
@@ -1702,12 +2184,12 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         </span>
                                     </td>
                                     <td>
-                                        <?php if (!empty($board['online_status'])): ?>
-                                        <span class="badge bg-<?= strtolower($board['online_status']) === 'online' ? 'success' : 'danger' ?>">
-                                            <?= htmlspecialchars($board['online_status']) ?>
-                                        </span>
+                                        <?php if ($boardType === 'gpon' || $boardType === 'epon'): ?>
+                                            <span class="badge bg-light text-dark border">
+                                                <?= $slotOnus['count'] ?> <span class="text-success">(<?= $slotOnus['online'] ?> online)</span>
+                                            </span>
                                         <?php else: ?>
-                                        <span class="text-muted">-</span>
+                                            <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -1826,117 +2308,310 @@ ont tr069-server-config 1 all profile-id 1</pre>
             </div>
             
             <?php elseif ($detailTab === 'ports'): ?>
-            <div class="card shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0 d-inline"><i class="bi bi-ethernet me-2"></i>PON Ports</h5>
-                        <?php if ($currentOlt['ports_synced_at']): ?>
-                        <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) ?></small>
-                        <?php endif; ?>
-                    </div>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="sync_ports">
-                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
-                        </button>
-                    </form>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($cachedPorts)): ?>
-                    <div class="row g-3">
-                        <?php foreach ($cachedPorts as $port): ?>
-                        <?php 
-                        $status = strtolower($port['oper_status'] ?? '');
-                        $isUp = in_array($status, ['up', 'online', 'normal', 'enable']);
-                        ?>
-                        <div class="col-md-3">
-                            <div class="card h-100 <?= $isUp ? 'border-success' : 'border-secondary' ?>">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-ethernet fs-2 <?= $isUp ? 'text-success' : 'text-secondary' ?>"></i>
-                                    <h6 class="mt-2 mb-1"><?= htmlspecialchars($port['port_name']) ?></h6>
-                                    <div class="small text-muted mb-1"><?= htmlspecialchars($port['port_type'] ?? 'GPON') ?></div>
-                                    <span class="badge bg-<?= $isUp ? 'success' : 'secondary' ?>">
-                                        <?= htmlspecialchars(ucfirst($port['oper_status'] ?? '-')) ?>
-                                    </span>
-                                    <?php if (!empty($port['admin_status'])): ?>
-                                    <span class="badge bg-<?= strtolower($port['admin_status']) === 'enable' ? 'info' : 'warning' ?>">
-                                        <?= htmlspecialchars($port['admin_status']) ?>
-                                    </span>
-                                    <?php endif; ?>
-                                    <div class="mt-2 small text-muted">
-                                        <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?? 0 ?> ONUs
+            <div class="row">
+                <div class="col-lg-9">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0 d-inline"><i class="bi bi-ethernet me-2"></i>PON Ports</h5>
+                                <?php if (!empty($currentOlt['ports_synced_at'])): ?>
+                                <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="sync_ports">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                                </button>
+                            </form>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($cachedPorts)): ?>
+                            <div class="row g-3">
+                                <?php foreach ($cachedPorts as $port): ?>
+                                <?php 
+                                $status = strtolower($port['oper_status'] ?? '');
+                                $isUp = in_array($status, ['up', 'online', 'normal', 'enable']);
+                                $adminEnabled = strtolower($port['admin_status'] ?? '') === 'enable';
+                                ?>
+                                <div class="col-md-4">
+                                    <div class="card h-100 <?= $isUp ? 'border-success' : 'border-secondary' ?>">
+                                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-2">
+                                            <strong><?= htmlspecialchars($port['port_name']) ?></strong>
+                                            <span class="badge bg-<?= $isUp ? 'success' : 'secondary' ?>">
+                                                <?= htmlspecialchars(ucfirst($port['oper_status'] ?? '-')) ?>
+                                            </span>
+                                        </div>
+                                        <div class="card-body text-center py-3">
+                                            <i class="bi bi-ethernet fs-2 <?= $isUp ? 'text-success' : 'text-secondary' ?>"></i>
+                                            <div class="small text-muted mt-1"><?= htmlspecialchars($port['port_type'] ?? 'GPON') ?></div>
+                                            <div class="mt-2 small">
+                                                <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?? 0 ?> ONUs
+                                            </div>
+                                            <?php if (!empty($port['native_vlan'])): ?>
+                                            <div class="small text-muted">VLAN: <?= $port['native_vlan'] ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="card-footer bg-transparent d-flex gap-1 flex-wrap justify-content-center py-2">
+                                            <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="btn btn-sm btn-outline-primary" title="View ONUs">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="toggle_port">
+                                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                <input type="hidden" name="port_name" value="<?= htmlspecialchars($port['port_name']) ?>">
+                                                <input type="hidden" name="enable" value="<?= $adminEnabled ? '0' : '1' ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-<?= $adminEnabled ? 'warning' : 'success' ?>" 
+                                                        title="<?= $adminEnabled ? 'Disable' : 'Enable' ?> Port" 
+                                                        onclick="return confirm('<?= $adminEnabled ? 'Disable' : 'Enable' ?> port <?= $port['port_name'] ?>?')">
+                                                    <i class="bi bi-<?= $adminEnabled ? 'pause' : 'play' ?>-fill"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#vlanModal<?= str_replace('/', '_', $port['port_name']) ?>" title="Assign VLAN">
+                                                <i class="bi bi-diagram-2"></i>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="btn btn-sm btn-outline-primary mt-2">
-                                        View ONUs
-                                    </a>
+                                </div>
+                                
+                                <div class="modal fade" id="vlanModal<?= str_replace('/', '_', $port['port_name']) ?>" tabindex="-1">
+                                    <div class="modal-dialog modal-sm">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h6 class="modal-title">Assign VLAN to <?= htmlspecialchars($port['port_name']) ?></h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="post">
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="action" value="assign_port_vlan">
+                                                    <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                    <input type="hidden" name="port_name" value="<?= htmlspecialchars($port['port_name']) ?>">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">VLAN ID</label>
+                                                        <select name="vlan_id" class="form-select" required>
+                                                            <?php foreach ($cachedVLANs as $vlan): ?>
+                                                            <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: $vlan['vlan_type'] ?? 'smart') ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Mode</label>
+                                                        <select name="vlan_mode" class="form-select">
+                                                            <option value="tag">Tagged</option>
+                                                            <option value="untag">Untagged</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-primary">Assign</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php else: ?>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch PON port information.
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-sliders me-2"></i>Bulk Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="bulk_port_vlan">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label small">Apply VLAN to All Ports</label>
+                                    <select name="vlan_id" class="form-select form-select-sm">
+                                        <?php foreach ($cachedVLANs as $vlan): ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-sm btn-outline-primary w-100" onclick="return confirm('Apply this VLAN to all PON ports?')">
+                                    <i class="bi bi-check-all me-1"></i> Apply to All
+                                </button>
+                            </form>
+                            
+                            <hr>
+                            
+                            <div class="small text-muted">
+                                <strong>Legend:</strong>
+                                <div class="mt-2">
+                                    <i class="bi bi-play-fill text-success"></i> Enable port<br>
+                                    <i class="bi bi-pause-fill text-warning"></i> Disable port<br>
+                                    <i class="bi bi-diagram-2 text-info"></i> Assign VLAN
                                 </div>
                             </div>
                         </div>
-                        <?php endforeach; ?>
                     </div>
-                    <?php else: ?>
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch PON port information.
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
             
             <?php elseif ($detailTab === 'uplinks'): ?>
-            <div class="card shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0 d-inline"><i class="bi bi-arrow-up-circle me-2"></i>Uplink Ports</h5>
-                        <?php if ($currentOlt['uplinks_synced_at']): ?>
-                        <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['uplinks_synced_at'])) ?></small>
-                        <?php endif; ?>
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0 d-inline"><i class="bi bi-arrow-up-circle me-2"></i>Uplink Ports</h5>
+                                <?php if (!empty($currentOlt['uplinks_synced_at'])): ?>
+                                <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['uplinks_synced_at'])) ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="sync_uplinks">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                                </button>
+                            </form>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($cachedUplinks)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Port</th>
+                                            <th>Type</th>
+                                            <th>VLAN Mode</th>
+                                            <th>PVID</th>
+                                            <th>Allowed VLANs</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($cachedUplinks as $uplink): ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?= htmlspecialchars($uplink['port_name']) ?></strong>
+                                                <?php if (!empty($uplink['description'])): ?>
+                                                <br><small class="text-muted"><?= htmlspecialchars($uplink['description']) ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><span class="badge bg-warning"><?= htmlspecialchars($uplink['port_type'] ?? 'GE') ?></span></td>
+                                            <td>
+                                                <span class="badge bg-<?= ($uplink['vlan_mode'] ?? '') === 'trunk' ? 'primary' : 'secondary' ?>">
+                                                    <?= htmlspecialchars(ucfirst($uplink['vlan_mode'] ?? '-')) ?>
+                                                </span>
+                                            </td>
+                                            <td><?= $uplink['pvid'] ?? '-' ?></td>
+                                            <td>
+                                                <?php if (!empty($uplink['allowed_vlans'])): ?>
+                                                <small><?= htmlspecialchars($uplink['allowed_vlans']) ?></small>
+                                                <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uplinkModal<?= str_replace('/', '_', $uplink['port_name']) ?>" title="Configure">
+                                                    <i class="bi bi-gear"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        
+                                        <div class="modal fade" id="uplinkModal<?= str_replace('/', '_', $uplink['port_name']) ?>" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Configure Uplink <?= htmlspecialchars($uplink['port_name']) ?></h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form method="post">
+                                                        <div class="modal-body">
+                                                            <input type="hidden" name="action" value="configure_uplink">
+                                                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                            <input type="hidden" name="port_name" value="<?= htmlspecialchars($uplink['port_name']) ?>">
+                                                            
+                                                            <div class="row g-3">
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label">VLAN Mode</label>
+                                                                    <select name="vlan_mode" class="form-select" id="vlanMode<?= str_replace('/', '_', $uplink['port_name']) ?>">
+                                                                        <option value="trunk" <?= ($uplink['vlan_mode'] ?? '') === 'trunk' ? 'selected' : '' ?>>Trunk</option>
+                                                                        <option value="access" <?= ($uplink['vlan_mode'] ?? '') === 'access' ? 'selected' : '' ?>>Access</option>
+                                                                        <option value="hybrid" <?= ($uplink['vlan_mode'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label">Native/Default VLAN</label>
+                                                                    <input type="number" name="pvid" class="form-control" value="<?= $uplink['pvid'] ?? 1 ?>" min="1" max="4094">
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div class="mt-3">
+                                                                <label class="form-label">Allowed VLANs (for Trunk mode)</label>
+                                                                <input type="text" name="allowed_vlans" class="form-control" 
+                                                                       value="<?= htmlspecialchars($uplink['allowed_vlans'] ?? '') ?>" 
+                                                                       placeholder="e.g., 100,200,300-400 or all">
+                                                                <small class="text-muted">Comma-separated VLAN IDs or ranges. Use "all" for all VLANs.</small>
+                                                            </div>
+                                                            
+                                                            <div class="mt-3">
+                                                                <label class="form-label">Description</label>
+                                                                <input type="text" name="description" class="form-control" 
+                                                                       value="<?= htmlspecialchars($uplink['description'] ?? '') ?>" 
+                                                                       placeholder="Port description">
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">Apply Configuration</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php else: ?>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch uplink port information.
+                            </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="sync_uplinks">
-                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
-                        </button>
-                    </form>
                 </div>
-                <div class="card-body">
-                    <?php if (!empty($cachedUplinks)): ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Port</th>
-                                    <th>VLAN Mode</th>
-                                    <th>PVID</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($cachedUplinks as $uplink): ?>
-                                <tr>
-                                    <td><strong><?= htmlspecialchars($uplink['port_name']) ?></strong></td>
-                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($uplink['vlan_mode'] ?? '-') ?></span></td>
-                                    <td><?= $uplink['pvid'] ?? '-' ?></td>
-                                    <td>
-                                        <?php if (!empty($uplink['oper_status'])): ?>
-                                        <span class="badge bg-<?= strtolower($uplink['oper_status']) === 'up' ? 'success' : 'secondary' ?>">
-                                            <?= htmlspecialchars($uplink['oper_status']) ?>
-                                        </span>
-                                        <?php else: ?>
-                                        <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Uplink Configuration</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="small">
+                                <p><strong>VLAN Modes:</strong></p>
+                                <ul class="ps-3">
+                                    <li><strong>Trunk</strong>: Carries multiple VLANs with 802.1Q tagging. Use for connections to core switches.</li>
+                                    <li><strong>Access</strong>: Single VLAN, untagged traffic. Use for simple connections.</li>
+                                    <li><strong>Hybrid</strong>: Mix of tagged and untagged VLANs.</li>
+                                </ul>
+                                
+                                <p class="mt-3"><strong>Allowed VLANs:</strong></p>
+                                <p class="text-muted">For trunk mode, specify which VLANs can pass through:</p>
+                                <ul class="ps-3">
+                                    <li><code>all</code> - All VLANs</li>
+                                    <li><code>100,200,300</code> - Specific VLANs</li>
+                                    <li><code>100-200</code> - VLAN range</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <?php else: ?>
-                    <div class="alert alert-info mb-0">
-                        <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch uplink port information.
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
             
