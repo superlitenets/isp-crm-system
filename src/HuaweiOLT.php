@@ -11,7 +11,14 @@ class HuaweiOLT {
     }
     
     private function getEncryptionKey(): string {
-        return getenv('SESSION_SECRET') ?: 'huawei-olt-default-key-2024';
+        $key = getenv('SESSION_SECRET');
+        if (empty($key)) {
+            $key = $_ENV['SESSION_SECRET'] ?? '';
+        }
+        if (empty($key)) {
+            throw new \RuntimeException('SESSION_SECRET environment variable is required for OLT credential encryption');
+        }
+        return $key;
     }
     
     private function encrypt(string $data): string {
