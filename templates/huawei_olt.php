@@ -741,9 +741,14 @@ try {
             <?php elseif ($view === 'profiles'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Profiles</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#profileModal" onclick="resetProfileForm()">
-                    <i class="bi bi-plus-circle me-1"></i> Add Profile
-                </button>
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#configScriptModal">
+                        <i class="bi bi-terminal me-1"></i> Generate OLT Config
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#profileModal" onclick="resetProfileForm()">
+                        <i class="bi bi-plus-circle me-1"></i> Add Profile
+                    </button>
+                </div>
             </div>
             
             <div class="card shadow-sm">
@@ -1831,8 +1836,205 @@ ont tr069-server-config 1 all profile-id 1</pre>
         </div>
     </div>
 
+    <div class="modal fade" id="configScriptModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-terminal me-2"></i>OLT Configuration Script</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> Run these commands on your Huawei OLT via Telnet/SSH before authorizing ONUs.
+                        The line profile and service profile IDs must exist on the OLT.
+                    </div>
+                    
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#lineProfilesTab">Line Profiles</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#srvProfilesTab">Service Profiles</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#trafficProfilesTab">Traffic Profiles</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullScriptTab">Full Script</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="lineProfilesTab">
+                            <p class="small text-muted">ONT Line Profiles define the TCONT and GEM port mapping for upstream/downstream traffic.</p>
+                            <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow: auto;"><code><?php
+foreach ($profiles as $p) {
+    if (empty($p['line_profile'])) continue;
+    $lpId = htmlspecialchars($p['line_profile']);
+    $name = preg_replace('/[^a-zA-Z0-9_-]/', '_', $p['name']);
+    $vlan = $p['vlan_id'] ?: 100;
+    echo "# Line Profile for: {$p['name']}\n";
+    echo "ont-lineprofile gpon profile-id {$lpId} profile-name {$name}\n";
+    echo "  tcont 1 dba-profile-id 1\n";
+    echo "  gem add 1 eth tcont 1\n";
+    echo "  gem mapping 1 0 vlan {$vlan}\n";
+    echo "  commit\n";
+    echo "  quit\n\n";
+}
+if (empty(array_filter($profiles, fn($p) => !empty($p['line_profile'])))) {
+    echo "# No profiles with Line Profile IDs configured\n";
+}
+?></code></pre>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="srvProfilesTab">
+                            <p class="small text-muted">ONT Service Profiles define the port capabilities (ETH, POTS, WiFi) of the ONU.</p>
+                            <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow: auto;"><code><?php
+foreach ($profiles as $p) {
+    if (empty($p['srv_profile'])) continue;
+    $spId = htmlspecialchars($p['srv_profile']);
+    $name = preg_replace('/[^a-zA-Z0-9_-]/', '_', $p['name']);
+    echo "# Service Profile for: {$p['name']}\n";
+    echo "ont-srvprofile gpon profile-id {$spId} profile-name {$name}\n";
+    echo "  ont-port eth adaptive pots 0 catv 0\n";
+    echo "  port vlan eth 1 translation {$p['vlan_id']} user-vlan untagged\n";
+    echo "  commit\n";
+    echo "  quit\n\n";
+}
+if (empty(array_filter($profiles, fn($p) => !empty($p['srv_profile'])))) {
+    echo "# No profiles with Service Profile IDs configured\n";
+}
+?></code></pre>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="trafficProfilesTab">
+                            <p class="small text-muted">Traffic/DBA Profiles define bandwidth allocation for upstream traffic.</p>
+                            <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow: auto;"><code><?php
+$speeds = [];
+foreach ($profiles as $p) {
+    if (!empty($p['speed_profile_up'])) {
+        $speeds[$p['speed_profile_up']] = true;
+    }
+}
+if (!empty($speeds)) {
+    echo "# DBA Profiles for bandwidth control\n\n";
+    $dbaId = 1;
+    foreach (array_keys($speeds) as $speed) {
+        $speedKbps = ((int)$speed) * 1024;
+        echo "# DBA Profile: {$speed}Mbps\n";
+        echo "dba-profile add profile-id {$dbaId} profile-name speed_{$speed}m type4 max {$speedKbps}\n\n";
+        $dbaId++;
+    }
+    echo "\n# Traffic Tables for downstream\n\n";
+    foreach ($profiles as $p) {
+        if (empty($p['speed_profile_down'])) continue;
+        $name = preg_replace('/[^a-zA-Z0-9_-]/', '_', $p['name']);
+        $downKbps = ((int)$p['speed_profile_down']) * 1024;
+        echo "# Traffic table for: {$p['name']}\n";
+        echo "traffic table ip index {$p['line_profile']} cir {$downKbps} priority 0 priority-policy local-setting\n\n";
+    }
+} else {
+    echo "# No speed profiles configured\n";
+    echo "# Example DBA profile:\n";
+    echo "dba-profile add profile-id 1 profile-name speed_50m type4 max 51200\n";
+}
+?></code></pre>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="fullScriptTab">
+                            <p class="small text-muted">Complete configuration script for all profiles. Copy and paste into OLT CLI.</p>
+                            <pre class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow: auto;"><code><?php
+echo "# ================================================\n";
+echo "# Huawei OLT Configuration Script\n";
+echo "# Generated: " . date('Y-m-d H:i:s') . "\n";
+echo "# ================================================\n\n";
+echo "enable\nconfig\n\n";
+
+echo "# ========== DBA Profiles ==========\n";
+$speeds = [];
+$dbaId = 1;
+foreach ($profiles as $p) {
+    if (!empty($p['speed_profile_up']) && !isset($speeds[$p['speed_profile_up']])) {
+        $speedKbps = ((int)$p['speed_profile_up']) * 1024;
+        echo "dba-profile add profile-id {$dbaId} profile-name speed_{$p['speed_profile_up']}m type4 max {$speedKbps}\n";
+        $speeds[$p['speed_profile_up']] = $dbaId;
+        $dbaId++;
+    }
+}
+echo "\n";
+
+echo "# ========== Line Profiles ==========\n";
+foreach ($profiles as $p) {
+    if (empty($p['line_profile'])) continue;
+    $lpId = htmlspecialchars($p['line_profile']);
+    $name = preg_replace('/[^a-zA-Z0-9_-]/', '_', $p['name']);
+    $vlan = $p['vlan_id'] ?: 100;
+    $dbaRef = $speeds[$p['speed_profile_up']] ?? 1;
+    echo "ont-lineprofile gpon profile-id {$lpId} profile-name {$name}\n";
+    echo "  tcont 1 dba-profile-id {$dbaRef}\n";
+    echo "  gem add 1 eth tcont 1\n";
+    echo "  gem mapping 1 0 vlan {$vlan}\n";
+    echo "  commit\n";
+    echo "  quit\n\n";
+}
+
+echo "# ========== Service Profiles ==========\n";
+foreach ($profiles as $p) {
+    if (empty($p['srv_profile'])) continue;
+    $spId = htmlspecialchars($p['srv_profile']);
+    $name = preg_replace('/[^a-zA-Z0-9_-]/', '_', $p['name']);
+    $vlan = $p['vlan_id'] ?: 100;
+    echo "ont-srvprofile gpon profile-id {$spId} profile-name {$name}\n";
+    echo "  ont-port eth adaptive pots 0 catv 0\n";
+    echo "  port vlan eth 1 translation {$vlan} user-vlan untagged\n";
+    echo "  commit\n";
+    echo "  quit\n\n";
+}
+
+echo "# ========== Traffic Tables ==========\n";
+foreach ($profiles as $p) {
+    if (empty($p['speed_profile_down']) || empty($p['line_profile'])) continue;
+    $downKbps = ((int)$p['speed_profile_down']) * 1024;
+    echo "traffic table ip index {$p['line_profile']} cir {$downKbps} priority 0 priority-policy local-setting\n";
+}
+echo "\n";
+
+echo "# ========== Service Ports (per VLAN) ==========\n";
+$vlans = array_unique(array_filter(array_column($profiles, 'vlan_id')));
+foreach ($vlans as $vlan) {
+    echo "# Create VLAN {$vlan} if not exists\n";
+    echo "vlan {$vlan} smart\n";
+    echo "port vlan {$vlan} 0/0 0\n\n";
+}
+
+echo "quit\nquit\n";
+echo "\n# ================================================\n";
+echo "# Script Complete\n";
+echo "# ================================================\n";
+?></code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="copyConfigScript()">
+                        <i class="bi bi-clipboard me-1"></i> Copy Full Script
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    function copyConfigScript() {
+        const fullScriptTab = document.querySelector('#fullScriptTab code');
+        navigator.clipboard.writeText(fullScriptTab.textContent).then(() => {
+            alert('Configuration script copied to clipboard!');
+        });
+    }
+    
     function resetOltForm() {
         document.getElementById('oltAction').value = 'add_olt';
         document.getElementById('oltId').value = '';
