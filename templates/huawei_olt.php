@@ -47,12 +47,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 break;
             case 'add_onu':
-                $huaweiOLT->addONU($_POST);
+                $onuData = [
+                    'olt_id' => (int)$_POST['olt_id'],
+                    'sn' => $_POST['sn'] ?? '',
+                    'name' => $_POST['name'] ?? '',
+                    'frame' => (int)($_POST['frame'] ?? 0),
+                    'slot' => !empty($_POST['slot']) ? (int)$_POST['slot'] : null,
+                    'port' => !empty($_POST['port']) ? (int)$_POST['port'] : null,
+                    'onu_id' => !empty($_POST['onu_id']) ? (int)$_POST['onu_id'] : null,
+                    'customer_id' => !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null,
+                    'service_profile_id' => !empty($_POST['service_profile_id']) ? (int)$_POST['service_profile_id'] : null,
+                    'is_authorized' => !empty($_POST['is_authorized']),
+                ];
+                $huaweiOLT->addONU($onuData);
                 $message = 'ONU added successfully';
                 $messageType = 'success';
                 break;
             case 'update_onu':
-                $huaweiOLT->updateONU((int)$_POST['id'], $_POST);
+                $onuData = [
+                    'name' => $_POST['name'] ?? '',
+                    'frame' => (int)($_POST['frame'] ?? 0),
+                    'slot' => !empty($_POST['slot']) ? (int)$_POST['slot'] : null,
+                    'port' => !empty($_POST['port']) ? (int)$_POST['port'] : null,
+                    'onu_id' => !empty($_POST['onu_id']) ? (int)$_POST['onu_id'] : null,
+                    'customer_id' => !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null,
+                    'service_profile_id' => !empty($_POST['service_profile_id']) ? (int)$_POST['service_profile_id'] : null,
+                ];
+                if (isset($_POST['is_authorized'])) {
+                    $onuData['is_authorized'] = !empty($_POST['is_authorized']);
+                }
+                $huaweiOLT->updateONU((int)$_POST['id'], $onuData);
                 $message = 'ONU updated successfully';
                 $messageType = 'success';
                 break;
