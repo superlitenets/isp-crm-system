@@ -5708,8 +5708,8 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="?page=huawei-olt" target="_blank">
-                    <i class="bi bi-router text-primary"></i> Huawei OLT <i class="bi bi-box-arrow-up-right small"></i>
+                <a class="nav-link" href="?page=huawei-olt">
+                    <i class="bi bi-router text-primary"></i> Huawei OLT
                 </a>
             </li>
             <?php endif; ?>

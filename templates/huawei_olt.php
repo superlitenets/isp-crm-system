@@ -352,7 +352,10 @@ try {
 <body>
     <div class="d-flex">
         <div class="sidebar d-flex flex-column p-3" style="width: 260px;">
-            <div class="d-flex align-items-center mb-4 px-2">
+            <a href="?page=dashboard" class="text-decoration-none text-warning small mb-2 px-2">
+                <i class="bi bi-arrow-left me-1"></i> Back to CRM
+            </a>
+            <div class="d-flex align-items-center mb-3 px-2">
                 <i class="bi bi-router fs-3 text-white me-2"></i>
                 <span class="brand-title">Huawei OLT</span>
             </div>
@@ -395,10 +398,6 @@ try {
                     <i class="bi bi-gear me-2"></i> Settings
                 </a>
             </nav>
-            <hr class="my-3 border-light">
-            <a class="nav-link text-warning" href="?page=dashboard" target="_self">
-                <i class="bi bi-arrow-left me-2"></i> Back to CRM
-            </a>
         </div>
         
         <div class="flex-grow-1 p-4">
