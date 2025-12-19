@@ -8,10 +8,12 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libcurl4-openssl-dev \
     libzip-dev \
+    libsnmp-dev \
+    snmp \
     zip \
     unzip \
     git \
-    && docker-php-ext-install pdo pdo_pgsql intl curl zip opcache sockets \
+    && docker-php-ext-install pdo pdo_pgsql intl curl zip opcache sockets snmp \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
