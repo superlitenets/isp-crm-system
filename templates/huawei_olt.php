@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'discover_unconfigured':
                 $result = $huaweiOLT->discoverUnconfiguredONUs((int)$_POST['olt_id']);
                 if ($result['success']) {
-                    $message = "Found {$result['count']} unconfigured ONUs";
+                    $message = "Found {$result['count']} unsynced ONUs";
                     $messageType = 'success';
                 } else {
                     $message = $result['error'] ?? 'Discovery failed';
@@ -339,8 +339,8 @@ try {
                 <a class="nav-link <?= $view === 'onus' ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
                     <i class="bi bi-diagram-3 me-2"></i> ONU Inventory
                 </a>
-                <a class="nav-link <?= $view === 'unconfigured' ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
-                    <i class="bi bi-question-circle me-2"></i> Unconfigured ONUs
+                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
+                    <i class="bi bi-arrow-repeat me-2"></i> Unsynced ONUs
                     <?php if ($stats['unconfigured_onus'] > 0): ?>
                     <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
                     <?php endif; ?>
@@ -437,7 +437,7 @@ try {
                                 <i class="bi bi-question-circle fs-4"></i>
                             </div>
                             <div>
-                                <div class="text-muted small">Unconfigured</div>
+                                <div class="text-muted small">Unsynced</div>
                                 <div class="fs-4 fw-bold text-warning"><?= $stats['unconfigured_onus'] ?></div>
                             </div>
                         </div>
@@ -618,7 +618,7 @@ try {
                                 <form method="post" class="d-inline">
                                     <input type="hidden" name="action" value="discover_unconfigured">
                                     <input type="hidden" name="olt_id" value="<?= $olt['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Discover Unconfigured ONUs">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Discover Unsynced ONUs">
                                         <i class="bi bi-search"></i>
                                     </button>
                                 </form>
@@ -634,7 +634,7 @@ try {
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
                     <i class="bi bi-diagram-3 me-2"></i>
-                    <?= isset($_GET['unconfigured']) ? 'Unconfigured ONUs' : 'ONU Inventory' ?>
+                    <?= isset($_GET['unconfigured']) ? 'Unsynced ONUs' : 'ONU Inventory' ?>
                 </h4>
                 <div class="d-flex gap-2">
                     <form class="d-flex gap-2" method="get">
@@ -671,7 +671,7 @@ try {
                             <input type="hidden" name="action" value="discover_unconfigured">
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-warning btn-sm">
-                                <i class="bi bi-search me-1"></i> Discover Unconfigured
+                                <i class="bi bi-search me-1"></i> Discover Unsynced
                             </button>
                         </form>
                     </div>
@@ -718,7 +718,7 @@ try {
                                             <?= ucfirst($onu['status']) ?>
                                         </span>
                                         <?php if (!$onu['is_authorized']): ?>
-                                        <span class="badge bg-warning">Unconfigured</span>
+                                        <span class="badge bg-warning">Unsynced</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -988,7 +988,7 @@ try {
                     <div class="mt-3">
                         <label class="form-label">Quick Commands</label>
                         <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="setCommand('display ont autofind all')">Unconfigured ONTs</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="setCommand('display ont autofind all')">Unsynced ONTs</button>
                             <button class="btn btn-sm btn-outline-secondary" onclick="setCommand('display board 0')">Board Info</button>
                             <button class="btn btn-sm btn-outline-secondary" onclick="setCommand('display sysman temperature')">Temperature</button>
                             <button class="btn btn-sm btn-outline-secondary" onclick="setCommand('display interface gpon 0/1/0')">PON Port 0/1/0</button>
