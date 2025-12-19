@@ -229,7 +229,13 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'SNMP write failed for OID: ' . $oid];
         }
         
-        $this->addLog($oltId, null, 'snmp_write', 'success', "SNMP write: {$oid} = {$value}");
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'snmp_write',
+            'status' => 'success',
+            'message' => "SNMP write: {$oid} = {$value}",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
         
         return ['success' => true, 'oid' => $oid, 'value' => $value];
     }
@@ -441,7 +447,13 @@ class HuaweiOLT {
             $synced++;
         }
         
-        $this->addLog($oltId, null, 'snmp_sync', 'success', "Synced {$synced} ONUs ({$added} new, {$updated} updated)");
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'snmp_sync',
+            'status' => 'success',
+            'message' => "Synced {$synced} ONUs ({$added} new, {$updated} updated)",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
         
         return [
             'success' => true,
@@ -521,7 +533,13 @@ class HuaweiOLT {
             }
         }
         
-        $this->addLog($oltId, null, 'discover_unconfigured', 'success', "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new");
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'discover_unconfigured',
+            'status' => 'success',
+            'message' => "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
         
         return [
             'success' => true,
