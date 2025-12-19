@@ -258,6 +258,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'VLAN deleted successfully' : ($result['message'] ?? 'Failed to delete VLAN');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'refresh_onu_optical':
+                $result = $huaweiOLT->refreshONUOptical((int)$_POST['onu_id']);
+                if ($result['success']) {
+                    $message = "Optical: RX={$result['rx_power']}dBm, TX={$result['tx_power']}dBm";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed to refresh optical data';
+                    $messageType = 'danger';
+                }
+                break;
             default:
                 break;
         }
@@ -764,8 +774,11 @@ try {
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
                                             <?php endif; ?>
-                                            <button class="btn btn-outline-secondary" onclick="editOnu(<?= htmlspecialchars(json_encode($onu)) ?>)" title="Edit">
-                                                <i class="bi bi-pencil"></i>
+                                            <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="btn btn-outline-info" title="Configure">
+                                                <i class="bi bi-gear"></i>
+                                            </a>
+                                            <button class="btn btn-outline-secondary" onclick="refreshOptical(<?= $onu['id'] ?>)" title="Refresh Signal">
+                                                <i class="bi bi-reception-4"></i>
                                             </button>
                                             <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Delete">
                                                 <i class="bi bi-trash"></i>
@@ -2403,6 +2416,12 @@ echo "# ================================================\n";
             document.getElementById('actionId').value = id;
             document.getElementById('actionForm').submit();
         }
+    }
+    
+    function refreshOptical(id) {
+        document.getElementById('actionType').value = 'refresh_onu_optical';
+        document.getElementById('actionOnuId').value = id;
+        document.getElementById('actionForm').submit();
     }
     
     function setCommand(cmd) {

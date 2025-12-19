@@ -491,6 +491,46 @@ class HuaweiOLT {
         ];
     }
     
+    public function refreshONUOptical(int $onuId): array {
+        $onu = $this->getONU($onuId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        if ($onu['slot'] === null || $onu['port'] === null || $onu['onu_id'] === null) {
+            return ['success' => false, 'error' => 'ONU location (slot/port/onu_id) not set'];
+        }
+        
+        $optical = $this->getONUOpticalInfoViaSNMP(
+            $onu['olt_id'],
+            $onu['frame'] ?? 0,
+            $onu['slot'],
+            $onu['port'],
+            $onu['onu_id']
+        );
+        
+        if (!$optical['success']) {
+            return $optical;
+        }
+        
+        $stmt = $this->db->prepare("
+            UPDATE huawei_onus 
+            SET rx_power = ?, tx_power = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmt->execute([
+            $optical['optical']['rx_power'],
+            $optical['optical']['tx_power'],
+            $onuId
+        ]);
+        
+        return [
+            'success' => true,
+            'rx_power' => $optical['optical']['rx_power'],
+            'tx_power' => $optical['optical']['tx_power']
+        ];
+    }
+    
     public function discoverUnconfiguredONUs(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
