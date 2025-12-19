@@ -24,7 +24,8 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Inventory Management**: Comprehensive warehouse and stock management, including multi-warehouse support, stock intake (PO, receipts with serial/MAC), disbursement workflow (requests, pick, handover), field usage tracking, returns/RMA, loss reporting, stock movements audit, and ISP-specific equipment categories with low stock alerts and various reports.
 - **SLA Management**: Automatic policy application based on ticket priority, considering business hours.
 - **Complaints Module**: Approval workflow for public complaints before ticket conversion.
-- **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning.
+- **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning via SmartOLT cloud API.
+- **Huawei OLT Module**: Standalone direct management module for Huawei OLT devices (opens in new tab). Features include OLT device management with Telnet/SSH/SNMP connectivity, ONU inventory and status monitoring, service profile management (VLAN, QoS, speed profiles), auto-provisioning with unconfigured ONU detection, ONU operations (authorize, reboot, delete), CLI terminal for direct commands, provisioning logs and alerts. Credentials stored encrypted with AES-256-CBC using SESSION_SECRET.
 - **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging for key system actions.
 - **Ticket Commission System**: Auto-calculates employee earnings based on resolved/closed tickets, configurable rates, and payroll integration.
 - **Ticket Enhancements**: Includes timeline/activity history, quick status changes, customer satisfaction ratings, escalation features, statistics dashboard, and secure status update links for technicians via WhatsApp/SMS.
@@ -52,3 +53,4 @@ The system features a modular and extensible design. Configuration is managed vi
 - **M-Pesa**: For mobile money payments.
 - **SmartOLT API**: For network monitoring and ONU management.
 - **One-ISP Billing API**: For customer data lookup and import.
+- **Huawei OLT Devices**: Direct Telnet/SSH/SNMP connectivity for fiber network provisioning and management.
