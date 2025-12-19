@@ -29,6 +29,7 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Ticket Commission System**: Auto-calculates employee earnings based on resolved/closed tickets, configurable rates, and payroll integration.
 - **Ticket Enhancements**: Includes timeline/activity history, quick status changes, customer satisfaction ratings, escalation features, statistics dashboard, and secure status update links for technicians via WhatsApp/SMS.
 - **Ticket Status Links**: When tickets are assigned or reposted, technicians receive clickable links in WhatsApp/SMS messages that allow them to update ticket status (In Progress, Resolved, Closed) without logging in. Links use secure tokens with expiration (72 hours) and usage limits.
+- **Customer Ticket View Links**: Customers receive a {view_link} in ticket creation notifications (SMS/WhatsApp) to view their ticket progress and submit satisfaction ratings. Links use secure tokens (7-day expiry, 50-use limit) with the same O(1) lookup security model as technician links.
 - **Multi-Branch Support**: Manages operations across multiple physical locations, including branch-specific assignments for employees, tickets, and teams, with daily summary reports.
 - **Salary Advance System**: Employee request, approval, and disbursement workflow with flexible repayment schedules and payroll integration. Mobile API available.
 - **Leave Management System**: Comprehensive tracking of multiple leave types, monthly accrual, request/approval workflow with balance validation, public holidays, and mobile API support.
