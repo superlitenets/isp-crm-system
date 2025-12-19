@@ -5,6 +5,19 @@ date_default_timezone_set('Africa/Nairobi');
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
+function applyTimezoneFromSettings(): void {
+    try {
+        $db = \Database::getConnection();
+        $stmt = $db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'");
+        $stmt->execute();
+        $tz = $stmt->fetchColumn();
+        if ($tz && in_array($tz, timezone_identifiers_list())) {
+            date_default_timezone_set($tz);
+        }
+    } catch (\Exception $e) {
+    }
+}
+
 $isReplit = !empty(getenv('REPLIT_DEV_DOMAIN'));
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
            (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
@@ -87,6 +100,8 @@ if (!getenv('SKIP_DB_INIT')) {
 }
 
 $db = Database::getConnection();
+
+applyTimezoneFromSettings();
 
 \App\Auth::init();
 

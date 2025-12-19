@@ -26,6 +26,11 @@ try {
     }
 
     $settings = new \App\Settings();
+    
+    $tz = $settings->get('timezone');
+    if ($tz && in_array($tz, timezone_identifiers_list())) {
+        date_default_timezone_set($tz);
+    }
     $cronSecret = $settings->get('cron_secret', 'isp-crm-cron-2024');
 
     // Allow CLI calls without secret (they're running from the container)
