@@ -86,6 +86,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'All alerts marked as read';
                 $messageType = 'success';
                 break;
+            case 'sync_onus_snmp':
+                $result = $huaweiOLT->syncONUsFromSNMP((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Synced {$result['synced']} ONUs ({$result['added']} new, {$result['updated']} updated)";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Sync failed';
+                    $messageType = 'danger';
+                }
+                break;
+            case 'get_olt_info_snmp':
+                $result = $huaweiOLT->getOLTSystemInfoViaSNMP((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $info = $result['info'];
+                    $message = "OLT Info: {$info['sysName']} - {$info['sysDescr']}";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed to get OLT info';
+                    $messageType = 'danger';
+                }
+                break;
+            case 'refresh_onu_optical':
+                $onu = $huaweiOLT->getONU((int)$_POST['onu_id']);
+                if ($onu) {
+                    $result = $huaweiOLT->getONUOpticalInfoViaSNMP(
+                        $onu['olt_id'], $onu['frame'], $onu['slot'], $onu['port'], $onu['onu_id']
+                    );
+                    if ($result['success']) {
+                        $optical = $result['optical'];
+                        $huaweiOLT->updateONU((int)$_POST['onu_id'], [
+                            'rx_power' => $optical['rx_power'],
+                            'tx_power' => $optical['tx_power']
+                        ]);
+                        $message = "Optical: RX={$optical['rx_power']}dBm, TX={$optical['tx_power']}dBm";
+                        $messageType = 'success';
+                    } else {
+                        $message = $result['error'] ?? 'Failed to get optical info';
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+            case 'discover_unconfigured':
+                $result = $huaweiOLT->discoverUnconfiguredONUs((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Found {$result['count']} unconfigured ONUs";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Discovery failed';
+                    $messageType = 'danger';
+                }
+                break;
         }
     } catch (Exception $e) {
         $message = 'Error: ' . $e->getMessage();
@@ -432,6 +483,20 @@ try {
                                 <a href="?page=huawei-olt&view=onus&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-info">
                                     <i class="bi bi-diagram-3 me-1"></i> ONUs
                                 </a>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="sync_onus_snmp">
+                                    <input type="hidden" name="olt_id" value="<?= $olt['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Sync ONUs via SNMP">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                </form>
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="discover_unconfigured">
+                                    <input type="hidden" name="olt_id" value="<?= $olt['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Discover Unconfigured ONUs">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -468,6 +533,24 @@ try {
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
                         <i class="bi bi-plus-circle me-1"></i> Add ONU
                     </button>
+                    <?php if ($oltId): ?>
+                    <div class="btn-group">
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="sync_onus_snmp">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Sync all authorized ONUs from OLT via SNMP?')">
+                                <i class="bi bi-arrow-repeat me-1"></i> Sync ONUs
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="discover_unconfigured">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="bi bi-search me-1"></i> Discover Unconfigured
+                            </button>
+                        </form>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             

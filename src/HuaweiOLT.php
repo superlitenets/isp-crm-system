@@ -451,6 +451,86 @@ class HuaweiOLT {
         ];
     }
     
+    public function discoverUnconfiguredONUs(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $huaweiAutofindSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.3';
+        $huaweiAutofindTypeBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.5';
+        $huaweiAutofindPortBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.1';
+        
+        $serials = @snmprealwalk($host, $community, $huaweiAutofindSerialBase, 10000000, 2);
+        $types = @snmprealwalk($host, $community, $huaweiAutofindTypeBase, 10000000, 2);
+        
+        if ($serials === false) {
+            return ['success' => false, 'error' => 'Failed to discover unconfigured ONUs via SNMP'];
+        }
+        
+        $unconfigured = [];
+        $added = 0;
+        
+        foreach ($serials as $oid => $serial) {
+            $indexPart = substr($oid, strlen($huaweiAutofindSerialBase) + 1);
+            $parts = explode('.', $indexPart);
+            
+            if (count($parts) >= 2) {
+                $portIndex = (int)$parts[0];
+                $autofindId = (int)$parts[1];
+                
+                $frame = 0;
+                $slot = floor($portIndex / 100000000);
+                $port = ($portIndex % 100000000) / 1000000;
+                
+                $typeOid = $huaweiAutofindTypeBase . '.' . $indexPart;
+                $onuType = isset($types[$typeOid]) ? $this->cleanSnmpValue($types[$typeOid]) : '';
+                
+                $sn = $this->cleanSnmpValue($serial);
+                
+                $existing = $this->getONUBySN($sn);
+                if (!$existing) {
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $sn,
+                        'frame' => (int)$frame,
+                        'slot' => (int)$slot,
+                        'port' => (int)$port,
+                        'onu_type' => $onuType,
+                        'status' => 'unconfigured',
+                        'is_authorized' => false,
+                    ]);
+                    $added++;
+                }
+                
+                $unconfigured[] = [
+                    'sn' => $sn,
+                    'frame' => (int)$frame,
+                    'slot' => (int)$slot,
+                    'port' => (int)$port,
+                    'onu_type' => $onuType,
+                    'autofind_id' => $autofindId
+                ];
+            }
+        }
+        
+        $this->addLog($oltId, null, 'discover_unconfigured', 'success', "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new");
+        
+        return [
+            'success' => true,
+            'onus' => $unconfigured,
+            'count' => count($unconfigured),
+            'added' => $added
+        ];
+    }
+    
     private function cleanSnmpValue(string $value): string {
         $value = preg_replace('/^(STRING|INTEGER|Hex-STRING|OID|Timeticks|Counter32|Gauge32|IpAddress):\s*/i', '', $value);
         $value = trim($value, '" ');
