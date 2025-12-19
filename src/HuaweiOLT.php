@@ -56,8 +56,8 @@ class HuaweiOLT {
     public function addOLT(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_olts (name, ip_address, port, connection_type, username, password_encrypted, 
-                                     snmp_community, snmp_version, snmp_port, vendor, model, location, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     snmp_read_community, snmp_write_community, snmp_version, snmp_port, vendor, model, location, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
@@ -66,7 +66,8 @@ class HuaweiOLT {
             $data['connection_type'] ?? 'telnet',
             $data['username'] ?? '',
             !empty($data['password']) ? $this->encrypt($data['password']) : '',
-            $data['snmp_community'] ?? 'public',
+            $data['snmp_read_community'] ?? 'public',
+            $data['snmp_write_community'] ?? 'private',
             $data['snmp_version'] ?? 'v2c',
             $data['snmp_port'] ?? 161,
             $data['vendor'] ?? 'Huawei',
@@ -79,7 +80,7 @@ class HuaweiOLT {
     
     public function updateOLT(int $id, array $data): bool {
         $fields = ['name', 'ip_address', 'port', 'connection_type', 'username', 
-                   'snmp_community', 'snmp_version', 'snmp_port', 'vendor', 'model', 'location', 'is_active'];
+                   'snmp_read_community', 'snmp_write_community', 'snmp_version', 'snmp_port', 'vendor', 'model', 'location', 'is_active'];
         $updates = [];
         $params = [];
         
@@ -120,7 +121,7 @@ class HuaweiOLT {
         } elseif ($olt['connection_type'] === 'ssh') {
             return $this->testSSHConnection($olt['ip_address'], $olt['port'], $olt['username'], $password);
         } elseif ($olt['connection_type'] === 'snmp') {
-            return $this->testSNMPConnection($olt['ip_address'], $olt['snmp_community'], $olt['snmp_port']);
+            return $this->testSNMPConnection($olt['ip_address'], $olt['snmp_read_community'] ?? 'public', $olt['snmp_port']);
         }
         
         return ['success' => false, 'message' => 'Unknown connection type'];
@@ -183,6 +184,297 @@ class HuaweiOLT {
         }
         
         return ['success' => true, 'message' => 'SNMP connection successful', 'sysDescr' => $sysDescr];
+    }
+    
+    // ==================== SNMP Read/Write Operations ====================
+    
+    public function snmpRead(int $oltId, string $oid, int $timeout = 2000000, int $retries = 2): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpget')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $result = @snmpget($host, $community, $oid, $timeout, $retries);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'SNMP read failed for OID: ' . $oid];
+        }
+        
+        return ['success' => true, 'value' => $result, 'oid' => $oid];
+    }
+    
+    public function snmpWrite(int $oltId, string $oid, string $type, $value, int $timeout = 2000000, int $retries = 2): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpset')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_write_community'] ?? 'private';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $result = @snmpset($host, $community, $oid, $type, $value, $timeout, $retries);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'SNMP write failed for OID: ' . $oid];
+        }
+        
+        $this->addLog($oltId, null, 'snmp_write', 'success', "SNMP write: {$oid} = {$value}");
+        
+        return ['success' => true, 'oid' => $oid, 'value' => $value];
+    }
+    
+    public function snmpWalk(int $oltId, string $oid, int $timeout = 5000000, int $retries = 2): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $result = @snmprealwalk($host, $community, $oid, $timeout, $retries);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'SNMP walk failed for OID: ' . $oid];
+        }
+        
+        return ['success' => true, 'data' => $result, 'count' => count($result)];
+    }
+    
+    public function getOLTSystemInfoViaSNMP(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpget')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        $timeout = 2000000;
+        $retries = 2;
+        
+        $systemOIDs = [
+            'sysDescr' => '1.3.6.1.2.1.1.1.0',
+            'sysObjectID' => '1.3.6.1.2.1.1.2.0',
+            'sysUpTime' => '1.3.6.1.2.1.1.3.0',
+            'sysContact' => '1.3.6.1.2.1.1.4.0',
+            'sysName' => '1.3.6.1.2.1.1.5.0',
+            'sysLocation' => '1.3.6.1.2.1.1.6.0',
+        ];
+        
+        $info = [];
+        foreach ($systemOIDs as $name => $oid) {
+            $result = @snmpget($host, $community, $oid, $timeout, $retries);
+            $info[$name] = $result !== false ? $this->cleanSnmpValue($result) : null;
+        }
+        
+        $this->db->prepare("UPDATE huawei_olts SET last_sync_at = CURRENT_TIMESTAMP, last_status = 'online' WHERE id = ?")->execute([$oltId]);
+        
+        return ['success' => true, 'info' => $info];
+    }
+    
+    public function setOLTSystemInfoViaSNMP(int $oltId, string $field, string $value): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        $writableOIDs = [
+            'sysContact' => '1.3.6.1.2.1.1.4.0',
+            'sysName' => '1.3.6.1.2.1.1.5.0',
+            'sysLocation' => '1.3.6.1.2.1.1.6.0',
+        ];
+        
+        if (!isset($writableOIDs[$field])) {
+            return ['success' => false, 'error' => 'Field not writable: ' . $field];
+        }
+        
+        return $this->snmpWrite($oltId, $writableOIDs[$field], 's', $value);
+    }
+    
+    public function getONUListViaSNMP(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $huaweiONTSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3';
+        $huaweiONTStatusBase = '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15';
+        $huaweiONTDescBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
+        
+        $serials = @snmprealwalk($host, $community, $huaweiONTSerialBase, 10000000, 2);
+        $statuses = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
+        $descriptions = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
+        
+        if ($serials === false) {
+            return ['success' => false, 'error' => 'Failed to get ONU list via SNMP'];
+        }
+        
+        $onus = [];
+        foreach ($serials as $oid => $serial) {
+            $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
+            $parts = explode('.', $indexPart);
+            
+            if (count($parts) >= 2) {
+                $portIndex = (int)$parts[0];
+                $onuId = (int)$parts[1];
+                
+                $frame = 0;
+                $slot = floor($portIndex / 100000000);
+                $port = ($portIndex % 100000000) / 1000000;
+                
+                $statusOid = $huaweiONTStatusBase . '.' . $indexPart;
+                $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$statuses[$statusOid]) : 'unknown';
+                
+                $descOid = $huaweiONTDescBase . '.' . $indexPart;
+                $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
+                
+                $onus[] = [
+                    'sn' => $this->cleanSnmpValue($serial),
+                    'frame' => $frame,
+                    'slot' => (int)$slot,
+                    'port' => (int)$port,
+                    'onu_id' => $onuId,
+                    'status' => $status,
+                    'description' => $desc,
+                    'index' => $indexPart
+                ];
+            }
+        }
+        
+        return ['success' => true, 'onus' => $onus, 'count' => count($onus)];
+    }
+    
+    public function getONUOpticalInfoViaSNMP(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmpget')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        $portIndex = ($slot * 100000000) + ($port * 1000000);
+        $indexSuffix = "{$portIndex}.{$onuId}";
+        
+        $rxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}";
+        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.5.{$indexSuffix}";
+        $temperatureOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.1.{$indexSuffix}";
+        $voltageOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.2.{$indexSuffix}";
+        
+        $rxPower = @snmpget($host, $community, $rxPowerOid, 2000000, 2);
+        $txPower = @snmpget($host, $community, $txPowerOid, 2000000, 2);
+        $temperature = @snmpget($host, $community, $temperatureOid, 2000000, 2);
+        $voltage = @snmpget($host, $community, $voltageOid, 2000000, 2);
+        
+        return [
+            'success' => true,
+            'optical' => [
+                'rx_power' => $rxPower !== false ? $this->parseOpticalPower($rxPower) : null,
+                'tx_power' => $txPower !== false ? $this->parseOpticalPower($txPower) : null,
+                'temperature' => $temperature !== false ? $this->cleanSnmpValue($temperature) : null,
+                'voltage' => $voltage !== false ? $this->cleanSnmpValue($voltage) : null,
+            ]
+        ];
+    }
+    
+    public function syncONUsFromSNMP(int $oltId): array {
+        $result = $this->getONUListViaSNMP($oltId);
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $synced = 0;
+        $added = 0;
+        $updated = 0;
+        
+        foreach ($result['onus'] as $onu) {
+            $existing = $this->getONUBySN($onu['sn']);
+            
+            $data = [
+                'olt_id' => $oltId,
+                'sn' => $onu['sn'],
+                'frame' => $onu['frame'],
+                'slot' => $onu['slot'],
+                'port' => $onu['port'],
+                'onu_id' => $onu['onu_id'],
+                'status' => $onu['status'],
+                'description' => $onu['description'],
+            ];
+            
+            if ($existing) {
+                $this->updateONU($existing['id'], $data);
+                $updated++;
+            } else {
+                $this->addONU($data);
+                $added++;
+            }
+            $synced++;
+        }
+        
+        $this->addLog($oltId, null, 'snmp_sync', 'success', "Synced {$synced} ONUs ({$added} new, {$updated} updated)");
+        
+        return [
+            'success' => true,
+            'synced' => $synced,
+            'added' => $added,
+            'updated' => $updated
+        ];
+    }
+    
+    private function cleanSnmpValue(string $value): string {
+        $value = preg_replace('/^(STRING|INTEGER|Hex-STRING|OID|Timeticks|Counter32|Gauge32|IpAddress):\s*/i', '', $value);
+        $value = trim($value, '" ');
+        return $value;
+    }
+    
+    private function parseONUStatus(int $status): string {
+        $statusMap = [
+            1 => 'online',
+            2 => 'offline',
+            3 => 'los',
+            4 => 'dyinggasp',
+            5 => 'authfailed',
+            6 => 'deregistered',
+        ];
+        return $statusMap[$status] ?? 'unknown';
+    }
+    
+    private function parseOpticalPower($value): ?float {
+        $cleaned = $this->cleanSnmpValue((string)$value);
+        if (is_numeric($cleaned)) {
+            return round((float)$cleaned / 100, 2);
+        }
+        return null;
     }
     
     // ==================== ONU Management ====================

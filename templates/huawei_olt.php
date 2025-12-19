@@ -852,6 +852,31 @@ try {
                             <label class="form-label">Location</label>
                             <input type="text" name="location" id="oltLocation" class="form-control">
                         </div>
+                        <hr>
+                        <h6 class="text-muted mb-3">SNMP Configuration</h6>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Read Community (Public)</label>
+                                <input type="text" name="snmp_read_community" id="oltSnmpRead" class="form-control" value="public" placeholder="public">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Write Community (Private)</label>
+                                <input type="text" name="snmp_write_community" id="oltSnmpWrite" class="form-control" value="private" placeholder="private">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">SNMP Version</label>
+                                <select name="snmp_version" id="oltSnmpVersion" class="form-select">
+                                    <option value="v1">v1</option>
+                                    <option value="v2c" selected>v2c</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">SNMP Port</label>
+                                <input type="number" name="snmp_port" id="oltSnmpPort" class="form-control" value="161">
+                            </div>
+                        </div>
                         <div class="form-check">
                             <input type="checkbox" name="is_active" id="oltActive" class="form-check-input" value="1" checked>
                             <label class="form-check-label">Active</label>
@@ -1081,6 +1106,10 @@ try {
         document.getElementById('oltVendor').value = 'Huawei';
         document.getElementById('oltModel').value = '';
         document.getElementById('oltLocation').value = '';
+        document.getElementById('oltSnmpRead').value = 'public';
+        document.getElementById('oltSnmpWrite').value = 'private';
+        document.getElementById('oltSnmpVersion').value = 'v2c';
+        document.getElementById('oltSnmpPort').value = '161';
         document.getElementById('oltActive').checked = true;
     }
     
@@ -1097,6 +1126,10 @@ try {
         document.getElementById('oltVendor').value = olt.vendor || 'Huawei';
         document.getElementById('oltModel').value = olt.model || '';
         document.getElementById('oltLocation').value = olt.location || '';
+        document.getElementById('oltSnmpRead').value = olt.snmp_read_community || 'public';
+        document.getElementById('oltSnmpWrite').value = olt.snmp_write_community || 'private';
+        document.getElementById('oltSnmpVersion').value = olt.snmp_version || 'v2c';
+        document.getElementById('oltSnmpPort').value = olt.snmp_port || '161';
         document.getElementById('oltActive').checked = olt.is_active;
         new bootstrap.Modal(document.getElementById('oltModal')).show();
     }
