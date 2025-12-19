@@ -77,10 +77,10 @@ INSERT INTO tr069_profiles (name, description, profile_type, parameters, is_defa
 ON CONFLICT DO NOTHING;
 
 -- GenieACS settings
-INSERT INTO settings (setting_key, setting_value, setting_label, setting_group) VALUES
-('genieacs_url', 'http://localhost:7557', 'GenieACS NBI URL', 'TR-069'),
-('genieacs_username', '', 'GenieACS Username', 'TR-069'),
-('genieacs_password', '', 'GenieACS Password', 'TR-069'),
-('genieacs_timeout', '30', 'GenieACS Timeout (seconds)', 'TR-069'),
-('genieacs_enabled', '0', 'Enable GenieACS Integration', 'TR-069')
+INSERT INTO settings (setting_key, setting_value, setting_group) VALUES
+('genieacs_url', 'http://localhost:7557', 'TR-069'),
+('genieacs_username', '', 'TR-069'),
+('genieacs_password', '', 'TR-069'),
+('genieacs_timeout', '30', 'TR-069'),
+('genieacs_enabled', '0', 'TR-069')
 ON CONFLICT (setting_key) DO NOTHING;
