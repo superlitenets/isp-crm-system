@@ -1103,4 +1103,161 @@ class HuaweiOLT {
         
         return $result;
     }
+    
+    // ==================== Board & VLAN Management ====================
+    
+    public function getBoardInfo(int $oltId): array {
+        $command = "display board 0";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $boards = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+                $boards[] = [
+                    'slot' => $matches[1],
+                    'board_name' => $matches[3],
+                    'status' => $matches[4],
+                    'subtype' => $matches[5] ?? '',
+                    'ports' => $matches[6] ?? ''
+                ];
+            }
+        }
+        
+        return ['success' => true, 'boards' => $boards, 'raw' => $result['output']];
+    }
+    
+    public function getVLANs(int $oltId): array {
+        $command = "display vlan all";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $vlans = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+                $vlanId = (int)$matches[1];
+                if ($vlanId > 0 && $vlanId < 4095) {
+                    $vlans[] = [
+                        'vlan_id' => $vlanId,
+                        'type' => $matches[2] ?? 'common',
+                        'description' => $matches[3] ?? ''
+                    ];
+                }
+            }
+        }
+        
+        return ['success' => true, 'vlans' => $vlans, 'raw' => $result['output']];
+    }
+    
+    public function createVLAN(int $oltId, int $vlanId, string $description = '', string $type = 'smart'): array {
+        if ($vlanId < 1 || $vlanId > 4094) {
+            return ['success' => false, 'message' => 'Invalid VLAN ID (1-4094)'];
+        }
+        
+        $command = "vlan {$vlanId} {$type}";
+        if (!empty($description)) {
+            $command .= " description {$description}";
+        }
+        
+        $result = $this->executeCommand($oltId, $command);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'create_vlan',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "VLAN {$vlanId} created" : ($result['message'] ?? 'Failed'),
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function deleteVLAN(int $oltId, int $vlanId): array {
+        if ($vlanId < 1 || $vlanId > 4094) {
+            return ['success' => false, 'message' => 'Invalid VLAN ID'];
+        }
+        
+        $command = "undo vlan {$vlanId}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'delete_vlan',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "VLAN {$vlanId} deleted" : ($result['message'] ?? 'Failed'),
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function getPONPorts(int $oltId): array {
+        $command = "display port state all";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $ports = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+\/\d+\/\d+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+                $ports[] = [
+                    'port' => $matches[1],
+                    'status' => $matches[2],
+                    'type' => $matches[3] ?? 'GPON'
+                ];
+            }
+        }
+        
+        $onuCounts = $this->getONUCountsByPort($oltId);
+        foreach ($ports as &$port) {
+            $port['onu_count'] = $onuCounts[$port['port']] ?? 0;
+        }
+        
+        return ['success' => true, 'ports' => $ports, 'raw' => $result['output']];
+    }
+    
+    public function getONUCountsByPort(int $oltId): array {
+        $stmt = $this->db->prepare("
+            SELECT CONCAT(frame, '/', slot, '/', port) as pon_port, COUNT(*) as count
+            FROM huawei_onus 
+            WHERE olt_id = ?
+            GROUP BY frame, slot, port
+        ");
+        $stmt->execute([$oltId]);
+        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $counts = [];
+        foreach ($results as $row) {
+            $counts[$row['pon_port']] = (int)$row['count'];
+        }
+        return $counts;
+    }
+    
+    public function getServicePortInfo(int $oltId, int $frame, int $slot, int $port): array {
+        $command = "display service-port port {$frame}/{$slot}/{$port}";
+        return $this->executeCommand($oltId, $command);
+    }
+    
+    public function getONUDetailedInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        return $this->executeCommand($oltId, $command);
+    }
 }

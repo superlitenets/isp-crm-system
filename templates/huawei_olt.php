@@ -211,6 +211,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'create_vlan':
+                $result = $huaweiOLT->createVLAN(
+                    (int)$_POST['olt_id'],
+                    (int)$_POST['vlan_id'],
+                    $_POST['description'] ?? '',
+                    $_POST['vlan_type'] ?? 'smart'
+                );
+                $message = $result['success'] ? 'VLAN created successfully' : ($result['message'] ?? 'Failed to create VLAN');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_vlan':
+                $result = $huaweiOLT->deleteVLAN((int)$_POST['olt_id'], (int)$_POST['vlan_id']);
+                $message = $result['success'] ? 'VLAN deleted successfully' : ($result['message'] ?? 'Failed to delete VLAN');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
         }
     } catch (Exception $e) {
         $message = 'Error: ' . $e->getMessage();
@@ -561,6 +576,9 @@ try {
                                 <button class="btn btn-sm btn-outline-secondary" onclick="editOlt(<?= htmlspecialchars(json_encode($olt)) ?>)">
                                     <i class="bi bi-pencil me-1"></i> Edit
                                 </button>
+                                <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-gear me-1"></i> Manage
+                                </a>
                                 <a href="?page=huawei-olt&view=onus&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-info">
                                     <i class="bi bi-diagram-3 me-1"></i> ONUs
                                 </a>
@@ -1198,6 +1216,268 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     </div>
                 </div>
             </div>
+            
+            <?php elseif ($view === 'olt_detail' && $oltId): ?>
+            <?php
+            $currentOlt = $huaweiOLT->getOLT($oltId);
+            $detailTab = $_GET['tab'] ?? 'boards';
+            $boardInfo = null;
+            $vlanInfo = null;
+            $portInfo = null;
+            
+            if ($detailTab === 'boards') {
+                $boardInfo = $huaweiOLT->getBoardInfo($oltId);
+            } elseif ($detailTab === 'vlans') {
+                $vlanInfo = $huaweiOLT->getVLANs($oltId);
+            } elseif ($detailTab === 'ports') {
+                $portInfo = $huaweiOLT->getPONPorts($oltId);
+            }
+            ?>
+            <?php if ($currentOlt): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <a href="?page=huawei-olt&view=olts" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                    <span class="fs-4 fw-bold"><?= htmlspecialchars($currentOlt['name']) ?></span>
+                    <span class="text-muted ms-2">(<?= htmlspecialchars($currentOlt['ip_address']) ?>)</span>
+                </div>
+                <div>
+                    <span class="badge bg-<?= $currentOlt['is_active'] ? 'success' : 'secondary' ?> me-2">
+                        <?= $currentOlt['is_active'] ? 'Active' : 'Inactive' ?>
+                    </span>
+                </div>
+            </div>
+            
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'boards' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=boards">
+                        <i class="bi bi-cpu me-1"></i> Boards
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'vlans' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=vlans">
+                        <i class="bi bi-diagram-2 me-1"></i> VLANs
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'ports' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=ports">
+                        <i class="bi bi-ethernet me-1"></i> PON Ports
+                    </a>
+                </li>
+            </ul>
+            
+            <?php if ($detailTab === 'boards'): ?>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Board Information</h5>
+                    <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=boards" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php if ($boardInfo && $boardInfo['success']): ?>
+                    <?php if (!empty($boardInfo['boards'])): ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Slot</th>
+                                    <th>Board Name</th>
+                                    <th>Status</th>
+                                    <th>Subtype</th>
+                                    <th>Ports</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($boardInfo['boards'] as $board): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($board['slot']) ?></strong></td>
+                                    <td><?= htmlspecialchars($board['board_name']) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= strtolower($board['status']) === 'normal' ? 'success' : 'warning' ?>">
+                                            <?= htmlspecialchars($board['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= htmlspecialchars($board['subtype']) ?></td>
+                                    <td><?= htmlspecialchars($board['ports']) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-info mb-0">No boards parsed. Raw output below:</div>
+                    <?php endif; ?>
+                    
+                    <details class="mt-3">
+                        <summary class="text-muted small">View Raw Output</summary>
+                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow: auto;"><?= htmlspecialchars($boardInfo['raw'] ?? '') ?></pre>
+                    </details>
+                    <?php else: ?>
+                    <div class="alert alert-danger mb-0">
+                        <?= htmlspecialchars($boardInfo['message'] ?? 'Failed to retrieve board information') ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php elseif ($detailTab === 'vlans'): ?>
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-diagram-2 me-2"></i>VLANs</h5>
+                            <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=vlans" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            </a>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if ($vlanInfo && $vlanInfo['success']): ?>
+                            <?php if (!empty($vlanInfo['vlans'])): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>VLAN ID</th>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($vlanInfo['vlans'] as $vlan): ?>
+                                        <tr>
+                                            <td><strong><?= $vlan['vlan_id'] ?></strong></td>
+                                            <td><span class="badge bg-secondary"><?= htmlspecialchars($vlan['type']) ?></span></td>
+                                            <td><?= htmlspecialchars($vlan['description']) ?></td>
+                                            <td>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete VLAN <?= $vlan['vlan_id'] ?>?')">
+                                                    <input type="hidden" name="action" value="delete_vlan">
+                                                    <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                    <input type="hidden" name="vlan_id" value="<?= $vlan['vlan_id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php else: ?>
+                            <div class="p-3">
+                                <div class="alert alert-info mb-0">No VLANs found or could not parse output.</div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <details class="p-3 border-top">
+                                <summary class="text-muted small">View Raw Output</summary>
+                                <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 200px; overflow: auto;"><?= htmlspecialchars($vlanInfo['raw'] ?? '') ?></pre>
+                            </details>
+                            <?php else: ?>
+                            <div class="p-3">
+                                <div class="alert alert-danger mb-0">
+                                    <?= htmlspecialchars($vlanInfo['message'] ?? 'Failed to retrieve VLANs') ?>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Create VLAN</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="create_vlan">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">VLAN ID</label>
+                                    <input type="number" name="vlan_id" class="form-control" min="1" max="4094" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select name="vlan_type" class="form-select">
+                                        <option value="smart">Smart</option>
+                                        <option value="common">Common</option>
+                                        <option value="mux">MUX</option>
+                                        <option value="standard">Standard</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <input type="text" name="description" class="form-control" placeholder="Optional">
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-plus-lg me-1"></i> Create VLAN
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($detailTab === 'ports'): ?>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-ethernet me-2"></i>PON Ports</h5>
+                    <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=ports" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </a>
+                </div>
+                <div class="card-body">
+                    <?php if ($portInfo && $portInfo['success']): ?>
+                    <?php if (!empty($portInfo['ports'])): ?>
+                    <div class="row g-3">
+                        <?php foreach ($portInfo['ports'] as $port): ?>
+                        <div class="col-md-3">
+                            <div class="card h-100 <?= strtolower($port['status']) === 'up' ? 'border-success' : 'border-secondary' ?>">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-ethernet fs-2 <?= strtolower($port['status']) === 'up' ? 'text-success' : 'text-secondary' ?>"></i>
+                                    <h6 class="mt-2 mb-1"><?= htmlspecialchars($port['port']) ?></h6>
+                                    <span class="badge bg-<?= strtolower($port['status']) === 'up' ? 'success' : 'secondary' ?>">
+                                        <?= htmlspecialchars($port['status']) ?>
+                                    </span>
+                                    <div class="mt-2 small text-muted">
+                                        <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?> ONUs
+                                    </div>
+                                    <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port']) ?>" class="btn btn-sm btn-outline-primary mt-2">
+                                        View ONUs
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-info mb-0">No PON ports found or could not parse output.</div>
+                    <?php endif; ?>
+                    
+                    <details class="mt-3">
+                        <summary class="text-muted small">View Raw Output</summary>
+                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow: auto;"><?= htmlspecialchars($portInfo['raw'] ?? '') ?></pre>
+                    </details>
+                    <?php else: ?>
+                    <div class="alert alert-danger mb-0">
+                        <?= htmlspecialchars($portInfo['message'] ?? 'Failed to retrieve port information') ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <?php else: ?>
+            <div class="alert alert-danger">OLT not found.</div>
+            <?php endif; ?>
             
             <?php endif; ?>
         </div>
