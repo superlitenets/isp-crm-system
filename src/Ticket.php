@@ -296,6 +296,15 @@ class Ticket {
         $customer = (new Customer())->find($ticket['customer_id']);
 
         if ($technician && $technician['phone'] && $customer) {
+            $statusLink = '';
+            try {
+                require_once __DIR__ . '/TicketStatusLink.php';
+                $statusLinkService = new \TicketStatusLink($this->db);
+                $statusLink = $statusLinkService->generateStatusUpdateUrl($ticketId, $technicianId);
+            } catch (\Throwable $e) {
+                error_log("Failed to generate status link for ticket $ticketId: " . $e->getMessage());
+            }
+            
             $placeholders = [
                 '{ticket_number}' => $ticket['ticket_number'],
                 '{subject}' => $ticket['subject'] ?? '',
@@ -307,16 +316,23 @@ class Ticket {
                 '{customer_address}' => $customer['address'] ?? '',
                 '{customer_email}' => $customer['email'] ?? '',
                 '{technician_name}' => $technician['name'] ?? 'Technician',
-                '{technician_phone}' => $technician['phone'] ?? ''
+                '{technician_phone}' => $technician['phone'] ?? '',
+                '{status_link}' => $statusLink
             ];
             
             $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', $placeholders);
+            if (!empty($statusLink) && strpos($message, $statusLink) === false) {
+                $message .= " Update: " . $statusLink;
+            }
             $result = $this->sms->send($technician['phone'], $message);
             $this->sms->logSMS($ticketId, $technician['phone'], 'technician', 'Ticket assignment notification', $result['success'] ? 'sent' : 'failed');
             
             $waMessage = $this->buildSMSFromTemplate('wa_template_technician_assigned', $placeholders);
             if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
                 $waMessage = $message;
+            }
+            if (!empty($statusLink) && strpos($waMessage, $statusLink) === false) {
+                $waMessage .= "\n\nUpdate status: " . $statusLink;
             }
             try {
                 $waResult = $this->whatsapp->send($technician['phone'], $waMessage);
@@ -990,6 +1006,15 @@ class Ticket {
 
         foreach ($members as $member) {
             if ($member['phone'] && $customer) {
+                $statusLink = '';
+                try {
+                    require_once __DIR__ . '/TicketStatusLink.php';
+                    $statusLinkService = new \TicketStatusLink($this->db);
+                    $statusLink = $statusLinkService->generateStatusUpdateUrl($ticketId, $member['id']);
+                } catch (\Throwable $e) {
+                    error_log("Failed to generate status link for team member: " . $e->getMessage());
+                }
+                
                 $message = $this->buildSMSFromTemplate('sms_template_technician_assigned', [
                     '{ticket_number}' => $ticket['ticket_number'],
                     '{customer_name}' => $customer['name'] ?? 'Customer',
@@ -998,8 +1023,12 @@ class Ticket {
                     '{subject}' => $ticket['subject'] ?? '',
                     '{category}' => $ticket['category'] ?? '',
                     '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
-                    '{technician_name}' => $member['user_name'] ?? $member['name'] ?? 'Team Member'
+                    '{technician_name}' => $member['user_name'] ?? $member['name'] ?? 'Team Member',
+                    '{status_link}' => $statusLink
                 ]);
+                if (!empty($statusLink) && strpos($message, $statusLink) === false) {
+                    $message .= " Update: " . $statusLink;
+                }
                 $result = $this->sms->send($member['phone'], $message);
                 $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
             }

@@ -361,7 +361,24 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
         $customer = new \App\Customer();
         $customerData = $ticketData['customer_id'] ? $customer->find($ticketData['customer_id']) : null;
         
-        $message = $whatsapp->formatTicketAssignmentMessage($ticketData, $customerData, $settings);
+        $statusLink = '';
+        try {
+            require_once __DIR__ . '/../src/TicketStatusLink.php';
+            $statusLinkService = new \TicketStatusLink($db);
+            $statusLink = $statusLinkService->generateStatusUpdateUrl($ticketId, $ticketData['assigned_to'] ?? null);
+        } catch (Throwable $e) {
+            error_log("Failed to generate status link for repost: " . $e->getMessage());
+        }
+        
+        if (!empty($ticketData['assigned_to'])) {
+            $assignedUser = $ticketModel->getUser($ticketData['assigned_to']);
+            $ticketData['assigned_to_name'] = $assignedUser['name'] ?? 'Unknown';
+        }
+        
+        $serviceFee = new \App\ServiceFee($db);
+        $ticketData['service_fees'] = $serviceFee->getTicketFees($ticketId);
+        
+        $message = $whatsapp->formatTicketAssignmentMessage($ticketData, $customerData, $settings, $statusLink);
         
         $groupsSent = 0;
         $errors = [];

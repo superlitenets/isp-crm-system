@@ -349,6 +349,11 @@ class WhatsApp {
     public function notifyTechnician(string $phone, string $ticketNumber, string $customerName, string $subject, array $extra = []): array {
         $settings = new Settings();
         $template = $settings->get('wa_template_technician_assigned', $settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}'));
+        
+        if (strpos($template, '{status_link}') === false && !empty($extra['{status_link}'])) {
+            $template .= "\n\nUpdate status: {status_link}";
+        }
+        
         $placeholders = array_merge([
             '{ticket_number}' => $ticketNumber,
             '{customer_name}' => $customerName,
@@ -357,7 +362,8 @@ class WhatsApp {
             '{customer_address}' => $extra['customer_address'] ?? '',
             '{priority}' => $extra['priority'] ?? 'Medium',
             '{category}' => $extra['category'] ?? '',
-            '{technician_name}' => $extra['technician_name'] ?? ''
+            '{technician_name}' => $extra['technician_name'] ?? '',
+            '{status_link}' => $extra['status_link'] ?? ''
         ], $extra);
         $text = str_replace(array_keys($placeholders), array_values($placeholders), $template);
         return $this->send($phone, $text);
@@ -365,6 +371,56 @@ class WhatsApp {
     
     public function sendMessage(string $phone, string $message): array {
         return $this->send($phone, $message);
+    }
+    
+    public function formatTicketAssignmentMessage(array $ticket, ?array $customer, $settings, string $statusLink = ''): string {
+        $ticketNumber = $ticket['ticket_number'] ?? $ticket['id'] ?? 'N/A';
+        $subject = $ticket['subject'] ?? 'No subject';
+        $category = ucfirst($ticket['category'] ?? 'General');
+        $priority = ucfirst($ticket['priority'] ?? 'Medium');
+        $status = ucfirst($ticket['status'] ?? 'Open');
+        $createdAt = isset($ticket['created_at']) ? date('M j, Y g:i A', strtotime($ticket['created_at'])) : 'N/A';
+        
+        $customerName = $customer['name'] ?? 'Unknown';
+        $customerPhone = $customer['phone'] ?? 'N/A';
+        $customerAddress = $customer['address'] ?? 'N/A';
+        $customerEmail = $customer['email'] ?? 'N/A';
+        
+        $assignedInfo = 'Unassigned';
+        if (!empty($ticket['assigned_to_name'])) {
+            $assignedInfo = "Assigned to: " . $ticket['assigned_to_name'];
+        }
+        
+        $serviceFees = '';
+        if (!empty($ticket['service_fees'])) {
+            $feeLines = [];
+            foreach ($ticket['service_fees'] as $fee) {
+                $feeLines[] = "• " . ($fee['name'] ?? 'Fee') . ": " . ($fee['currency'] ?? 'KES') . " " . number_format($fee['amount'] ?? 0, 2);
+            }
+            if (!empty($feeLines)) {
+                $serviceFees = "\n\n💰 *Service Fees:*\n" . implode("\n", $feeLines);
+            }
+        }
+        
+        $message = "🎫 *TICKET #{$ticketNumber}*\n\n";
+        $message .= "📌 *Subject:* {$subject}\n";
+        $message .= "🏷️ *Category:* {$category}\n";
+        $message .= "⚡ *Priority:* {$priority}\n";
+        $message .= "📊 *Status:* {$status}\n";
+        $message .= "🕐 *Created:* {$createdAt}\n\n";
+        $message .= "👤 *Customer:*\n";
+        $message .= "• Name: {$customerName}\n";
+        $message .= "• Phone: {$customerPhone}\n";
+        $message .= "• Address: {$customerAddress}\n";
+        $message .= "• Email: {$customerEmail}\n\n";
+        $message .= "👷 *{$assignedInfo}*";
+        $message .= $serviceFees;
+        
+        if (!empty($statusLink)) {
+            $message .= "\n\n🔗 *Update Status:* {$statusLink}";
+        }
+        
+        return $message;
     }
     
     public function sendBulk(array $recipients, string $message): array {

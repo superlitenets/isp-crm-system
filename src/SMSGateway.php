@@ -285,6 +285,11 @@ class SMSGateway {
     public function notifyTechnician(string $phone, string $ticketNumber, string $customerName, string $subject, array $extra = []): array {
         $settings = new Settings();
         $template = $settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}');
+        
+        if (strpos($template, '{status_link}') === false && !empty($extra['{status_link}'])) {
+            $template .= " Update: {status_link}";
+        }
+        
         $placeholders = array_merge([
             '{ticket_number}' => $ticketNumber,
             '{customer_name}' => $customerName,
@@ -293,7 +298,8 @@ class SMSGateway {
             '{customer_address}' => $extra['customer_address'] ?? '',
             '{priority}' => $extra['priority'] ?? 'Medium',
             '{category}' => $extra['category'] ?? '',
-            '{technician_name}' => $extra['technician_name'] ?? ''
+            '{technician_name}' => $extra['technician_name'] ?? '',
+            '{status_link}' => $extra['status_link'] ?? ''
         ], $extra);
         $text = str_replace(array_keys($placeholders), array_values($placeholders), $template);
         return $this->send($phone, $text);
