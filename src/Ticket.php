@@ -669,7 +669,7 @@ class Ticket {
         }
         
         if (!empty($filters['sla_breached'])) {
-            $sql .= " AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE)";
+            $sql .= " AND t.status NOT IN ('resolved', 'closed') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
         
         $sql .= " ORDER BY 
@@ -725,6 +725,15 @@ class Ticket {
             $sql .= " AND (t.assigned_to = ? OR t.created_by = ?)";
             $params[] = (int)$filters['user_id'];
             $params[] = (int)$filters['user_id'];
+        }
+        
+        if (isset($filters['escalated']) && $filters['escalated'] !== '') {
+            $sql .= " AND t.is_escalated = ?";
+            $params[] = $filters['escalated'] === '1' || $filters['escalated'] === true;
+        }
+        
+        if (!empty($filters['sla_breached'])) {
+            $sql .= " AND t.status NOT IN ('resolved', 'closed') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
         
         $stmt = $this->db->prepare($sql);

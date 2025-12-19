@@ -1531,7 +1531,7 @@ $escalatedFilter = $_GET['escalated'] ?? '';
     <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
     <div>
         <strong><?= count($overdueTickets) ?> overdue ticket(s) require immediate attention!</strong>
-        <a href="?page=tickets&status=open&sla_breached=1" class="alert-link ms-2">View all</a>
+        <a href="?page=tickets&sla_breached=1" class="alert-link ms-2">View all</a>
     </div>
 </div>
 <?php endif; ?>
