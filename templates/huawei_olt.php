@@ -137,6 +137,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'save_genieacs_settings':
+                $settings = [
+                    'genieacs_url' => $_POST['genieacs_url'] ?? '',
+                    'genieacs_username' => $_POST['genieacs_username'] ?? '',
+                    'genieacs_password' => $_POST['genieacs_password'] ?? '',
+                    'genieacs_timeout' => $_POST['genieacs_timeout'] ?? '30',
+                    'genieacs_enabled' => isset($_POST['genieacs_enabled']) ? '1' : '0'
+                ];
+                foreach ($settings as $key => $value) {
+                    $stmt = $db->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+                    $stmt->execute([$value, $key]);
+                    if ($stmt->rowCount() === 0) {
+                        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, setting_group) VALUES (?, ?, 'TR-069')");
+                        $stmt->execute([$key, $value]);
+                    }
+                }
+                $message = 'GenieACS settings saved successfully';
+                $messageType = 'success';
+                break;
+            case 'test_genieacs':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->testConnection();
+                $message = $result['message'];
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'sync_tr069_devices':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->syncDevicesToDB();
+                if ($result['success']) {
+                    $message = "Synced {$result['synced']} devices from GenieACS (total: {$result['total']})";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Sync failed';
+                    $messageType = 'danger';
+                }
+                break;
+            case 'tr069_reboot':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->rebootDevice($_POST['device_id']);
+                $message = $result['success'] ? 'Reboot command sent' : ($result['error'] ?? 'Reboot failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'tr069_refresh':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->refreshDevice($_POST['device_id']);
+                $message = $result['success'] ? 'Refresh task created' : ($result['error'] ?? 'Refresh failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'tr069_wifi':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->setWiFiSettings(
+                    $_POST['device_id'],
+                    $_POST['ssid'],
+                    $_POST['password'],
+                    isset($_POST['enabled']),
+                    (int)($_POST['channel'] ?? 0)
+                );
+                $message = $result['success'] ? 'WiFi configuration sent' : ($result['error'] ?? 'Configuration failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'tr069_factory_reset':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $result = $genieacs->factoryReset($_POST['device_id']);
+                $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
         }
     } catch (Exception $e) {
         $message = 'Error: ' . $e->getMessage();
@@ -244,6 +316,13 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'terminal' ? 'active' : '' ?>" href="?page=huawei-olt&view=terminal">
                     <i class="bi bi-terminal me-2"></i> CLI Terminal
+                </a>
+                <hr class="my-2 border-light opacity-25">
+                <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
+                    <i class="bi bi-gear-wide-connected me-2"></i> TR-069 / ACS
+                </a>
+                <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings">
+                    <i class="bi bi-gear me-2"></i> Settings
                 </a>
             </nav>
             <hr class="my-3 border-light">
@@ -874,6 +953,250 @@ try {
                     <?php endif; ?>
                 </div>
             </div>
+            
+            <?php elseif ($view === 'tr069'): ?>
+            <?php
+            require_once __DIR__ . '/../src/GenieACS.php';
+            $genieacs = new \App\GenieACS($db);
+            $genieacsEnabled = false;
+            $tr069Devices = [];
+            try {
+                $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_enabled'");
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                $genieacsEnabled = ($row['setting_value'] ?? '0') === '1';
+                
+                if ($genieacsEnabled) {
+                    $stmt = $db->query("SELECT t.*, o.name as onu_name, o.sn as onu_sn FROM tr069_devices t LEFT JOIN huawei_onus o ON t.onu_id = o.id ORDER BY t.last_inform DESC LIMIT 100");
+                    $tr069Devices = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                }
+            } catch (Exception $e) {}
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS</h4>
+                <div>
+                    <?php if ($genieacsEnabled): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_tr069_devices">
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i> Sync Devices</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php if (!$genieacsEnabled): ?>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>TR-069 / GenieACS is not configured.</strong><br>
+                Go to <a href="?page=huawei-olt&view=settings">Settings</a> to configure your GenieACS server connection.
+            </div>
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5>What is TR-069?</h5>
+                    <p>TR-069 (CWMP) is a remote management protocol that allows you to configure ONU devices over the network. With GenieACS integration, you can:</p>
+                    <ul>
+                        <li><i class="bi bi-wifi text-primary me-2"></i>Configure WiFi settings (SSID, password, channel)</li>
+                        <li><i class="bi bi-telephone text-success me-2"></i>Set up VoIP parameters</li>
+                        <li><i class="bi bi-arrow-up-circle text-info me-2"></i>Perform firmware upgrades</li>
+                        <li><i class="bi bi-arrow-clockwise text-warning me-2"></i>Reboot devices remotely</li>
+                        <li><i class="bi bi-speedometer text-secondary me-2"></i>Monitor device performance</li>
+                    </ul>
+                    
+                    <h6 class="mt-4">Setup Requirements:</h6>
+                    <ol>
+                        <li>Deploy GenieACS (Docker recommended): <code>docker run -d -p 7547:7547 -p 7557:7557 -p 3000:3000 genieacs/genieacs</code></li>
+                        <li>Configure your OLT to push TR-069 ACS URL to ONUs</li>
+                        <li>Enter GenieACS NBI URL in Settings (usually <code>http://your-server:7557</code>)</li>
+                    </ol>
+                </div>
+            </div>
+            <?php else: ?>
+            
+            <?php if (empty($tr069Devices)): ?>
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                No TR-069 devices found. Click "Sync Devices" to fetch devices from GenieACS, or ensure your ONUs are connecting to the ACS.
+            </div>
+            <?php else: ?>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Serial Number</th>
+                                    <th>Linked ONU</th>
+                                    <th>Manufacturer</th>
+                                    <th>Model</th>
+                                    <th>Last Inform</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($tr069Devices as $device): ?>
+                                <?php
+                                $lastInform = $device['last_inform'] ? strtotime($device['last_inform']) : 0;
+                                $isOnline = (time() - $lastInform) < 300;
+                                ?>
+                                <tr>
+                                    <td><code><?= htmlspecialchars($device['serial_number']) ?></code></td>
+                                    <td>
+                                        <?php if ($device['onu_sn']): ?>
+                                        <a href="?page=huawei-olt&view=onus&search=<?= urlencode($device['onu_sn']) ?>">
+                                            <?= htmlspecialchars($device['onu_name'] ?: $device['onu_sn']) ?>
+                                        </a>
+                                        <?php else: ?>
+                                        <span class="text-muted">Not linked</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($device['manufacturer'] ?: '-') ?></td>
+                                    <td><?= htmlspecialchars($device['model'] ?: '-') ?></td>
+                                    <td>
+                                        <?php if ($device['last_inform']): ?>
+                                        <span title="<?= date('Y-m-d H:i:s', $lastInform) ?>">
+                                            <?= date('M j, H:i', $lastInform) ?>
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="text-muted">Never</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-<?= $isOnline ? 'success' : 'secondary' ?>">
+                                            <?= $isOnline ? 'Online' : 'Offline' ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" onclick="openWifiConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Configure WiFi">
+                                                <i class="bi bi-wifi"></i>
+                                            </button>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="tr069_refresh">
+                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
+                                                <button type="submit" class="btn btn-outline-info" title="Refresh Parameters">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="tr069_reboot">
+                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
+                                                <button type="submit" class="btn btn-outline-warning" title="Reboot" onclick="return confirm('Reboot this device?')">
+                                                    <i class="bi bi-power"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="tr069_factory_reset">
+                                                <input type="hidden" name="device_id" value="<?= htmlspecialchars($device['device_id']) ?>">
+                                                <button type="submit" class="btn btn-outline-danger" title="Factory Reset" onclick="return confirm('Factory reset this device? All settings will be lost!')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
+            
+            <?php elseif ($view === 'settings'): ?>
+            <?php
+            $genieacsSettings = [];
+            try {
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'genieacs_%'");
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $genieacsSettings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch (Exception $e) {}
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-gear me-2"></i>Settings</h4>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>GenieACS / TR-069 Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_genieacs_settings">
+                                
+                                <div class="mb-3 form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="genieacs_enabled" id="genieacsEnabled" <?= ($genieacsSettings['genieacs_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="genieacsEnabled">Enable GenieACS Integration</label>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">GenieACS NBI URL</label>
+                                    <input type="url" name="genieacs_url" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_url'] ?? 'http://localhost:7557') ?>" placeholder="http://genieacs:7557">
+                                    <div class="form-text">The NBI (North Bound Interface) URL, usually port 7557</div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Username (optional)</label>
+                                        <input type="text" name="genieacs_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_username'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Password</label>
+                                        <input type="password" name="genieacs_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_password'] ?? '') ?>" placeholder="Leave blank to keep existing">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Timeout (seconds)</label>
+                                    <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
+                                    <button type="submit" name="action" value="test_genieacs" class="btn btn-outline-secondary"><i class="bi bi-plug me-1"></i> Test Connection</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>GenieACS Setup Guide</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6>1. Deploy GenieACS</h6>
+                            <p class="small">Using Docker Compose (recommended):</p>
+                            <pre class="bg-light p-2 rounded small">services:
+  genieacs:
+    image: genieacs/genieacs
+    ports:
+      - "7547:7547"  # CWMP (for ONUs)
+      - "7557:7557"  # NBI (for CRM)
+      - "3000:3000"  # Web UI</pre>
+                            
+                            <h6 class="mt-3">2. Configure OLT TR-069 Profile</h6>
+                            <pre class="bg-light p-2 rounded small">ont tr069-server-profile add profile-id 1 \
+  url http://YOUR_SERVER:7547/ \
+  user admin admin</pre>
+                            
+                            <h6 class="mt-3">3. Apply to ONUs</h6>
+                            <pre class="bg-light p-2 rounded small">interface gpon 0/1
+ont tr069-server-config 1 all profile-id 1</pre>
+                            
+                            <h6 class="mt-3">4. Enter NBI URL Above</h6>
+                            <p class="small mb-0">Use <code>http://YOUR_SERVER:7557</code> for the NBI URL in settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <?php endif; ?>
         </div>
     </div>
@@ -1173,6 +1496,58 @@ try {
         <input type="hidden" name="onu_id" id="actionOnuId">
         <input type="hidden" name="id" id="actionId">
     </form>
+    
+    <div class="modal fade" id="wifiConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" value="tr069_wifi">
+                    <input type="hidden" name="device_id" id="wifiDeviceId">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-wifi me-2"></i>Configure WiFi</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Configuring device: <strong id="wifiDeviceSn"></strong>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="enabled" id="wifiEnabled" checked>
+                            <label class="form-check-label" for="wifiEnabled">Enable WiFi</label>
+                        </div>
+                        
+                        <h6>2.4 GHz WiFi</h6>
+                        <div class="row mb-3">
+                            <div class="col-8">
+                                <label class="form-label">SSID</label>
+                                <input type="text" name="ssid" class="form-control" placeholder="Network Name" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Channel</label>
+                                <select name="channel" class="form-select">
+                                    <option value="0">Auto</option>
+                                    <option value="1">1</option>
+                                    <option value="6">6</option>
+                                    <option value="11">11</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="text" name="password" class="form-control" placeholder="WiFi Password" required minlength="8">
+                            <div class="form-text">Minimum 8 characters</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Apply Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -1316,6 +1691,12 @@ try {
     
     function setCommand(cmd) {
         document.querySelector('input[name="command"]').value = cmd;
+    }
+    
+    function openWifiConfig(deviceId, serialNumber) {
+        document.getElementById('wifiDeviceId').value = deviceId;
+        document.getElementById('wifiDeviceSn').textContent = serialNumber;
+        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     </script>
 </body>
