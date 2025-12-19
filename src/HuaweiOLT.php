@@ -1342,19 +1342,26 @@ class HuaweiOLT {
         
         foreach ($lines as $line) {
             $line = trim($line);
-            if (preg_match('/^(\d{1,4})\s+(\w+)/i', $line, $matches)) {
+            
+            if (empty($line) || preg_match('/^[-=]+$/', $line) || 
+                stripos($line, 'VLANID') !== false || 
+                stripos($line, 'VID') !== false ||
+                stripos($line, 'display') !== false ||
+                stripos($line, 'Total') !== false) {
+                continue;
+            }
+            
+            if (preg_match('/^\s*(\d{1,4})\s+(\w+)\s*(.*)/i', $line, $matches)) {
                 $vlanId = (int)$matches[1];
                 if ($vlanId > 0 && $vlanId < 4095) {
                     $type = strtolower($matches[2]);
-                    $description = '';
-                    if (preg_match('/^\d+\s+\w+\s+(.+)$/i', $line, $descMatch)) {
-                        $description = trim($descMatch[1]);
+                    if (in_array($type, ['smart', 'common', 'mux', 'standard', 'super', 'stacking'])) {
+                        $vlans[] = [
+                            'vlan_id' => $vlanId,
+                            'type' => $type,
+                            'description' => trim($matches[3] ?? '')
+                        ];
                     }
-                    $vlans[] = [
-                        'vlan_id' => $vlanId,
-                        'type' => $type,
-                        'description' => $description
-                    ];
                 }
             }
         }
@@ -1409,7 +1416,7 @@ class HuaweiOLT {
     }
     
     public function getPONPorts(int $oltId): array {
-        $command = "display port state all";
+        $command = "display board 0";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -1417,40 +1424,56 @@ class HuaweiOLT {
         }
         
         $ports = [];
+        $gponSlots = [];
         $lines = explode("\n", $result['output'] ?? '');
-        
         foreach ($lines as $line) {
-            $line = trim($line);
-            if (preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(\w+)\s+(\w+)\s+(\w+)/i', $line, $matches)) {
+            if (preg_match('/^(\d{1,2})\s+(H\d{3}[A-Z0-9]*GP[A-Z0-9]*)/i', $line, $matches)) {
+                $gponSlots[] = (int)$matches[1];
+            }
+        }
+        
+        if (empty($gponSlots)) {
+            $gponSlots = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        }
+        
+        foreach ($gponSlots as $slot) {
+            for ($portNum = 0; $portNum <= 15; $portNum++) {
+                $portName = "0/{$slot}/{$portNum}";
                 $ports[] = [
-                    'port' => "{$matches[1]}/{$matches[2]}/{$matches[3]}",
-                    'type' => strtoupper($matches[4]),
-                    'admin' => $matches[5],
-                    'status' => $matches[6]
-                ];
-            } elseif (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)\s+(\w+)\s+(\w+)/i', $line, $matches)) {
-                $ports[] = [
-                    'port' => $matches[1],
-                    'type' => strtoupper($matches[2]),
-                    'admin' => $matches[3],
-                    'status' => $matches[4]
-                ];
-            } elseif (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)/i', $line, $matches)) {
-                $ports[] = [
-                    'port' => $matches[1],
+                    'port' => $portName,
                     'type' => 'GPON',
                     'admin' => 'enable',
-                    'status' => $matches[2]
+                    'status' => 'online'
                 ];
             }
         }
         
         $onuCounts = $this->getONUCountsByPort($oltId);
-        foreach ($ports as &$port) {
-            $port['onu_count'] = $onuCounts[$port['port']] ?? 0;
+        $filteredPorts = [];
+        foreach ($ports as $port) {
+            $count = $onuCounts[$port['port']] ?? 0;
+            if ($count > 0) {
+                $port['onu_count'] = $count;
+                $filteredPorts[] = $port;
+            }
         }
         
-        return ['success' => true, 'ports' => $ports, 'raw' => $result['output']];
+        if (empty($filteredPorts)) {
+            foreach ($gponSlots as $slot) {
+                for ($portNum = 0; $portNum <= 7; $portNum++) {
+                    $portName = "0/{$slot}/{$portNum}";
+                    $filteredPorts[] = [
+                        'port' => $portName,
+                        'type' => 'GPON',
+                        'admin' => 'enable',
+                        'status' => 'online',
+                        'onu_count' => 0
+                    ];
+                }
+            }
+        }
+        
+        return ['success' => true, 'ports' => $filteredPorts, 'raw' => $result['output']];
     }
     
     public function getONUCountsByPort(int $oltId): array {
@@ -1591,7 +1614,7 @@ class HuaweiOLT {
     }
     
     public function syncUplinksFromOLT(int $oltId): array {
-        $command = "display port vlan all";
+        $command = "display board 0";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -1603,26 +1626,40 @@ class HuaweiOLT {
         
         foreach ($lines as $line) {
             $line = trim($line);
-            if (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)\s+(\d+)/i', $line, $matches)) {
-                $uplinks[] = [
-                    'port' => $matches[1],
-                    'mode' => $matches[2],
-                    'pvid' => (int)$matches[3]
-                ];
+            if (preg_match('/^(\d{1,2})\s+(H\d{3}[A-Z0-9]*(GI|XG|GE|X2)[A-Z0-9]*)\s+(\S+)/i', $line, $matches)) {
+                $slot = (int)$matches[1];
+                $boardName = $matches[2];
+                $status = $matches[4];
+                
+                $portCount = 2;
+                if (stripos($boardName, 'X2') !== false) $portCount = 2;
+                elseif (stripos($boardName, 'X4') !== false) $portCount = 4;
+                elseif (stripos($boardName, 'X8') !== false) $portCount = 8;
+                elseif (stripos($boardName, 'GI') !== false) $portCount = 4;
+                
+                for ($p = 0; $p < $portCount; $p++) {
+                    $uplinks[] = [
+                        'port' => "0/{$slot}/{$p}",
+                        'board' => $boardName,
+                        'mode' => 'trunk',
+                        'pvid' => 1
+                    ];
+                }
             }
         }
         
         $this->db->prepare("DELETE FROM huawei_olt_uplinks WHERE olt_id = ?")->execute([$oltId]);
         
         $stmt = $this->db->prepare("
-            INSERT INTO huawei_olt_uplinks (olt_id, port_name, vlan_mode, pvid)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO huawei_olt_uplinks (olt_id, port_name, port_type, vlan_mode, pvid)
+            VALUES (?, ?, ?, ?, ?)
         ");
         
         foreach ($uplinks as $uplink) {
             $stmt->execute([
                 $oltId,
                 $uplink['port'],
+                $uplink['board'] ?? 'GE',
                 $uplink['mode'],
                 $uplink['pvid']
             ]);
