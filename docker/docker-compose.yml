@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -49,24 +47,16 @@ services:
       - isp-crm-network
 
   genieacs:
-    image: genieacs/genieacs:latest
+    image: drumsergio/genieacs:latest
     container_name: isp-crm-genieacs
     environment:
-      - GENIEACS_CWMP_ACCESS_LOG_FILE=/var/log/genieacs/cwmp-access.log
-      - GENIEACS_NBI_ACCESS_LOG_FILE=/var/log/genieacs/nbi-access.log
-      - GENIEACS_FS_ACCESS_LOG_FILE=/var/log/genieacs/fs-access.log
-      - GENIEACS_UI_ACCESS_LOG_FILE=/var/log/genieacs/ui-access.log
-      - GENIEACS_DEBUG_FILE=/var/log/genieacs/debug.log
-      - GENIEACS_EXT_DIR=/opt/genieacs/ext
       - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
+      - GENIEACS_UI_JWT_SECRET=isp-crm-genieacs-jwt-secret-2025
     ports:
       - "7547:7547"
       - "7557:7557"
       - "7567:7567"
       - "3000:3000"
-    volumes:
-      - genieacs_ext:/opt/genieacs/ext
-      - genieacs_logs:/var/log/genieacs
     depends_on:
       - genieacs-mongo
     restart: unless-stopped
@@ -86,8 +76,6 @@ volumes:
   postgres_data:
   uploads_data:
   logs_data:
-  genieacs_ext:
-  genieacs_logs:
   genieacs_mongo_data:
 
 networks:
