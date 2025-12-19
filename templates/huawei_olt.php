@@ -250,6 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'VLAN deleted successfully' : ($result['message'] ?? 'Failed to delete VLAN');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            default:
+                break;
         }
     } catch (Exception $e) {
         $message = 'Error: ' . $e->getMessage();

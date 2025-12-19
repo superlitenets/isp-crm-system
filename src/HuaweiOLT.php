@@ -632,7 +632,7 @@ class HuaweiOLT {
         
         if (isset($filters['is_authorized'])) {
             $sql .= " AND o.is_authorized = ?";
-            $params[] = $filters['is_authorized'];
+            $params[] = $this->castBoolean($filters['is_authorized']);
         }
         
         $sql .= " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
