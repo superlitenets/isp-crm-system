@@ -1429,9 +1429,13 @@ class HuaweiOLT {
             return $result;
         }
         
+        $vlans = $this->parseVLANOutput($result['output'] ?? '');
+        return ['success' => true, 'vlans' => $vlans, 'raw' => $result['output']];
+    }
+    
+    public function parseVLANOutput(string $output): array {
         $vlans = [];
-        $lines = explode("\n", $result['output'] ?? '');
-        $currentVlan = null;
+        $lines = explode("\n", $output);
         
         foreach ($lines as $line) {
             $line = trim($line);
@@ -1439,56 +1443,78 @@ class HuaweiOLT {
             if (empty($line) || preg_match('/^[-=]+$/', $line) || 
                 stripos($line, 'display') !== false ||
                 stripos($line, 'Total') !== false ||
-                stripos($line, 'Command') !== false) {
+                stripos($line, 'Command') !== false ||
+                stripos($line, 'VLAN   Type') !== false ||
+                stripos($line, 'Note :') !== false) {
                 continue;
             }
             
-            if (preg_match('/VLAN\s*ID\s*[:\s]+(\d{1,4})/i', $line, $matches)) {
-                if ($currentVlan !== null) {
-                    $vlans[] = $currentVlan;
-                }
-                $currentVlan = [
-                    'vlan_id' => (int)$matches[1],
-                    'type' => 'smart',
-                    'description' => ''
+            if (preg_match('/^\s*(\d{1,4})\s+(smart|mux|standard|super)\s+(\w+)\s+(\d+)\s+(\d+)\s+(-|\d+)/i', $line, $m)) {
+                $vlans[] = [
+                    'vlan_id' => (int)$m[1],
+                    'vlan_type' => strtolower($m[2]),
+                    'attribute' => strtolower($m[3]),
+                    'standard_port_count' => (int)$m[4],
+                    'service_port_count' => (int)$m[5],
+                    'vlan_connect_count' => $m[6] === '-' ? 0 : (int)$m[6]
                 ];
-                continue;
-            }
-            
-            if ($currentVlan !== null) {
-                if (preg_match('/Type\s*[:\s]+(\w+)/i', $line, $matches)) {
-                    $currentVlan['type'] = strtolower($matches[1]);
-                } elseif (preg_match('/Description\s*[:\s]+(.+)/i', $line, $matches)) {
-                    $currentVlan['description'] = trim($matches[1]);
-                }
-            }
-            
-            if (preg_match('/^\s*(\d{1,4})\s+(smart|common|mux|standard|super|stacking)\s*(.*)/i', $line, $matches)) {
-                $vlanId = (int)$matches[1];
-                if ($vlanId > 0 && $vlanId < 4095) {
-                    $vlans[] = [
-                        'vlan_id' => $vlanId,
-                        'type' => strtolower($matches[2]),
-                        'description' => trim($matches[3] ?? '')
-                    ];
-                }
             }
         }
         
-        if ($currentVlan !== null) {
-            $vlans[] = $currentVlan;
+        return $vlans;
+    }
+    
+    public function syncVLANsFromOLT(int $oltId): array {
+        $result = $this->getVLANs($oltId);
+        if (!$result['success']) {
+            return $result;
         }
         
-        $uniqueVlans = [];
-        $seenIds = [];
-        foreach ($vlans as $vlan) {
-            if (!in_array($vlan['vlan_id'], $seenIds)) {
-                $seenIds[] = $vlan['vlan_id'];
-                $uniqueVlans[] = $vlan;
-            }
+        $synced = 0;
+        foreach ($result['vlans'] as $vlan) {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_vlans (olt_id, vlan_id, vlan_type, attribute, standard_port_count, 
+                                          service_port_count, vlan_connect_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (olt_id, vlan_id) DO UPDATE SET
+                    vlan_type = EXCLUDED.vlan_type,
+                    attribute = EXCLUDED.attribute,
+                    standard_port_count = EXCLUDED.standard_port_count,
+                    service_port_count = EXCLUDED.service_port_count,
+                    vlan_connect_count = EXCLUDED.vlan_connect_count,
+                    updated_at = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([
+                $oltId,
+                $vlan['vlan_id'],
+                $vlan['vlan_type'],
+                $vlan['attribute'],
+                $vlan['standard_port_count'],
+                $vlan['service_port_count'],
+                $vlan['vlan_connect_count']
+            ]);
+            $synced++;
         }
         
-        return ['success' => true, 'vlans' => $uniqueVlans, 'raw' => $result['output']];
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'sync_vlans',
+            'status' => 'success',
+            'message' => "Synced {$synced} VLANs from OLT",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return ['success' => true, 'synced' => $synced, 'vlans' => $result['vlans']];
+    }
+    
+    public function getCachedVLANs(int $oltId): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM huawei_vlans 
+            WHERE olt_id = ? AND is_active = TRUE 
+            ORDER BY vlan_id
+        ");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function createVLAN(int $oltId, int $vlanId, string $description = '', string $type = 'smart'): array {
@@ -1633,11 +1659,6 @@ class HuaweiOLT {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function getCachedVLANs(int $oltId): array {
-        $stmt = $this->db->prepare("SELECT * FROM huawei_olt_vlans WHERE olt_id = ? ORDER BY vlan_id");
-        $stmt->execute([$oltId]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
     
     public function getCachedPONPorts(int $oltId): array {
         $stmt = $this->db->prepare("SELECT * FROM huawei_olt_pon_ports WHERE olt_id = ? ORDER BY port_name");
@@ -1679,32 +1700,6 @@ class HuaweiOLT {
         return ['success' => true, 'count' => count($result['boards']), 'raw' => $result['raw']];
     }
     
-    public function syncVLANsFromOLT(int $oltId): array {
-        $result = $this->getVLANs($oltId);
-        if (!$result['success']) {
-            return $result;
-        }
-        
-        $this->db->prepare("DELETE FROM huawei_olt_vlans WHERE olt_id = ?")->execute([$oltId]);
-        
-        $stmt = $this->db->prepare("
-            INSERT INTO huawei_olt_vlans (olt_id, vlan_id, vlan_type, description)
-            VALUES (?, ?, ?, ?)
-        ");
-        
-        foreach ($result['vlans'] as $vlan) {
-            $stmt->execute([
-                $oltId,
-                $vlan['vlan_id'],
-                $vlan['type'],
-                $vlan['description']
-            ]);
-        }
-        
-        $this->db->prepare("UPDATE huawei_olts SET vlans_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$oltId]);
-        
-        return ['success' => true, 'count' => count($result['vlans']), 'raw' => $result['raw']];
-    }
     
     public function syncPONPortsFromOLT(int $oltId): array {
         $result = $this->getPONPorts($oltId);
