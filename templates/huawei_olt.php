@@ -278,6 +278,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'sync_boards':
+                $result = $huaweiOLT->syncBoardsFromOLT((int)$_POST['olt_id']);
+                $message = $result['success'] ? "Synced {$result['count']} boards from OLT" : ($result['message'] ?? 'Sync failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'sync_vlans':
+                $result = $huaweiOLT->syncVLANsFromOLT((int)$_POST['olt_id']);
+                $message = $result['success'] ? "Synced {$result['count']} VLANs from OLT" : ($result['message'] ?? 'Sync failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'sync_ports':
+                $result = $huaweiOLT->syncPONPortsFromOLT((int)$_POST['olt_id']);
+                $message = $result['success'] ? "Synced {$result['count']} PON ports from OLT" : ($result['message'] ?? 'Sync failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'sync_uplinks':
+                $result = $huaweiOLT->syncUplinksFromOLT((int)$_POST['olt_id']);
+                $message = $result['success'] ? "Synced {$result['count']} uplink ports from OLT" : ($result['message'] ?? 'Sync failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'sync_all_olt':
+                $result = $huaweiOLT->syncAllFromOLT((int)$_POST['olt_id']);
+                $message = $result['success'] ? "Full sync complete: {$result['message']}" : "Sync partially failed: {$result['message']}";
+                $messageType = $result['success'] ? 'success' : 'warning';
+                break;
             default:
                 break;
         }
@@ -1478,18 +1503,12 @@ ont tr069-server-config 1 all profile-id 1</pre>
             <?php elseif ($view === 'olt_detail' && $oltId): ?>
             <?php
             $currentOlt = $huaweiOLT->getOLT($oltId);
-            $detailTab = $_GET['tab'] ?? 'boards';
-            $boardInfo = null;
-            $vlanInfo = null;
-            $portInfo = null;
+            $detailTab = $_GET['tab'] ?? 'overview';
             
-            if ($detailTab === 'boards') {
-                $boardInfo = $huaweiOLT->getBoardInfo($oltId);
-            } elseif ($detailTab === 'vlans') {
-                $vlanInfo = $huaweiOLT->getVLANs($oltId);
-            } elseif ($detailTab === 'ports') {
-                $portInfo = $huaweiOLT->getPONPorts($oltId);
-            }
+            $cachedBoards = $huaweiOLT->getCachedBoards($oltId);
+            $cachedVLANs = $huaweiOLT->getCachedVLANs($oltId);
+            $cachedPorts = $huaweiOLT->getCachedPONPorts($oltId);
+            $cachedUplinks = $huaweiOLT->getCachedUplinks($oltId);
             ?>
             <?php if ($currentOlt): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -1500,17 +1519,39 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     <span class="fs-4 fw-bold"><?= htmlspecialchars($currentOlt['name']) ?></span>
                     <span class="text-muted ms-2">(<?= htmlspecialchars($currentOlt['ip_address']) ?>)</span>
                 </div>
-                <div>
-                    <span class="badge bg-<?= $currentOlt['is_active'] ? 'success' : 'secondary' ?> me-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-<?= $currentOlt['is_active'] ? 'success' : 'secondary' ?>">
                         <?= $currentOlt['is_active'] ? 'Active' : 'Inactive' ?>
                     </span>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_all_olt">
+                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync all data from OLT? This may take a moment.')">
+                            <i class="bi bi-arrow-repeat me-1"></i> Sync All from OLT
+                        </button>
+                    </form>
                 </div>
             </div>
             
-            <ul class="nav nav-tabs mb-4">
+            <ul class="nav nav-tabs mb-4 flex-nowrap" style="overflow-x: auto;">
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'overview' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=overview">
+                        <i class="bi bi-info-circle me-1"></i> Overview
+                    </a>
+                </li>
                 <li class="nav-item">
                     <a class="nav-link <?= $detailTab === 'boards' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=boards">
-                        <i class="bi bi-cpu me-1"></i> Boards
+                        <i class="bi bi-cpu me-1"></i> Cards
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'ports' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=ports">
+                        <i class="bi bi-ethernet me-1"></i> PON Ports
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $detailTab === 'uplinks' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=uplinks">
+                        <i class="bi bi-arrow-up-circle me-1"></i> Uplinks
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1519,23 +1560,106 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?= $detailTab === 'ports' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=ports">
-                        <i class="bi bi-ethernet me-1"></i> PON Ports
+                    <a class="nav-link <?= $detailTab === 'advanced' ? 'active' : '' ?>" href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=advanced">
+                        <i class="bi bi-gear me-1"></i> Advanced
                     </a>
                 </li>
             </ul>
             
-            <?php if ($detailTab === 'boards'): ?>
+            <?php if ($detailTab === 'overview'): ?>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-info-circle me-2"></i>OLT Details
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tr><td class="text-muted">Name</td><td><strong><?= htmlspecialchars($currentOlt['name']) ?></strong></td></tr>
+                                <tr><td class="text-muted">IP Address</td><td><code><?= htmlspecialchars($currentOlt['ip_address']) ?></code></td></tr>
+                                <tr><td class="text-muted">Port</td><td><?= $currentOlt['port'] ?></td></tr>
+                                <tr><td class="text-muted">Connection</td><td><?= ucfirst($currentOlt['connection_type']) ?></td></tr>
+                                <tr><td class="text-muted">Vendor</td><td><?= htmlspecialchars($currentOlt['vendor'] ?: 'Huawei') ?></td></tr>
+                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($currentOlt['model'] ?: '-') ?></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-bar-chart me-2"></i>Statistics
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6 mb-3">
+                                    <div class="fs-3 fw-bold text-primary"><?= count($cachedBoards) ?></div>
+                                    <div class="small text-muted">Cards</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fs-3 fw-bold text-success"><?= count($cachedPorts) ?></div>
+                                    <div class="small text-muted">PON Ports</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="fs-3 fw-bold text-info"><?= count($cachedVLANs) ?></div>
+                                    <div class="small text-muted">VLANs</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="fs-3 fw-bold text-warning"><?= count($cachedUplinks) ?></div>
+                                    <div class="small text-muted">Uplinks</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-info text-white">
+                            <i class="bi bi-clock-history me-2"></i>Last Sync
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tr>
+                                    <td class="text-muted">Boards</td>
+                                    <td><?= $currentOlt['boards_synced_at'] ? date('M j, H:i', strtotime($currentOlt['boards_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">VLANs</td>
+                                    <td><?= $currentOlt['vlans_synced_at'] ? date('M j, H:i', strtotime($currentOlt['vlans_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Ports</td>
+                                    <td><?= $currentOlt['ports_synced_at'] ? date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Uplinks</td>
+                                    <td><?= $currentOlt['uplinks_synced_at'] ? date('M j, H:i', strtotime($currentOlt['uplinks_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($detailTab === 'boards'): ?>
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Board Information</h5>
-                    <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=boards" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                    </a>
+                    <div>
+                        <h5 class="mb-0 d-inline"><i class="bi bi-cpu me-2"></i>Cards</h5>
+                        <?php if ($currentOlt['boards_synced_at']): ?>
+                        <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['boards_synced_at'])) ?></small>
+                        <?php endif; ?>
+                    </div>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_boards">
+                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                        </button>
+                    </form>
                 </div>
                 <div class="card-body">
-                    <?php if ($boardInfo && $boardInfo['success']): ?>
-                    <?php if (!empty($boardInfo['boards'])): ?>
+                    <?php if (!empty($cachedBoards)): ?>
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
@@ -1547,13 +1671,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($boardInfo['boards'] as $board): ?>
+                                <?php foreach ($cachedBoards as $board): ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($board['slot']) ?></strong></td>
                                     <td><code><?= htmlspecialchars($board['board_name']) ?></code></td>
                                     <td>
                                         <?php
-                                        $status = strtolower($board['status']);
+                                        $status = strtolower($board['status'] ?? '');
                                         $statusClass = 'secondary';
                                         if (strpos($status, 'normal') !== false) $statusClass = 'success';
                                         elseif (strpos($status, 'active') !== false) $statusClass = 'primary';
@@ -1561,13 +1685,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         elseif (strpos($status, 'failed') !== false) $statusClass = 'danger';
                                         ?>
                                         <span class="badge bg-<?= $statusClass ?>">
-                                            <?= htmlspecialchars($board['status']) ?>
+                                            <?= htmlspecialchars($board['status'] ?? '-') ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <?php if (!empty($board['online'])): ?>
-                                        <span class="badge bg-<?= strtolower($board['online']) === 'online' ? 'success' : 'danger' ?>">
-                                            <?= htmlspecialchars($board['online']) ?>
+                                        <?php if (!empty($board['online_status'])): ?>
+                                        <span class="badge bg-<?= strtolower($board['online_status']) === 'online' ? 'success' : 'danger' ?>">
+                                            <?= htmlspecialchars($board['online_status']) ?>
                                         </span>
                                         <?php else: ?>
                                         <span class="text-muted">-</span>
@@ -1579,16 +1703,8 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         </table>
                     </div>
                     <?php else: ?>
-                    <div class="alert alert-info mb-0">No boards parsed. Raw output below:</div>
-                    <?php endif; ?>
-                    
-                    <details class="mt-3">
-                        <summary class="text-muted small">View Raw Output</summary>
-                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow: auto;"><?= htmlspecialchars($boardInfo['raw'] ?? '') ?></pre>
-                    </details>
-                    <?php else: ?>
-                    <div class="alert alert-danger mb-0">
-                        <?= htmlspecialchars($boardInfo['message'] ?? 'Failed to retrieve board information') ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch board information.
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1599,14 +1715,22 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 <div class="col-lg-8">
                     <div class="card shadow-sm">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-diagram-2 me-2"></i>VLANs</h5>
-                            <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=vlans" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                            </a>
+                            <div>
+                                <h5 class="mb-0 d-inline"><i class="bi bi-diagram-2 me-2"></i>VLANs</h5>
+                                <?php if ($currentOlt['vlans_synced_at']): ?>
+                                <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['vlans_synced_at'])) ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="sync_vlans">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                                </button>
+                            </form>
                         </div>
                         <div class="card-body p-0">
-                            <?php if ($vlanInfo && $vlanInfo['success']): ?>
-                            <?php if (!empty($vlanInfo['vlans'])): ?>
+                            <?php if (!empty($cachedVLANs)): ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
                                     <thead class="table-light">
@@ -1618,11 +1742,11 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($vlanInfo['vlans'] as $vlan): ?>
+                                        <?php foreach ($cachedVLANs as $vlan): ?>
                                         <tr>
                                             <td><strong><?= $vlan['vlan_id'] ?></strong></td>
-                                            <td><span class="badge bg-secondary"><?= htmlspecialchars($vlan['type']) ?></span></td>
-                                            <td><?= htmlspecialchars($vlan['description']) ?></td>
+                                            <td><span class="badge bg-secondary"><?= htmlspecialchars($vlan['vlan_type'] ?? 'smart') ?></span></td>
+                                            <td><?= htmlspecialchars($vlan['description'] ?? '') ?></td>
                                             <td>
                                                 <form method="post" class="d-inline" onsubmit="return confirm('Delete VLAN <?= $vlan['vlan_id'] ?>?')">
                                                     <input type="hidden" name="action" value="delete_vlan">
@@ -1640,18 +1764,8 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             </div>
                             <?php else: ?>
                             <div class="p-3">
-                                <div class="alert alert-info mb-0">No VLANs found or could not parse output.</div>
-                            </div>
-                            <?php endif; ?>
-                            
-                            <details class="p-3 border-top">
-                                <summary class="text-muted small">View Raw Output</summary>
-                                <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 200px; overflow: auto;"><?= htmlspecialchars($vlanInfo['raw'] ?? '') ?></pre>
-                            </details>
-                            <?php else: ?>
-                            <div class="p-3">
-                                <div class="alert alert-danger mb-0">
-                                    <?= htmlspecialchars($vlanInfo['message'] ?? 'Failed to retrieve VLANs') ?>
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch VLANs.
                                 </div>
                             </div>
                             <?php endif; ?>
@@ -1701,28 +1815,46 @@ ont tr069-server-config 1 all profile-id 1</pre>
             <?php elseif ($detailTab === 'ports'): ?>
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-ethernet me-2"></i>PON Ports</h5>
-                    <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $oltId ?>&tab=ports" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                    </a>
+                    <div>
+                        <h5 class="mb-0 d-inline"><i class="bi bi-ethernet me-2"></i>PON Ports</h5>
+                        <?php if ($currentOlt['ports_synced_at']): ?>
+                        <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) ?></small>
+                        <?php endif; ?>
+                    </div>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_ports">
+                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                        </button>
+                    </form>
                 </div>
                 <div class="card-body">
-                    <?php if ($portInfo && $portInfo['success']): ?>
-                    <?php if (!empty($portInfo['ports'])): ?>
+                    <?php if (!empty($cachedPorts)): ?>
                     <div class="row g-3">
-                        <?php foreach ($portInfo['ports'] as $port): ?>
+                        <?php foreach ($cachedPorts as $port): ?>
+                        <?php 
+                        $status = strtolower($port['oper_status'] ?? '');
+                        $isUp = in_array($status, ['up', 'online', 'normal', 'enable']);
+                        ?>
                         <div class="col-md-3">
-                            <div class="card h-100 <?= strtolower($port['status']) === 'up' ? 'border-success' : 'border-secondary' ?>">
+                            <div class="card h-100 <?= $isUp ? 'border-success' : 'border-secondary' ?>">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-ethernet fs-2 <?= strtolower($port['status']) === 'up' ? 'text-success' : 'text-secondary' ?>"></i>
-                                    <h6 class="mt-2 mb-1"><?= htmlspecialchars($port['port']) ?></h6>
-                                    <span class="badge bg-<?= strtolower($port['status']) === 'up' ? 'success' : 'secondary' ?>">
-                                        <?= htmlspecialchars($port['status']) ?>
+                                    <i class="bi bi-ethernet fs-2 <?= $isUp ? 'text-success' : 'text-secondary' ?>"></i>
+                                    <h6 class="mt-2 mb-1"><?= htmlspecialchars($port['port_name']) ?></h6>
+                                    <div class="small text-muted mb-1"><?= htmlspecialchars($port['port_type'] ?? 'GPON') ?></div>
+                                    <span class="badge bg-<?= $isUp ? 'success' : 'secondary' ?>">
+                                        <?= htmlspecialchars(ucfirst($port['oper_status'] ?? '-')) ?>
                                     </span>
+                                    <?php if (!empty($port['admin_status'])): ?>
+                                    <span class="badge bg-<?= strtolower($port['admin_status']) === 'enable' ? 'info' : 'warning' ?>">
+                                        <?= htmlspecialchars($port['admin_status']) ?>
+                                    </span>
+                                    <?php endif; ?>
                                     <div class="mt-2 small text-muted">
-                                        <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?> ONUs
+                                        <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?? 0 ?> ONUs
                                     </div>
-                                    <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port']) ?>" class="btn btn-sm btn-outline-primary mt-2">
+                                    <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="btn btn-sm btn-outline-primary mt-2">
                                         View ONUs
                                     </a>
                                 </div>
@@ -1731,18 +1863,108 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         <?php endforeach; ?>
                     </div>
                     <?php else: ?>
-                    <div class="alert alert-info mb-0">No PON ports found or could not parse output.</div>
-                    <?php endif; ?>
-                    
-                    <details class="mt-3">
-                        <summary class="text-muted small">View Raw Output</summary>
-                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow: auto;"><?= htmlspecialchars($portInfo['raw'] ?? '') ?></pre>
-                    </details>
-                    <?php else: ?>
-                    <div class="alert alert-danger mb-0">
-                        <?= htmlspecialchars($portInfo['message'] ?? 'Failed to retrieve port information') ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch PON port information.
                     </div>
                     <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php elseif ($detailTab === 'uplinks'): ?>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0 d-inline"><i class="bi bi-arrow-up-circle me-2"></i>Uplink Ports</h5>
+                        <?php if ($currentOlt['uplinks_synced_at']): ?>
+                        <small class="text-muted ms-2">Last sync: <?= date('M j, H:i', strtotime($currentOlt['uplinks_synced_at'])) ?></small>
+                        <?php endif; ?>
+                    </div>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="sync_uplinks">
+                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Sync from OLT
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($cachedUplinks)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Port</th>
+                                    <th>VLAN Mode</th>
+                                    <th>PVID</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($cachedUplinks as $uplink): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($uplink['port_name']) ?></strong></td>
+                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($uplink['vlan_mode'] ?? '-') ?></span></td>
+                                    <td><?= $uplink['pvid'] ?? '-' ?></td>
+                                    <td>
+                                        <?php if (!empty($uplink['oper_status'])): ?>
+                                        <span class="badge bg-<?= strtolower($uplink['oper_status']) === 'up' ? 'success' : 'secondary' ?>">
+                                            <?= htmlspecialchars($uplink['oper_status']) ?>
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch uplink port information.
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php elseif ($detailTab === 'advanced'): ?>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>CLI Terminal</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Execute custom commands on this OLT device.</p>
+                            <a href="?page=huawei-olt&view=terminal&olt_id=<?= $oltId ?>" class="btn btn-primary">
+                                <i class="bi bi-terminal me-2"></i>Open Terminal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-gear me-2"></i>OLT Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="refresh_all_optical">
+                                    <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                    <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('Refresh optical power for all ONUs? This may take some time.')">
+                                        <i class="bi bi-broadcast me-2"></i>Refresh All ONU Optical Power
+                                    </button>
+                                </form>
+                                <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&unconfigured=1" class="btn btn-outline-warning w-100">
+                                    <i class="bi bi-question-circle me-2"></i>View Pending Auth ONUs
+                                </a>
+                                <a href="?page=huawei-olt&view=logs&olt_id=<?= $oltId ?>" class="btn btn-outline-secondary w-100">
+                                    <i class="bi bi-journal-text me-2"></i>View Logs
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <?php endif; ?>

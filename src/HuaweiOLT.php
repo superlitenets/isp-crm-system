@@ -1341,13 +1341,19 @@ class HuaweiOLT {
         $lines = explode("\n", $result['output'] ?? '');
         
         foreach ($lines as $line) {
-            if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+            $line = trim($line);
+            if (preg_match('/^(\d{1,4})\s+(\w+)/i', $line, $matches)) {
                 $vlanId = (int)$matches[1];
                 if ($vlanId > 0 && $vlanId < 4095) {
+                    $type = strtolower($matches[2]);
+                    $description = '';
+                    if (preg_match('/^\d+\s+\w+\s+(.+)$/i', $line, $descMatch)) {
+                        $description = trim($descMatch[1]);
+                    }
                     $vlans[] = [
                         'vlan_id' => $vlanId,
-                        'type' => $matches[2] ?? 'common',
-                        'description' => $matches[3] ?? ''
+                        'type' => $type,
+                        'description' => $description
                     ];
                 }
             }
@@ -1414,11 +1420,27 @@ class HuaweiOLT {
         $lines = explode("\n", $result['output'] ?? '');
         
         foreach ($lines as $line) {
-            if (preg_match('/^\s*(\d+\/\d+\/\d+)\s+(\S+)\s+(\S+)/i', $line, $matches)) {
+            $line = trim($line);
+            if (preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(\w+)\s+(\w+)\s+(\w+)/i', $line, $matches)) {
+                $ports[] = [
+                    'port' => "{$matches[1]}/{$matches[2]}/{$matches[3]}",
+                    'type' => strtoupper($matches[4]),
+                    'admin' => $matches[5],
+                    'status' => $matches[6]
+                ];
+            } elseif (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)\s+(\w+)\s+(\w+)/i', $line, $matches)) {
                 $ports[] = [
                     'port' => $matches[1],
-                    'status' => $matches[2],
-                    'type' => $matches[3] ?? 'GPON'
+                    'type' => strtoupper($matches[2]),
+                    'admin' => $matches[3],
+                    'status' => $matches[4]
+                ];
+            } elseif (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)/i', $line, $matches)) {
+                $ports[] = [
+                    'port' => $matches[1],
+                    'type' => 'GPON',
+                    'admin' => 'enable',
+                    'status' => $matches[2]
                 ];
             }
         }
@@ -1456,5 +1478,180 @@ class HuaweiOLT {
     public function getONUDetailedInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
         $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
         return $this->executeCommand($oltId, $command);
+    }
+    
+    // ==================== Cached Data Management ====================
+    
+    public function getCachedBoards(int $oltId): array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_olt_boards WHERE olt_id = ? ORDER BY slot");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getCachedVLANs(int $oltId): array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_olt_vlans WHERE olt_id = ? ORDER BY vlan_id");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getCachedPONPorts(int $oltId): array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_olt_pon_ports WHERE olt_id = ? ORDER BY port_name");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getCachedUplinks(int $oltId): array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_olt_uplinks WHERE olt_id = ? ORDER BY port_name");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function syncBoardsFromOLT(int $oltId): array {
+        $result = $this->getBoardInfo($oltId);
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $this->db->prepare("DELETE FROM huawei_olt_boards WHERE olt_id = ?")->execute([$oltId]);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO huawei_olt_boards (olt_id, slot, board_name, status, online_status)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        
+        foreach ($result['boards'] as $board) {
+            $stmt->execute([
+                $oltId,
+                $board['slot'],
+                $board['board_name'],
+                $board['status'],
+                $board['online'] ?? null
+            ]);
+        }
+        
+        $this->db->prepare("UPDATE huawei_olts SET boards_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$oltId]);
+        
+        return ['success' => true, 'count' => count($result['boards']), 'raw' => $result['raw']];
+    }
+    
+    public function syncVLANsFromOLT(int $oltId): array {
+        $result = $this->getVLANs($oltId);
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $this->db->prepare("DELETE FROM huawei_olt_vlans WHERE olt_id = ?")->execute([$oltId]);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO huawei_olt_vlans (olt_id, vlan_id, vlan_type, description)
+            VALUES (?, ?, ?, ?)
+        ");
+        
+        foreach ($result['vlans'] as $vlan) {
+            $stmt->execute([
+                $oltId,
+                $vlan['vlan_id'],
+                $vlan['type'],
+                $vlan['description']
+            ]);
+        }
+        
+        $this->db->prepare("UPDATE huawei_olts SET vlans_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$oltId]);
+        
+        return ['success' => true, 'count' => count($result['vlans']), 'raw' => $result['raw']];
+    }
+    
+    public function syncPONPortsFromOLT(int $oltId): array {
+        $result = $this->getPONPorts($oltId);
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $this->db->prepare("DELETE FROM huawei_olt_pon_ports WHERE olt_id = ?")->execute([$oltId]);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO huawei_olt_pon_ports (olt_id, port_name, port_type, admin_status, oper_status, onu_count)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        
+        foreach ($result['ports'] as $port) {
+            $stmt->execute([
+                $oltId,
+                $port['port'],
+                $port['type'] ?? 'GPON',
+                $port['admin'] ?? 'enable',
+                $port['status'],
+                $port['onu_count'] ?? 0
+            ]);
+        }
+        
+        $this->db->prepare("UPDATE huawei_olts SET ports_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$oltId]);
+        
+        return ['success' => true, 'count' => count($result['ports']), 'raw' => $result['raw']];
+    }
+    
+    public function syncUplinksFromOLT(int $oltId): array {
+        $command = "display port vlan all";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $uplinks = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (preg_match('/^(\d+\/\d+\/\d+)\s+(\w+)\s+(\d+)/i', $line, $matches)) {
+                $uplinks[] = [
+                    'port' => $matches[1],
+                    'mode' => $matches[2],
+                    'pvid' => (int)$matches[3]
+                ];
+            }
+        }
+        
+        $this->db->prepare("DELETE FROM huawei_olt_uplinks WHERE olt_id = ?")->execute([$oltId]);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO huawei_olt_uplinks (olt_id, port_name, vlan_mode, pvid)
+            VALUES (?, ?, ?, ?)
+        ");
+        
+        foreach ($uplinks as $uplink) {
+            $stmt->execute([
+                $oltId,
+                $uplink['port'],
+                $uplink['mode'],
+                $uplink['pvid']
+            ]);
+        }
+        
+        $this->db->prepare("UPDATE huawei_olts SET uplinks_synced_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$oltId]);
+        
+        return ['success' => true, 'count' => count($uplinks), 'raw' => $result['output']];
+    }
+    
+    public function syncAllFromOLT(int $oltId): array {
+        $results = [
+            'boards' => $this->syncBoardsFromOLT($oltId),
+            'vlans' => $this->syncVLANsFromOLT($oltId),
+            'ports' => $this->syncPONPortsFromOLT($oltId),
+            'uplinks' => $this->syncUplinksFromOLT($oltId)
+        ];
+        
+        $success = true;
+        $message = [];
+        foreach ($results as $type => $result) {
+            if ($result['success']) {
+                $message[] = ucfirst($type) . ": {$result['count']}";
+            } else {
+                $success = false;
+                $message[] = ucfirst($type) . ": Failed";
+            }
+        }
+        
+        return ['success' => $success, 'message' => implode(', ', $message), 'details' => $results];
     }
 }
