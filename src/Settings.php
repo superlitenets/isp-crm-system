@@ -250,12 +250,23 @@ class Settings {
     public function getTimezones(): array {
         return [
             'UTC' => 'UTC',
+            'Africa/Nairobi' => 'Nairobi (East Africa)',
+            'Africa/Lagos' => 'Lagos (West Africa)',
+            'Africa/Johannesburg' => 'Johannesburg (South Africa)',
+            'Africa/Cairo' => 'Cairo (Egypt)',
+            'Africa/Casablanca' => 'Casablanca (Morocco)',
+            'Africa/Accra' => 'Accra (Ghana)',
+            'Africa/Addis_Ababa' => 'Addis Ababa (Ethiopia)',
+            'Africa/Dar_es_Salaam' => 'Dar es Salaam (Tanzania)',
+            'Africa/Kampala' => 'Kampala (Uganda)',
+            'Africa/Kigali' => 'Kigali (Rwanda)',
             'America/New_York' => 'Eastern Time (US)',
             'America/Chicago' => 'Central Time (US)',
             'America/Denver' => 'Mountain Time (US)',
             'America/Los_Angeles' => 'Pacific Time (US)',
             'Europe/London' => 'London',
             'Europe/Paris' => 'Paris',
+            'Asia/Dubai' => 'Dubai (UAE)',
             'Asia/Tokyo' => 'Tokyo',
             'Asia/Singapore' => 'Singapore',
             'Australia/Sydney' => 'Sydney'
