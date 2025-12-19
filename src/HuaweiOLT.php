@@ -1464,6 +1464,79 @@ class HuaweiOLT {
         return $vlans;
     }
     
+    public function parseVLANConfig(string $config): array {
+        $result = [
+            'vlans' => [],
+            'vlan_descriptions' => [],
+            'port_vlans' => [],
+            'gpon_ports' => []
+        ];
+        
+        $lines = explode("\n", $config);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            if (preg_match('/^vlan\s+(\d+)(?:\s+to\s+(\d+))?\s+(smart|mux|standard|super)/i', $line, $m)) {
+                $startVlan = (int)$m[1];
+                $endVlan = isset($m[2]) && !empty($m[2]) ? (int)$m[2] : $startVlan;
+                $type = strtolower($m[3]);
+                
+                for ($v = $startVlan; $v <= $endVlan; $v++) {
+                    $result['vlans'][$v] = ['vlan_id' => $v, 'vlan_type' => $type];
+                }
+            }
+            
+            if (preg_match('/^vlan\s+desc\s+(\d+)\s+description\s+"([^"]+)"/i', $line, $m)) {
+                $result['vlan_descriptions'][(int)$m[1]] = $m[2];
+            }
+            
+            if (preg_match('/^port\s+vlan\s+(\d+)(?:\s+to\s+(\d+))?\s+(\d+)\/(\d+)\s+(\d+)/i', $line, $m)) {
+                $startVlan = (int)$m[1];
+                $endVlan = isset($m[2]) && !empty($m[2]) ? (int)$m[2] : $startVlan;
+                $frame = (int)$m[3];
+                $slot = (int)$m[4];
+                $port = (int)$m[5];
+                $portName = "{$frame}/{$slot}/{$port}";
+                
+                if (!isset($result['port_vlans'][$portName])) {
+                    $result['port_vlans'][$portName] = [];
+                }
+                
+                for ($v = $startVlan; $v <= $endVlan; $v++) {
+                    $result['port_vlans'][$portName][] = $v;
+                }
+            }
+            
+            if (preg_match('/^port\s+(\d+)\s+ont-auto-find\s+(enable|disable)/i', $line, $m)) {
+                $result['gpon_ports'][(int)$m[1]] = [
+                    'port' => (int)$m[1],
+                    'auto_find' => strtolower($m[2]) === 'enable'
+                ];
+            }
+        }
+        
+        foreach ($result['vlan_descriptions'] as $vlanId => $desc) {
+            if (isset($result['vlans'][$vlanId])) {
+                $result['vlans'][$vlanId]['description'] = $desc;
+                $result['vlans'][$vlanId]['is_management'] = (stripos($desc, 'MGNT') !== false || stripos($desc, 'management') !== false);
+            }
+        }
+        
+        return $result;
+    }
+    
+    public function getUplinkVLANs(int $oltId, string $portName): array {
+        $stmt = $this->db->prepare("
+            SELECT v.* FROM huawei_vlans v
+            JOIN huawei_port_vlans pv ON v.id = pv.vlan_id
+            WHERE pv.olt_id = ? AND pv.port_name = ?
+            ORDER BY v.vlan_id
+        ");
+        $stmt->execute([$oltId, $portName]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     public function syncVLANsFromOLT(int $oltId): array {
         $result = $this->getVLANs($oltId);
         if (!$result['success']) {
