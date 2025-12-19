@@ -34,6 +34,19 @@ class HuaweiOLT {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv) ?: '';
     }
     
+    private function castBoolean($value): bool {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if ($value === '' || $value === null) {
+            return false;
+        }
+        if (is_string($value)) {
+            return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
+        }
+        return (bool)$value;
+    }
+    
     // ==================== OLT Management ====================
     
     public function getOLTs(bool $activeOnly = true): array {
@@ -73,14 +86,15 @@ class HuaweiOLT {
             $data['vendor'] ?? 'Huawei',
             $data['model'] ?? '',
             $data['location'] ?? '',
-            !empty($data['is_active'])
+            $this->castBoolean($data['is_active'] ?? true)
         ]);
         return (int)$this->db->lastInsertId();
     }
     
     public function updateOLT(int $id, array $data): bool {
         $fields = ['name', 'ip_address', 'port', 'connection_type', 'username', 
-                   'snmp_read_community', 'snmp_write_community', 'snmp_version', 'snmp_port', 'vendor', 'model', 'location', 'is_active'];
+                   'snmp_read_community', 'snmp_write_community', 'snmp_version', 'snmp_port', 'vendor', 'model', 'location'];
+        $booleanFields = ['is_active'];
         $updates = [];
         $params = [];
         
@@ -88,6 +102,13 @@ class HuaweiOLT {
             if (isset($data[$field])) {
                 $updates[] = "{$field} = ?";
                 $params[] = $data[$field];
+            }
+        }
+        
+        foreach ($booleanFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[] = "{$field} = ?";
+                $params[] = $this->castBoolean($data[$field]);
             }
         }
         
@@ -670,7 +691,7 @@ class HuaweiOLT {
             $data['service_profile_id'] ?? null,
             $data['line_profile'] ?? '',
             $data['srv_profile'] ?? '',
-            isset($data['is_authorized']) ? (bool)$data['is_authorized'] : false,
+            $this->castBoolean($data['is_authorized'] ?? false),
             $data['auth_type'] ?? 'sn',
             $data['password'] ?? ''
         ]);
@@ -680,7 +701,7 @@ class HuaweiOLT {
     public function updateONU(int $id, array $data): bool {
         $fields = ['customer_id', 'name', 'description', 'frame', 'slot', 'port', 'onu_id', 'onu_type',
                    'mac_address', 'status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
-                   'line_profile', 'srv_profile', 'is_authorized', 'firmware_version', 'ip_address',
+                   'line_profile', 'srv_profile', 'firmware_version', 'ip_address',
                    'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause'];
         $booleanFields = ['is_authorized'];
         $updates = [];
@@ -689,11 +710,14 @@ class HuaweiOLT {
         foreach ($fields as $field) {
             if (array_key_exists($field, $data)) {
                 $updates[] = "{$field} = ?";
-                if (in_array($field, $booleanFields)) {
-                    $params[] = $data[$field] === '' ? false : (bool)$data[$field];
-                } else {
-                    $params[] = $data[$field];
-                }
+                $params[] = $data[$field];
+            }
+        }
+        
+        foreach ($booleanFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[] = "{$field} = ?";
+                $params[] = $this->castBoolean($data[$field]);
             }
         }
         
@@ -755,8 +779,8 @@ class HuaweiOLT {
             $data['srv_profile'] ?? '',
             $data['native_vlan'] ?? null,
             $data['additional_config'] ?? '',
-            $data['is_default'] ?? false,
-            $data['is_active'] ?? true
+            $this->castBoolean($data['is_default'] ?? false),
+            $this->castBoolean($data['is_active'] ?? true)
         ]);
         return (int)$this->db->lastInsertId();
     }
@@ -764,7 +788,8 @@ class HuaweiOLT {
     public function updateServiceProfile(int $id, array $data): bool {
         $fields = ['name', 'description', 'profile_type', 'vlan_id', 'vlan_mode', 'speed_profile_up',
                    'speed_profile_down', 'qos_profile', 'gem_port', 'tcont_profile', 'line_profile',
-                   'srv_profile', 'native_vlan', 'additional_config', 'is_default', 'is_active'];
+                   'srv_profile', 'native_vlan', 'additional_config'];
+        $booleanFields = ['is_default', 'is_active'];
         $updates = [];
         $params = [];
         
@@ -772,6 +797,13 @@ class HuaweiOLT {
             if (array_key_exists($field, $data)) {
                 $updates[] = "{$field} = ?";
                 $params[] = $data[$field];
+            }
+        }
+        
+        foreach ($booleanFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[] = "{$field} = ?";
+                $params[] = $this->castBoolean($data[$field]);
             }
         }
         
