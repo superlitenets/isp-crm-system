@@ -85,6 +85,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'ONU deleted from database';
                 $messageType = 'success';
                 break;
+            case 'quick_authorize':
+                $onuId = (int)$_POST['id'];
+                $huaweiOLT->updateONU($onuId, ['is_authorized' => true]);
+                $message = 'ONU authorized successfully. You can now configure it.';
+                $messageType = 'success';
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId);
+                exit;
+                break;
             case 'authorize_onu':
                 $result = $huaweiOLT->authorizeONU((int)$_POST['onu_id'], (int)$_POST['profile_id']);
                 $message = $result['message'];
@@ -286,6 +294,15 @@ if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
 }
 
+$currentOnu = null;
+if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
+    $currentOnu = $huaweiOLT->getONU((int)$_GET['onu_id']);
+    if (!$currentOnu) {
+        header('Location: ?page=huawei-olt&view=onus');
+        exit;
+    }
+}
+
 $customers = [];
 try {
     $stmt = $db->query("SELECT id, name, phone FROM customers ORDER BY name LIMIT 1000");
@@ -340,7 +357,7 @@ try {
                     <i class="bi bi-diagram-3 me-2"></i> ONU Inventory
                 </a>
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
-                    <i class="bi bi-arrow-repeat me-2"></i> Unsynced ONUs
+                    <i class="bi bi-clock-history me-2"></i> Pending Authorization
                     <?php if ($stats['unconfigured_onus'] > 0): ?>
                     <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
                     <?php endif; ?>
@@ -437,7 +454,7 @@ try {
                                 <i class="bi bi-question-circle fs-4"></i>
                             </div>
                             <div>
-                                <div class="text-muted small">Unsynced</div>
+                                <div class="text-muted small">Pending Auth</div>
                                 <div class="fs-4 fw-bold text-warning"><?= $stats['unconfigured_onus'] ?></div>
                             </div>
                         </div>
@@ -634,7 +651,7 @@ try {
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
                     <i class="bi bi-diagram-3 me-2"></i>
-                    <?= isset($_GET['unconfigured']) ? 'Unsynced ONUs' : 'ONU Inventory' ?>
+                    <?= isset($_GET['unconfigured']) ? 'Pending Authorization' : 'ONU Inventory' ?>
                 </h4>
                 <div class="d-flex gap-2">
                     <form class="d-flex gap-2" method="get">
@@ -718,7 +735,7 @@ try {
                                             <?= ucfirst($onu['status']) ?>
                                         </span>
                                         <?php if (!$onu['is_authorized']): ?>
-                                        <span class="badge bg-warning">Unsynced</span>
+                                        <span class="badge bg-warning">Pending</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -739,8 +756,8 @@ try {
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <?php if (!$onu['is_authorized']): ?>
-                                            <button class="btn btn-success" onclick="provisionOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Provision">
-                                                <i class="bi bi-plus-circle"></i>
+                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Authorize">
+                                                <i class="bi bi-check-circle"></i>
                                             </button>
                                             <?php else: ?>
                                             <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot">
@@ -761,6 +778,187 @@ try {
                         </table>
                     </div>
                     <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php elseif ($view === 'onu_detail' && $currentOnu): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0">
+                    <i class="bi bi-router me-2"></i>
+                    ONU Configuration: <?= htmlspecialchars($currentOnu['sn']) ?>
+                </h4>
+                <a href="?page=huawei-olt&view=onus" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Inventory
+                </a>
+            </div>
+            
+            <?php if (!empty($message)): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <?= htmlspecialchars($message) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php endif; ?>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-info-circle me-2"></i>ONU Information
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="update_onu">
+                                <input type="hidden" name="id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Serial Number</label>
+                                        <input type="text" class="form-control" value="<?= htmlspecialchars($currentOnu['sn']) ?>" readonly>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">OLT</label>
+                                        <input type="text" class="form-control" value="<?= htmlspecialchars($currentOnu['olt_name'] ?? 'Unknown') ?>" readonly>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Name / Description</label>
+                                    <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($currentOnu['name'] ?? '') ?>" placeholder="Customer name or location">
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-3">
+                                        <label class="form-label">Frame</label>
+                                        <input type="number" name="frame" class="form-control" value="<?= $currentOnu['frame'] ?? 0 ?>">
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label">Slot</label>
+                                        <input type="number" name="slot" class="form-control" value="<?= $currentOnu['slot'] ?? '' ?>">
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label">Port</label>
+                                        <input type="number" name="port" class="form-control" value="<?= $currentOnu['port'] ?? '' ?>">
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label">ONU ID</label>
+                                        <input type="number" name="onu_id" class="form-control" value="<?= $currentOnu['onu_id'] ?? '' ?>">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Link to Customer</label>
+                                    <select name="customer_id" class="form-select">
+                                        <option value="">-- Not Linked --</option>
+                                        <?php foreach ($customers as $cust): ?>
+                                        <option value="<?= $cust['id'] ?>" <?= ($currentOnu['customer_id'] == $cust['id']) ? 'selected' : '' ?>><?= htmlspecialchars($cust['name']) ?> (<?= $cust['phone'] ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Service Profile</label>
+                                    <select name="service_profile_id" class="form-select">
+                                        <option value="">-- None --</option>
+                                        <?php foreach ($profiles as $profile): ?>
+                                        <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>><?= htmlspecialchars($profile['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Save Changes
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-info text-white">
+                            <i class="bi bi-activity me-2"></i>Status & Signal
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-4">
+                                <div class="col-4">
+                                    <div class="h6 text-muted">Status</div>
+                                    <?php
+                                    $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger', 'power_fail' => 'warning'];
+                                    ?>
+                                    <span class="badge bg-<?= $statusClass[$currentOnu['status']] ?? 'secondary' ?> fs-6">
+                                        <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
+                                    </span>
+                                </div>
+                                <div class="col-4">
+                                    <div class="h6 text-muted">RX Power</div>
+                                    <?php
+                                    $rx = $currentOnu['rx_power'];
+                                    $rxClass = 'success';
+                                    if ($rx !== null) {
+                                        if ($rx <= -28) $rxClass = 'danger';
+                                        elseif ($rx <= -25) $rxClass = 'warning';
+                                    }
+                                    ?>
+                                    <span class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 1) . ' dBm' : 'N/A' ?></span>
+                                </div>
+                                <div class="col-4">
+                                    <div class="h6 text-muted">TX Power</div>
+                                    <span class="fw-bold"><?= $currentOnu['tx_power'] !== null ? number_format($currentOnu['tx_power'], 1) . ' dBm' : 'N/A' ?></span>
+                                </div>
+                            </div>
+                            
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="h6 text-muted">Authorization</div>
+                                    <?php if ($currentOnu['is_authorized']): ?>
+                                    <span class="badge bg-success fs-6">Authorized</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-warning fs-6">Pending</span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-6">
+                                    <div class="h6 text-muted">Distance</div>
+                                    <span class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            
+                            <div class="d-flex gap-2 justify-content-center">
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="refresh_onu_optical">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-info">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Refresh Signal
+                                    </button>
+                                </form>
+                                <?php if ($currentOnu['is_authorized']): ?>
+                                <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
+                                    <input type="hidden" name="action" value="reboot_onu">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-warning">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Reboot ONU
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-secondary text-white">
+                            <i class="bi bi-terminal me-2"></i>OLT Commands
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">Copy these commands to configure this ONU on the Huawei OLT:</p>
+                            <pre class="bg-dark text-light p-3 rounded small" style="white-space: pre-wrap;">interface gpon 0/<?= $currentOnu['slot'] ?? '0' ?>/<?= $currentOnu['port'] ?? '0' ?>
+ont add <?= $currentOnu['port'] ?? '0' ?> <?= $currentOnu['onu_id'] ?? '0' ?> sn-auth "<?= $currentOnu['sn'] ?>" omci ont-lineprofile-id <?= $currentOnu['line_profile'] ?: '10' ?> ont-srvprofile-id <?= $currentOnu['srv_profile'] ?: '10' ?> desc "<?= $currentOnu['name'] ?: 'Customer' ?>"
+quit</pre>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent); alert('Copied!')">
+                                <i class="bi bi-clipboard me-1"></i> Copy Commands
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2181,6 +2379,14 @@ echo "# ================================================\n";
         document.getElementById('provisionOnuId').value = id;
         document.getElementById('provisionOnuSn').textContent = sn;
         new bootstrap.Modal(document.getElementById('provisionModal')).show();
+    }
+    
+    function authorizeOnu(id, sn) {
+        if (confirm('Authorize ONU ' + sn + '? This will mark it as authorized and open the configuration page.')) {
+            document.getElementById('actionType').value = 'quick_authorize';
+            document.getElementById('actionId').value = id;
+            document.getElementById('actionForm').submit();
+        }
     }
     
     function rebootOnu(id) {
