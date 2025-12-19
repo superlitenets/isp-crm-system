@@ -86,6 +86,40 @@ services:
     networks:
       - crm_network
 
+  genieacs:
+    image: genieacs/genieacs:latest
+    container_name: isp_crm_genieacs
+    restart: unless-stopped
+    environment:
+      - GENIEACS_CWMP_ACCESS_LOG_FILE=/var/log/genieacs/cwmp-access.log
+      - GENIEACS_NBI_ACCESS_LOG_FILE=/var/log/genieacs/nbi-access.log
+      - GENIEACS_FS_ACCESS_LOG_FILE=/var/log/genieacs/fs-access.log
+      - GENIEACS_UI_ACCESS_LOG_FILE=/var/log/genieacs/ui-access.log
+      - GENIEACS_DEBUG_FILE=/var/log/genieacs/debug.log
+      - GENIEACS_EXT_DIR=/opt/genieacs/ext
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
+    ports:
+      - "7547:7547"
+      - "7557:7557"
+      - "7567:7567"
+      - "3000:3000"
+    volumes:
+      - genieacs_ext:/opt/genieacs/ext
+      - genieacs_logs:/var/log/genieacs
+    depends_on:
+      - genieacs-mongo
+    networks:
+      - crm_network
+
+  genieacs-mongo:
+    image: mongo:4.4
+    container_name: isp_crm_genieacs_mongo
+    restart: unless-stopped
+    volumes:
+      - genieacs_mongo_data:/data/db
+    networks:
+      - crm_network
+
 networks:
   crm_network:
     driver: bridge
@@ -94,3 +128,6 @@ volumes:
   db_data:
   whatsapp_session:
   whatsapp_secret:
+  genieacs_ext:
+  genieacs_logs:
+  genieacs_mongo_data:
