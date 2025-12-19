@@ -1047,7 +1047,7 @@ class HuaweiOLT {
     }
     
     private function executeTelnetCommand(string $ip, int $port, string $username, string $password, string $command): array {
-        $timeout = 10;
+        $timeout = 15;
         $socket = @fsockopen($ip, $port, $errno, $errstr, $timeout);
         
         if (!$socket) {
@@ -1055,34 +1055,99 @@ class HuaweiOLT {
         }
         
         stream_set_timeout($socket, $timeout);
+        stream_set_blocking($socket, false);
         
         $response = '';
-        $response .= fread($socket, 4096);
+        $startTime = time();
         
-        if (strpos($response, 'sername') !== false || strpos($response, 'ogin') !== false) {
+        while ((time() - $startTime) < 5) {
+            $chunk = @fread($socket, 4096);
+            if ($chunk) {
+                $response .= $chunk;
+            }
+            if (stripos($response, 'name') !== false || stripos($response, 'login') !== false) {
+                break;
+            }
+            usleep(100000);
+        }
+        
+        if (stripos($response, 'name') !== false || stripos($response, 'login') !== false) {
             fwrite($socket, $username . "\r\n");
-            usleep(500000);
-            $response .= fread($socket, 4096);
+            usleep(1000000);
+            
+            $startTime = time();
+            while ((time() - $startTime) < 5) {
+                $chunk = @fread($socket, 4096);
+                if ($chunk) {
+                    $response .= $chunk;
+                }
+                if (stripos($response, 'assword') !== false) {
+                    break;
+                }
+                usleep(100000);
+            }
         }
         
-        if (strpos($response, 'assword') !== false) {
+        if (stripos($response, 'assword') !== false) {
             fwrite($socket, $password . "\r\n");
-            usleep(500000);
-            $response .= fread($socket, 4096);
+            usleep(2000000);
+            
+            $startTime = time();
+            while ((time() - $startTime) < 5) {
+                $chunk = @fread($socket, 4096);
+                if ($chunk) {
+                    $response .= $chunk;
+                }
+                if (stripos($response, '>') !== false || stripos($response, '#') !== false) {
+                    break;
+                }
+                usleep(100000);
+            }
         }
+        
+        fwrite($socket, "enable\r\n");
+        usleep(500000);
+        @fread($socket, 4096);
+        
+        fwrite($socket, "config\r\n");
+        usleep(500000);
+        @fread($socket, 4096);
+        
+        fwrite($socket, "scroll 512\r\n");
+        usleep(300000);
+        @fread($socket, 4096);
         
         fwrite($socket, $command . "\r\n");
-        usleep(1000000);
+        usleep(2000000);
         
         $output = '';
-        while (!feof($socket)) {
-            $chunk = fread($socket, 4096);
-            if (empty($chunk)) break;
-            $output .= $chunk;
-            if (strlen($output) > 65536) break;
+        $startTime = time();
+        stream_set_blocking($socket, false);
+        
+        while ((time() - $startTime) < 10) {
+            $chunk = @fread($socket, 8192);
+            if ($chunk) {
+                $output .= $chunk;
+                if (strlen($output) > 65536) break;
+                if (preg_match('/[>#]\s*$/', $output)) {
+                    usleep(500000);
+                    $extra = @fread($socket, 4096);
+                    if (empty($extra)) break;
+                    $output .= $extra;
+                }
+            }
+            usleep(100000);
         }
         
+        fwrite($socket, "quit\r\n");
+        usleep(200000);
+        fwrite($socket, "quit\r\n");
+        usleep(200000);
+        
         fclose($socket);
+        
+        $output = preg_replace('/\x1b\[[0-9;]*[a-zA-Z]/', '', $output);
+        $output = preg_replace('/---- More.*?----/', '', $output);
         
         return [
             'success' => true,
