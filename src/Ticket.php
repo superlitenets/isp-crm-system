@@ -70,6 +70,15 @@ class Ticket {
 
         $customer = (new Customer())->find($data['customer_id']);
         if ($customer && $customer['phone']) {
+            $viewLink = '';
+            try {
+                require_once __DIR__ . '/CustomerTicketLink.php';
+                $customerLinkService = new \CustomerTicketLink($this->db);
+                $viewLink = $customerLinkService->generateViewUrl($ticketId, $data['customer_id']);
+            } catch (\Throwable $e) {
+                error_log("Failed to generate customer view link for ticket $ticketId: " . $e->getMessage());
+            }
+            
             $placeholders = [
                 '{ticket_number}' => $ticketNumber,
                 '{subject}' => $data['subject'] ?? '',
@@ -80,9 +89,13 @@ class Ticket {
                 '{customer_name}' => $customer['name'] ?? 'Customer',
                 '{customer_phone}' => $customer['phone'] ?? '',
                 '{customer_address}' => $customer['address'] ?? '',
-                '{customer_email}' => $customer['email'] ?? ''
+                '{customer_email}' => $customer['email'] ?? '',
+                '{view_link}' => $viewLink
             ];
             $message = $this->buildSMSFromTemplate('sms_template_ticket_created', $placeholders);
+            if (!empty($viewLink) && strpos($message, $viewLink) === false) {
+                $message .= " Track: " . $viewLink;
+            }
             
             $result = $this->sms->send($customer['phone'], $message);
             $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Ticket created notification', $result['success'] ? 'sent' : 'failed');
@@ -90,6 +103,9 @@ class Ticket {
             $waMessage = $this->buildSMSFromTemplate('wa_template_ticket_created', $placeholders);
             if (empty(trim(str_replace(array_keys($placeholders), '', $waMessage)))) {
                 $waMessage = $message;
+            }
+            if (!empty($viewLink) && strpos($waMessage, $viewLink) === false) {
+                $waMessage .= "\n\nTrack your ticket: " . $viewLink;
             }
             try {
                 $waResult = $this->whatsapp->send($customer['phone'], $waMessage);
