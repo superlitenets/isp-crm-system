@@ -233,7 +233,7 @@ class HRNotification {
     
     private function getAdminUsers(): array {
         $stmt = $this->db->query("
-            SELECT id, name FROM users WHERE role = 'admin' AND is_active = TRUE
+            SELECT id, name FROM users WHERE role = 'admin'
         ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
