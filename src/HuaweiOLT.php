@@ -682,13 +682,18 @@ class HuaweiOLT {
                    'mac_address', 'status', 'rx_power', 'tx_power', 'distance', 'service_profile_id',
                    'line_profile', 'srv_profile', 'is_authorized', 'firmware_version', 'ip_address',
                    'config_state', 'run_state', 'auth_type', 'password', 'last_down_cause'];
+        $booleanFields = ['is_authorized'];
         $updates = [];
         $params = [];
         
         foreach ($fields as $field) {
             if (array_key_exists($field, $data)) {
                 $updates[] = "{$field} = ?";
-                $params[] = $data[$field];
+                if (in_array($field, $booleanFields)) {
+                    $params[] = $data[$field] === '' ? false : (bool)$data[$field];
+                } else {
+                    $params[] = $data[$field];
+                }
             }
         }
         
