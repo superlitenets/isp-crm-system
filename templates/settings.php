@@ -742,9 +742,9 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                     <small class="text-muted">Placeholders: {branch_name}, {branch_code}, {date}, {time}, {new_tickets}, {resolved_tickets}, {in_progress_tickets}, {open_tickets}, {closed_tickets}, {sla_breached}, {escalated_tickets}, {team_performance}, {top_performer}</small>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label fw-bold">Daily Operations Summary</label>
-                                    <textarea class="form-control" name="wa_template_operations_daily_summary" rows="10"><?= htmlspecialchars($settings->get('wa_template_operations_daily_summary', "📊 *DAILY OPERATIONS SUMMARY*\n📅 Date: {date}\n🏢 Company: {company_name}\n\n👥 *ATTENDANCE OVERVIEW*\n• Total Employees: {total_employees}\n• Present: {total_present}\n• Absent: {total_absent}\n• Late: {total_late}\n• Hours Worked: {total_hours}\n\n📈 *TICKET STATISTICS*\n• Total Tickets Today: {total_tickets}\n• Resolved: {total_resolved}\n• In Progress: {total_in_progress}\n• Open: {total_open}\n• SLA Breached: {total_sla_breached}\n\n🏢 *BRANCH BREAKDOWN*\n{branch_summaries}\n\n🏆 *TOP PERFORMERS*\n{top_performers}\n\n⏰ Generated at {time}")) ?></textarea>
-                                    <small class="text-muted">Placeholders: {date}, {time}, {company_name}, {total_tickets}, {total_resolved}, {total_in_progress}, {total_open}, {total_sla_breached}, {total_employees}, {total_present}, {total_absent}, {total_late}, {total_hours}, {branch_summaries}, {top_performers}, {branch_count}</small>
+                                    <label class="form-label fw-bold">Daily Operations Summary (Incomplete Tickets)</label>
+                                    <textarea class="form-control" name="wa_template_operations_daily_summary" rows="10"><?= htmlspecialchars($settings->get('wa_template_operations_daily_summary', "📋 *INCOMPLETE TICKETS REPORT*\n📅 Date: {date}\n🏢 Company: {company_name}\n\n📈 *TICKET SUMMARY*\n• Total Incomplete: {total_incomplete}\n• Open: {total_open}\n• In Progress: {total_in_progress}\n• SLA Breached: {total_sla_breached}\n\n🏢 *BY BRANCH*\n{branch_summaries}\n\n🏆 *TOP PERFORMERS TODAY*\n{top_performers}\n\n⏰ Generated at {time}")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {date}, {time}, {company_name}, {total_incomplete}, {total_in_progress}, {total_open}, {total_sla_breached}, {branch_summaries}, {top_performers}, {branch_count}</small>
                                 </div>
                             </div>
                         </div>
@@ -1157,6 +1157,9 @@ function resetToDefaults() {
                                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="testDailySummary()">
                                     <i class="bi bi-send"></i> Send Test Summary Now
                                 </button>
+                                <button type="button" class="btn btn-warning btn-sm" onclick="repostIncompleteTickets()">
+                                    <i class="bi bi-arrow-repeat"></i> Repost Incomplete Tickets
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1550,15 +1553,33 @@ function selectGroup(groupId, groupName) {
 }
 
 function testDailySummary() {
-    if (!confirm('Send a test daily summary to all configured groups now?')) return;
+    if (!confirm('Send incomplete tickets summary to all configured groups now?')) return;
     
     fetch('cron.php?action=daily_summary&secret=<?= htmlspecialchars($settings->get("cron_secret", "isp-crm-cron-2024")) ?>')
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                alert('Test summary sent! Groups: ' + data.groups_sent + ', Employees: ' + data.employees_count + ', Tickets: ' + data.tickets_count);
+                alert('Summary sent!\n\nIncomplete Tickets: ' + (data.incomplete_tickets || 0) + 
+                      '\nOpen: ' + (data.open_tickets || 0) + 
+                      '\nIn Progress: ' + (data.in_progress_tickets || 0) + 
+                      '\nGroups: ' + (data.groups_sent || 0));
             } else {
-                alert('Failed: ' + (data.error || 'Unknown error'));
+                alert('Failed: ' + (data.error || data.errors?.join(', ') || 'Unknown error'));
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
+}
+
+function repostIncompleteTickets() {
+    if (!confirm('Repost all incomplete (not closed/resolved) tickets to WhatsApp groups now?')) return;
+    
+    fetch('cron.php?action=repost_incomplete&secret=<?= htmlspecialchars($settings->get("cron_secret", "isp-crm-cron-2024")) ?>')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success || data.message) {
+                alert(data.message || 'Reposted! Incomplete tickets: ' + data.incomplete_tickets + ', Groups sent: ' + data.success_count);
+            } else {
+                alert('Failed: ' + (data.error || data.errors?.join(', ') || 'Unknown error'));
             }
         })
         .catch(err => alert('Error: ' + err.message));

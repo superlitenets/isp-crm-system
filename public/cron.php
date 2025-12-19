@@ -43,6 +43,11 @@ try {
             sendDailySummaryToGroups($db, $settings);
             break;
             
+        case 'repost_incomplete':
+            // Manually repost incomplete tickets to WhatsApp groups
+            repostIncompleteTickets($db, $settings);
+            break;
+            
         case 'scheduled_summaries':
         case 'check_schedule':
             // Scheduled - checks time and prevents duplicates
@@ -59,7 +64,7 @@ try {
             break;
             
         default:
-            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'scheduled_summaries', 'check_schedule', 'sync_attendance', 'biometric_sync', 'leave_accrual']]);
+            echo json_encode(['error' => 'Unknown action', 'available' => ['daily_summary', 'repost_incomplete', 'scheduled_summaries', 'check_schedule', 'sync_attendance', 'biometric_sync', 'leave_accrual']]);
     }
 } catch (Throwable $e) {
     http_response_code(500);
@@ -95,65 +100,70 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     
     $stmt = $db->query("
         SELECT 
-            e.id, e.name, e.department_id,
-            a.clock_in, a.clock_out, a.hours_worked, a.late_minutes,
-            d.name as department_name
-        FROM employees e
-        LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = '$today'
-        LEFT JOIN departments d ON e.department_id = d.id
-        WHERE e.employment_status = 'active'
-        ORDER BY d.name, e.name
-    ");
-    $employees = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    
-    $stmt = $db->query("
-        SELECT 
             t.id, t.ticket_number, t.subject, t.status, t.priority, t.assigned_to,
-            u.name as assigned_name, c.name as customer_name
+            t.category, t.created_at,
+            u.name as assigned_name, c.name as customer_name, c.phone as customer_phone
         FROM tickets t
         LEFT JOIN users u ON t.assigned_to = u.id
         LEFT JOIN customers c ON t.customer_id = c.id
-        WHERE DATE(t.created_at) = '$today' OR DATE(t.updated_at) = '$today'
-        ORDER BY t.priority DESC, t.updated_at DESC
+        WHERE t.status NOT IN ('resolved', 'closed')
+        ORDER BY 
+            CASE t.priority 
+                WHEN 'critical' THEN 1 
+                WHEN 'high' THEN 2 
+                WHEN 'medium' THEN 3 
+                ELSE 4 
+            END,
+            t.created_at ASC
     ");
-    $tickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    $incompleteTickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
     
-    $message = "*📊 DAILY TEAM SUMMARY*\n";
+    $message = "*📋 INCOMPLETE TICKETS REPORT*\n";
     $message .= "Date: " . date('l, M j, Y') . "\n";
-    $message .= "Time: " . date('h:i A') . " (" . ($summaryType === 'morning' ? 'Morning Report' : 'Evening Report') . ")\n\n";
+    $message .= "Time: " . date('h:i A') . "\n\n";
     
-    $message .= "*👥 ATTENDANCE*\n";
-    $present = array_filter($employees, fn($e) => !empty($e['clock_in']));
-    $absent = array_filter($employees, fn($e) => empty($e['clock_in']));
-    $lateCount = array_filter($employees, fn($e) => ($e['late_minutes'] ?? 0) > 0);
+    $openTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'open');
+    $inProgressTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'in_progress');
+    $pendingTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'pending');
     
-    $message .= "Present: " . count($present) . " | Absent: " . count($absent) . " | Late: " . count($lateCount) . "\n";
+    $message .= "*📊 SUMMARY*\n";
+    $message .= "Total Incomplete: " . count($incompleteTickets) . "\n";
+    $message .= "Open: " . count($openTickets) . " | In Progress: " . count($inProgressTickets) . " | Pending: " . count($pendingTickets) . "\n\n";
     
-    if ($summaryType === 'evening') {
-        $totalHours = array_sum(array_column($employees, 'hours_worked'));
-        $message .= "Total Hours Worked: " . round($totalHours, 1) . " hrs\n";
-    }
-    
-    $message .= "\n*🎫 TICKETS TODAY*\n";
-    $newTickets = array_filter($tickets, fn($t) => $t['status'] === 'open');
-    $inProgress = array_filter($tickets, fn($t) => $t['status'] === 'in_progress');
-    $resolved = array_filter($tickets, fn($t) => in_array($t['status'], ['resolved', 'closed']));
-    
-    $message .= "New: " . count($newTickets) . " | In Progress: " . count($inProgress) . " | Resolved: " . count($resolved) . "\n";
-    
-    $criticalTickets = array_filter($tickets, fn($t) => $t['priority'] === 'critical' && $t['status'] !== 'closed');
+    $criticalTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'critical');
     if (count($criticalTickets) > 0) {
-        $message .= "\n*🔴 CRITICAL TICKETS*\n";
-        foreach (array_slice($criticalTickets, 0, 5) as $t) {
+        $message .= "*🔴 CRITICAL (" . count($criticalTickets) . ")*\n";
+        foreach ($criticalTickets as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
             $message .= "• #{$t['ticket_number']}: {$t['subject']}\n";
-            $message .= "  Assigned: " . ($t['assigned_name'] ?? 'Unassigned') . "\n";
+            $message .= "  👤 " . ($t['assigned_name'] ?? 'Unassigned') . " | ⏱️ {$age}d old\n";
         }
+        $message .= "\n";
     }
     
-    if ($summaryType === 'evening' && count($resolved) > 0) {
-        $message .= "\n*✅ RESOLVED TODAY*\n";
-        foreach (array_slice($resolved, 0, 10) as $t) {
+    $highTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'high');
+    if (count($highTickets) > 0) {
+        $message .= "*🟠 HIGH PRIORITY (" . count($highTickets) . ")*\n";
+        foreach (array_slice($highTickets, 0, 10) as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
             $message .= "• #{$t['ticket_number']}: {$t['subject']}\n";
+            $message .= "  👤 " . ($t['assigned_name'] ?? 'Unassigned') . " | ⏱️ {$age}d old\n";
+        }
+        if (count($highTickets) > 10) {
+            $message .= "  _...and " . (count($highTickets) - 10) . " more_\n";
+        }
+        $message .= "\n";
+    }
+    
+    $otherTickets = array_filter($incompleteTickets, fn($t) => !in_array($t['priority'], ['critical', 'high']));
+    if (count($otherTickets) > 0) {
+        $message .= "*🟡 OTHER TICKETS (" . count($otherTickets) . ")*\n";
+        foreach (array_slice($otherTickets, 0, 10) as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
+            $message .= "• #{$t['ticket_number']}: {$t['subject']} ({$t['priority']})\n";
+        }
+        if (count($otherTickets) > 10) {
+            $message .= "  _...and " . (count($otherTickets) - 10) . " more_\n";
         }
     }
     
@@ -218,7 +228,7 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         }
     }
     
-    // Branch-specific summaries
+    // Branch-specific summaries (incomplete tickets only)
     $branchClass = new \App\Branch();
     $branchesWithGroups = $branchClass->getBranchesWithWhatsAppGroups();
     $allBranches = $branchClass->getAll();
@@ -226,45 +236,57 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     $branchSummaries = [];
     
     foreach ($branchesWithGroups as $branch) {
-        $branchData = $branchClass->getBranchSummaryData($branch['id'], $today);
-        $branchEmployees = $branchData['employees'];
-        $branchTickets = $branchData['tickets'];
+        $branchIncompleteStmt = $db->prepare("
+            SELECT t.id, t.ticket_number, t.subject, t.status, t.priority, t.created_at,
+                   u.name as assigned_name
+            FROM tickets t
+            LEFT JOIN users u ON t.assigned_to = u.id
+            WHERE t.branch_id = ? AND t.status NOT IN ('resolved', 'closed')
+            ORDER BY 
+                CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+                t.created_at ASC
+        ");
+        $branchIncompleteStmt->execute([$branch['id']]);
+        $branchIncomplete = $branchIncompleteStmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        $branchMessage = "*📊 " . strtoupper($branch['name']) . " DAILY SUMMARY*\n";
+        $branchMessage = "*📋 " . strtoupper($branch['name']) . " INCOMPLETE TICKETS*\n";
         $branchMessage .= "Date: " . date('l, M j, Y') . "\n";
-        $branchMessage .= "Time: " . date('h:i A') . " (" . ($summaryType === 'morning' ? 'Morning Report' : 'Evening Report') . ")\n\n";
+        $branchMessage .= "Time: " . date('h:i A') . "\n\n";
         
-        $branchMessage .= "*👥 ATTENDANCE*\n";
-        $branchPresent = array_filter($branchEmployees, fn($e) => !empty($e['clock_in']));
-        $branchAbsent = array_filter($branchEmployees, fn($e) => empty($e['clock_in']));
-        $branchLate = array_filter($branchEmployees, fn($e) => ($e['late_minutes'] ?? 0) > 0);
+        $branchOpen = array_filter($branchIncomplete, fn($t) => $t['status'] === 'open');
+        $branchInProgress = array_filter($branchIncomplete, fn($t) => $t['status'] === 'in_progress');
         
-        $branchMessage .= "Present: " . count($branchPresent) . " | Absent: " . count($branchAbsent) . " | Late: " . count($branchLate) . "\n";
+        $branchMessage .= "*📊 Total: " . count($branchIncomplete) . "*\n";
+        $branchMessage .= "Open: " . count($branchOpen) . " | In Progress: " . count($branchInProgress) . "\n\n";
         
-        if ($summaryType === 'evening') {
-            $branchTotalHours = array_sum(array_column($branchEmployees, 'hours_worked'));
-            $branchMessage .= "Total Hours: " . round($branchTotalHours, 1) . " hrs\n";
+        $branchCritical = array_filter($branchIncomplete, fn($t) => $t['priority'] === 'critical');
+        if (count($branchCritical) > 0) {
+            $branchMessage .= "*🔴 CRITICAL*\n";
+            foreach ($branchCritical as $t) {
+                $age = floor((time() - strtotime($t['created_at'])) / 86400);
+                $branchMessage .= "• #{$t['ticket_number']}: {$t['subject']} ({$age}d)\n";
+            }
+            $branchMessage .= "\n";
         }
         
-        $branchMessage .= "\n*🎫 TICKETS*\n";
-        $branchNew = array_filter($branchTickets, fn($t) => $t['status'] === 'open');
-        $branchInProgress = array_filter($branchTickets, fn($t) => $t['status'] === 'in_progress');
-        $branchResolved = array_filter($branchTickets, fn($t) => in_array($t['status'], ['resolved', 'closed']));
-        
-        $branchMessage .= "New: " . count($branchNew) . " | In Progress: " . count($branchInProgress) . " | Resolved: " . count($branchResolved) . "\n";
+        foreach (array_slice($branchIncomplete, 0, 10) as $t) {
+            if ($t['priority'] !== 'critical') {
+                $age = floor((time() - strtotime($t['created_at'])) / 86400);
+                $branchMessage .= "• #{$t['ticket_number']}: {$t['subject']} ({$t['priority']}, {$age}d)\n";
+            }
+        }
+        if (count($branchIncomplete) > 10) {
+            $branchMessage .= "_...and " . (count($branchIncomplete) - 10) . " more_\n";
+        }
         
         $branchMessage .= "\n_" . ($branch['code'] ?? $branch['name']) . " - " . ($settings->get('company_name', 'Your ISP')) . "_";
         
         $branchSummaries[$branch['id']] = [
             'name' => $branch['name'],
             'code' => $branch['code'] ?? '',
-            'employees' => count($branchEmployees),
-            'present' => count($branchPresent),
-            'absent' => count($branchAbsent),
-            'late' => count($branchLate),
-            'new_tickets' => count($branchNew),
-            'in_progress' => count($branchInProgress),
-            'resolved' => count($branchResolved)
+            'total_incomplete' => count($branchIncomplete),
+            'open' => count($branchOpen),
+            'in_progress' => count($branchInProgress)
         ];
         
         if ($provider === 'session') {
@@ -279,27 +301,23 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         }
     }
     
-    // Daily Operations Group consolidated summary
+    // Daily Operations Group consolidated summary (incomplete tickets focus)
     $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
     if (!empty($operationsGroupId) && $provider === 'session') {
-        $totalTickets = count($tickets);
-        $totalResolved = count($resolved);
-        $totalInProgress = count($inProgress);
-        $totalOpen = count($newTickets);
-        $totalHours = round(array_sum(array_column($employees, 'hours_worked')), 1);
+        $totalIncomplete = count($incompleteTickets);
+        $totalOpen = count($openTickets);
+        $totalInProgress = count($inProgressTickets);
         
         $slaBreachedStmt = $db->query("
             SELECT COUNT(*) FROM tickets 
-            WHERE DATE(created_at) = '$today' 
+            WHERE status NOT IN ('resolved', 'closed')
             AND (sla_response_breached = true OR sla_resolution_breached = true)
         ");
         $totalSlaBreached = $slaBreachedStmt->fetchColumn() ?: 0;
         
         $branchBreakdownText = "";
         foreach ($branchSummaries as $bs) {
-            $branchBreakdownText .= "\n🏢 *{$bs['name']}*\n";
-            $branchBreakdownText .= "  👥 Present: {$bs['present']}/{$bs['employees']} | Late: {$bs['late']}\n";
-            $branchBreakdownText .= "  🎫 New: {$bs['new_tickets']} | Progress: {$bs['in_progress']} | Done: {$bs['resolved']}";
+            $branchBreakdownText .= "\n🏢 *{$bs['name']}*: {$bs['total_incomplete']} incomplete (Open: {$bs['open']}, In Progress: {$bs['in_progress']})";
         }
         
         if (empty($branchBreakdownText)) {
@@ -333,37 +351,27 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
         if (!empty($opsTemplate)) {
             $opsMessage = str_replace([
                 '{date}', '{time}', '{company_name}',
-                '{total_tickets}', '{total_resolved}', '{total_in_progress}', '{total_open}', '{total_sla_breached}',
-                '{total_employees}', '{total_present}', '{total_absent}', '{total_late}', '{total_hours}',
+                '{total_incomplete}', '{total_in_progress}', '{total_open}', '{total_sla_breached}',
                 '{branch_summaries}', '{top_performers}', '{branch_count}'
             ], [
                 date('l, M j, Y'), date('h:i A'), $settings->get('company_name', 'Your ISP'),
-                $totalTickets, $totalResolved, $totalInProgress, $totalOpen, $totalSlaBreached,
-                count($employees), count($present), count($absent), count($lateCount), $totalHours,
+                $totalIncomplete, $totalInProgress, $totalOpen, $totalSlaBreached,
                 $branchBreakdownText, $topPerformersText, count($allBranches)
             ], $opsTemplate);
         } else {
-            $opsMessage = "📊 *DAILY OPERATIONS SUMMARY*\n";
+            $opsMessage = "📋 *INCOMPLETE TICKETS REPORT*\n";
             $opsMessage .= "📅 Date: " . date('l, M j, Y') . "\n";
             $opsMessage .= "🏢 Company: " . $settings->get('company_name', 'Your ISP') . "\n\n";
             
-            $opsMessage .= "👥 *ATTENDANCE OVERVIEW*\n";
-            $opsMessage .= "• Total Employees: " . count($employees) . "\n";
-            $opsMessage .= "• Present: " . count($present) . "\n";
-            $opsMessage .= "• Absent: " . count($absent) . "\n";
-            $opsMessage .= "• Late: " . count($lateCount) . "\n";
-            $opsMessage .= "• Hours Worked: {$totalHours} hrs\n\n";
-            
-            $opsMessage .= "📈 *TICKET STATISTICS*\n";
-            $opsMessage .= "• Total Tickets Today: {$totalTickets}\n";
-            $opsMessage .= "• Resolved: {$totalResolved}\n";
-            $opsMessage .= "• In Progress: {$totalInProgress}\n";
+            $opsMessage .= "📈 *TICKET SUMMARY*\n";
+            $opsMessage .= "• Total Incomplete: {$totalIncomplete}\n";
             $opsMessage .= "• Open: {$totalOpen}\n";
+            $opsMessage .= "• In Progress: {$totalInProgress}\n";
             $opsMessage .= "• SLA Breached: {$totalSlaBreached}\n\n";
             
-            $opsMessage .= "🏢 *BRANCH BREAKDOWN*" . $branchBreakdownText . "\n\n";
+            $opsMessage .= "🏢 *BY BRANCH*" . $branchBreakdownText . "\n\n";
             
-            $opsMessage .= "🏆 *TOP PERFORMERS*\n" . $topPerformersText . "\n";
+            $opsMessage .= "🏆 *TOP PERFORMERS TODAY*\n" . $topPerformersText . "\n";
             
             $opsMessage .= "⏰ Generated at " . date('h:i A');
         }
@@ -380,8 +388,9 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     echo json_encode([
         'success' => count($errors) === 0,
         'summary_type' => $summaryType,
-        'employees_count' => count($employees),
-        'tickets_count' => count($tickets),
+        'incomplete_tickets' => count($incompleteTickets),
+        'open_tickets' => count($openTickets),
+        'in_progress_tickets' => count($inProgressTickets),
         'groups_sent' => count($results),
         'success_count' => $successCount,
         'provider' => $provider,
@@ -546,4 +555,122 @@ function runLeaveAccrual(\PDO $db): void {
             'error' => $e->getMessage()
         ]);
     }
+}
+
+function repostIncompleteTickets(\PDO $db, \App\Settings $settings): void {
+    $whatsapp = new \App\WhatsApp();
+    
+    if (!$whatsapp->isEnabled()) {
+        echo json_encode(['success' => false, 'error' => 'WhatsApp disabled']);
+        return;
+    }
+    
+    $provider = $whatsapp->getProvider();
+    if ($provider !== 'session') {
+        echo json_encode(['success' => false, 'error' => 'Repost requires WhatsApp Session provider']);
+        return;
+    }
+    
+    $stmt = $db->query("
+        SELECT 
+            t.id, t.ticket_number, t.subject, t.status, t.priority, t.category,
+            t.created_at, t.branch_id,
+            u.name as assigned_name, c.name as customer_name, c.phone as customer_phone
+        FROM tickets t
+        LEFT JOIN users u ON t.assigned_to = u.id
+        LEFT JOIN customers c ON t.customer_id = c.id
+        WHERE t.status NOT IN ('resolved', 'closed')
+        ORDER BY 
+            CASE t.priority 
+                WHEN 'critical' THEN 1 
+                WHEN 'high' THEN 2 
+                WHEN 'medium' THEN 3 
+                ELSE 4 
+            END,
+            t.created_at ASC
+    ");
+    $incompleteTickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    
+    if (count($incompleteTickets) === 0) {
+        echo json_encode(['success' => true, 'message' => 'No incomplete tickets to repost']);
+        return;
+    }
+    
+    $message = "*🔄 INCOMPLETE TICKETS REPOST*\n";
+    $message .= "Time: " . date('h:i A, M j, Y') . "\n";
+    $message .= "Total: " . count($incompleteTickets) . " tickets\n\n";
+    
+    $criticalTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'critical');
+    if (count($criticalTickets) > 0) {
+        $message .= "*🔴 CRITICAL (" . count($criticalTickets) . ")*\n";
+        foreach ($criticalTickets as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
+            $message .= "• #{$t['ticket_number']}: {$t['subject']}\n";
+            $message .= "  👤 " . ($t['assigned_name'] ?? 'Unassigned') . " | ⏱️ {$age}d\n";
+        }
+        $message .= "\n";
+    }
+    
+    $highTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'high');
+    if (count($highTickets) > 0) {
+        $message .= "*🟠 HIGH (" . count($highTickets) . ")*\n";
+        foreach (array_slice($highTickets, 0, 10) as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
+            $message .= "• #{$t['ticket_number']}: {$t['subject']} ({$age}d)\n";
+        }
+        if (count($highTickets) > 10) {
+            $message .= "  _+" . (count($highTickets) - 10) . " more_\n";
+        }
+        $message .= "\n";
+    }
+    
+    $otherTickets = array_filter($incompleteTickets, fn($t) => !in_array($t['priority'], ['critical', 'high']));
+    if (count($otherTickets) > 0) {
+        $message .= "*🟡 MEDIUM/LOW (" . count($otherTickets) . ")*\n";
+        foreach (array_slice($otherTickets, 0, 10) as $t) {
+            $age = floor((time() - strtotime($t['created_at'])) / 86400);
+            $message .= "• #{$t['ticket_number']}: {$t['subject']} ({$age}d)\n";
+        }
+        if (count($otherTickets) > 10) {
+            $message .= "  _+" . (count($otherTickets) - 10) . " more_\n";
+        }
+    }
+    
+    $message .= "\n_" . ($settings->get('company_name', 'Your ISP')) . " - Repost_";
+    
+    $results = [];
+    $errors = [];
+    
+    $groupsJson = $settings->get('whatsapp_daily_summary_groups', '[]');
+    $groups = json_decode($groupsJson, true) ?: [];
+    
+    foreach ($groups as $group) {
+        $groupId = $group['id'] ?? $group;
+        if (!empty($groupId)) {
+            $result = $whatsapp->sendToGroup($groupId, $message);
+            $results[$groupId] = $result;
+            if (!$result['success']) {
+                $errors[] = "Group {$groupId}: " . ($result['error'] ?? 'Unknown error');
+            }
+        }
+    }
+    
+    $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
+    if (!empty($operationsGroupId)) {
+        $result = $whatsapp->sendToGroup($operationsGroupId, $message);
+        $results['operations_group'] = $result;
+        if (!$result['success']) {
+            $errors[] = "Operations Group: " . ($result['error'] ?? 'Unknown error');
+        }
+    }
+    
+    $successCount = count(array_filter($results, fn($r) => $r['success'] ?? false));
+    
+    echo json_encode([
+        'success' => count($errors) === 0,
+        'incomplete_tickets' => count($incompleteTickets),
+        'groups_sent' => count($results),
+        'success_count' => $successCount,
+        'errors' => $errors
+    ]);
 }

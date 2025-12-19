@@ -470,7 +470,7 @@ try {
             requireAuth();
             
             $employee = $api->getEmployeeByUserId($user['id']);
-            $allowedRoles = ['admin', 'technician', 'manager'];
+            $allowedRoles = ['admin', 'technician', 'manager', 'support_staff'];
             if (!in_array($user['role'] ?? '', $allowedRoles) && !$employee) {
                 echo json_encode(['success' => false, 'error' => 'Not authorized to create tickets']);
                 break;
