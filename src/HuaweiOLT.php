@@ -1145,21 +1145,26 @@ class HuaweiOLT {
         
         $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
         
+        $result = ['success' => false, 'message' => 'Unsupported connection type for commands'];
+        
+        if ($olt['connection_type'] === 'telnet') {
+            $result = $this->executeTelnetCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
+        } elseif ($olt['connection_type'] === 'ssh') {
+            $result = $this->executeSSHCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
+        }
+        
+        // Log command with response
         $this->addLog([
             'olt_id' => $oltId,
             'action' => 'command',
-            'status' => 'pending',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['message'] ?? '',
             'command_sent' => $command,
+            'command_response' => substr($result['output'] ?? '', 0, 10000),
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        if ($olt['connection_type'] === 'telnet') {
-            return $this->executeTelnetCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
-        } elseif ($olt['connection_type'] === 'ssh') {
-            return $this->executeSSHCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
-        }
-        
-        return ['success' => false, 'message' => 'Unsupported connection type for commands'];
+        return $result;
     }
     
     private function executeTelnetCommand(string $ip, int $port, string $username, string $password, string $command): array {
