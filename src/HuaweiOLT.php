@@ -2286,6 +2286,52 @@ class HuaweiOLT {
         return $result;
     }
     
+    public function authorizeONUWithSmartOLT(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = '', array $smartoltData = []): array {
+        $localResult = $this->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword);
+        
+        if (!$localResult['success']) {
+            return $localResult;
+        }
+        
+        if (empty($smartoltData) || empty($smartoltData['sync_to_smartolt'])) {
+            return $localResult;
+        }
+        
+        require_once __DIR__ . '/SmartOLT.php';
+        $smartolt = new \SmartOLT($this->db);
+        
+        $onu = $this->getONU($onuId);
+        
+        $smartoltPayload = [
+            'sn' => $onu['sn'],
+            'name' => $smartoltData['name'] ?? $onu['name'] ?? $onu['sn'],
+            'olt_id' => $smartoltData['smartolt_olt_id'] ?? null,
+            'onu_type' => $smartoltData['onu_type'] ?? 'bridge',
+            'zone' => $smartoltData['zone'] ?? null,
+            'odb' => $smartoltData['odb'] ?? null,
+            'vlan' => $smartoltData['vlan'] ?? null,
+            'speed_profile' => $smartoltData['speed_profile'] ?? null,
+        ];
+        
+        if (!empty($smartoltPayload['olt_id'])) {
+            $smartoltResult = $smartolt->authorizeONU($smartoltPayload);
+            
+            $localResult['smartolt_sync'] = $smartoltResult['status'] ?? false;
+            $localResult['smartolt_message'] = $smartoltResult['message'] ?? ($smartoltResult['error'] ?? 'Unknown');
+            
+            $this->addLog([
+                'olt_id' => $onu['olt_id'],
+                'onu_id' => $onuId,
+                'action' => 'smartolt_sync',
+                'status' => ($smartoltResult['status'] ?? false) ? 'success' : 'failed',
+                'message' => "SmartOLT sync: " . ($smartoltResult['message'] ?? $smartoltResult['error'] ?? 'Unknown'),
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+        }
+        
+        return $localResult;
+    }
+    
     public function rebootONU(int $onuId): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
