@@ -1,0 +1,32 @@
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, status, LEFT(command_response, 1500) as response FROM huawei_provisioning_logs WHERE action = 'command' ORDER BY created_at DESC LIMIT 1"
+ id | status  |                                  response
+----+---------+-----------------------------------------------------------------------------
+ 51 | success |  512\r                                                                     +
+    |         | \r                                                                         +
+    |         | MA5683T(config)#display vlan all\r                                         +
+    |         | { <cr>|vlanattr<K>|vlantype<E><mux,standard,smart,super> }:\r              +
+    |         | \r                                                                         +
+    |         |   Command:\r                                                               +
+    |         |           display vlan all \r                                              +
+    |         |   -----------------------------------------------------------------------\r+
+    |         |   VLAN   Type      Attribute  STND-Port NUM   SERV-Port NUM  VLAN-Con NUM\r+
+    |         |   -----------------------------------------------------------------------\r+
+    |         |      1   smart     common                 8               0             -\r+
+    |         |     26   smart     common                 1              20             -\r+
+    |         |     40   smart     common                 1               0             -\r+
+    |         |     44   smart     common                 1               0             -\r+
+    |         |     69   smart     common                 1             561             -\r+
+    |         |    100   smart     common                 1               0             -\r+
+    |         |    115   smart     common                 1               2             -\r+
+    |         |    140   smart     common                 1               1             -\r+
+    |         |    144   smart     common                 1               1             -\r+
+    |         |    200   smart     common                 1               0             -\r+
+    |         |    505   smart     common                 1               0             -\r+
+    |         |    515   smart     common                 1               1             -\r+
+    |         |    660   smart     common                 1               1             -\r+
+    |         |    900   smart     common                 1              29             -\r+
+    |         |    901   smart     common                 1              98             -\r+
+    |         |    9
+(1 row)
+
+root@superlitecrm:~/isp#
