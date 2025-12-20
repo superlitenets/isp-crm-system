@@ -1799,6 +1799,134 @@ class HuaweiOLT {
     }
     
     public function discoverUnconfiguredONUs(int $oltId): array {
+        // Try CLI first (more reliable), then fall back to SNMP
+        $cliResult = $this->discoverUnconfiguredONUsViaCLI($oltId);
+        if ($cliResult['success'] && !empty($cliResult['onus'])) {
+            return $cliResult;
+        }
+        
+        // Fall back to SNMP
+        return $this->discoverUnconfiguredONUsViaSNMP($oltId);
+    }
+    
+    public function discoverUnconfiguredONUsViaCLI(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Run CLI command to find unconfigured ONUs
+        $result = $this->executeCommand($oltId, 'display ont autofind all');
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => 'Failed to execute autofind command: ' . ($result['message'] ?? 'Unknown error')];
+        }
+        
+        $output = $result['output'] ?? '';
+        $lines = explode("\n", $output);
+        
+        $unconfigured = [];
+        $added = 0;
+        $currentFrame = 0;
+        $currentSlot = 0;
+        $currentPort = 0;
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // Parse port header: "   ----------------------------------------------------------------------------"
+            // followed by "   Port : 0/1/0" or "   F/S/P : 0/1/0"
+            if (preg_match('/(?:Port|F\/S\/P)\s*:\s*(\d+)\/(\d+)\/(\d+)/i', $line, $m)) {
+                $currentFrame = (int)$m[1];
+                $currentSlot = (int)$m[2];
+                $currentPort = (int)$m[3];
+                continue;
+            }
+            
+            // Parse ONU entry - formats vary by firmware:
+            // Format 1: "   1    HWTC12345678    auto    0    SN"
+            // Format 2: "   Ont SN           : HWTC12345678"
+            // Format 3: Table row with Number, SN, Password, LOID, etc.
+            
+            // Table format: Number | SN/MAC | Password/LOID | Type | Auth mode
+            if (preg_match('/^\s*(\d+)\s+([A-Fa-f0-9]{8,16})\s+/i', $line, $m)) {
+                $autofindId = (int)$m[1];
+                $sn = strtoupper($m[2]);
+                
+                // Skip if already authorized
+                $existing = $this->getONUBySN($sn);
+                if (!$existing) {
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $sn,
+                        'frame' => $currentFrame,
+                        'slot' => $currentSlot,
+                        'port' => $currentPort,
+                        'status' => 'unconfigured',
+                        'is_authorized' => false,
+                    ]);
+                    $added++;
+                }
+                
+                $unconfigured[] = [
+                    'sn' => $sn,
+                    'frame' => $currentFrame,
+                    'slot' => $currentSlot,
+                    'port' => $currentPort,
+                    'autofind_id' => $autofindId,
+                    'method' => 'cli'
+                ];
+                continue;
+            }
+            
+            // Alternative format: "Ont SN : HWTC12345678"
+            if (preg_match('/Ont\s+SN\s*:\s*([A-Fa-f0-9]{8,16})/i', $line, $m)) {
+                $sn = strtoupper($m[1]);
+                
+                $existing = $this->getONUBySN($sn);
+                if (!$existing) {
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $sn,
+                        'frame' => $currentFrame,
+                        'slot' => $currentSlot,
+                        'port' => $currentPort,
+                        'status' => 'unconfigured',
+                        'is_authorized' => false,
+                    ]);
+                    $added++;
+                }
+                
+                $unconfigured[] = [
+                    'sn' => $sn,
+                    'frame' => $currentFrame,
+                    'slot' => $currentSlot,
+                    'port' => $currentPort,
+                    'autofind_id' => count($unconfigured) + 1,
+                    'method' => 'cli'
+                ];
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'discover_unconfigured_cli',
+            'status' => 'success',
+            'message' => "Found " . count($unconfigured) . " unconfigured ONUs via CLI, added {$added} new",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'onus' => $unconfigured,
+            'count' => count($unconfigured),
+            'added' => $added,
+            'method' => 'cli',
+            'raw_output' => $output
+        ];
+    }
+    
+    public function discoverUnconfiguredONUsViaSNMP(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];
@@ -1833,18 +1961,17 @@ class HuaweiOLT {
             }
         }
         
-        // Log debug info
         error_log("Autofind discovery debug: " . implode(', ', $debugInfo));
         
         if ($serials === false || empty($serials)) {
             return [
                 'success' => false, 
-                'error' => 'No unconfigured ONUs found via SNMP. Tried OIDs: .42.1.3, .45.1.3, .45.1.4. Make sure the ONU is powered on and connected to the OLT fiber.',
+                'error' => 'No unconfigured ONUs found. Make sure the ONU is powered on and connected to the OLT fiber.',
                 'debug' => $debugInfo
             ];
         }
         
-        $huaweiAutofindTypeBase = str_replace('.3', '.5', $usedOid); // Type OID
+        $huaweiAutofindTypeBase = str_replace('.3', '.5', $usedOid);
         $types = @snmprealwalk($host, $community, $huaweiAutofindTypeBase, 10000000, 2);
         
         $unconfigured = [];
@@ -1858,7 +1985,6 @@ class HuaweiOLT {
                 $ponIndex = (int)$parts[0];
                 $autofindId = (int)$parts[1];
                 
-                // Decode Huawei ponIndex: frame*8192 + slot*256 + port (same as registered ONUs)
                 $frame = intdiv($ponIndex, 8192);
                 $remainder = $ponIndex % 8192;
                 $slot = intdiv($remainder, 256);
@@ -1869,7 +1995,6 @@ class HuaweiOLT {
                 
                 $sn = $this->cleanSnmpValue($serial);
                 
-                // Handle hex byte format
                 if (stripos($sn, 'hex') !== false || preg_match('/^[0-9a-fA-F\s]+$/', $sn)) {
                     $sn = preg_replace('/[^0-9a-fA-F]/', '', $sn);
                 }
@@ -1900,16 +2025,17 @@ class HuaweiOLT {
                     'slot' => $slot,
                     'port' => $port,
                     'onu_type' => $onuType,
-                    'autofind_id' => $autofindId
+                    'autofind_id' => $autofindId,
+                    'method' => 'snmp'
                 ];
             }
         }
         
         $this->addLog([
             'olt_id' => $oltId,
-            'action' => 'discover_unconfigured',
+            'action' => 'discover_unconfigured_snmp',
             'status' => 'success',
-            'message' => "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new (used OID: {$usedOid})",
+            'message' => "Found " . count($unconfigured) . " unconfigured ONUs via SNMP, added {$added} new",
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
@@ -1918,6 +2044,7 @@ class HuaweiOLT {
             'onus' => $unconfigured,
             'count' => count($unconfigured),
             'added' => $added,
+            'method' => 'snmp',
             'used_oid' => $usedOid
         ];
     }
