@@ -285,7 +285,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'sync_vlans':
                 $result = $huaweiOLT->syncVLANsFromOLT((int)$_POST['olt_id']);
-                $message = $result['success'] ? "Synced {$result['count']} VLANs from OLT" : ($result['message'] ?? 'Sync failed');
+                $count = $result['synced'] ?? $result['count'] ?? 0;
+                $message = $result['success'] ? "Synced {$count} VLANs from OLT" : ($result['message'] ?? 'Sync failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'sync_ports':
@@ -2015,9 +2016,9 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <table class="table table-sm mb-0">
                                 <tr><td class="text-muted" width="40%">Name</td><td><strong><?= htmlspecialchars($currentOlt['name']) ?></strong></td></tr>
                                 <tr><td class="text-muted">IP Address</td><td><code><?= htmlspecialchars($currentOlt['ip_address']) ?></code></td></tr>
-                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($currentOlt['hardware_model'] ?: $currentOlt['model'] ?: '-') ?></td></tr>
-                                <tr><td class="text-muted">Software</td><td><small><?= htmlspecialchars($currentOlt['software_version'] ?: '-') ?></small></td></tr>
-                                <tr><td class="text-muted">Firmware</td><td><small><?= htmlspecialchars($currentOlt['firmware_version'] ?: '-') ?></small></td></tr>
+                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars(($currentOlt['hardware_model'] ?? '') ?: ($currentOlt['model'] ?? '-')) ?></td></tr>
+                                <tr><td class="text-muted">Software</td><td><small><?= htmlspecialchars($currentOlt['software_version'] ?? '-') ?></small></td></tr>
+                                <tr><td class="text-muted">Firmware</td><td><small><?= htmlspecialchars($currentOlt['firmware_version'] ?? '-') ?></small></td></tr>
                                 <tr><td class="text-muted">Uptime</td><td><?= htmlspecialchars($currentOlt['uptime'] ?: '-') ?></td></tr>
                             </table>
                         </div>
