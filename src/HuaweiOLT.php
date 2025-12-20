@@ -142,7 +142,7 @@ class HuaweiOLT {
         } elseif ($olt['connection_type'] === 'ssh') {
             return $this->testSSHConnection($olt['ip_address'], $olt['port'], $olt['username'], $password);
         } elseif ($olt['connection_type'] === 'snmp') {
-            return $this->testSNMPConnection($olt['ip_address'], $olt['snmp_read_community'] ?? 'public', $olt['snmp_port']);
+            return $this->testSNMPConnection($olt['ip_address'], $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public', $olt['snmp_port']);
         }
         
         return ['success' => false, 'message' => 'Unknown connection type'];
@@ -219,7 +219,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         $result = @snmpget($host, $community, $oid, $timeout, $retries);
@@ -271,7 +271,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         $result = @snmprealwalk($host, $community, $oid, $timeout, $retries);
@@ -293,7 +293,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         $timeout = 2000000;
         $retries = 2;
@@ -347,7 +347,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         $huaweiONTSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3';
@@ -407,7 +407,8 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        // Use snmp_community field (supports both single field or separate read/write)
+        $community = $olt['snmp_community'] ?? $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         // Configure SNMP for plain values
@@ -577,7 +578,8 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        // Use snmp_community field (supports both single field or separate read/write)
+        $community = $olt['snmp_community'] ?? $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         // Correct Huawei optical power OIDs (base: .51.1.x)
@@ -820,7 +822,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        $community = $olt['snmp_read_community'] ?? 'public';
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         $huaweiAutofindSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.3';
