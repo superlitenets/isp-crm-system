@@ -1250,7 +1250,7 @@ class HuaweiOLT {
         $startTime = time();
         stream_set_blocking($socket, false);
         
-        while ((time() - $startTime) < 15) {
+        while ((time() - $startTime) < 20) {
             $chunk = @fread($socket, 8192);
             if ($chunk) {
                 $output .= $chunk;
@@ -1260,6 +1260,13 @@ class HuaweiOLT {
                 if (preg_match('/----\s*More\s*----/i', $chunk)) {
                     fwrite($socket, " "); // Send space to continue
                     usleep(500000);
+                    continue;
+                }
+                
+                // Handle Huawei command prompts like "{ <cr>|... }:" - send Enter
+                if (preg_match('/\}\s*:\s*$/', $output)) {
+                    fwrite($socket, "\r\n"); // Send Enter to accept default/show all
+                    usleep(1000000);
                     continue;
                 }
                 
