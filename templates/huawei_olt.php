@@ -214,6 +214,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'delete_all_onus':
+                $deleteOltId = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $result = $huaweiOLT->deleteAllONUs($deleteOltId);
+                if ($result['success']) {
+                    $message = "Deleted all ONUs" . ($deleteOltId ? " for this OLT" : "") . ". You can now start fresh.";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['message'] ?? 'Failed to delete ONUs';
+                    $messageType = 'danger';
+                }
+                break;
             case 'sync_cli':
                 $result = $huaweiOLT->syncONUsFromCLI((int)$_POST['olt_id']);
                 if ($result['success']) {
@@ -1096,6 +1107,16 @@ try {
                                         </button>
                                     </form>
                                 </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="delete_all_onus">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item text-danger" onclick="return confirm('DELETE ALL ONUs for this OLT? This cannot be undone!')">
+                                            <i class="bi bi-trash me-2"></i> Delete All ONUs
+                                        </button>
+                                    </form>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -1116,10 +1137,9 @@ try {
                             <thead class="table-light">
                                 <tr>
                                     <th>Serial Number</th>
-                                    <th>Name</th>
+                                    <th>Name / Description</th>
                                     <th>OLT / Port</th>
                                     <th>Status</th>
-                                    <th>Sync</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Customer</th>
                                     <th>Actions</th>
@@ -1129,24 +1149,33 @@ try {
                                 <?php foreach ($onus as $onu): ?>
                                 <tr>
                                     <td><code><?= htmlspecialchars($onu['sn']) ?></code></td>
-                                    <td><?= htmlspecialchars($onu['name'] ?: '-') ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($onu['name'] ?: '-') ?></strong>
+                                        <?php if (!empty($onu['description'])): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($onu['description']) ?></small>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <span class="text-muted"><?= htmlspecialchars($onu['olt_name'] ?? '-') ?></span>
                                         <br><small><?= $onu['frame'] ?>/<?= $onu['slot'] ?>/<?= $onu['port'] ?> : <?= $onu['onu_id'] ?? '-' ?></small>
                                     </td>
                                     <td>
                                         <?php
-                                        $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger', 'power_fail' => 'warning'];
+                                        $statusConfig = [
+                                            'online' => ['class' => 'success', 'icon' => 'check-circle-fill', 'label' => 'Online'],
+                                            'offline' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
+                                            'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill', 'label' => 'LOS'],
+                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
+                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
+                                        ];
+                                        $status = strtolower($onu['status'] ?? 'offline');
+                                        $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle', 'label' => ucfirst($status)];
                                         ?>
-                                        <span class="badge bg-<?= $statusClass[$onu['status']] ?? 'secondary' ?>">
-                                            <?= ucfirst($onu['status']) ?>
+                                        <span class="badge bg-<?= $cfg['class'] ?>">
+                                            <i class="bi bi-<?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?>
                                         </span>
-                                    </td>
-                                    <td>
-                                        <?php if ($onu['is_authorized']): ?>
-                                        <span class="badge bg-success" title="Synced with OLT"><i class="bi bi-check-circle me-1"></i>Synced</span>
-                                        <?php else: ?>
-                                        <span class="badge bg-warning" title="Not synced with OLT"><i class="bi bi-exclamation-circle me-1"></i>Pending</span>
+                                        <?php if (!$onu['is_authorized']): ?>
+                                        <br><span class="badge bg-warning text-dark" style="font-size: 0.7em;"><i class="bi bi-hourglass-split me-1"></i>Pending Auth</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>

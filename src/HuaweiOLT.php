@@ -1987,6 +1987,30 @@ class HuaweiOLT {
         return $stmt->execute([$id]);
     }
     
+    public function deleteAllONUs(?int $oltId = null): array {
+        try {
+            if ($oltId) {
+                $stmt = $this->db->prepare("DELETE FROM huawei_onus WHERE olt_id = ?");
+                $stmt->execute([$oltId]);
+            } else {
+                $this->db->exec("DELETE FROM huawei_onus");
+            }
+            $count = $stmt->rowCount() ?? 0;
+            
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'delete_all_onus',
+                'status' => 'success',
+                'message' => "Deleted all ONUs" . ($oltId ? " for OLT #{$oltId}" : ""),
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return ['success' => true, 'count' => $count];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
     // ==================== Service Profiles ====================
     
     public function getServiceProfiles(bool $activeOnly = true): array {
