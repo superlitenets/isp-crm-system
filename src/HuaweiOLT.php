@@ -910,13 +910,58 @@ class HuaweiOLT {
         return isset($matches[1]) ? (float)$matches[1] : null;
     }
     
+    public function discoverONUsViaCLI(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Use display ont info summary - same as SmartOLT
+        $result = $this->executeCommand($oltId, 'display ont info summary');
+        if (!$result['success']) {
+            return ['success' => false, 'error' => 'Failed to get ONU summary: ' . ($result['message'] ?? 'Unknown error')];
+        }
+        
+        $output = $result['output'] ?? '';
+        $lines = explode("\n", $output);
+        $onus = [];
+        
+        foreach ($lines as $line) {
+            // Parse: F/S/P  ONU-ID  SN  Status  ...
+            // Format: 0/1/3    12    48575443E3E5FA9E  online
+            if (preg_match('/(\d+)\/(\d+)\/(\d+)\s+(\d+)\s+([A-Z0-9]{16})\s+(\w+)/i', $line, $m)) {
+                list(, $frame, $slot, $port, $onuId, $serial, $status) = $m;
+                $serial = strtoupper($serial);
+                
+                $onus[$serial] = [
+                    'sn' => $serial,
+                    'frame' => (int)$frame,
+                    'slot' => (int)$slot,
+                    'port' => (int)$port,
+                    'onu_id' => (int)$onuId,
+                    'status' => strtolower($status),
+                ];
+            }
+        }
+        
+        return [
+            'success' => true,
+            'onus' => $onus,
+            'count' => count($onus)
+        ];
+    }
+    
     public function syncONUsFromCLI(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        // Get ONU configuration from CLI
+        // First try display ont info summary (fast, gets serial + status)
+        $summaryResult = $this->discoverONUsViaCLI($oltId);
+        $summaryOnus = $summaryResult['success'] ? $summaryResult['onus'] : [];
+        
+        // Then get detailed configuration for descriptions/profiles
         $configResult = $this->executeCommand($oltId, 'display current-configuration | include "ont add"');
         if (!$configResult['success']) {
             return ['success' => false, 'error' => 'Failed to get ONU configuration: ' . ($configResult['message'] ?? 'Unknown error')];
@@ -1210,13 +1255,30 @@ class HuaweiOLT {
         $community = $olt['snmp_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // Correct Huawei optical power OIDs (hwGponOltOptics table .51.1.x)
+        // Huawei optical power OIDs - try multiple tables as firmware varies
         // Index format: ponIndex.onuId where ponIndex = frame*8192 + slot*256 + port
-        // Values are in 0.01 dBm units (divide by 100)
-        $oids = [
-            'rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4',  // hwGponOltOpticsDnRx (ONU → OLT)
-            'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6',  // hwGponOltOpticsUpTx (OLT → ONU)
+        $oidSets = [
+            // Primary: hwGponOnuInfo table .43.1.x (raw dBm values)
+            ['rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7', 'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8', 'divisor' => 1],
+            // Fallback: hwGponOltOptics table .51.1.x (0.01 dBm units)
+            ['rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4', 'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6', 'divisor' => 100],
         ];
+        
+        // Try each OID set until we get data
+        $oids = null;
+        $divisor = 1;
+        foreach ($oidSets as $set) {
+            $testResult = @snmprealwalk($host, $community, $set['rx'], 5000000, 1);
+            if ($testResult !== false && !empty($testResult)) {
+                $oids = $set;
+                $divisor = $set['divisor'];
+                break;
+            }
+        }
+        
+        if (!$oids) {
+            return ['success' => false, 'error' => 'No optical power data available via SNMP'];
+        }
         
         $results = [];
         
@@ -1234,7 +1296,7 @@ class HuaweiOLT {
             foreach ($rxResults as $oid => $value) {
                 $key = $this->parseHuaweiOpticalIndex($oid, $oids['rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv100($value);
+                    $power = $this->parseOpticalPower($value, $divisor);
                     if ($power !== null && $power > -50 && $power < 10) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -1251,7 +1313,7 @@ class HuaweiOLT {
             foreach ($txResults as $oid => $value) {
                 $key = $this->parseHuaweiOpticalIndex($oid, $oids['tx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv100($value);
+                    $power = $this->parseOpticalPower($value, $divisor);
                     if ($power !== null && $power > -50 && $power < 10) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -1291,11 +1353,11 @@ class HuaweiOLT {
         return null;
     }
     
-    private function parseOpticalPowerDiv100($value): ?float {
-        // Huawei returns power in 0.01 dBm units
+    private function parseOpticalPower($value, int $divisor = 1): ?float {
+        // Huawei power values: .43.1.x = raw dBm, .51.1.x = 0.01 dBm units
         $value = $this->cleanSnmpValue((string)$value);
         if (is_numeric($value)) {
-            return (float)$value / 100;
+            return (float)$value / $divisor;
         }
         return null;
     }
@@ -1695,19 +1757,6 @@ class HuaweiOLT {
             6 => 'deregistered',
         ];
         return $statusMap[$status] ?? 'unknown';
-    }
-    
-    private function parseOpticalPower($value): ?float {
-        // Huawei returns power in 0.1 dBm units, divide by 10
-        $cleaned = $this->cleanSnmpValue((string)$value);
-        if (is_numeric($cleaned)) {
-            $power = round((float)$cleaned / 10, 1);
-            // Valid range check: -50 to +10 dBm
-            if ($power >= -50 && $power <= 10) {
-                return $power;
-            }
-        }
-        return null;
     }
     
     // ==================== ONU Management ====================
