@@ -360,44 +360,93 @@ class HuaweiOLT {
         $huaweiONTDescBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.2';
         
         $serials = @snmprealwalk($host, $community, $huaweiONTSerialBase, 10000000, 2);
+        
+        // Debug: log what we got
+        error_log("SNMP Serial Walk Result for OID {$huaweiONTSerialBase}: " . ($serials === false ? 'FAILED' : count($serials) . ' entries'));
+        if ($serials !== false && count($serials) > 0) {
+            $firstKey = array_key_first($serials);
+            error_log("First entry: {$firstKey} = " . $serials[$firstKey]);
+        }
+        
+        // If .43.1.9 returns nothing, try alternative approach using status table
+        if ($serials === false || empty($serials)) {
+            // Try walking the status table which is more commonly available
+            $altSerialOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3'; // Try the original OID that was working
+            $serials = @snmprealwalk($host, $community, $altSerialOid, 10000000, 2);
+            error_log("Fallback SNMP Walk Result for OID {$altSerialOid}: " . ($serials === false ? 'FAILED' : count($serials) . ' entries'));
+            if ($serials !== false && count($serials) > 0) {
+                $huaweiONTSerialBase = $altSerialOid; // Use this OID for parsing
+            }
+        }
+        
+        if ($serials === false || empty($serials)) {
+            return ['success' => false, 'error' => 'Failed to get ONU list via SNMP. No data returned from OID .43.1.9 or .43.1.3'];
+        }
+        
         $statuses = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
         $descriptions = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
         
-        if ($serials === false) {
-            return ['success' => false, 'error' => 'Failed to get ONU list via SNMP'];
-        }
-        
         $onus = [];
         foreach ($serials as $oid => $serial) {
-            // Index format: frame.slot.port.onu_id (e.g., 0.1.3.12)
             $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
             $parts = explode('.', $indexPart);
             
-            // MA5680T uses 4-part index: frame.slot.port.onu_id
+            $frame = 0;
+            $slot = 0;
+            $port = 0;
+            $onuId = 0;
+            
+            // MA5680T can use different index formats depending on the OID table
             if (count($parts) >= 4) {
+                // 4-part index: frame.slot.port.onu_id (e.g., 0.1.3.12)
                 $frame = (int)$parts[0];
                 $slot = (int)$parts[1];
                 $port = (int)$parts[2];
                 $onuId = (int)$parts[3];
+            } elseif (count($parts) >= 2) {
+                // 2-part index: portIndex.onuId (some tables use this)
+                // portIndex encodes frame/slot/port
+                $portIndex = (int)$parts[0];
+                $onuId = (int)$parts[1];
                 
-                $statusOid = $huaweiONTStatusBase . '.' . $indexPart;
-                $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$this->cleanSnmpValue($statuses[$statusOid])) : 'unknown';
-                
-                $descOid = $huaweiONTDescBase . '.' . $indexPart;
-                $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
-                
-                $onus[] = [
-                    'sn' => $this->cleanSnmpValue($serial),
-                    'frame' => $frame,
-                    'slot' => $slot,
-                    'port' => $port,
-                    'onu_id' => $onuId,
-                    'status' => $status,
-                    'description' => $desc,
-                    'index' => $indexPart
-                ];
+                // Decode Huawei portIndex: typically slot*8 + port or similar
+                // Try common encoding: high bits = slot, low bits = port
+                if ($portIndex > 100000000) {
+                    // Large portIndex - use bit shifting
+                    $slot = (int)floor($portIndex / 100000000);
+                    $port = (int)(($portIndex % 100000000) / 1000000);
+                } else {
+                    // Smaller portIndex - might be slot*256 + port or slot*8 + port
+                    $slot = (int)floor($portIndex / 256);
+                    $port = $portIndex % 256;
+                    if ($slot > 20) { // Sanity check - slots usually 0-21
+                        $slot = (int)floor($portIndex / 8);
+                        $port = $portIndex % 8;
+                    }
+                }
+            } else {
+                continue; // Skip invalid entries
             }
+            
+            $statusOid = $huaweiONTStatusBase . '.' . $indexPart;
+            $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$this->cleanSnmpValue($statuses[$statusOid])) : 'unknown';
+            
+            $descOid = $huaweiONTDescBase . '.' . $indexPart;
+            $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
+            
+            $onus[] = [
+                'sn' => $this->cleanSnmpValue($serial),
+                'frame' => $frame,
+                'slot' => $slot,
+                'port' => $port,
+                'onu_id' => $onuId,
+                'status' => $status,
+                'description' => $desc,
+                'index' => $indexPart
+            ];
         }
+        
+        error_log("Parsed " . count($onus) . " ONUs from SNMP");
         
         return ['success' => true, 'onus' => $onus, 'count' => count($onus)];
     }
