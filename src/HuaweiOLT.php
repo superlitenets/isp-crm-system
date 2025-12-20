@@ -2596,6 +2596,8 @@ class HuaweiOLT {
     }
     
     public function testFullConnection(int $oltId): array {
+        set_time_limit(120);
+        
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];
@@ -3914,6 +3916,9 @@ class HuaweiOLT {
     }
     
     public function syncAllFromOLT(int $oltId): array {
+        // Extend timeout for full sync operation
+        set_time_limit(300);
+        
         $results = [
             'system' => $this->syncSystemInfoFromOLT($oltId),
             'boards' => $this->syncBoardsFromOLT($oltId),
