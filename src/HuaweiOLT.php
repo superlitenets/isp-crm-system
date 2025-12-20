@@ -594,16 +594,17 @@ class HuaweiOLT {
         foreach ($result['onus'] as $onu) {
             $existing = $this->getONUBySN($onu['sn']);
             
-            // Generate a meaningful name from description or location
+            // Generate a meaningful name from description - extract SNS code only
             $onuName = '';
             $desc = $onu['description'] ?? '';
             if (!empty($desc)) {
-                // Try to extract location from description format: HWTC..._zone_Area_Location_...
-                if (preg_match('/_zone_([^_]+)_([^_]+)/i', $desc, $m)) {
-                    $onuName = trim($m[1] . ' - ' . $m[2]);
+                // Extract SNS/SFL code (e.g., SNS000540, SFL0034) from description
+                if (preg_match('/^(SNS\d+|SFL\d+)/i', $desc, $m)) {
+                    $onuName = strtoupper($m[1]);
                 } else {
-                    // Use description as-is if it's meaningful
-                    $onuName = $desc;
+                    // If no SNS code, use first part before underscore
+                    $parts = explode('_', $desc);
+                    $onuName = $parts[0];
                 }
             }
             if (empty($onuName)) {
@@ -1143,14 +1144,16 @@ class HuaweiOLT {
                 $existing = $this->getONUBySN($onu['sn']);
                 
                 // Use addONU which has ON CONFLICT (olt_id, sn) DO UPDATE
-                // Generate a meaningful name: use description if available, otherwise location-based name
+                // Generate a meaningful name - extract SNS code only
                 $onuName = '';
                 if (!empty($onu['description'])) {
-                    // Extract customer/location info from description format: HWTC..._zone_Area_Location_authd_date
-                    if (preg_match('/_zone_([^_]+)_([^_]+)/i', $onu['description'], $m)) {
-                        $onuName = trim($m[1] . ' - ' . $m[2]);
+                    // Extract SNS/SFL code (e.g., SNS000540, SFL0034) from description
+                    if (preg_match('/^(SNS\d+|SFL\d+)/i', $onu['description'], $m)) {
+                        $onuName = strtoupper($m[1]);
                     } else {
-                        $onuName = $onu['description'];
+                        // If no SNS code, use first part before underscore
+                        $parts = explode('_', $onu['description']);
+                        $onuName = $parts[0];
                     }
                 }
                 if (empty($onuName)) {
