@@ -1074,10 +1074,25 @@ class HuaweiOLT {
                 $existing = $this->getONUBySN($onu['sn']);
                 
                 // Use addONU which has ON CONFLICT (olt_id, sn) DO UPDATE
+                // Generate a meaningful name: use description if available, otherwise location-based name
+                $onuName = '';
+                if (!empty($onu['description'])) {
+                    // Extract customer/location info from description format: HWTC..._zone_Area_Location_authd_date
+                    if (preg_match('/_zone_([^_]+)_([^_]+)/i', $onu['description'], $m)) {
+                        $onuName = trim($m[1] . ' - ' . $m[2]);
+                    } else {
+                        $onuName = $onu['description'];
+                    }
+                }
+                if (empty($onuName)) {
+                    // Fallback to location-based name
+                    $onuName = "ONU {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
+                }
+                
                 $this->addONU([
                     'olt_id' => $oltId,
                     'sn' => $onu['sn'],
-                    'name' => $onu['description'] ?: $onu['sn'],
+                    'name' => $onuName,
                     'frame' => $onu['frame'],
                     'slot' => $onu['slot'],
                     'port' => $onu['port'],
