@@ -413,8 +413,11 @@ class HuaweiOLT {
         $portIndex = ($slot * 100000000) + ($port * 1000000);
         $indexSuffix = "{$portIndex}.{$onuId}";
         
+        // Huawei GPON ONU Optical Power OIDs
+        // RX: hwGponOltOpticsDnRx (1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4)
+        // TX: hwGponOltOpticsUpTx (1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6)
         $rxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}";
-        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.5.{$indexSuffix}";
+        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.{$indexSuffix}";
         $temperatureOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.1.{$indexSuffix}";
         $voltageOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.2.{$indexSuffix}";
         
