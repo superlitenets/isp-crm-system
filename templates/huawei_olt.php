@@ -1262,6 +1262,9 @@ try {
                     <form class="d-flex gap-2" method="get">
                         <input type="hidden" name="page" value="huawei-olt">
                         <input type="hidden" name="view" value="onus">
+                        <?php if (isset($_GET['unconfigured'])): ?>
+                        <input type="hidden" name="unconfigured" value="1">
+                        <?php endif; ?>
                         <select name="olt_id" class="form-select form-select-sm" onchange="this.form.submit()">
                             <option value="">All OLTs</option>
                             <?php foreach ($olts as $olt): ?>
