@@ -278,6 +278,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'discover_all_unconfigured':
+                $totalFound = 0;
+                $successOlts = [];
+                $failedOlts = [];
+                $allOlts = $huaweiOLT->getOLTs(false);
+                foreach ($allOlts as $olt) {
+                    if ($olt['is_active']) {
+                        try {
+                            $result = $huaweiOLT->discoverUnconfiguredONUs($olt['id']);
+                            if ($result['success']) {
+                                $totalFound += $result['count'];
+                                $successOlts[] = "{$olt['name']}: {$result['count']}";
+                            } else {
+                                $failedOlts[] = "{$olt['name']}: " . ($result['error'] ?? 'failed');
+                            }
+                        } catch (Exception $e) {
+                            $failedOlts[] = "{$olt['name']}: " . $e->getMessage();
+                        }
+                    }
+                }
+                
+                if (empty($failedOlts) && !empty($successOlts)) {
+                    $message = "Discovery complete. Found {$totalFound} unsynced ONUs (" . implode(', ', $successOlts) . ")";
+                    $messageType = 'success';
+                } elseif (!empty($failedOlts) && !empty($successOlts)) {
+                    $message = "Partial discovery. Found {$totalFound} ONUs from: " . implode(', ', $successOlts) . ". Failed: " . implode(', ', $failedOlts);
+                    $messageType = 'warning';
+                } elseif (!empty($failedOlts)) {
+                    $message = "Discovery failed for all OLTs: " . implode(', ', $failedOlts);
+                    $messageType = 'danger';
+                } else {
+                    $message = "No active OLTs found to discover from.";
+                    $messageType = 'warning';
+                }
+                break;
             case 'import_smartolt':
                 $result = $huaweiOLT->importFromSmartOLT((int)$_POST['olt_id']);
                 if ($result['success']) {
@@ -722,23 +757,8 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
-        // Auto-discover unconfigured ONUs when viewing Pending Authorization tab
-        if ($oltId) {
-            // Discover from specific OLT
-            $huaweiOLT->discoverUnconfiguredONUs($oltId);
-        } else {
-            // Discover from ALL active OLTs
-            foreach ($olts as $olt) {
-                if ($olt['is_active']) {
-                    try {
-                        $huaweiOLT->discoverUnconfiguredONUs($olt['id']);
-                    } catch (Exception $e) {
-                        // Continue with other OLTs if one fails
-                        error_log("Failed to discover ONUs from OLT {$olt['name']}: " . $e->getMessage());
-                    }
-                }
-            }
-        }
+        // Discovery is now triggered by button click, not on page load
+        // This prevents the page from hanging while waiting for OLT connections
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
 }
@@ -1293,14 +1313,23 @@ try {
                         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search SN/Name..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                     </form>
-                    <?php if (isset($_GET['unconfigured']) && $oltId): ?>
-                    <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="discover_unconfigured">
-                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                        <button type="submit" class="btn btn-warning btn-sm">
-                            <i class="bi bi-search me-1"></i> Discover New ONUs
-                        </button>
-                    </form>
+                    <?php if (isset($_GET['unconfigured'])): ?>
+                        <?php if ($oltId): ?>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="discover_unconfigured">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-warning btn-sm" onclick="showLoading('Discovering unconfigured ONUs...')">
+                                <i class="bi bi-search me-1"></i> Discover ONUs
+                            </button>
+                        </form>
+                        <?php else: ?>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="discover_all_unconfigured">
+                            <button type="submit" class="btn btn-warning btn-sm" onclick="showLoading('Discovering from all OLTs... This may take a while.')">
+                                <i class="bi bi-broadcast me-1"></i> Discover All ONUs
+                            </button>
+                        </form>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
                         <i class="bi bi-plus-circle me-1"></i> Add ONU
