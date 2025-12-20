@@ -503,7 +503,13 @@ if ($view === 'onus' || $view === 'dashboard') {
     if ($oltId) $onuFilters['olt_id'] = $oltId;
     if (!empty($_GET['status'])) $onuFilters['status'] = $_GET['status'];
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
-    if (isset($_GET['unconfigured'])) $onuFilters['is_authorized'] = false;
+    if (isset($_GET['unconfigured'])) {
+        $onuFilters['is_authorized'] = false;
+        // Auto-discover unconfigured ONUs when viewing Pending Authorization tab
+        if ($oltId) {
+            $huaweiOLT->discoverUnconfiguredONUs($oltId);
+        }
+    }
     $onus = $huaweiOLT->getONUs($onuFilters);
 }
 
