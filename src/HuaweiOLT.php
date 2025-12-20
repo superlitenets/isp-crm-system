@@ -1057,8 +1057,8 @@ class HuaweiOLT {
             }
         }
         
-        // Now get optical power levels for all ONUs
-        $opticalResult = $this->syncOpticalPowerFromCLI($oltId);
+        // Now get optical power levels for all ONUs via SNMP (faster than CLI)
+        $opticalResult = $this->refreshAllONUOptical($oltId);
         
         $this->addLog([
             'olt_id' => $oltId,
@@ -1207,15 +1207,15 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        // Use snmp_community field from database
         $community = $olt['snmp_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // Huawei ONU OIDs (hwGponOnuInfo table .43.1.x)
-        // Index format: frame.slot.pon.onu (e.g., 0.1.3.12)
+        // Correct Huawei optical power OIDs (hwGponOltOptics table .51.1.x)
+        // Index format: ponIndex.onuId where ponIndex = frame*8192 + slot*256 + port
+        // Values are in 0.01 dBm units (divide by 100)
         $oids = [
-            'rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3',  // RX Power (divide by 10)
-            'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4',  // TX Power (divide by 10)
+            'rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4',  // hwGponOltOpticsDnRx (ONU → OLT)
+            'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6',  // hwGponOltOpticsUpTx (OLT → ONU)
         ];
         
         $results = [];
@@ -1229,13 +1229,13 @@ class HuaweiOLT {
         }
         
         // Walk RX power table
-        $rxResults = @snmpwalk($host, $community, $oids['rx']);
+        $rxResults = @snmprealwalk($host, $community, $oids['rx'], 10000000, 2);
         if ($rxResults !== false) {
-            foreach ($rxResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['rx']);
+            foreach ($rxResults as $oid => $value) {
+                $key = $this->parseHuaweiOpticalIndex($oid, $oids['rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
-                    if ($power !== null) {
+                    $power = $this->parseOpticalPowerDiv100($value);
+                    if ($power !== null && $power > -50 && $power < 10) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
                         }
@@ -1246,13 +1246,13 @@ class HuaweiOLT {
         }
         
         // Walk TX power table
-        $txResults = @snmpwalk($host, $community, $oids['tx']);
+        $txResults = @snmprealwalk($host, $community, $oids['tx'], 10000000, 2);
         if ($txResults !== false) {
-            foreach ($txResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['tx']);
+            foreach ($txResults as $oid => $value) {
+                $key = $this->parseHuaweiOpticalIndex($oid, $oids['tx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
-                    if ($power !== null) {
+                    $power = $this->parseOpticalPowerDiv100($value);
+                    if ($power !== null && $power > -50 && $power < 10) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
                         }
@@ -1267,6 +1267,37 @@ class HuaweiOLT {
             'data' => $results,
             'count' => count($results)
         ];
+    }
+    
+    private function parseHuaweiOpticalIndex(string $oid, string $baseOid): ?string {
+        // Extract ponIndex.onuId from OID
+        // OID format: baseOid.ponIndex.onuId
+        $indexPart = substr($oid, strlen($baseOid) + 1);
+        $parts = explode('.', $indexPart);
+        
+        if (count($parts) >= 2) {
+            $ponIndex = (int)$parts[0];
+            $onuId = (int)$parts[1];
+            
+            // Decode ponIndex: frame*8192 + slot*256 + port
+            $frame = intdiv($ponIndex, 8192);
+            $remainder = $ponIndex % 8192;
+            $slot = intdiv($remainder, 256);
+            $port = $remainder % 256;
+            
+            // Return key format: slot.port.onuId (matching buildOpticalKey format)
+            return "{$slot}.{$port}.{$onuId}";
+        }
+        return null;
+    }
+    
+    private function parseOpticalPowerDiv100($value): ?float {
+        // Huawei returns power in 0.01 dBm units
+        $value = $this->cleanSnmpValue((string)$value);
+        if (is_numeric($value)) {
+            return (float)$value / 100;
+        }
+        return null;
     }
     
     private function parseHuaweiPortOnuIndex($indexOrOid, string $baseOid): ?string {
