@@ -1605,6 +1605,600 @@ quit</pre>
                 </div>
             </div>
             
+            <!-- TR-069 Remote Management Section -->
+            <?php if ($currentOnu['is_authorized']): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Remote Management</span>
+                    <span class="badge bg-light text-dark">
+                        <i class="bi bi-wifi me-1"></i>OMCI / GenieACS
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- TR-069 Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="tr069Tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="wan-tab" data-bs-toggle="tab" data-bs-target="#wanConfig" type="button">
+                                <i class="bi bi-globe me-1"></i> WAN
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="wireless-tab" data-bs-toggle="tab" data-bs-target="#wirelessConfig" type="button">
+                                <i class="bi bi-wifi me-1"></i> Wireless
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="lan-tab" data-bs-toggle="tab" data-bs-target="#lanConfig" type="button">
+                                <i class="bi bi-ethernet me-1"></i> LAN
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="device-tab" data-bs-toggle="tab" data-bs-target="#deviceInfo" type="button">
+                                <i class="bi bi-cpu me-1"></i> Device
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="voip-tab" data-bs-toggle="tab" data-bs-target="#voipConfig" type="button">
+                                <i class="bi bi-telephone me-1"></i> VoIP
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="tr069TabContent">
+                        <!-- WAN Configuration -->
+                        <div class="tab-pane fade show active" id="wanConfig" role="tabpanel">
+                            <form method="post" id="wanConfigForm">
+                                <input type="hidden" name="action" value="tr069_wan_config">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">WAN Connection Settings</h6>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Connection Type</label>
+                                            <select name="wan_type" class="form-select" id="wanType" onchange="toggleWanFields()">
+                                                <option value="dhcp">DHCP (Automatic)</option>
+                                                <option value="static">Static IP</option>
+                                                <option value="pppoe">PPPoE</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div id="pppoeFields" style="display:none;">
+                                            <div class="mb-3">
+                                                <label class="form-label">PPPoE Username</label>
+                                                <input type="text" name="pppoe_user" class="form-control" placeholder="username@isp.com">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">PPPoE Password</label>
+                                                <input type="password" name="pppoe_pass" class="form-control">
+                                            </div>
+                                        </div>
+                                        
+                                        <div id="staticFields" style="display:none;">
+                                            <div class="mb-3">
+                                                <label class="form-label">IP Address</label>
+                                                <input type="text" name="static_ip" class="form-control" placeholder="192.168.1.100">
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label">Subnet Mask</label>
+                                                    <input type="text" name="static_mask" class="form-control" value="255.255.255.0">
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label">Gateway</label>
+                                                    <input type="text" name="static_gw" class="form-control" placeholder="192.168.1.1">
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label">Primary DNS</label>
+                                                    <input type="text" name="dns1" class="form-control" value="8.8.8.8">
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="form-label">Secondary DNS</label>
+                                                    <input type="text" name="dns2" class="form-control" value="8.8.4.4">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">VLAN & Priority Settings</h6>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">WAN VLAN ID</label>
+                                                <input type="number" name="wan_vlan" class="form-control" placeholder="Auto" min="1" max="4094">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">802.1p Priority</label>
+                                                <select name="wan_priority" class="form-select">
+                                                    <option value="0">0 (Best Effort)</option>
+                                                    <option value="1">1</option>
+                                                    <option value="2">2</option>
+                                                    <option value="3">3</option>
+                                                    <option value="4">4</option>
+                                                    <option value="5">5</option>
+                                                    <option value="6">6 (Voice)</option>
+                                                    <option value="7">7 (Network Control)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" name="nat_enable" id="natEnable" checked>
+                                                <label class="form-check-label" for="natEnable">Enable NAT</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">MTU Size</label>
+                                            <input type="number" name="mtu" class="form-control" value="1500" min="576" max="1500">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Apply WAN Settings
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Wireless Configuration -->
+                        <div class="tab-pane fade" id="wirelessConfig" role="tabpanel">
+                            <form method="post" id="wirelessConfigForm">
+                                <input type="hidden" name="action" value="tr069_wireless_config">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3"><i class="bi bi-broadcast me-2"></i>2.4 GHz WiFi</h6>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="wifi_24_enable" id="wifi24Enable" checked>
+                                            <label class="form-check-label" for="wifi24Enable">Enable 2.4 GHz Radio</label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="ssid_24" class="form-control" placeholder="MyNetwork_2.4G" maxlength="32">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Password (WPA2-PSK)</label>
+                                            <div class="input-group">
+                                                <input type="password" name="wifi_pass_24" class="form-control" id="wifiPass24" minlength="8" maxlength="63">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('wifiPass24')">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Channel</label>
+                                                <select name="channel_24" class="form-select">
+                                                    <option value="auto">Auto</option>
+                                                    <option value="1">1</option>
+                                                    <option value="6">6</option>
+                                                    <option value="11">11</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Bandwidth</label>
+                                                <select name="bandwidth_24" class="form-select">
+                                                    <option value="20">20 MHz</option>
+                                                    <option value="40" selected>40 MHz</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-check mb-3">
+                                            <input type="checkbox" class="form-check-input" name="hide_ssid_24" id="hideSsid24">
+                                            <label class="form-check-label" for="hideSsid24">Hide SSID (Broadcast disabled)</label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3"><i class="bi bi-broadcast me-2"></i>5 GHz WiFi</h6>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="wifi_5_enable" id="wifi5Enable" checked>
+                                            <label class="form-check-label" for="wifi5Enable">Enable 5 GHz Radio</label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="ssid_5" class="form-control" placeholder="MyNetwork_5G" maxlength="32">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Password (WPA2-PSK)</label>
+                                            <div class="input-group">
+                                                <input type="password" name="wifi_pass_5" class="form-control" id="wifiPass5" minlength="8" maxlength="63">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('wifiPass5')">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Channel</label>
+                                                <select name="channel_5" class="form-select">
+                                                    <option value="auto">Auto</option>
+                                                    <option value="36">36</option>
+                                                    <option value="40">40</option>
+                                                    <option value="44">44</option>
+                                                    <option value="48">48</option>
+                                                    <option value="149">149</option>
+                                                    <option value="153">153</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Bandwidth</label>
+                                                <select name="bandwidth_5" class="form-select">
+                                                    <option value="20">20 MHz</option>
+                                                    <option value="40">40 MHz</option>
+                                                    <option value="80" selected>80 MHz</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-check mb-3">
+                                            <input type="checkbox" class="form-check-input" name="hide_ssid_5" id="hideSsid5">
+                                            <label class="form-check-label" for="hideSsid5">Hide SSID (Broadcast disabled)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input type="checkbox" class="form-check-input" name="same_ssid" id="sameSsid">
+                                            <label class="form-check-label" for="sameSsid">Use same SSID for 2.4G and 5G (Band Steering)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Max Connected Clients</label>
+                                            <input type="number" name="max_clients" class="form-control" value="32" min="1" max="128">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Apply WiFi Settings
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- LAN Configuration -->
+                        <div class="tab-pane fade" id="lanConfig" role="tabpanel">
+                            <form method="post" id="lanConfigForm">
+                                <input type="hidden" name="action" value="tr069_lan_config">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">LAN IP Settings</h6>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">LAN IP Address</label>
+                                            <input type="text" name="lan_ip" class="form-control" value="192.168.1.1">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Subnet Mask</label>
+                                            <select name="lan_mask" class="form-select">
+                                                <option value="255.255.255.0">/24 (255.255.255.0)</option>
+                                                <option value="255.255.0.0">/16 (255.255.0.0)</option>
+                                                <option value="255.255.255.128">/25 (255.255.255.128)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">DHCP Server</h6>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="dhcp_enable" id="dhcpEnable" checked>
+                                            <label class="form-check-label" for="dhcpEnable">Enable DHCP Server</label>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Start IP</label>
+                                                <input type="text" name="dhcp_start" class="form-control" value="192.168.1.100">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">End IP</label>
+                                                <input type="text" name="dhcp_end" class="form-control" value="192.168.1.200">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Lease Time (hours)</label>
+                                            <input type="number" name="dhcp_lease" class="form-control" value="24" min="1" max="720">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <h6 class="text-muted mb-3">Ethernet Port Configuration</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Port</th>
+                                                <th>Status</th>
+                                                <th>Speed</th>
+                                                <th>VLAN Mode</th>
+                                                <th>VLAN ID</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php for ($i = 1; $i <= 4; $i++): ?>
+                                            <tr>
+                                                <td>ETH <?= $i ?></td>
+                                                <td>
+                                                    <div class="form-check form-switch">
+                                                        <input type="checkbox" class="form-check-input" name="eth<?= $i ?>_enable" checked>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <select name="eth<?= $i ?>_speed" class="form-select form-select-sm" style="width:100px">
+                                                        <option value="auto">Auto</option>
+                                                        <option value="100">100M</option>
+                                                        <option value="1000">1000M</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select name="eth<?= $i ?>_vlan_mode" class="form-select form-select-sm" style="width:100px">
+                                                        <option value="tag">Tagged</option>
+                                                        <option value="untag" selected>Untagged</option>
+                                                        <option value="transparent">Transparent</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="eth<?= $i ?>_vlan" class="form-control form-control-sm" style="width:80px" placeholder="1">
+                                                </td>
+                                            </tr>
+                                            <?php endfor; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Apply LAN Settings
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Device Info -->
+                        <div class="tab-pane fade" id="deviceInfo" role="tabpanel">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3">Device Information</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th class="text-muted">Serial Number</th>
+                                            <td><code><?= htmlspecialchars($currentOnu['sn']) ?></code></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">MAC Address</th>
+                                            <td><code><?= htmlspecialchars($currentOnu['mac_address'] ?? 'N/A') ?></code></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">Model</th>
+                                            <td><?= htmlspecialchars($currentOnu['model'] ?? 'N/A') ?></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">Firmware Version</th>
+                                            <td><?= htmlspecialchars($currentOnu['software_version'] ?? 'N/A') ?></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">Hardware Version</th>
+                                            <td><?= htmlspecialchars($currentOnu['hardware_version'] ?? 'N/A') ?></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">Uptime</th>
+                                            <td><?= htmlspecialchars($currentOnu['uptime'] ?? 'N/A') ?></td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <h6 class="text-muted mb-3 mt-4">Device Actions</h6>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="tr069_reboot">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-warning" onclick="return confirm('Reboot this ONU?')">
+                                                <i class="bi bi-arrow-clockwise me-1"></i> Reboot
+                                            </button>
+                                        </form>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="tr069_factory_reset">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-danger" onclick="return confirm('FACTORY RESET will erase all settings! Are you sure?')">
+                                                <i class="bi bi-exclamation-triangle me-1"></i> Factory Reset
+                                            </button>
+                                        </form>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="tr069_refresh">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-info">
+                                                <i class="bi bi-arrow-repeat me-1"></i> Refresh Device Info
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3">TR-069 Status</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th class="text-muted">Last Inform</th>
+                                            <td><?= $currentOnu['last_inform'] ?? 'Never' ?></td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">Connection Status</th>
+                                            <td>
+                                                <?php if ($currentOnu['status'] === 'online'): ?>
+                                                <span class="badge bg-success">Connected to ACS</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary">Offline</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-muted">TR-069 VLAN</th>
+                                            <td><?= $currentOnu['profile_tr069_vlan'] ?? 'Not configured' ?></td>
+                                        </tr>
+                                    </table>
+                                    
+                                    <h6 class="text-muted mb-3 mt-4">Firmware Update</h6>
+                                    <form method="post" class="mb-3">
+                                        <input type="hidden" name="action" value="tr069_firmware">
+                                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                        <div class="mb-3">
+                                            <label class="form-label">Firmware URL</label>
+                                            <input type="url" name="firmware_url" class="form-control" placeholder="http://server/firmware.bin">
+                                        </div>
+                                        <button type="submit" class="btn btn-secondary" onclick="return confirm('Start firmware upgrade? The device will reboot.')">
+                                            <i class="bi bi-cloud-download me-1"></i> Upgrade Firmware
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- VoIP Configuration -->
+                        <div class="tab-pane fade" id="voipConfig" role="tabpanel">
+                            <form method="post" id="voipConfigForm">
+                                <input type="hidden" name="action" value="tr069_voip_config">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">SIP Account 1 (Line 1)</h6>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="voip1_enable" id="voip1Enable">
+                                            <label class="form-check-label" for="voip1Enable">Enable Line 1</label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Server</label>
+                                            <input type="text" name="sip_server1" class="form-control" placeholder="sip.provider.com">
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">SIP Port</label>
+                                                <input type="number" name="sip_port1" class="form-control" value="5060">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Phone Number</label>
+                                                <input type="text" name="phone1" class="form-control" placeholder="1001">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Username</label>
+                                            <input type="text" name="sip_user1" class="form-control">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Password</label>
+                                            <input type="password" name="sip_pass1" class="form-control">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3">SIP Account 2 (Line 2)</h6>
+                                        
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="voip2_enable" id="voip2Enable">
+                                            <label class="form-check-label" for="voip2Enable">Enable Line 2</label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Server</label>
+                                            <input type="text" name="sip_server2" class="form-control" placeholder="sip.provider.com">
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">SIP Port</label>
+                                                <input type="number" name="sip_port2" class="form-control" value="5060">
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Phone Number</label>
+                                                <input type="text" name="phone2" class="form-control" placeholder="1002">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Username</label>
+                                            <input type="text" name="sip_user2" class="form-control">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SIP Password</label>
+                                            <input type="password" name="sip_pass2" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">VoIP VLAN</label>
+                                            <input type="number" name="voip_vlan" class="form-control" placeholder="e.g., 200" min="1" max="4094">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Codec Priority</label>
+                                            <select name="voip_codec" class="form-select">
+                                                <option value="g711a">G.711a (alaw)</option>
+                                                <option value="g711u">G.711u (ulaw)</option>
+                                                <option value="g729">G.729</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg me-1"></i> Apply VoIP Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function toggleWanFields() {
+                const wanType = document.getElementById('wanType').value;
+                document.getElementById('pppoeFields').style.display = wanType === 'pppoe' ? 'block' : 'none';
+                document.getElementById('staticFields').style.display = wanType === 'static' ? 'block' : 'none';
+            }
+            
+            function togglePassword(id) {
+                const input = document.getElementById(id);
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }
+            </script>
+            <?php endif; ?>
+            
             <?php elseif ($view === 'profiles'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Profiles</h4>
