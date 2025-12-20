@@ -3008,7 +3008,7 @@ class HuaweiOLT {
         return 'Connection failed. Check IP, credentials, and network access.';
     }
     
-    public function authorizeONU(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = ''): array {
+    public function authorizeONU(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = '', array $options = []): array {
         $onu = $this->getONU($onuId);
         $profile = $this->getServiceProfile($profileId);
         
@@ -3019,66 +3019,128 @@ class HuaweiOLT {
         $frame = $onu['frame'] ?? 0;
         $slot = $onu['slot'];
         $port = $onu['port'];
+        $oltId = $onu['olt_id'];
         
-        // Build command based on authentication method (Huawei MA5600/MA5800 syntax)
+        // Build auth part based on authentication method
         switch ($authMethod) {
             case 'loid':
                 if (empty($loid)) {
-                    return ['success' => false, 'message' => 'LOID value is required for LOID authentication'];
+                    return ['success' => false, 'message' => 'LOID value is required'];
                 }
-                // Huawei syntax: ont add 0/1/0 loid-auth loid <loid> [password <pwd>]
                 $authPart = "loid-auth loid {$loid}";
                 if (!empty($loidPassword)) {
                     $authPart .= " password {$loidPassword}";
                 }
                 break;
             case 'mac':
-                // MAC auth requires a valid MAC address stored in the ONU record
-                // Huawei syntax: ont add 0/1/0 mac-auth mac xxxx-xxxx-xxxx
                 $mac = $onu['mac_address'] ?? '';
                 if (empty($mac)) {
-                    return ['success' => false, 'message' => 'MAC address not available for this ONU. Please update the ONU record with a valid MAC address first.'];
+                    return ['success' => false, 'message' => 'MAC address not available'];
                 }
-                // Validate MAC format and convert to Huawei format (xxxx-xxxx-xxxx)
                 $cleanMac = preg_replace('/[^a-fA-F0-9]/', '', $mac);
                 if (strlen($cleanMac) !== 12) {
-                    return ['success' => false, 'message' => 'Invalid MAC address format. Expected 12 hex characters.'];
+                    return ['success' => false, 'message' => 'Invalid MAC address format'];
                 }
                 $huaweiMac = strtolower(substr($cleanMac, 0, 4) . '-' . substr($cleanMac, 4, 4) . '-' . substr($cleanMac, 8, 4));
                 $authPart = "mac-auth mac {$huaweiMac}";
                 break;
             case 'sn':
             default:
-                // Huawei syntax: ont add 0/1/0 sn-auth <serial-number>
                 $authPart = "sn-auth {$onu['sn']}";
                 break;
         }
         
-        $command = "ont add {$frame}/{$slot}/{$port} {$authPart} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']}";
-        
-        $result = $this->executeCommand($onu['olt_id'], $command);
-        
-        if ($result['success']) {
-            $this->updateONU($onuId, [
-                'is_authorized' => true,
-                'service_profile_id' => $profileId,
-                'line_profile' => $profile['line_profile'],
-                'srv_profile' => $profile['srv_profile']
-            ]);
-            
-            $this->addLog([
-                'olt_id' => $onu['olt_id'],
-                'onu_id' => $onuId,
-                'action' => 'authorize',
-                'status' => 'success',
-                'message' => "ONU {$onu['sn']} authorized with profile {$profile['name']} using {$authMethod} auth",
-                'command_sent' => $command,
-                'command_response' => $result['output'] ?? '',
-                'user_id' => $_SESSION['user_id'] ?? null
-            ]);
+        // Description for the ONU (use name or generate SNS code)
+        $description = $options['description'] ?? $onu['name'] ?? '';
+        if (empty($description)) {
+            $description = $this->generateNextSNSCode($oltId);
         }
         
-        return $result;
+        // Build CLI script with newlines for multi-command execution
+        // Huawei MA5680T/MA5683T requires interface context for ont add
+        $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$authPart} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']} desc \"{$description}\"\r\nquit";
+        
+        // Execute the authorization command
+        $result = $this->executeCommand($oltId, $cliScript);
+        $output = $result['output'] ?? '';
+        
+        // Parse assigned ONU ID from response: "ONTID :1", "ONT-ID=1", "Number:1"
+        $assignedOnuId = null;
+        if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
+            $assignedOnuId = (int)$m[1];
+        }
+        
+        // Check for errors in response
+        $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output);
+        
+        if (!$result['success'] || $hasError) {
+            $this->addLog([
+                'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
+                'status' => 'failed', 'message' => "Authorization failed for {$onu['sn']}",
+                'command_sent' => $cliScript, 'command_response' => $output,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            return ['success' => false, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
+        }
+        
+        // Update ONU record
+        $updateData = [
+            'is_authorized' => true,
+            'service_profile_id' => $profileId,
+            'line_profile' => $profile['line_profile'],
+            'srv_profile' => $profile['srv_profile'],
+            'name' => $description,
+            'status' => 'online'
+        ];
+        if ($assignedOnuId !== null) {
+            $updateData['onu_id'] = $assignedOnuId;
+        }
+        $this->updateONU($onuId, $updateData);
+        
+        // Create service-port if VLAN is specified
+        $vlanId = $options['vlan_id'] ?? $profile['default_vlan'] ?? null;
+        $servicePortResult = null;
+        if ($vlanId && $assignedOnuId !== null) {
+            $gemPort = $options['gem_port'] ?? 1;
+            $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+            $servicePortResult = $this->executeCommand($oltId, $spCmd);
+            $output .= "\n" . ($servicePortResult['output'] ?? '');
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
+            'status' => 'success',
+            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : ''),
+            'command_sent' => $cliScript,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => "ONU authorized successfully" . ($assignedOnuId ? " as ONU ID {$assignedOnuId}" : ''),
+            'onu_id' => $assignedOnuId,
+            'description' => $description,
+            'output' => $output
+        ];
+    }
+    
+    private function generateNextSNSCode(int $oltId): string {
+        // Find highest SNS number for this OLT
+        $stmt = $this->db->prepare("
+            SELECT name FROM huawei_onus 
+            WHERE olt_id = ? AND name LIKE 'SNS%' 
+            ORDER BY name DESC LIMIT 1
+        ");
+        $stmt->execute([$oltId]);
+        $lastName = $stmt->fetchColumn();
+        
+        $nextNum = 1;
+        if ($lastName && preg_match('/SNS(\d+)/i', $lastName, $m)) {
+            $nextNum = (int)$m[1] + 1;
+        }
+        
+        return 'SNS' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
     }
     
     public function markAllONUsAuthorized(int $oltId): array {
