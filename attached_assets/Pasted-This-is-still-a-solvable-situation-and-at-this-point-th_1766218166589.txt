@@ -1,0 +1,134 @@
+This is still a solvable situation, and at this point the problem is not your PHP code and not SmartOLT data.
+
+You’ve now reached the real Huawei boundary that many people hit.
+
+I’ll be very direct and precise.
+
+🚨 What this result REALLY means
+
+If NONE of these return serials
+
+.43.1.9
+
+.45.1.4
+
+.46.1.3
+
+👉 then your Huawei OLT does NOT expose ONU serial numbers via SNMP at all on your current firmware / license / SNMP view.
+
+This is common, especially on:
+
+MA5800-X series
+
+Newer MA5600 firmware
+
+OLTs with restricted SNMP views
+
+Some ISP-customized Huawei builds
+
+SmartOLT does NOT rely on SNMP alone in these cases.
+
+🔑 Critical truth (very important)
+SmartOLT gets ONU serials via CLI, not SNMP, on many Huawei OLTs
+
+Specifically:
+
+SSH / Telnet
+
+display ont info
+
+display ont info summary
+
+display ont info by-sn
+
+SNMP is used mainly for:
+
+Optics (RX/TX)
+
+Status
+
+Counters
+
+👉 Serial numbers are often CLI-only
+
+This explains everything you’re seeing.
+
+✅ How SmartOLT actually works (real behavior)
+
+SmartOLT logic (Huawei):
+
+SSH → get ONU serial + index
+SNMP → get optics + status
+MERGE → display in UI
+
+
+You are currently doing only SNMP, which is why you’re blocked.
+
+🧠 Why Huawei does this
+
+Huawei treats:
+
+ONU serials = inventory / security data
+
+SNMP = monitoring protocol
+
+So serials are often:
+
+Hidden from SNMP
+
+CLI-only
+
+Restricted by SNMP view
+
+🛠️ What you should do NOW (correct path)
+OPTION A — ✅ Use SSH/CLI to fetch serials (RECOMMENDED)
+
+This is the correct and industry-accurate solution.
+
+CLI command that ALWAYS works:
+display ont info summary
+
+
+or per PON:
+
+display ont info summary frame 0 slot 1 port 3
+
+
+Output example:
+
+-------------------------------------------------------------------------------
+ONT-ID  SN              Control flag  Run state  Config state  Match state
+-------------------------------------------------------------------------------
+12      HWTC9A123456    active        online     normal        match
+
+
+This gives you:
+
+ONU ID
+
+Serial
+
+Port location
+
+PHP example (SSH via phpseclib)
+use phpseclib3\Net\SSH2;
+
+$ssh = new SSH2('192.168.1.10');
+if (!$ssh->login('admin', 'password')) {
+    die('SSH login failed');
+}
+
+$output = $ssh->exec("display ont info summary\n");
+
+echo $output;
+
+
+Then parse:
+
+Frame / Slot / Port (from context)
+
+ONU ID
+
+Serial
+
+This is exactly what SmartOLT does internally.

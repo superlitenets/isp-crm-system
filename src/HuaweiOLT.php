@@ -571,12 +571,14 @@ class HuaweiOLT {
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
         // Huawei stores ONU serials in different tables depending on firmware:
-        // Table 43.1.9 - older firmware
+        // Table 43.1.3 - hwGponDeviceOntSn (MA5680T confirmed)
         // Table 46.1.3 - common on MA5800/newer MA5600
         // Table 45.1.4 - alternative location
+        // Table 43.1.9 - older firmware
         $serialOids = [
-            '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3',  // Most common - device info table
-            '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4',  // Alternative - auth table
+            '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3',  // hwGponDeviceOntSn - MA5680T confirmed
+            '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3',  // Device info table
+            '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4',  // Auth table
             '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9',  // Older firmware
         ];
         
@@ -599,7 +601,7 @@ class HuaweiOLT {
         }
         
         if ($serials === false || empty($serials)) {
-            return ['success' => false, 'error' => 'Failed to get ONU serial numbers. Tried OIDs: .46.1.3, .45.1.4, .43.1.9. None returned valid serials.'];
+            return ['success' => false, 'error' => 'Failed to get ONU serial numbers. Tried OIDs: .43.1.3, .46.1.3, .45.1.4, .43.1.9. None returned valid serials. Your OLT may not expose serials via SNMP.'];
         }
         
         // Build map: serial -> location from SNMP
