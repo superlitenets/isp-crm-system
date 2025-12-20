@@ -517,6 +517,7 @@ class HuaweiOLT {
         foreach ($result['onus'] as $onu) {
             $existing = $this->getONUBySN($onu['sn']);
             
+            // ONUs visible via SNMP are already authorized on the OLT
             $data = [
                 'olt_id' => $oltId,
                 'sn' => $onu['sn'],
@@ -526,6 +527,7 @@ class HuaweiOLT {
                 'onu_id' => $onu['onu_id'],
                 'status' => $onu['status'],
                 'description' => $onu['description'],
+                'is_authorized' => true,
             ];
             
             try {
@@ -680,11 +682,11 @@ class HuaweiOLT {
             if (isset($snmpOnuMap[$sn])) {
                 $snmpData = $snmpOnuMap[$sn];
                 
-                // Update location data from SNMP
+                // Update location data from SNMP - also mark as authorized since it's on OLT
                 try {
                     $stmt = $this->db->prepare("
                         UPDATE huawei_onus 
-                        SET frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                        SET frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                     ");
                     $stmt->execute([
@@ -719,6 +721,7 @@ class HuaweiOLT {
                         'onu_id' => $snmpData['onu_id'],
                         'status' => $snmpData['status'] ?? 'unknown',
                         'description' => $snmpData['description'] ?? '',
+                        'is_authorized' => true,
                     ]);
                     $added++;
                 } catch (\Exception $e) {
@@ -844,12 +847,12 @@ class HuaweiOLT {
             
             try {
                 if ($existing) {
-                    // Update existing ONU
+                    // Update existing ONU - SmartOLT ONUs are already authorized
                     $stmt = $this->db->prepare("
                         UPDATE huawei_onus 
                         SET frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, 
                             rx_power = COALESCE(?, rx_power), tx_power = COALESCE(?, tx_power),
-                            name = COALESCE(?, name), updated_at = CURRENT_TIMESTAMP
+                            name = COALESCE(?, name), is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                     ");
                     $stmt->execute([
@@ -860,7 +863,7 @@ class HuaweiOLT {
                     ]);
                     $updated++;
                 } else {
-                    // Add new ONU
+                    // Add new ONU - SmartOLT ONUs are already authorized on OLT
                     $this->addONU([
                         'olt_id' => $oltId,
                         'sn' => $sn,
@@ -873,6 +876,7 @@ class HuaweiOLT {
                         'tx_power' => $txPower,
                         'name' => $onu['name'] ?? $onu['onu_name'] ?? '',
                         'description' => $onu['description'] ?? '',
+                        'is_authorized' => true,
                     ]);
                     $added++;
                 }
