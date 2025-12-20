@@ -525,13 +525,21 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU location (slot/port/onu_id) not set'];
         }
         
+        $frame = $onu['frame'] ?? 0;
+        
+        // Try SNMP first
         $optical = $this->getONUOpticalInfoViaSNMP(
             $onu['olt_id'],
-            $onu['frame'] ?? 0,
+            $frame,
             $onu['slot'],
             $onu['port'],
             $onu['onu_id']
         );
+        
+        // If SNMP fails, try CLI as fallback
+        if (!$optical['success'] || ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null)) {
+            $optical = $this->getONUOpticalInfoViaCLI($onu['olt_id'], $frame, $onu['slot'], $onu['port'], $onu['onu_id']);
+        }
         
         if (!$optical['success']) {
             return $optical;
@@ -552,6 +560,44 @@ class HuaweiOLT {
             'success' => true,
             'rx_power' => $optical['optical']['rx_power'],
             'tx_power' => $optical['optical']['tx_power']
+        ];
+    }
+    
+    public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+        // Use CLI command to get optical power: display ont optical-info <frame>/<slot>/<port> <onu_id>
+        $command = "display ont optical-info {$frame}/{$slot}/{$port} {$onuId}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['message'] ?? 'CLI command failed'];
+        }
+        
+        $output = $result['output'] ?? '';
+        $rxPower = null;
+        $txPower = null;
+        
+        // Parse CLI output for optical power values
+        // Huawei format: "Rx optical power(dBm)    : -18.50"
+        //                "Tx optical power(dBm)    : 2.35"
+        if (preg_match('/Rx\s+optical\s+power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $rxPower = (float)$m[1];
+        }
+        if (preg_match('/Tx\s+optical\s+power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $txPower = (float)$m[1];
+        }
+        
+        // Alternative format: "OLT Rx ONT optical power(dBm) : -18.50"
+        if ($rxPower === null && preg_match('/OLT\s+Rx.*power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $rxPower = (float)$m[1];
+        }
+        
+        return [
+            'success' => true,
+            'optical' => [
+                'rx_power' => $rxPower,
+                'tx_power' => $txPower,
+            ],
+            'raw_output' => $output
         ];
     }
     

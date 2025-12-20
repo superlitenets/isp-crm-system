@@ -160,26 +160,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
-            case 'refresh_onu_optical':
-                $onu = $huaweiOLT->getONU((int)$_POST['onu_id']);
-                if ($onu) {
-                    $result = $huaweiOLT->getONUOpticalInfoViaSNMP(
-                        $onu['olt_id'], $onu['frame'], $onu['slot'], $onu['port'], $onu['onu_id']
-                    );
-                    if ($result['success']) {
-                        $optical = $result['optical'];
-                        $huaweiOLT->updateONU((int)$_POST['onu_id'], [
-                            'rx_power' => $optical['rx_power'],
-                            'tx_power' => $optical['tx_power']
-                        ]);
-                        $message = "Optical: RX={$optical['rx_power']}dBm, TX={$optical['tx_power']}dBm";
-                        $messageType = 'success';
-                    } else {
-                        $message = $result['error'] ?? 'Failed to get optical info';
-                        $messageType = 'danger';
-                    }
-                }
-                break;
             case 'discover_unconfigured':
                 $result = $huaweiOLT->discoverUnconfiguredONUs((int)$_POST['olt_id']);
                 if ($result['success']) {
