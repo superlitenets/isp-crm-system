@@ -570,12 +570,36 @@ class HuaweiOLT {
         $community = $olt['snmp_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // Walk the CORRECT serial number OID: .43.1.9 (hwGponDeviceOntSn)
-        $serialOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
-        $serials = @snmprealwalk($host, $community, $serialOid, 10000000, 2);
+        // Huawei stores ONU serials in different tables depending on firmware:
+        // Table 43.1.9 - older firmware
+        // Table 46.1.3 - common on MA5800/newer MA5600
+        // Table 45.1.4 - alternative location
+        $serialOids = [
+            '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3',  // Most common - device info table
+            '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4',  // Alternative - auth table
+            '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9',  // Older firmware
+        ];
+        
+        $serials = false;
+        $serialOid = '';
+        $usedOid = '';
+        
+        foreach ($serialOids as $tryOid) {
+            $result = @snmprealwalk($host, $community, $tryOid, 10000000, 2);
+            if ($result !== false && !empty($result)) {
+                // Verify this contains actual serial numbers (not just numbers)
+                $firstVal = $this->cleanSnmpValue(reset($result));
+                if (!empty($firstVal) && !is_numeric($firstVal) && strlen($firstVal) >= 8) {
+                    $serials = $result;
+                    $serialOid = $tryOid;
+                    $usedOid = $tryOid;
+                    break;
+                }
+            }
+        }
         
         if ($serials === false || empty($serials)) {
-            return ['success' => false, 'error' => 'Failed to get ONU serial numbers via SNMP OID .43.1.9'];
+            return ['success' => false, 'error' => 'Failed to get ONU serial numbers. Tried OIDs: .46.1.3, .45.1.4, .43.1.9. None returned valid serials.'];
         }
         
         // Build map: serial -> location from SNMP
@@ -701,6 +725,7 @@ class HuaweiOLT {
             'db_total' => count($existingOnus),
             'sample_snmp' => $sampleSnmp,
             'sample_db' => $sampleDb,
+            'used_oid' => $usedOid,
             'errors' => $errors
         ];
     }

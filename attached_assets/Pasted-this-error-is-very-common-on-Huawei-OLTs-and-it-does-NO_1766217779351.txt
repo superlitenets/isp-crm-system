@@ -1,0 +1,148 @@
+this error is very common on Huawei OLTs, and it does NOT mean SNMP is broken.
+It means the OID .43.1.9 is not exposed on your specific Huawei model / firmware.
+
+Huawei is notorious for changing ONU tables across MA5600 / MA5800 / firmware releases.
+
+Let’s fix this properly and safely, step by step.
+
+1️⃣ Why .43.1.9 fails (important truth)
+
+The OID:
+
+1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9
+
+
+Exists only on some Huawei firmware.
+
+On many MA5800 / newer MA5600 versions:
+
+ONU serial number is NOT in table 43
+
+Table 43 may expose optics only
+
+Serial is in another table entirely
+
+So SNMP returns:
+
+empty
+
+or “No Such Object”
+
+👉 This is expected behavior.
+
+2️⃣ The correct way to find the RIGHT ONU serial OID (do this once)
+Step A — Confirm Huawei SNMP tree access
+
+Run this from your server:
+
+snmpwalk -v2c -c public 192.168.1.10 1.3.6.1.4.1.2011.6.128
+
+
+If you see output → SNMP access is OK.
+
+Step B — Find ANY table that contains ONU serials
+
+Run:
+
+snmpwalk -v2c -c public 192.168.1.10 1.3.6.1.4.1.2011 | grep -i "HWTC"
+
+
+(or any known ONU vendor prefix)
+
+You will almost always see something like:
+
+...1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3.0.1.3.12 = STRING: "HWTC9A123456"
+
+
+👉 This tells us:
+
+Table = 46, not 43
+
+Column = 3, not 9
+
+3️⃣ Common Huawei ONU serial OIDs (real-world)
+✅ Most common working OIDs (tested)
+Purpose	OID
+ONU Serial	1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3
+ONU SN (alt)	1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4
+ONU ID list	1.3.6.1.4.1.2011.6.128.1.1.2.42
+
+Huawei moves this between:
+
+table 42
+
+table 45
+
+table 46
+
+depending on firmware.
+
+4️⃣ Minimal test (this WILL work on one of them)
+
+Run these one by one:
+
+snmpwalk -v2c -c public 192.168.1.10 1.3.6.1.4.1.2011.6.128.1.1.2.46
+
+
+If that fails, try:
+
+snmpwalk -v2c -c public 192.168.1.10 1.3.6.128.1.1.2.45
+
+
+One of them will expose serials.
+
+5️⃣ Why Huawei does this (important context)
+
+Huawei splits ONU data across tables:
+
+Table	Purpose
+42	ONU existence / index
+43	Optical info (RX/TX/Distance)
+45	Authentication / LOID
+46	Device info (Serial, model)
+
+SmartOLT internally:
+
+Detects firmware
+
+Switches table dynamically
+
+Your system must do the same.
+
+6️⃣ Correct reconciliation strategy (updated)
+
+Since .43.1.9 is unavailable:
+
+✅ Use table 46 serials
+✅ Use table 43 optics
+✅ Match them via ONU index
+
+Index format remains:
+
+frame.slot.pon.onu
+
+7️⃣ PHP example – robust serial discovery (safe)
+$serialOids = [
+    '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.3',
+    '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4'
+];
+
+$serials = [];
+
+foreach ($serialOids as $oid) {
+    $walk = @snmpwalk($OLT_IP, $COMMUNITY, $oid);
+    if ($walk && count($walk)) {
+        foreach ($walk as $fullOid => $value) {
+            $index = str_replace($oid . '.', '', $fullOid);
+            $serials[$index] = trim($value, '"');
+        }
+        break; // stop once one works
+    }
+}
+
+if (empty($serials)) {
+    die("No ONU serials found via SNMP");
+}
+
+
+This is exactly how SmartOLT does it internally.
