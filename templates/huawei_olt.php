@@ -152,8 +152,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'sync_onu_locations':
                 $result = $huaweiOLT->syncONULocationsFromSNMP((int)$_POST['olt_id']);
                 if ($result['success']) {
-                    $message = "Location sync: Updated {$result['updated']} ONUs, Added {$result['added']} new. SNMP found {$result['snmp_total']} ONUs.";
-                    $messageType = 'success';
+                    $message = "Location sync: Updated {$result['updated']}/{$result['db_total']} DB ONUs. SNMP found {$result['snmp_total']} ONUs.";
+                    if ($result['updated'] == 0 && !empty($result['sample_snmp']) && !empty($result['sample_db'])) {
+                        $snmpSamples = implode(', ', $result['sample_snmp']);
+                        $dbSamples = implode(', ', $result['sample_db']);
+                        $message .= " DEBUG: SNMP serials=[{$snmpSamples}] vs DB serials=[{$dbSamples}]";
+                    }
+                    $messageType = $result['updated'] > 0 ? 'success' : 'warning';
                 } else {
                     $message = $result['error'] ?? 'Sync failed';
                     $messageType = 'danger';

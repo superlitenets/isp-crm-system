@@ -562,27 +562,69 @@ class HuaweiOLT {
     }
     
     public function syncONULocationsFromSNMP(int $oltId): array {
-        // Get ONU list from OLT via SNMP (has correct frame/slot/port/onu_id)
-        $snmpResult = $this->getONUListViaSNMP($oltId);
-        if (!$snmpResult['success']) {
-            return $snmpResult;
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        if (empty($snmpResult['onus'])) {
-            return ['success' => false, 'error' => 'No ONUs found via SNMP. Check OLT SNMP configuration.'];
+        $community = $olt['snmp_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        // Walk the CORRECT serial number OID: .43.1.9 (hwGponDeviceOntSn)
+        $serialOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
+        $serials = @snmprealwalk($host, $community, $serialOid, 10000000, 2);
+        
+        if ($serials === false || empty($serials)) {
+            return ['success' => false, 'error' => 'Failed to get ONU serial numbers via SNMP OID .43.1.9'];
         }
         
-        // Build a map by serial number for quick lookup
+        // Build map: serial -> location from SNMP
         $snmpOnuMap = [];
-        foreach ($snmpResult['onus'] as $onu) {
-            $sn = strtoupper(trim($onu['sn'] ?? ''));
-            if (!empty($sn)) {
-                $snmpOnuMap[$sn] = $onu;
+        $sampleSnmp = [];
+        $count = 0;
+        
+        foreach ($serials as $oid => $rawSerial) {
+            // Parse index: .43.1.9.frame.slot.port.onu_id
+            $indexPart = substr($oid, strlen($serialOid) + 1);
+            $parts = explode('.', $indexPart);
+            
+            if (count($parts) >= 4) {
+                $sn = $this->cleanSnmpValue($rawSerial);
+                $sn = strtoupper(trim($sn));
+                
+                // Skip empty or numeric-only values (these are power readings, not serials)
+                if (empty($sn) || is_numeric($sn)) {
+                    continue;
+                }
+                
+                $snmpOnuMap[$sn] = [
+                    'frame' => (int)$parts[0],
+                    'slot' => (int)$parts[1],
+                    'port' => (int)$parts[2],
+                    'onu_id' => (int)$parts[3],
+                    'index' => $indexPart
+                ];
+                
+                // Collect samples for debug
+                if ($count < 3) {
+                    $sampleSnmp[] = $sn;
+                }
+                $count++;
             }
+        }
+        
+        if (empty($snmpOnuMap)) {
+            return ['success' => false, 'error' => "SNMP returned {$count} entries but none were valid serial numbers. OID .43.1.9 may not be supported."];
         }
         
         // Get all existing ONUs in huawei_onus table for this OLT
         $existingOnus = $this->getONUs(['olt_id' => $oltId]);
+        
+        // Collect sample DB serials for debug
+        $sampleDb = [];
+        foreach (array_slice($existingOnus, 0, 3) as $e) {
+            $sampleDb[] = strtoupper(trim($e['sn'] ?? ''));
+        }
         
         $updated = 0;
         $notFound = 0;
@@ -656,6 +698,9 @@ class HuaweiOLT {
             'added' => $added,
             'not_found' => $notFound,
             'snmp_total' => count($snmpOnuMap),
+            'db_total' => count($existingOnus),
+            'sample_snmp' => $sampleSnmp,
+            'sample_db' => $sampleDb,
             'errors' => $errors
         ];
     }
