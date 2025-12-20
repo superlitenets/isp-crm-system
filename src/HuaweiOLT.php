@@ -507,6 +507,105 @@ class HuaweiOLT {
         ];
     }
     
+    public function syncONULocationsFromSNMP(int $oltId): array {
+        // Get ONU list from OLT via SNMP (has correct frame/slot/port/onu_id)
+        $snmpResult = $this->getONUListViaSNMP($oltId);
+        if (!$snmpResult['success']) {
+            return $snmpResult;
+        }
+        
+        if (empty($snmpResult['onus'])) {
+            return ['success' => false, 'error' => 'No ONUs found via SNMP. Check OLT SNMP configuration.'];
+        }
+        
+        // Build a map by serial number for quick lookup
+        $snmpOnuMap = [];
+        foreach ($snmpResult['onus'] as $onu) {
+            $sn = strtoupper(trim($onu['sn'] ?? ''));
+            if (!empty($sn)) {
+                $snmpOnuMap[$sn] = $onu;
+            }
+        }
+        
+        // Get all existing ONUs in huawei_onus table for this OLT
+        $existingOnus = $this->getONUs(['olt_id' => $oltId]);
+        
+        $updated = 0;
+        $notFound = 0;
+        $errors = [];
+        
+        foreach ($existingOnus as $existing) {
+            $sn = strtoupper(trim($existing['sn'] ?? ''));
+            if (empty($sn)) continue;
+            
+            if (isset($snmpOnuMap[$sn])) {
+                $snmpData = $snmpOnuMap[$sn];
+                
+                // Update location data from SNMP
+                try {
+                    $stmt = $this->db->prepare("
+                        UPDATE huawei_onus 
+                        SET frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([
+                        $snmpData['frame'],
+                        $snmpData['slot'],
+                        $snmpData['port'],
+                        $snmpData['onu_id'],
+                        $snmpData['status'] ?? $existing['status'],
+                        $existing['id']
+                    ]);
+                    $updated++;
+                } catch (\Exception $e) {
+                    $errors[] = "Failed to update {$sn}: " . $e->getMessage();
+                }
+            } else {
+                $notFound++;
+            }
+        }
+        
+        // Also add any new ONUs from SNMP that don't exist in database
+        $added = 0;
+        foreach ($snmpOnuMap as $sn => $snmpData) {
+            $existing = $this->getONUBySN($sn);
+            if (!$existing) {
+                try {
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $sn,
+                        'frame' => $snmpData['frame'],
+                        'slot' => $snmpData['slot'],
+                        'port' => $snmpData['port'],
+                        'onu_id' => $snmpData['onu_id'],
+                        'status' => $snmpData['status'] ?? 'unknown',
+                        'description' => $snmpData['description'] ?? '',
+                    ]);
+                    $added++;
+                } catch (\Exception $e) {
+                    $errors[] = "Failed to add {$sn}: " . $e->getMessage();
+                }
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'sync_locations',
+            'status' => 'success',
+            'message' => "Updated {$updated} ONUs, added {$added} new, {$notFound} not found on OLT",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'updated' => $updated,
+            'added' => $added,
+            'not_found' => $notFound,
+            'snmp_total' => count($snmpOnuMap),
+            'errors' => $errors
+        ];
+    }
+    
     public function refreshAllONUOptical(int $oltId): array {
         $onus = $this->getONUs(['olt_id' => $oltId]);
         

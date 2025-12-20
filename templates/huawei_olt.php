@@ -149,6 +149,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'sync_onu_locations':
+                $result = $huaweiOLT->syncONULocationsFromSNMP((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Location sync: Updated {$result['updated']} ONUs, Added {$result['added']} new. SNMP found {$result['snmp_total']} ONUs.";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Sync failed';
+                    $messageType = 'danger';
+                }
+                break;
             case 'get_olt_info_snmp':
                 $result = $huaweiOLT->getOLTSystemInfoViaSNMP((int)$_POST['olt_id']);
                 if ($result['success']) {
@@ -1010,6 +1020,13 @@ try {
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Sync all authorized ONUs from OLT via SNMP?')">
                                 <i class="bi bi-arrow-repeat me-1"></i> Sync ONUs
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="sync_onu_locations">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Fix ONU location data (frame/slot/port/onu_id) from SNMP? This corrects SmartOLT-imported ONUs.')">
+                                <i class="bi bi-geo-alt me-1"></i> Fix Locations
                             </button>
                         </form>
                         <form method="post" class="d-inline">
@@ -4030,6 +4047,7 @@ echo "# ================================================\n";
     // Loading overlay for OLT sync operations
     const loadingMessages = {
         'sync_onus_snmp': 'Syncing ONUs from OLT...',
+        'sync_onu_locations': 'Fixing ONU location data from SNMP...',
         'sync_tr069_devices': 'Syncing TR-069 devices...',
         'sync_boards': 'Syncing board information...',
         'sync_vlans': 'Syncing VLANs from OLT...',
