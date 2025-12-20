@@ -2406,15 +2406,22 @@ class HuaweiOLT {
     // ==================== Location Management (Zones, Subzones, Apartments, ODBs) ====================
     
     public function getZones(bool $activeOnly = false): array {
-        $sql = "SELECT z.*, 
-                (SELECT COUNT(*) FROM huawei_subzones WHERE zone_id = z.id) as subzone_count,
-                (SELECT COUNT(*) FROM huawei_apartments WHERE zone_id = z.id) as apartment_count,
-                (SELECT COUNT(*) FROM huawei_odb_units WHERE zone_id = z.id) as odb_count,
-                (SELECT COUNT(*) FROM huawei_onus WHERE zone_id = z.id) as onu_count
-                FROM huawei_zones z";
-        if ($activeOnly) $sql .= " WHERE z.is_active = TRUE";
-        $sql .= " ORDER BY z.name";
-        return $this->db->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $hasOnuZoneCol = $this->db->query("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'huawei_onus' AND column_name = 'zone_id')")->fetchColumn();
+            $onuCountSql = $hasOnuZoneCol ? "(SELECT COUNT(*) FROM huawei_onus WHERE zone_id = z.id)" : "0";
+            $sql = "SELECT z.*, 
+                    (SELECT COUNT(*) FROM huawei_subzones WHERE zone_id = z.id) as subzone_count,
+                    (SELECT COUNT(*) FROM huawei_apartments WHERE zone_id = z.id) as apartment_count,
+                    (SELECT COUNT(*) FROM huawei_odb_units WHERE zone_id = z.id) as odb_count,
+                    {$onuCountSql} as onu_count
+                    FROM huawei_zones z";
+            if ($activeOnly) $sql .= " WHERE z.is_active = TRUE";
+            $sql .= " ORDER BY z.name";
+            return $this->db->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log("getZones error: " . $e->getMessage());
+            return [];
+        }
     }
     
     public function getZone(int $id): ?array {
@@ -2493,22 +2500,29 @@ class HuaweiOLT {
     }
     
     public function getApartments(?int $zoneId = null, ?int $subzoneId = null, bool $activeOnly = false): array {
-        $sql = "SELECT a.*, z.name as zone_name, s.name as subzone_name,
-                (SELECT COUNT(*) FROM huawei_odb_units WHERE apartment_id = a.id) as odb_count,
-                (SELECT COUNT(*) FROM huawei_onus WHERE apartment_id = a.id) as onu_count
-                FROM huawei_apartments a
-                LEFT JOIN huawei_zones z ON a.zone_id = z.id
-                LEFT JOIN huawei_subzones s ON a.subzone_id = s.id";
-        $params = [];
-        $where = [];
-        if ($zoneId) { $where[] = "a.zone_id = ?"; $params[] = $zoneId; }
-        if ($subzoneId) { $where[] = "a.subzone_id = ?"; $params[] = $subzoneId; }
-        if ($activeOnly) { $where[] = "a.is_active = TRUE"; }
-        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
-        $sql .= " ORDER BY z.name, a.name";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $hasOnuAptCol = $this->db->query("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'huawei_onus' AND column_name = 'apartment_id')")->fetchColumn();
+            $onuCountSql = $hasOnuAptCol ? "(SELECT COUNT(*) FROM huawei_onus WHERE apartment_id = a.id)" : "0";
+            $sql = "SELECT a.*, z.name as zone_name, s.name as subzone_name,
+                    (SELECT COUNT(*) FROM huawei_odb_units WHERE apartment_id = a.id) as odb_count,
+                    {$onuCountSql} as onu_count
+                    FROM huawei_apartments a
+                    LEFT JOIN huawei_zones z ON a.zone_id = z.id
+                    LEFT JOIN huawei_subzones s ON a.subzone_id = s.id";
+            $params = [];
+            $where = [];
+            if ($zoneId) { $where[] = "a.zone_id = ?"; $params[] = $zoneId; }
+            if ($subzoneId) { $where[] = "a.subzone_id = ?"; $params[] = $subzoneId; }
+            if ($activeOnly) { $where[] = "a.is_active = TRUE"; }
+            if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+            $sql .= " ORDER BY z.name, a.name";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log("getApartments error: " . $e->getMessage());
+            return [];
+        }
     }
     
     public function addApartment(array $data): int {
@@ -2555,22 +2569,29 @@ class HuaweiOLT {
     }
     
     public function getODBs(?int $zoneId = null, ?int $apartmentId = null, bool $activeOnly = false): array {
-        $sql = "SELECT o.*, z.name as zone_name, s.name as subzone_name, a.name as apartment_name,
-                (SELECT COUNT(*) FROM huawei_onus WHERE odb_id = o.id) as onu_count
-                FROM huawei_odb_units o
-                LEFT JOIN huawei_zones z ON o.zone_id = z.id
-                LEFT JOIN huawei_subzones s ON o.subzone_id = s.id
-                LEFT JOIN huawei_apartments a ON o.apartment_id = a.id";
-        $params = [];
-        $where = [];
-        if ($zoneId) { $where[] = "o.zone_id = ?"; $params[] = $zoneId; }
-        if ($apartmentId) { $where[] = "o.apartment_id = ?"; $params[] = $apartmentId; }
-        if ($activeOnly) { $where[] = "o.is_active = TRUE"; }
-        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
-        $sql .= " ORDER BY o.code";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        try {
+            $hasOnuOdbCol = $this->db->query("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'huawei_onus' AND column_name = 'odb_id')")->fetchColumn();
+            $onuCountSql = $hasOnuOdbCol ? "(SELECT COUNT(*) FROM huawei_onus WHERE odb_id = o.id)" : "0";
+            $sql = "SELECT o.*, z.name as zone_name, s.name as subzone_name, a.name as apartment_name,
+                    {$onuCountSql} as onu_count
+                    FROM huawei_odb_units o
+                    LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                    LEFT JOIN huawei_subzones s ON o.subzone_id = s.id
+                    LEFT JOIN huawei_apartments a ON o.apartment_id = a.id";
+            $params = [];
+            $where = [];
+            if ($zoneId) { $where[] = "o.zone_id = ?"; $params[] = $zoneId; }
+            if ($apartmentId) { $where[] = "o.apartment_id = ?"; $params[] = $apartmentId; }
+            if ($activeOnly) { $where[] = "o.is_active = TRUE"; }
+            if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+            $sql .= " ORDER BY o.code";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log("getODBs error: " . $e->getMessage());
+            return [];
+        }
     }
     
     public function addODB(array $data): int {

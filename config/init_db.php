@@ -586,7 +586,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122003'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122004'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1824,7 +1824,11 @@ function runMigrations(PDO $db): void {
         ['equipment', 'last_lifecycle_change', 'ALTER TABLE equipment ADD COLUMN last_lifecycle_change TIMESTAMP'],
         ['equipment', 'installed_customer_id', 'ALTER TABLE equipment ADD COLUMN installed_customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL'],
         ['equipment', 'installed_at', 'ALTER TABLE equipment ADD COLUMN installed_at TIMESTAMP'],
-        ['equipment', 'installed_by', 'ALTER TABLE equipment ADD COLUMN installed_by INTEGER REFERENCES users(id) ON DELETE SET NULL']
+        ['equipment', 'installed_by', 'ALTER TABLE equipment ADD COLUMN installed_by INTEGER REFERENCES users(id) ON DELETE SET NULL'],
+        ['huawei_onus', 'zone_id', 'ALTER TABLE huawei_onus ADD COLUMN zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE SET NULL'],
+        ['huawei_onus', 'subzone_id', 'ALTER TABLE huawei_onus ADD COLUMN subzone_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL'],
+        ['huawei_onus', 'apartment_id', 'ALTER TABLE huawei_onus ADD COLUMN apartment_id INTEGER REFERENCES huawei_apartments(id) ON DELETE SET NULL'],
+        ['huawei_onus', 'odb_id', 'ALTER TABLE huawei_onus ADD COLUMN odb_id INTEGER REFERENCES huawei_odb_units(id) ON DELETE SET NULL']
     ];
     
     foreach ($columnMigrations as $migration) {
