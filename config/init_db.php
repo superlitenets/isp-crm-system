@@ -586,7 +586,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122002'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122003'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1703,6 +1703,54 @@ function runMigrations(PDO $db): void {
                 timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 raw_data JSONB,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'huawei_zones' => "
+            CREATE TABLE IF NOT EXISTS huawei_zones (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'huawei_subzones' => "
+            CREATE TABLE IF NOT EXISTS huawei_subzones (
+                id SERIAL PRIMARY KEY,
+                zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'huawei_apartments' => "
+            CREATE TABLE IF NOT EXISTS huawei_apartments (
+                id SERIAL PRIMARY KEY,
+                zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE CASCADE,
+                subzone_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL,
+                name VARCHAR(150) NOT NULL,
+                address TEXT,
+                floors INTEGER,
+                units_count INTEGER,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+        'huawei_odb_units' => "
+            CREATE TABLE IF NOT EXISTS huawei_odb_units (
+                id SERIAL PRIMARY KEY,
+                zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE CASCADE,
+                subzone_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL,
+                apartment_id INTEGER REFERENCES huawei_apartments(id) ON DELETE SET NULL,
+                code VARCHAR(50) NOT NULL,
+                capacity INTEGER DEFAULT 8,
+                ports_used INTEGER DEFAULT 0,
+                location_description TEXT,
+                latitude DECIMAL(10, 8),
+                longitude DECIMAL(11, 8),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )"
     ];
     
