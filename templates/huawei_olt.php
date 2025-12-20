@@ -206,6 +206,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'sync_cli':
+                $result = $huaweiOLT->syncONUsFromCLI((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $opticalInfo = isset($result['optical_sync']) ? ", optical updated: {$result['optical_sync']['updated']}" : '';
+                    $message = "CLI Sync: {$result['added']} added, {$result['updated']} updated (total: {$result['total']}){$opticalInfo}";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'CLI sync failed';
+                    $messageType = 'danger';
+                }
+                break;
             case 'save_genieacs_settings':
                 $settings = [
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
@@ -1087,6 +1098,13 @@ try {
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-outline-success btn-sm" onclick="return confirm('Mark all existing ONUs as authorized? Use this to fix imported data.')">
                                 <i class="bi bi-check-all me-1"></i> Mark All Authorized
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="sync_cli">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync ONUs from OLT CLI? This reads configuration directly from the OLT and gets optical power levels.')">
+                                <i class="bi bi-terminal me-1"></i> Sync from CLI
                             </button>
                         </form>
                     </div>

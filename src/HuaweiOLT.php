@@ -910,6 +910,241 @@ class HuaweiOLT {
         return isset($matches[1]) ? (float)$matches[1] : null;
     }
     
+    public function syncONUsFromCLI(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Get ONU configuration from CLI
+        $configResult = $this->executeCommand($oltId, 'display current-configuration | include "ont add"');
+        if (!$configResult['success']) {
+            return ['success' => false, 'error' => 'Failed to get ONU configuration: ' . ($configResult['message'] ?? 'Unknown error')];
+        }
+        
+        $output = $configResult['output'] ?? '';
+        $lines = explode("\n", $output);
+        
+        $added = 0;
+        $updated = 0;
+        $errors = [];
+        $parsed = [];
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // Parse: ont add <slot> <onu_id> sn-auth "<serial>" omci ont-lineprofile-id <id> ont-srvprofile-id <id> desc "<desc>"
+            // Also handles: ont add <slot> <onu_id> sn-auth <serial> (without quotes)
+            if (preg_match('/ont\s+add\s+(\d+)\s+(\d+)\s+(\w+)-auth\s+"?([A-Fa-f0-9]+)"?/i', $line, $matches)) {
+                $port = (int)$matches[1];
+                $onuId = (int)$matches[2];
+                $authType = strtolower($matches[3]); // sn, loid, password
+                $serial = strtoupper(trim($matches[4], '"'));
+                
+                // Extract line-profile-id
+                $lineProfileId = null;
+                if (preg_match('/ont-lineprofile-id\s+(\d+)/i', $line, $m)) {
+                    $lineProfileId = (int)$m[1];
+                }
+                
+                // Extract srv-profile-id
+                $srvProfileId = null;
+                if (preg_match('/ont-srvprofile-id\s+(\d+)/i', $line, $m)) {
+                    $srvProfileId = (int)$m[1];
+                }
+                
+                // Extract description
+                $description = '';
+                if (preg_match('/desc\s+"([^"]+)"/i', $line, $m)) {
+                    $description = $m[1];
+                }
+                
+                // Parse description for zone/area info (format: SNSxxxxxx_zone_Name_Area_authd_date)
+                $zone = '';
+                $area = '';
+                $customerName = '';
+                if (preg_match('/zone_([^_]+)_([^_]+)_authd/i', $description, $m)) {
+                    $zone = $m[1];
+                    $area = $m[2];
+                }
+                if (preg_match('/^([A-Z0-9]+)_zone/i', $description, $m)) {
+                    $customerName = $m[1];
+                }
+                
+                $parsed[] = [
+                    'sn' => $serial,
+                    'port' => $port,
+                    'onu_id' => $onuId,
+                    'auth_type' => $authType,
+                    'line_profile_id' => $lineProfileId,
+                    'srv_profile_id' => $srvProfileId,
+                    'description' => $description,
+                    'zone' => $zone,
+                    'area' => $area,
+                    'customer_name' => $customerName,
+                ];
+            }
+        }
+        
+        // Get current interface context (frame/slot) from config
+        // We need to run display current-configuration section to get interface context
+        $frameSlotResult = $this->executeCommand($oltId, 'display current-configuration | include "interface gpon"');
+        $currentFrame = 0;
+        $currentSlot = 0;
+        
+        // Parse interface gpon 0/X to get slot numbers
+        $slotMap = [];
+        if ($frameSlotResult['success'] && !empty($frameSlotResult['output'])) {
+            $ifLines = explode("\n", $frameSlotResult['output']);
+            foreach ($ifLines as $ifLine) {
+                if (preg_match('/interface\s+gpon\s+(\d+)\/(\d+)/i', $ifLine, $m)) {
+                    $currentFrame = (int)$m[1];
+                    $currentSlot = (int)$m[2];
+                }
+            }
+        }
+        
+        // Now process parsed ONUs
+        foreach ($parsed as $onu) {
+            $existing = $this->getONUBySN($onu['sn']);
+            
+            try {
+                if ($existing) {
+                    // Update existing ONU
+                    $stmt = $this->db->prepare("
+                        UPDATE huawei_onus 
+                        SET frame = ?, slot = COALESCE(slot, ?), port = ?, onu_id = ?,
+                            description = COALESCE(NULLIF(?, ''), description),
+                            line_profile_id = COALESCE(?, line_profile_id),
+                            srv_profile_id = COALESCE(?, srv_profile_id),
+                            auth_type = ?, zone = COALESCE(NULLIF(?, ''), zone),
+                            area = COALESCE(NULLIF(?, ''), area),
+                            customer_name = COALESCE(NULLIF(?, ''), customer_name),
+                            is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([
+                        $currentFrame, $currentSlot, $onu['port'], $onu['onu_id'],
+                        $onu['description'],
+                        $onu['line_profile_id'], $onu['srv_profile_id'],
+                        $onu['auth_type'], $onu['zone'], $onu['area'], $onu['customer_name'],
+                        $existing['id']
+                    ]);
+                    $updated++;
+                } else {
+                    // Add new ONU
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $onu['sn'],
+                        'frame' => $currentFrame,
+                        'slot' => $currentSlot,
+                        'port' => $onu['port'],
+                        'onu_id' => $onu['onu_id'],
+                        'description' => $onu['description'],
+                        'line_profile_id' => $onu['line_profile_id'],
+                        'srv_profile_id' => $onu['srv_profile_id'],
+                        'auth_type' => $onu['auth_type'],
+                        'zone' => $onu['zone'],
+                        'area' => $onu['area'],
+                        'customer_name' => $onu['customer_name'],
+                        'is_authorized' => true,
+                        'status' => 'online',
+                    ]);
+                    $added++;
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Failed for {$onu['sn']}: " . $e->getMessage();
+            }
+        }
+        
+        // Now get optical power levels for all ONUs
+        $opticalResult = $this->syncOpticalPowerFromCLI($oltId);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'sync_cli',
+            'status' => 'success',
+            'message' => "CLI Sync: {$added} added, {$updated} updated, " . count($parsed) . " total parsed",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'total' => count($parsed),
+            'added' => $added,
+            'updated' => $updated,
+            'optical_sync' => $opticalResult,
+            'errors' => $errors
+        ];
+    }
+    
+    public function syncOpticalPowerFromCLI(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Get all ONUs for this OLT
+        $onus = $this->getONUs(['olt_id' => $oltId]);
+        if (empty($onus)) {
+            return ['success' => true, 'updated' => 0, 'message' => 'No ONUs to update'];
+        }
+        
+        // Group ONUs by slot/port for efficient batch queries
+        $bySlotPort = [];
+        foreach ($onus as $onu) {
+            if ($onu['slot'] !== null && $onu['port'] !== null) {
+                $key = $onu['frame'] . '/' . $onu['slot'] . '/' . $onu['port'];
+                $bySlotPort[$key][] = $onu;
+            }
+        }
+        
+        $updated = 0;
+        
+        foreach ($bySlotPort as $location => $onuList) {
+            list($frame, $slot, $port) = explode('/', $location);
+            
+            // Get optical info for all ONUs on this port
+            $cmd = "display ont optical-info {$frame}/{$slot} {$port} all";
+            $result = $this->executeCommand($oltId, $cmd);
+            
+            if (!$result['success'] || empty($result['output'])) {
+                continue;
+            }
+            
+            // Parse output - format varies but typically:
+            // ONT-ID  Rx power(dBm)  Tx power(dBm)  OLT Rx ONT power(dBm)  ...
+            // 1       -18.50         2.35           -19.20
+            $lines = explode("\n", $result['output']);
+            $opticalData = [];
+            
+            foreach ($lines as $line) {
+                // Match lines with ONU ID and power values
+                // Format: <onu_id>  <rx_power>  <tx_power>  <olt_rx>
+                if (preg_match('/^\s*(\d+)\s+([-\d.]+)\s+([-\d.]+)/m', $line, $m)) {
+                    $opticalData[(int)$m[1]] = [
+                        'rx_power' => (float)$m[2],
+                        'tx_power' => (float)$m[3],
+                    ];
+                }
+            }
+            
+            // Update each ONU
+            foreach ($onuList as $onu) {
+                if (isset($opticalData[$onu['onu_id']])) {
+                    $data = $opticalData[$onu['onu_id']];
+                    $this->updateONU($onu['id'], [
+                        'rx_power' => $data['rx_power'],
+                        'tx_power' => $data['tx_power'],
+                    ]);
+                    $updated++;
+                }
+            }
+        }
+        
+        return ['success' => true, 'updated' => $updated];
+    }
+    
     public function refreshAllONUOptical(int $oltId): array {
         $onus = $this->getONUs(['olt_id' => $oltId]);
         
