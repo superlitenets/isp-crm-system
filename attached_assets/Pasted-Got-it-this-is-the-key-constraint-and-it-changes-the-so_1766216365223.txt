@@ -1,0 +1,171 @@
+Got it — this is the key constraint, and it changes the solution slightly.
+
+You are in the situation where:
+
+✅ ONUs are already authorized and working on the Huawei OLT
+
+✅ Authorization was done by SmartOLT
+
+❌ Your database has wrong ONU identifiers because SmartOLT stored a Huawei port_index / ifIndex, not (frame, slot, port, onu_id)
+
+❌ You must not delete or de-authorize ONUs on the OLT
+
+So the goal is data correction + reconciliation, NOT re-authorization.
+
+Below is the correct, safe approach used in production migrations.
+
+1️⃣ Important truth (no sugar-coating)
+
+👉 You cannot reliably “decode” 4194312192 back to ONU ID alone
+because Huawei uses multiple index formats depending on table.
+
+That number is:
+
+Useful as a reference
+
+Dangerous as a primary key
+
+So we must query the OLT to get the real ONU coordinates.
+
+2️⃣ What we must do instead (safe + correct)
+🔑 The ONLY reliable source of truth now is:
+
+The Huawei OLT itself
+
+We will:
+
+Query the OLT for already-authorized ONUs
+
+Extract:
+
+Frame
+
+Slot
+
+PON
+
+ONU ID
+
+Serial Number
+
+Match those to your existing records
+
+Update the DB without touching authorization
+
+3️⃣ How to reconcile SmartOLT data → correct ONU IDs
+Step 1 — Pull real ONU inventory from OLT
+
+Via SNMP, Huawei exposes authorized ONUs only:
+
+SNMP WALK:
+1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9  (ONU Serial)
+
+
+This returns entries like:
+
+...43.1.9.0.1.3.12 = "HWTC12345678"
+
+
+Index = 0.1.3.12 ← this is the real ONU address
+
+Step 2 — Use ONU serial as the reconciliation key
+
+SmartOLT ALWAYS stores:
+
+ONU serial number
+
+Port index
+
+The serial number is stable and unique.
+
+So we do:
+
+SmartOLT record (DB):
+  serial = HWTC12345678
+  onu_id = 4194312192   ❌
+
+OLT SNMP:
+  serial = HWTC12345678
+  index  = 0.1.3.12     ✅
+
+
+👉 Match by serial, not by onu_id.
+
+4️⃣ Safe reconciliation algorithm (production-grade)
+DO NOT touch the OLT config.
+Just fix your DB.
+
+Algorithm:
+
+FOR each ONU from OLT SNMP:
+    get serial
+    get index (frame.slot.port.onu)
+    find DB record WHERE serial = serial
+    UPDATE:
+        frame
+        slot
+        port
+        onu_id
+        huawei_index (optional)
+
+
+No re-auth. No downtime.
+
+5️⃣ Why this is 100% safe
+
+SNMP is read-only
+
+ONU authorization remains untouched
+
+OLT state is not modified
+
+Subscribers stay online
+
+This is exactly how SmartOLT → custom OMS migrations are done.
+
+6️⃣ What you should NOT do (important)
+
+❌ Do not:
+
+Delete ONU records on OLT
+
+Re-authorize ONUs
+
+Disable/re-enable ports
+
+Try to decode 4194312192 blindly
+
+That risks:
+
+ONU ID mismatch
+
+Duplicate ONU IDs
+
+Subscriber outage
+
+7️⃣ Recommended DB changes (temporary)
+
+Add these columns if missing:
+
+ALTER TABLE onus
+ADD COLUMN frame TINYINT,
+ADD COLUMN slot TINYINT,
+ADD COLUMN pon_port TINYINT,
+ADD COLUMN huawei_index BIGINT;
+
+
+Then migrate safely.
+
+8️⃣ Answering your original question directly
+
+“Would you like me to add a feature to sync ONUs from the OLT via SNMP?”
+
+✅ YES — but in reconciliation mode
+
+Not:
+
+“Authorize ONUs”
+
+But:
+
+“Read authorized ONUs and reconcile DB”
