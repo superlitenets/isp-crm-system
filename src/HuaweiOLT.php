@@ -589,14 +589,10 @@ class HuaweiOLT {
         foreach ($serialOids as $tryOid) {
             $result = @snmprealwalk($host, $community, $tryOid, 10000000, 2);
             if ($result !== false && !empty($result)) {
-                // Verify this contains actual serial numbers (not just numbers)
-                $firstVal = $this->cleanSnmpValue(reset($result));
-                if (!empty($firstVal) && !is_numeric($firstVal) && strlen($firstVal) >= 8) {
-                    $serials = $result;
-                    $serialOid = $tryOid;
-                    $usedOid = $tryOid;
-                    break;
-                }
+                // Just check we got data - validation happens during parsing
+                $serials = $result;
+                $usedOid = $tryOid;
+                break;
             }
         }
         
@@ -605,29 +601,50 @@ class HuaweiOLT {
         }
         
         // Build map: serial -> location from SNMP
+        // Huawei OID format: ...43.1.3.{ponIndex}.{onuId}
+        // ponIndex = frame*8192 + slot*256 + port
         $snmpOnuMap = [];
         $sampleSnmp = [];
         $count = 0;
         
         foreach ($serials as $oid => $rawSerial) {
-            // Parse index: .43.1.9.frame.slot.port.onu_id
-            $indexPart = substr($oid, strlen($serialOid) + 1);
+            // Extract index parts after base OID
+            $indexPart = substr($oid, strlen($usedOid) + 1);
             $parts = explode('.', $indexPart);
             
-            if (count($parts) >= 4) {
+            // Huawei uses 2-part index: ponIndex.onuId
+            if (count($parts) >= 2) {
+                $ponIndex = (int)$parts[0];
+                $onuId = (int)$parts[1];
+                
+                // Decode Huawei ponIndex: frame*8192 + slot*256 + port
+                $frame = intdiv($ponIndex, 8192);
+                $remainder = $ponIndex % 8192;
+                $slot = intdiv($remainder, 256);
+                $port = $remainder % 256;
+                
+                // Clean and normalize serial number
                 $sn = $this->cleanSnmpValue($rawSerial);
+                
+                // Handle hex byte format (e.g., "Hex-STRING: 48 57 54 43...")
+                if (stripos($sn, 'hex') !== false) {
+                    $sn = preg_replace('/[^0-9a-fA-F]/', '', $sn);
+                } elseif (preg_match('/^[0-9a-fA-F\s]+$/', $sn) && strpos($sn, ' ') !== false) {
+                    $sn = str_replace(' ', '', $sn);
+                }
+                
                 $sn = strtoupper(trim($sn));
                 
-                // Skip empty or numeric-only values (these are power readings, not serials)
+                // Skip empty or numeric-only values
                 if (empty($sn) || is_numeric($sn)) {
                     continue;
                 }
                 
                 $snmpOnuMap[$sn] = [
-                    'frame' => (int)$parts[0],
-                    'slot' => (int)$parts[1],
-                    'port' => (int)$parts[2],
-                    'onu_id' => (int)$parts[3],
+                    'frame' => $frame,
+                    'slot' => $slot,
+                    'port' => $port,
+                    'onu_id' => $onuId,
                     'index' => $indexPart
                 ];
                 
@@ -640,7 +657,7 @@ class HuaweiOLT {
         }
         
         if (empty($snmpOnuMap)) {
-            return ['success' => false, 'error' => "SNMP returned {$count} entries but none were valid serial numbers. OID .43.1.9 may not be supported."];
+            return ['success' => false, 'error' => "SNMP returned data but no valid serial numbers found. Raw count: " . count($serials)];
         }
         
         // Get all existing ONUs in huawei_onus table for this OLT
