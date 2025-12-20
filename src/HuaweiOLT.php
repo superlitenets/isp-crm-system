@@ -363,21 +363,36 @@ class HuaweiOLT {
         
         $serials = @snmprealwalk($host, $community, $huaweiONTSerialBase, 10000000, 2);
         
-        // Debug: log what we got
+        // Debug: log what we got with first few entries for analysis
         error_log("SNMP Serial Walk Result for OID {$huaweiONTSerialBase}: " . ($serials === false ? 'FAILED' : count($serials) . ' entries'));
         if ($serials !== false && count($serials) > 0) {
-            $firstKey = array_key_first($serials);
-            error_log("First entry: {$firstKey} = " . $serials[$firstKey]);
+            $count = 0;
+            foreach ($serials as $oid => $val) {
+                error_log("SNMP Entry: {$oid} = {$val}");
+                if (++$count >= 3) break;
+            }
         }
         
-        // If .43.1.9 returns nothing, try alternative approach using status table
+        // If .43.1.9 returns nothing, try the description OID which also uses 4-part index
         if ($serials === false || empty($serials)) {
-            // Try walking the status table which is more commonly available
-            $altSerialOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3'; // Try the original OID that was working
-            $serials = @snmprealwalk($host, $community, $altSerialOid, 10000000, 2);
-            error_log("Fallback SNMP Walk Result for OID {$altSerialOid}: " . ($serials === false ? 'FAILED' : count($serials) . ' entries'));
-            if ($serials !== false && count($serials) > 0) {
-                $huaweiONTSerialBase = $altSerialOid; // Use this OID for parsing
+            // Try hwGponDeviceOntDespt (description) table - same index format as serial
+            $altSerialOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.2';
+            $descriptions = @snmprealwalk($host, $community, $altSerialOid, 10000000, 2);
+            error_log("Fallback SNMP Walk for Descriptions .43.1.2: " . ($descriptions === false ? 'FAILED' : count($descriptions) . ' entries'));
+            
+            if ($descriptions !== false && count($descriptions) > 0) {
+                // We got descriptions - now we need to get serials for each using the same index
+                $serials = [];
+                foreach ($descriptions as $oid => $desc) {
+                    $indexPart = substr($oid, strlen($altSerialOid) + 1);
+                    // Try to get serial using same index
+                    $serialOid = $huaweiONTSerialBase . '.' . $indexPart;
+                    $sn = @snmpget($host, $community, $serialOid, 5000000);
+                    if ($sn !== false) {
+                        $serials[$serialOid] = $sn;
+                    }
+                }
+                error_log("Retrieved " . count($serials) . " serials using description indexes");
             }
         }
         
