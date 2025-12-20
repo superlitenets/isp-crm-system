@@ -3248,6 +3248,24 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 <h4 class="mb-0"><i class="bi bi-code-square me-2"></i>CLI Script Generator</h4>
             </div>
             
+            <!-- Tabs for different generators -->
+            <ul class="nav nav-tabs mb-4" id="generatorTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="onu-tab" data-bs-toggle="tab" data-bs-target="#onu-generator" type="button">
+                        <i class="bi bi-router me-1"></i> ONU Provisioning
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="olt-setup-tab" data-bs-toggle="tab" data-bs-target="#olt-setup-generator" type="button">
+                        <i class="bi bi-hdd-rack me-1"></i> Fresh OLT Setup Wizard
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="generatorTabContent">
+            <!-- ONU Provisioning Tab -->
+            <div class="tab-pane fade show active" id="onu-generator" role="tabpanel">
+            
             <div class="row">
                 <div class="col-lg-5">
                     <div class="card shadow-sm mb-4">
@@ -3519,7 +3537,6 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 navigator.clipboard.writeText(script).then(() => {
                     alert('CLI script copied to clipboard!');
                 }).catch(() => {
-                    // Fallback for older browsers
                     const textarea = document.createElement('textarea');
                     textarea.value = script;
                     document.body.appendChild(textarea);
@@ -3529,7 +3546,312 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     alert('CLI script copied to clipboard!');
                 });
             }
+            
+            function generateOLTSetupScript() {
+                const ispName = document.getElementById('oltIspName').value.trim() || 'ISP';
+                const mgmtVlan = document.getElementById('oltMgmtVlan').value || '100';
+                const tr069Vlan = document.getElementById('oltTr069Vlan').value || '101';
+                const dataVlan = document.getElementById('oltDataVlan').value || '69';
+                const voiceVlan = document.getElementById('oltVoiceVlan').value || '';
+                const lineProfileId = document.getElementById('oltLineProfileId').value || '10';
+                const srvProfileId = document.getElementById('oltSrvProfileId').value || '10';
+                const tr069Enable = document.getElementById('oltTr069Enable').checked;
+                const acsUrl = document.getElementById('oltAcsUrl').value.trim();
+                const downloadSpeed = document.getElementById('oltDownloadSpeed').value || '30';
+                const uploadSpeed = document.getElementById('oltUploadSpeed').value || '15';
+                const ontModel = document.getElementById('oltOntModel').value || 'bridge';
+                
+                let script = `# ================================================================\n`;
+                script += `# FRESH OLT SETUP SCRIPT - ${ispName}\n`;
+                script += `# Generated: ${new Date().toLocaleString()}\n`;
+                script += `# ================================================================\n`;
+                script += `# This script configures profiles and VLANs for a new MA5683T/MA5680T\n`;
+                script += `# Copy each section and paste into OLT terminal\n`;
+                script += `# ================================================================\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 1: VLAN CONFIGURATION\n`;
+                script += `# ================================================\n`;
+                script += `config\n\n`;
+                
+                script += `# Management VLAN (for OLT management traffic)\n`;
+                script += `vlan ${mgmtVlan} smart\n`;
+                script += `vlan desc ${mgmtVlan} Management_VLAN\n\n`;
+                
+                if (tr069Enable && tr069Vlan) {
+                    script += `# TR-069 VLAN (for ONU remote management)\n`;
+                    script += `vlan ${tr069Vlan} smart\n`;
+                    script += `vlan desc ${tr069Vlan} TR069_ACS_VLAN\n\n`;
+                }
+                
+                script += `# Data/Service VLAN (for customer internet traffic)\n`;
+                script += `vlan ${dataVlan} smart\n`;
+                script += `vlan desc ${dataVlan} Customer_Data_VLAN\n\n`;
+                
+                if (voiceVlan) {
+                    script += `# Voice VLAN (for VoIP services)\n`;
+                    script += `vlan ${voiceVlan} smart\n`;
+                    script += `vlan desc ${voiceVlan} Voice_VoIP_VLAN\n\n`;
+                }
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 2: DBA PROFILE (Bandwidth Allocation)\n`;
+                script += `# ================================================\n`;
+                script += `# DBA Profile controls upstream bandwidth\n`;
+                const upBw = parseInt(uploadSpeed) * 1024;
+                script += `dba-profile add profile-id ${lineProfileId} profile-name "${ispName}_${uploadSpeed}M_UP" type4 max ${upBw}\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 3: LINE PROFILE (T-CONT + GEM configuration)\n`;
+                script += `# ================================================\n`;
+                script += `ont-lineprofile gpon profile-id ${lineProfileId} profile-name "${ispName}_Line_${downloadSpeed}M"\n`;
+                script += `  tcont 1 dba-profile-id ${lineProfileId}\n`;
+                script += `  gem add 1 eth tcont 1\n`;
+                script += `  gem mapping 1 0 vlan ${dataVlan}\n`;
+                if (tr069Enable && tr069Vlan) {
+                    script += `  gem add 2 eth tcont 1\n`;
+                    script += `  gem mapping 2 1 vlan ${tr069Vlan}\n`;
+                }
+                script += `  commit\n`;
+                script += `  quit\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 4: SERVICE PROFILE (ONU ports configuration)\n`;
+                script += `# ================================================\n`;
+                script += `ont-srvprofile gpon profile-id ${srvProfileId} profile-name "${ispName}_Srv_${ontModel}"\n`;
+                if (ontModel === 'router') {
+                    script += `  ont-port pots 2 eth 4\n`;
+                } else {
+                    script += `  ont-port eth 1\n`;
+                }
+                script += `  port vlan eth 1 ${dataVlan}\n`;
+                script += `  commit\n`;
+                script += `  quit\n\n`;
+                
+                if (tr069Enable && acsUrl) {
+                    script += `# ================================================\n`;
+                    script += `# SECTION 5: TR-069 ACS CONFIGURATION\n`;
+                    script += `# ================================================\n`;
+                    script += `# Configure TR-069 server for remote ONU management\n`;
+                    script += `tr069-server-config ${srvProfileId} profile-name "${ispName}_TR069"\n`;
+                    script += `  acs-url ${acsUrl}\n`;
+                    script += `  acs-username ${ispName.toLowerCase()}\n`;
+                    script += `  acs-password ${ispName.toLowerCase()}123\n`;
+                    script += `  periodic-inform enable\n`;
+                    script += `  periodic-inform-interval 3600\n`;
+                    script += `  commit\n`;
+                    script += `  quit\n\n`;
+                }
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 6: TRAFFIC TABLE (QoS / Speed limiting)\n`;
+                script += `# ================================================\n`;
+                const downBw = parseInt(downloadSpeed) * 1024;
+                script += `# Traffic table for ${downloadSpeed}Mbps downstream\n`;
+                script += `traffic table ip index ${lineProfileId} name "${ispName}_${downloadSpeed}M" cir ${downBw} priority 0 priority-policy local-Setting\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# SECTION 7: UPLINK PORT VLAN (Connect to router)\n`;
+                script += `# ================================================\n`;
+                script += `# Configure uplink port (adjust slot/port as needed)\n`;
+                script += `interface eth 0/20/0\n`;
+                script += `  port vlan ${mgmtVlan} ${dataVlan}`;
+                if (tr069Enable && tr069Vlan) {
+                    script += ` ${tr069Vlan}`;
+                }
+                if (voiceVlan) {
+                    script += ` ${voiceVlan}`;
+                }
+                script += ` 0\n`;
+                script += `quit\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# SETUP COMPLETE!\n`;
+                script += `# ================================================\n`;
+                script += `# Next steps:\n`;
+                script += `# 1. Connect ONU to PON port\n`;
+                script += `# 2. Run: display ont autofind all\n`;
+                script += `# 3. Authorize ONUs using the web interface or:\n`;
+                script += `#    interface gpon 0/X\n`;
+                script += `#    ont add Y sn-auth "SERIAL" omci ont-lineprofile-id ${lineProfileId} ont-srvprofile-id ${srvProfileId} desc "SNS000001"\n`;
+                script += `#    quit\n`;
+                script += `#    service-port vlan ${dataVlan} gpon 0/X/Y ont Z gemport 1 multi-service user-vlan ${dataVlan}\n`;
+                script += `# ================================================\n`;
+                
+                document.getElementById('oltSetupScript').textContent = script;
+            }
+            
+            function copyOLTSetupScript() {
+                const script = document.getElementById('oltSetupScript').textContent;
+                navigator.clipboard.writeText(script).then(() => {
+                    alert('OLT setup script copied to clipboard!');
+                }).catch(() => {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = script;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('OLT setup script copied to clipboard!');
+                });
+            }
             </script>
+            
+            </div><!-- End ONU generator tab -->
+            
+            <!-- OLT Setup Wizard Tab -->
+            <div class="tab-pane fade" id="olt-setup-generator" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-5">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-magic me-2"></i>Fresh OLT Configuration Wizard</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="oltSetupForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">ISP Name</label>
+                                        <input type="text" id="oltIspName" class="form-control" placeholder="e.g., MyISP" value="ISP">
+                                        <div class="form-text">Used in profile names</div>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6 class="text-muted mb-3"><i class="bi bi-ethernet me-2"></i>VLAN Configuration</h6>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Management VLAN</label>
+                                            <input type="number" id="oltMgmtVlan" class="form-control" value="100" min="1" max="4094">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Data/Internet VLAN</label>
+                                            <input type="number" id="oltDataVlan" class="form-control" value="69" min="1" max="4094">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">TR-069 VLAN</label>
+                                            <input type="number" id="oltTr069Vlan" class="form-control" value="101" min="1" max="4094">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Voice VLAN (optional)</label>
+                                            <input type="number" id="oltVoiceVlan" class="form-control" placeholder="e.g., 200" min="1" max="4094">
+                                        </div>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6 class="text-muted mb-3"><i class="bi bi-sliders me-2"></i>Profile Configuration</h6>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Line Profile ID</label>
+                                            <input type="number" id="oltLineProfileId" class="form-control" value="10" min="1">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Service Profile ID</label>
+                                            <input type="number" id="oltSrvProfileId" class="form-control" value="10" min="1">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Download Speed (Mbps)</label>
+                                            <input type="number" id="oltDownloadSpeed" class="form-control" value="30" min="1">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Upload Speed (Mbps)</label>
+                                            <input type="number" id="oltUploadSpeed" class="form-control" value="15" min="1">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">ONU Model Type</label>
+                                        <select id="oltOntModel" class="form-select">
+                                            <option value="bridge">Bridge Mode (1 ETH port)</option>
+                                            <option value="router">Router Mode (4 ETH + 2 POTS)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6 class="text-muted mb-3"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Configuration</h6>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" id="oltTr069Enable" checked>
+                                        <label class="form-check-label" for="oltTr069Enable">Enable TR-069 / Remote Management</label>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">ACS Server URL</label>
+                                        <input type="text" id="oltAcsUrl" class="form-control" placeholder="http://acs.example.com:7547">
+                                        <div class="form-text">GenieACS or other TR-069 server</div>
+                                    </div>
+                                    
+                                    <div class="d-grid gap-2">
+                                        <button type="button" class="btn btn-success btn-lg" onclick="generateOLTSetupScript()">
+                                            <i class="bi bi-magic me-2"></i>Generate OLT Setup Script
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-7">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>OLT Setup Commands</h5>
+                                <button type="button" class="btn btn-sm btn-outline-light" onclick="copyOLTSetupScript()">
+                                    <i class="bi bi-clipboard me-1"></i> Copy All
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="mb-0 p-3" style="background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; max-height: 700px; overflow-y: auto; border-radius: 0 0 0.375rem 0.375rem;"><code id="oltSetupScript"># Fresh OLT Setup Wizard
+# Fill in the form and click "Generate OLT Setup Script"
+#
+# This wizard generates a complete configuration including:
+# - VLAN setup (Management, Data, TR-069, Voice)
+# - DBA Profile (upstream bandwidth allocation)
+# - Line Profile (T-CONT + GEM port mapping)
+# - Service Profile (ONU port configuration)
+# - TR-069 ACS configuration (optional)
+# - Traffic tables for QoS
+# - Uplink port VLAN configuration
+#
+# The generated script is ready to paste into your MA5683T/MA5680T terminal.</code></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm mt-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-lightbulb me-2"></i>Setup Tips</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Before Running Script:</h6>
+                                        <ul class="small">
+                                            <li>Backup current config: <code>save</code></li>
+                                            <li>Check existing profiles: <code>display ont-lineprofile gpon all</code></li>
+                                            <li>Check VLANs: <code>display vlan all</code></li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>After Running Script:</h6>
+                                        <ul class="small">
+                                            <li>Save configuration: <code>save</code></li>
+                                            <li>Verify profiles: <code>display ont-srvprofile gpon all</code></li>
+                                            <li>Test with one ONU before mass deployment</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- End OLT Setup tab -->
+            
+            </div><!-- End tab-content -->
             <?php endif; ?>
             
         </div>
