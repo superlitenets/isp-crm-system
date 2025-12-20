@@ -621,6 +621,19 @@ try {
         .signal-warning { color: #ffc107; }
         .signal-critical { color: #dc3545; }
         
+        /* Pulsing badge for pending authorization */
+        .badge-pulse {
+            animation: pulse-animation 2s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+        }
+        .pending-auth-highlight {
+            background: linear-gradient(90deg, rgba(255, 193, 7, 0.1) 0%, transparent 100%);
+        }
+        
         /* Loading overlay styles */
         .loading-overlay {
             display: none;
@@ -694,10 +707,10 @@ try {
                 <a class="nav-link <?= ($view === 'onus' && !isset($_GET['unconfigured'])) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
                     <i class="bi bi-check-circle me-2"></i> Authorized ONUs
                 </a>
-                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
+                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= $stats['unconfigured_onus'] > 0 ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Pending Authorization
                     <?php if ($stats['unconfigured_onus'] > 0): ?>
-                    <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
+                    <span class="badge bg-warning badge-pulse ms-auto"><?= $stats['unconfigured_onus'] ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
