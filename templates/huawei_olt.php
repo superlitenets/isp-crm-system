@@ -164,52 +164,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'authorize_onu':
                 $onuId = (int)$_POST['onu_id'];
-                $profileId = (int)$_POST['profile_id'];
-                $authMethod = $_POST['auth_method'] ?? 'sn';
-                $loid = $_POST['loid'] ?? '';
-                $loidPassword = $_POST['loid_password'] ?? '';
-                $description = $_POST['description'] ?? '';
-                $macAddress = $_POST['mac_address'] ?? '';
-                $zone = $_POST['zone'] ?? '';
-                $apartment = $_POST['apartment'] ?? '';
-                $odb = $_POST['odb'] ?? '';
                 $zoneId = !empty($_POST['zone_id']) ? (int)$_POST['zone_id'] : null;
-                $apartmentId = !empty($_POST['apartment_id']) ? (int)$_POST['apartment_id'] : null;
-                $odbId = !empty($_POST['odb_id']) ? (int)$_POST['odb_id'] : null;
+                $zone = $_POST['zone'] ?? '';
+                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+                $description = trim($_POST['description'] ?? '');
                 
-                // Auto-generate description from zone/apartment if not provided
+                // Auto-generate description from zone if not provided
                 if (empty($description) && !empty($zone)) {
-                    $descParts = [$zone];
-                    if (!empty($apartment)) $descParts[] = $apartment;
-                    if (!empty($odb)) $descParts[] = $odb;
-                    $description = implode('_', $descParts) . '_authd_' . date('Ymd');
+                    $description = $zone . '_' . date('Ymd_His');
                 }
                 
-                // Update ONU record with location and description before authorization
-                $updateFields = [];
+                // Update ONU record with zone, VLAN, and description
+                $updateFields = [
+                    'is_authorized' => true,
+                    'authorization_date' => date('Y-m-d H:i:s'),
+                ];
                 if (!empty($description)) $updateFields['description'] = $description;
-                if (!empty($macAddress)) $updateFields['mac_address'] = $macAddress;
                 if (!empty($zone)) $updateFields['zone'] = $zone;
-                if (!empty($apartment)) $updateFields['apartment'] = $apartment;
-                if (!empty($odb)) $updateFields['odb'] = $odb;
                 if ($zoneId) $updateFields['zone_id'] = $zoneId;
-                if ($apartmentId) $updateFields['apartment_id'] = $apartmentId;
-                if ($odbId) $updateFields['odb_id'] = $odbId;
+                if ($vlanId) $updateFields['vlan_id'] = $vlanId;
                 
-                if (!empty($updateFields)) {
-                    $huaweiOLT->updateONU($onuId, $updateFields);
-                }
+                $huaweiOLT->updateONU($onuId, $updateFields);
                 
-                // Update ODB usage count if assigned
-                if ($odbId) {
-                    $huaweiOLT->updateODBUsage($odbId);
-                }
+                // For now, mark as authorized in DB only (TR-069 handles provisioning)
+                $message = 'ONU authorized successfully. VLAN: ' . ($vlanId ?: 'N/A') . '. TR-069 will handle router configuration.';
+                $messageType = 'success';
                 
-                // Authorize the ONU with the selected authentication method
-                $options = ['description' => $description];
-                $result = $huaweiOLT->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword, $options);
-                $message = $result['message'] ?? ($result['success'] ? 'ONU authorized using ' . strtoupper($authMethod) . ' authentication' : 'Authorization failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
+                // Redirect back to authorized ONUs list
+                header('Location: ?page=huawei-olt&view=onus&msg=' . urlencode($message) . '&msg_type=success');
+                exit;
                 break;
             case 'reboot_onu':
                 $result = $huaweiOLT->rebootONU((int)$_POST['onu_id']);
@@ -4988,7 +4971,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
     </form>
     
     <div class="modal fade" id="authModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <form method="post">
                     <input type="hidden" name="action" value="authorize_onu">
@@ -4998,152 +4981,61 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info">
+                        <div class="alert alert-info mb-3">
                             <i class="bi bi-router me-2"></i>
                             <strong>ONU:</strong> <span id="authOnuSn"></span>
                             <span class="ms-3"><strong>Location:</strong> <span id="authOnuLocation"></span></span>
                         </div>
                         
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-light">
-                                        <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Authentication Method</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="auth_method" id="authSN" value="sn" checked>
-                                            <label class="form-check-label" for="authSN">
-                                                <strong>Serial Number (SN)</strong>
-                                                <small class="text-muted d-block">Most common. Authenticate by ONU serial number.</small>
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="auth_method" id="authLOID" value="loid">
-                                            <label class="form-check-label" for="authLOID">
-                                                <strong>LOID (Logical ID)</strong>
-                                                <small class="text-muted d-block">Pre-register with Line ID for security.</small>
-                                            </label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="auth_method" id="authMAC" value="mac">
-                                            <label class="form-check-label" for="authMAC">
-                                                <strong>MAC Address</strong>
-                                                <small class="text-muted d-block">Authenticate by MAC address.</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div id="loidInputGroup" style="display:none;">
-                                    <div class="mb-2">
-                                        <label class="form-label small">LOID Value</label>
-                                        <input type="text" name="loid" class="form-control form-control-sm" placeholder="Enter LOID">
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label small">LOID Password (Optional)</label>
-                                        <input type="text" name="loid_password" class="form-control form-control-sm" placeholder="Password if required">
-                                    </div>
-                                </div>
-                                <div id="macInputGroup" style="display:none;">
-                                    <div class="mb-2">
-                                        <label class="form-label small">MAC Address</label>
-                                        <input type="text" name="mac_address" class="form-control form-control-sm" placeholder="XX:XX:XX:XX:XX:XX" pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$">
-                                        <small class="text-muted">Format: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX</small>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-light">
-                                        <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Location Details</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Zone <span class="text-danger">*</span></label>
-                                            <input type="text" name="zone" id="authZone" class="form-control" placeholder="e.g., Huruma, CBD, Industrial" required list="zoneList">
-                                            <datalist id="zoneList">
-                                                <?php
-                                                // Get distinct zones from existing ONUs
-                                                $zoneStmt = $db->query("SELECT DISTINCT zone FROM huawei_onus WHERE zone IS NOT NULL AND zone != '' ORDER BY zone");
-                                                while ($z = $zoneStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                                <option value="<?= htmlspecialchars($z['zone']) ?>">
-                                                <?php endwhile; ?>
-                                            </datalist>
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">Apartment/Building</label>
-                                                <input type="text" name="apartment" id="authApartment" class="form-control" placeholder="e.g., Sunrise Apts" list="apartmentList">
-                                                <datalist id="apartmentList">
-                                                    <?php
-                                                    $aptStmt = $db->query("SELECT DISTINCT apartment FROM huawei_onus WHERE apartment IS NOT NULL AND apartment != '' ORDER BY apartment");
-                                                    while ($a = $aptStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                                    <option value="<?= htmlspecialchars($a['apartment']) ?>">
-                                                    <?php endwhile; ?>
-                                                </datalist>
-                                            </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">ODB (Optical Box)</label>
-                                                <input type="text" name="odb" id="authOdb" class="form-control" placeholder="e.g., ODB-001" list="odbList">
-                                                <datalist id="odbList">
-                                                    <?php
-                                                    $odbStmt = $db->query("SELECT DISTINCT odb FROM huawei_onus WHERE odb IS NOT NULL AND odb != '' ORDER BY odb");
-                                                    while ($o = $odbStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                                    <option value="<?= htmlspecialchars($o['odb']) ?>">
-                                                    <?php endwhile; ?>
-                                                </datalist>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="card mb-3">
-                                    <div class="card-header bg-light">
-                                        <h6 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Configuration</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Service Profile</label>
-                                            <select name="profile_id" class="form-select" required>
-                                                <?php foreach ($profiles as $profile): ?>
-                                                <option value="<?= $profile['id'] ?>" <?= $profile['is_default'] ? 'selected' : '' ?>>
-                                                    <?= htmlspecialchars($profile['name']) ?>
-                                                    (<?= $profile['speed_profile_down'] ?: '-' ?> / <?= $profile['speed_profile_up'] ?: '-' ?>)
-                                                </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">Description</label>
-                                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="Auto-generated from Zone/Apartment">
-                                            <small class="text-muted">Leave empty to auto-generate from location</small>
-                                        </div>
-                                        
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="auto_configure" id="authAutoConfig" checked>
-                                            <label class="form-check-label" for="authAutoConfig">
-                                                Auto-configure service VLAN & TR-069
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Zone <span class="text-danger">*</span></label>
+                            <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
+                                <option value="">-- Select Zone --</option>
+                                <?php
+                                $zonesStmt = $db->query("SELECT id, name FROM oms_zones WHERE is_active = true ORDER BY name");
+                                while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
+                                    <?= htmlspecialchars($zone['name']) ?>
+                                </option>
+                                <?php endwhile; ?>
+                            </select>
+                            <input type="hidden" name="zone" id="authZoneName">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">VLAN ID <span class="text-danger">*</span></label>
+                            <input type="number" name="vlan_id" id="authVlanId" class="form-control" min="1" max="4094" required placeholder="e.g., 100">
+                            <small class="text-muted">Service VLAN for this ONU (1-4094)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Name / Description</label>
+                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="e.g., John_Apt5_Unit2">
+                            <small class="text-muted">Optional. Used as ONU description on OLT.</small>
+                        </div>
+                        
+                        <div class="alert alert-secondary small mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            After authorization, TR-069 will handle router configuration (WiFi, PPPoE, etc.)
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle me-1"></i> Authorize & Provision
+                            <i class="bi bi-check-circle me-1"></i> Authorize
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    
+    <script>
+    function updateZoneName(select) {
+        const selectedOption = select.options[select.selectedIndex];
+        document.getElementById('authZoneName').value = selectedOption.dataset.name || '';
+    }
+    </script>
     
     <div class="modal fade" id="wifiConfigModal" tabindex="-1">
         <div class="modal-dialog">
