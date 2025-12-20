@@ -1624,6 +1624,136 @@ class HuaweiOLT {
         return $profiles;
     }
     
+    public function generateLineProfileScript(array $profile): string {
+        $lines = [];
+        
+        $profileId = $profile['profile_id'] ?? 0;
+        $profileName = $profile['profile_name'] ?? "line-profile_{$profileId}";
+        
+        $lines[] = "ont-lineprofile gpon profile-id {$profileId} profile-name \"{$profileName}\"";
+        
+        if (!empty($profile['fec_upstream'])) {
+            $lines[] = "  fec-upstream enable";
+        }
+        
+        if (!empty($profile['tr069_enabled'])) {
+            $lines[] = "  tr069-management enable";
+        }
+        
+        if (!empty($profile['mapping_mode']) && $profile['mapping_mode'] !== 'vlan') {
+            $lines[] = "  mapping-mode {$profile['mapping_mode']}";
+        }
+        
+        if (!empty($profile['tconts'])) {
+            foreach ($profile['tconts'] as $tcont) {
+                $lines[] = "  tcont {$tcont['tcont_id']} dba-profile-id {$tcont['dba_profile_id']}";
+            }
+        }
+        
+        if (!empty($profile['gems'])) {
+            foreach ($profile['gems'] as $gem) {
+                $type = $gem['type'] ?? 'eth';
+                $lines[] = "  gem add {$gem['gem_id']} {$type} tcont {$gem['tcont_id']}";
+            }
+        }
+        
+        if (!empty($profile['gem_mappings'])) {
+            foreach ($profile['gem_mappings'] as $mapping) {
+                if ($mapping['type'] === 'vlan') {
+                    $lines[] = "  gem mapping {$mapping['gem_id']} {$mapping['index']} vlan {$mapping['vlan_id']}";
+                } else {
+                    $lines[] = "  gem mapping {$mapping['gem_id']} {$mapping['index']} priority {$mapping['priority']}";
+                }
+            }
+        }
+        
+        $lines[] = "  commit";
+        $lines[] = "  quit";
+        
+        return implode("\n", $lines);
+    }
+    
+    public function generateServiceProfileScript(array $profile): string {
+        $lines = [];
+        
+        $profileId = $profile['profile_id'] ?? 0;
+        $profileName = $profile['profile_name'] ?? "srv-profile_{$profileId}";
+        
+        $lines[] = "ont-srvprofile gpon profile-id {$profileId} profile-name \"{$profileName}\"";
+        
+        if (!empty($profile['ont_ports'])) {
+            foreach ($profile['ont_ports'] as $port) {
+                $portType = $port['type'] ?? 'eth';
+                $portCount = $port['count'] ?? 1;
+                $lines[] = "  ont-port {$portType} {$portCount}";
+            }
+        }
+        
+        if (!empty($profile['port_vlans'])) {
+            foreach ($profile['port_vlans'] as $pv) {
+                $portType = $pv['type'] ?? 'eth';
+                $portNum = $pv['port'] ?? 1;
+                $lines[] = "  port vlan {$portType} {$portNum} {$pv['vlan_id']}";
+            }
+        }
+        
+        $lines[] = "  commit";
+        $lines[] = "  quit";
+        
+        return implode("\n", $lines);
+    }
+    
+    public function generateONUProvisionScript(array $onu): string {
+        $lines = [];
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'] ?? 0;
+        $port = $onu['port'] ?? 0;
+        $onuId = $onu['onu_id'] ?? 0;
+        $sn = $onu['sn'] ?? '';
+        $lineProfileId = $onu['line_profile_id'] ?? 2;
+        $srvProfileId = $onu['srv_profile_id'] ?? 2;
+        $description = $onu['description'] ?? '';
+        $vlanId = $onu['vlan_id'] ?? 69;
+        $vlanPriority = $onu['vlan_priority'] ?? 2;
+        $ipMode = $onu['ip_mode'] ?? 'dhcp';
+        $tr069ProfileId = $onu['tr069_profile_id'] ?? null;
+        
+        $lines[] = "interface gpon {$frame}/{$slot}";
+        $lines[] = "  ont add {$port} {$onuId} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"";
+        $lines[] = "  ont ipconfig {$port} {$onuId} {$ipMode} vlan {$vlanId} priority {$vlanPriority}";
+        
+        if ($tr069ProfileId !== null) {
+            $lines[] = "  ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
+        }
+        
+        $lines[] = "  quit";
+        
+        if (!empty($onu['service_ports'])) {
+            foreach ($onu['service_ports'] as $sp) {
+                $spVlan = $sp['vlan_id'] ?? $vlanId;
+                $gemId = $sp['gem_id'] ?? 1;
+                $multiService = $sp['multi_service'] ?? 'user-vlan';
+                $rxTraffic = $sp['rx_traffic'] ?? 'table';
+                $txTraffic = $sp['tx_traffic'] ?? 'table';
+                
+                $lines[] = "service-port vlan {$spVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemId} multi-service {$multiService} rx-cttr {$rxTraffic} tx-cttr {$txTraffic}";
+            }
+        } else {
+            $lines[] = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport 1 multi-service user-vlan rx-cttr 6 tx-cttr 6";
+        }
+        
+        return implode("\n", $lines);
+    }
+    
+    public function generateBulkONUScript(array $onus): string {
+        $scripts = [];
+        foreach ($onus as $onu) {
+            $scripts[] = $this->generateONUProvisionScript($onu);
+        }
+        return implode("\n\n", $scripts);
+    }
+    
     public function syncVLANsFromOLT(int $oltId): array {
         $result = $this->getVLANs($oltId);
         if (!$result['success']) {
