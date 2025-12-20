@@ -2290,6 +2290,26 @@ class HuaweiOLT {
         return $result;
     }
     
+    public function markAllONUsAuthorized(int $oltId): array {
+        $stmt = $this->db->prepare("
+            UPDATE huawei_onus 
+            SET is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
+            WHERE olt_id = ? AND (is_authorized = FALSE OR is_authorized IS NULL)
+        ");
+        $stmt->execute([$oltId]);
+        $count = $stmt->rowCount();
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'mark_all_authorized',
+            'status' => 'success',
+            'message' => "Marked {$count} ONUs as authorized",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return ['success' => true, 'count' => $count];
+    }
+    
     public function authorizeONUWithSmartOLT(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = '', array $smartoltData = []): array {
         $localResult = $this->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword);
         

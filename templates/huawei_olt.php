@@ -196,6 +196,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'mark_all_authorized':
+                $result = $huaweiOLT->markAllONUsAuthorized((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Marked {$result['count']} ONUs as authorized";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed';
+                    $messageType = 'danger';
+                }
+                break;
             case 'save_genieacs_settings':
                 $settings = [
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
@@ -1064,6 +1074,13 @@ try {
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Import ONUs from SmartOLT? This will decode location data correctly.')">
                                 <i class="bi bi-cloud-download me-1"></i> Import SmartOLT
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="mark_all_authorized">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-outline-success btn-sm" onclick="return confirm('Mark all existing ONUs as authorized? Use this to fix imported data.')">
+                                <i class="bi bi-check-all me-1"></i> Mark All Authorized
                             </button>
                         </form>
                     </div>
