@@ -993,33 +993,16 @@ try {
                                 <form method="post" class="d-inline">
                                     <input type="hidden" name="action" value="test_connection">
                                     <input type="hidden" name="id" value="<?= $olt['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-plug me-1"></i> Test
+                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Test Connection">
+                                        <i class="bi bi-plug"></i>
                                     </button>
                                 </form>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="editOlt(<?= htmlspecialchars(json_encode($olt)) ?>)">
-                                    <i class="bi bi-pencil me-1"></i> Edit
-                                </button>
-                                <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-gear me-1"></i> Manage
-                                </a>
-                                <a href="?page=huawei-olt&view=onus&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-info">
+                                <a href="?page=huawei-olt&view=onus&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-primary">
                                     <i class="bi bi-diagram-3 me-1"></i> ONUs
                                 </a>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="sync_onus_snmp">
-                                    <input type="hidden" name="olt_id" value="<?= $olt['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Sync ONUs via SNMP">
-                                        <i class="bi bi-arrow-repeat"></i>
-                                    </button>
-                                </form>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="discover_unconfigured">
-                                    <input type="hidden" name="olt_id" value="<?= $olt['id'] ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Discover Unsynced ONUs">
-                                        <i class="bi bi-search"></i>
-                                    </button>
-                                </form>
+                                <a href="?page=huawei-olt&view=olt_detail&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Settings">
+                                    <i class="bi bi-gear"></i>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -1059,54 +1042,54 @@ try {
                     <?php if ($oltId): ?>
                     <div class="btn-group">
                         <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="sync_onus_snmp">
+                            <input type="hidden" name="action" value="sync_cli">
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-info btn-sm" onclick="return confirm('Sync all authorized ONUs from OLT via SNMP?')">
-                                <i class="bi bi-arrow-repeat me-1"></i> Sync ONUs
-                            </button>
-                        </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="sync_onu_locations">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Fix ONU location data (frame/slot/port/onu_id) from SNMP? This corrects SmartOLT-imported ONUs.')">
-                                <i class="bi bi-geo-alt me-1"></i> Fix Locations
+                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync ONUs from OLT? This reads configuration and optical power levels.')">
+                                <i class="bi bi-arrow-repeat me-1"></i> Sync from OLT
                             </button>
                         </form>
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="refresh_all_optical">
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Refresh optical power for all ONUs? This may take a while.')">
-                                <i class="bi bi-reception-4 me-1"></i> Refresh Power
+                            <button type="submit" class="btn btn-outline-primary btn-sm" title="Refresh power levels only">
+                                <i class="bi bi-reception-4"></i>
                             </button>
                         </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="discover_unconfigured">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-warning btn-sm">
-                                <i class="bi bi-search me-1"></i> Discover Unsynced
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots"></i>
                             </button>
-                        </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="import_smartolt">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Import ONUs from SmartOLT? This will decode location data correctly.')">
-                                <i class="bi bi-cloud-download me-1"></i> Import SmartOLT
-                            </button>
-                        </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="mark_all_authorized">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-outline-success btn-sm" onclick="return confirm('Mark all existing ONUs as authorized? Use this to fix imported data.')">
-                                <i class="bi bi-check-all me-1"></i> Mark All Authorized
-                            </button>
-                        </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="sync_cli">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync ONUs from OLT CLI? This reads configuration directly from the OLT and gets optical power levels.')">
-                                <i class="bi bi-terminal me-1"></i> Sync from CLI
-                            </button>
-                        </form>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="import_smartolt">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item" onclick="return confirm('Import ONUs from SmartOLT?')">
+                                            <i class="bi bi-cloud-download me-2"></i> Import from SmartOLT
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="mark_all_authorized">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item" onclick="return confirm('Mark all ONUs as authorized?')">
+                                            <i class="bi bi-check-all me-2"></i> Mark All Authorized
+                                        </button>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="sync_onus_snmp">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item" onclick="return confirm('Sync via SNMP only?')">
+                                            <i class="bi bi-broadcast me-2"></i> Sync via SNMP
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                     <?php endif; ?>
                 </div>
