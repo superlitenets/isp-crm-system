@@ -1229,6 +1229,11 @@ class HuaweiOLT {
         usleep(500000);
         @fread($socket, 4096);
         
+        // Disable pagination with multiple methods for compatibility
+        fwrite($socket, "screen-length 0 temporary\r\n");
+        usleep(300000);
+        @fread($socket, 4096);
+        
         fwrite($socket, "scroll 512\r\n");
         usleep(300000);
         @fread($socket, 4096);
@@ -1240,11 +1245,19 @@ class HuaweiOLT {
         $startTime = time();
         stream_set_blocking($socket, false);
         
-        while ((time() - $startTime) < 10) {
+        while ((time() - $startTime) < 15) {
             $chunk = @fread($socket, 8192);
             if ($chunk) {
                 $output .= $chunk;
                 if (strlen($output) > 65536) break;
+                
+                // Handle "---- More ----" pagination prompts
+                if (preg_match('/----\s*More\s*----/i', $chunk)) {
+                    fwrite($socket, " "); // Send space to continue
+                    usleep(500000);
+                    continue;
+                }
+                
                 if (preg_match('/[>#]\s*$/', $output)) {
                     usleep(500000);
                     $extra = @fread($socket, 4096);
