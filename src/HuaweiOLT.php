@@ -529,41 +529,62 @@ class HuaweiOLT {
         }
         
         $frame = $onu['frame'] ?? 0;
+        $snmpError = null;
+        $cliError = null;
         
-        // Try SNMP first
-        $optical = $this->getONUOpticalInfoViaSNMP(
-            $onu['olt_id'],
-            $frame,
-            $onu['slot'],
-            $onu['port'],
-            $onu['onu_id']
-        );
-        
-        // If SNMP fails, try CLI as fallback
-        if (!$optical['success'] || ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null)) {
-            $optical = $this->getONUOpticalInfoViaCLI($onu['olt_id'], $frame, $onu['slot'], $onu['port'], $onu['onu_id']);
+        // Try SNMP first if extension is available
+        if (function_exists('snmpget')) {
+            $optical = $this->getONUOpticalInfoViaSNMP(
+                $onu['olt_id'],
+                $frame,
+                $onu['slot'],
+                $onu['port'],
+                $onu['onu_id']
+            );
+            
+            if ($optical['success'] && ($optical['optical']['rx_power'] !== null || $optical['optical']['tx_power'] !== null)) {
+                // SNMP worked, update and return
+                $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
+                return [
+                    'success' => true,
+                    'rx_power' => $optical['optical']['rx_power'],
+                    'tx_power' => $optical['optical']['tx_power'],
+                    'method' => 'snmp'
+                ];
+            }
+            $snmpError = $optical['error'] ?? 'SNMP returned no data';
+        } else {
+            $snmpError = 'SNMP extension not installed';
         }
         
-        if (!$optical['success']) {
-            return $optical;
-        }
+        // Try CLI as fallback
+        $optical = $this->getONUOpticalInfoViaCLI($onu['olt_id'], $frame, $onu['slot'], $onu['port'], $onu['onu_id']);
         
+        if ($optical['success'] && ($optical['optical']['rx_power'] !== null || $optical['optical']['tx_power'] !== null)) {
+            $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
+            return [
+                'success' => true,
+                'rx_power' => $optical['optical']['rx_power'],
+                'tx_power' => $optical['optical']['tx_power'],
+                'method' => 'cli'
+            ];
+        }
+        $cliError = $optical['error'] ?? 'CLI returned no data';
+        
+        // Both methods failed
+        return [
+            'success' => false, 
+            'error' => "SNMP: {$snmpError}; CLI: {$cliError}"
+        ];
+    }
+    
+    private function updateONUOpticalInDB(int $onuId, ?float $rxPower, ?float $txPower): void {
         $stmt = $this->db->prepare("
             UPDATE huawei_onus 
-            SET rx_power = ?, tx_power = ?, updated_at = CURRENT_TIMESTAMP
+            SET rx_power = ?, tx_power = ?, optical_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
-        $stmt->execute([
-            $optical['optical']['rx_power'],
-            $optical['optical']['tx_power'],
-            $onuId
-        ]);
-        
-        return [
-            'success' => true,
-            'rx_power' => $optical['optical']['rx_power'],
-            'tx_power' => $optical['optical']['tx_power']
-        ];
+        $stmt->execute([$rxPower, $txPower, $onuId]);
     }
     
     public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
