@@ -885,7 +885,8 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         
         // SmartOLT stores port_index in onu_id field when slot/port are not set
-        if (($slot === null || $slot === 0) && ($port === null || $port === 0) && $onuIdNum > 1000) {
+        // Only trigger SmartOLT decode if slot AND port are BOTH null (not 0, which is valid)
+        if ($slot === null && $port === null && $onuIdNum > 1000) {
             // Decode SmartOLT port_index format
             // Format: port_index.onu_id where port_index encodes frame/slot/port
             // port_index = (frame << 25) | (slot << 16) | port (standard Huawei encoding)
