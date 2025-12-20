@@ -2314,10 +2314,10 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     <span class="badge bg-<?= $currentOlt['is_active'] ? 'success' : 'secondary' ?>">
                         <?= $currentOlt['is_active'] ? 'Active' : 'Inactive' ?>
                     </span>
-                    <form method="post" class="d-inline">
+                    <form method="post" class="d-inline" onsubmit="showLoading('Running full OLT sync... This may take a few minutes.')">
                         <input type="hidden" name="action" value="sync_all_olt">
                         <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync all data from OLT? This may take a moment.')">
+                        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Sync all data from OLT? This may take a few minutes.')">
                             <i class="bi bi-arrow-repeat me-1"></i> Sync All from OLT
                         </button>
                     </form>
