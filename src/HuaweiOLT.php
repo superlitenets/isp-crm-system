@@ -350,9 +350,14 @@ class HuaweiOLT {
         $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        $huaweiONTSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3';
+        // Correct Huawei MA5680T OIDs:
+        // .43.1.9 = hwGponDeviceOntSn (Serial Number)
+        // .43.1.3 = hwGponOntOpticalDdmRxPower (RX Power - NOT serial!)
+        // .46.1.15 = hwGponDeviceOntControlRunStatus (Status)
+        // .43.1.2 = hwGponDeviceOntDespt (Description)
+        $huaweiONTSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
         $huaweiONTStatusBase = '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15';
-        $huaweiONTDescBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
+        $huaweiONTDescBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.2';
         
         $serials = @snmprealwalk($host, $community, $huaweiONTSerialBase, 10000000, 2);
         $statuses = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
@@ -364,19 +369,19 @@ class HuaweiOLT {
         
         $onus = [];
         foreach ($serials as $oid => $serial) {
+            // Index format: frame.slot.port.onu_id (e.g., 0.1.3.12)
             $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
             $parts = explode('.', $indexPart);
             
-            if (count($parts) >= 2) {
-                $portIndex = (int)$parts[0];
-                $onuId = (int)$parts[1];
-                
-                $frame = 0;
-                $slot = floor($portIndex / 100000000);
-                $port = ($portIndex % 100000000) / 1000000;
+            // MA5680T uses 4-part index: frame.slot.port.onu_id
+            if (count($parts) >= 4) {
+                $frame = (int)$parts[0];
+                $slot = (int)$parts[1];
+                $port = (int)$parts[2];
+                $onuId = (int)$parts[3];
                 
                 $statusOid = $huaweiONTStatusBase . '.' . $indexPart;
-                $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$statuses[$statusOid]) : 'unknown';
+                $status = isset($statuses[$statusOid]) ? $this->parseONUStatus((int)$this->cleanSnmpValue($statuses[$statusOid])) : 'unknown';
                 
                 $descOid = $huaweiONTDescBase . '.' . $indexPart;
                 $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
@@ -384,8 +389,8 @@ class HuaweiOLT {
                 $onus[] = [
                     'sn' => $this->cleanSnmpValue($serial),
                     'frame' => $frame,
-                    'slot' => (int)$slot,
-                    'port' => (int)$port,
+                    'slot' => $slot,
+                    'port' => $port,
                     'onu_id' => $onuId,
                     'status' => $status,
                     'description' => $desc,
