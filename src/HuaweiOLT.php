@@ -406,26 +406,49 @@ class HuaweiOLT {
                 $port = (int)$parts[2];
                 $onuId = (int)$parts[3];
             } elseif (count($parts) >= 2) {
-                // 2-part index: portIndex.onuId (some tables use this)
-                // portIndex encodes frame/slot/port
-                $portIndex = (int)$parts[0];
+                // 2-part index: ifIndex.onuId (Huawei uses ifIndex encoding)
+                $ifIndex = (int)$parts[0];
                 $onuId = (int)$parts[1];
                 
-                // Decode Huawei portIndex: typically slot*8 + port or similar
-                // Try common encoding: high bits = slot, low bits = port
-                if ($portIndex > 100000000) {
-                    // Large portIndex - use bit shifting
-                    $slot = (int)floor($portIndex / 100000000);
-                    $port = (int)(($portIndex % 100000000) / 1000000);
+                // Huawei ifIndex bit-mask decoding for GPON interfaces
+                // ifIndex format: encodes frame/slot/port in specific bit positions
+                // Common Huawei encoding: ponIndex = frame*8192 + slot*256 + port
+                // But ifIndex can have additional bits for interface type
+                
+                // Try standard ponIndex decoding first (for smaller values)
+                if ($ifIndex < 100000) {
+                    // Small ifIndex - use ponIndex formula: frame*8192 + slot*256 + port
+                    $frame = (int)floor($ifIndex / 8192);
+                    $remainder = $ifIndex % 8192;
+                    $slot = (int)floor($remainder / 256);
+                    $port = $remainder % 256;
                 } else {
-                    // Smaller portIndex - might be slot*256 + port or slot*8 + port
-                    $slot = (int)floor($portIndex / 256);
-                    $port = $portIndex % 256;
-                    if ($slot > 20) { // Sanity check - slots usually 0-21
-                        $slot = (int)floor($portIndex / 8);
-                        $port = $portIndex % 8;
+                    // Large ifIndex (like 4194320384 = 0xFA004000) - use bit extraction
+                    // Huawei MA5680T ifIndex for GPON: 
+                    // Bits 24-31: interface type (0xFA = 250 = GPON)
+                    // Bits 16-23: slot
+                    // Bits 8-15: port  
+                    // Bits 0-7: reserved/sub-port
+                    $slot = ($ifIndex >> 16) & 0xFF;
+                    $port = ($ifIndex >> 8) & 0xFF;
+                    $frame = 0; // Usually 0 for single-chassis
+                    
+                    // Alternative decoding if slot seems too high
+                    if ($slot > 21) {
+                        // Try alternate bit layout: some firmware uses different encoding
+                        // ponIndex embedded in lower 24 bits
+                        $ponIndex = $ifIndex & 0xFFFFFF;
+                        $frame = (int)floor($ponIndex / 8192);
+                        $remainder = $ponIndex % 8192;
+                        $slot = (int)floor($remainder / 256);
+                        $port = $remainder % 256;
                     }
                 }
+                
+                // Sanity check - valid ranges for MA5680T
+                if ($frame > 7) $frame = 0;
+                if ($slot > 21) $slot = 0;
+                if ($port > 15) $port = 0;
             } else {
                 continue; // Skip invalid entries
             }
