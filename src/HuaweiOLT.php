@@ -2336,6 +2336,17 @@ class HuaweiOLT {
         return $result ?: null;
     }
     
+    public function getDefaultServiceProfile(): ?array {
+        $stmt = $this->db->query("SELECT * FROM huawei_service_profiles WHERE is_default = TRUE AND is_active = TRUE LIMIT 1");
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$result) {
+            // Fallback to first active profile
+            $stmt = $this->db->query("SELECT * FROM huawei_service_profiles WHERE is_active = TRUE ORDER BY id LIMIT 1");
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        return $result ?: null;
+    }
+    
     public function addServiceProfile(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_service_profiles (name, description, profile_type, vlan_id, vlan_mode,

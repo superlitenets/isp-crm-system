@@ -174,24 +174,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $description = $zone . '_' . date('Ymd_His');
                 }
                 
-                // Update ONU record with zone, VLAN, and description
-                $updateFields = [
-                    'is_authorized' => true,
-                    'authorization_date' => date('Y-m-d H:i:s'),
-                ];
-                if (!empty($description)) $updateFields['description'] = $description;
+                // Update ONU record with zone info before authorization
+                $updateFields = [];
                 if (!empty($zone)) $updateFields['zone'] = $zone;
                 if ($zoneId) $updateFields['zone_id'] = $zoneId;
                 if ($vlanId) $updateFields['vlan_id'] = $vlanId;
+                if (!empty($updateFields)) {
+                    $huaweiOLT->updateONU($onuId, $updateFields);
+                }
                 
-                $huaweiOLT->updateONU($onuId, $updateFields);
+                // Get default profile for authorization
+                $defaultProfile = $huaweiOLT->getDefaultServiceProfile();
+                $profileId = $defaultProfile ? $defaultProfile['id'] : 1;
                 
-                // For now, mark as authorized in DB only (TR-069 handles provisioning)
-                $message = 'ONU authorized successfully. VLAN: ' . ($vlanId ?: 'N/A') . '. TR-069 will handle router configuration.';
-                $messageType = 'success';
+                // Build options with VLAN for service-port command
+                $options = [
+                    'description' => $description,
+                    'vlan_id' => $vlanId
+                ];
+                
+                // Execute actual OLT authorization with VLAN in service-port
+                $result = $huaweiOLT->authorizeONU($onuId, $profileId, 'sn', '', '', $options);
+                
+                if ($result['success']) {
+                    $message = 'ONU authorized on OLT. VLAN ' . ($vlanId ?: 'default') . ' configured. TR-069 will handle router settings.';
+                    $messageType = 'success';
+                } else {
+                    $message = $result['message'] ?? 'Authorization failed';
+                    $messageType = 'danger';
+                }
                 
                 // Redirect back to authorized ONUs list
-                header('Location: ?page=huawei-olt&view=onus&msg=' . urlencode($message) . '&msg_type=success');
+                header('Location: ?page=huawei-olt&view=onus&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
             case 'reboot_onu':
