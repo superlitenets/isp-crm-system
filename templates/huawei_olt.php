@@ -280,7 +280,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'sync_boards':
                 $result = $huaweiOLT->syncBoardsFromOLT((int)$_POST['olt_id']);
-                $message = $result['success'] ? "Synced {$result['count']} boards from OLT" : ($result['message'] ?? 'Sync failed');
+                $count = $result['synced'] ?? $result['count'] ?? 0;
+                $message = $result['success'] ? "Synced {$count} boards from OLT" : ($result['message'] ?? 'Sync failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'sync_vlans':
@@ -291,12 +292,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'sync_ports':
                 $result = $huaweiOLT->syncPONPortsFromOLT((int)$_POST['olt_id']);
-                $message = $result['success'] ? "Synced {$result['count']} PON ports from OLT" : ($result['message'] ?? 'Sync failed');
+                $count = $result['synced'] ?? $result['count'] ?? 0;
+                $message = $result['success'] ? "Synced {$count} PON ports from OLT" : ($result['message'] ?? 'Sync failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'sync_uplinks':
                 $result = $huaweiOLT->syncUplinksFromOLT((int)$_POST['olt_id']);
-                $message = $result['success'] ? "Synced {$result['count']} uplink ports from OLT" : ($result['message'] ?? 'Sync failed');
+                $count = $result['synced'] ?? $result['count'] ?? 0;
+                $message = $result['success'] ? "Synced {$count} uplink ports from OLT" : ($result['message'] ?? 'Sync failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'sync_all_olt':
