@@ -690,6 +690,61 @@ class HuaweiOLT {
         return "{$slot}.{$port}.{$onuId}";
     }
     
+    private function decodeSmartOLTPortIndex(int $portIndex): ?array {
+        // SmartOLT/Huawei port_index format:
+        // port_index = (frame << 25) | (slot << 19) | (port << 8) | onu_id
+        // 
+        // Decoding:
+        // - frame  = (port_index >> 25) & 0x7F  (bits 25-31)
+        // - slot   = (port_index >> 19) & 0x3F  (bits 19-24)
+        // - port   = (port_index >> 8) & 0x7FF  (bits 8-18)
+        // - onu_id = port_index & 0xFF          (bits 0-7)
+        
+        $frame = ($portIndex >> 25) & 0x7F;
+        $slot = ($portIndex >> 19) & 0x3F;
+        $port = ($portIndex >> 8) & 0x7FF;
+        $onuId = $portIndex & 0xFF;
+        
+        // Validate decoded values (reasonable ranges for Huawei OLT)
+        // Frame: 0-7, Slot: 0-21, Port: 0-16, ONU: 0-127
+        if ($frame <= 7 && $slot <= 21 && $port <= 16 && $onuId <= 127) {
+            return [
+                'frame' => $frame,
+                'slot' => $slot,
+                'port' => $port,
+                'onu_id' => $onuId,
+                'decoded_from' => 'huawei_port_index'
+            ];
+        }
+        
+        // Try alternate format: simple flat index
+        // Format may be just slot.port.onu_id combined differently
+        // port_index = (slot << 16) | (port << 8) | onu_id
+        $altSlot = ($portIndex >> 16) & 0xFF;
+        $altPort = ($portIndex >> 8) & 0xFF;
+        $altOnuId = $portIndex & 0xFF;
+        
+        if ($altSlot <= 21 && $altPort <= 16 && $altOnuId <= 127) {
+            return [
+                'frame' => 0,
+                'slot' => $altSlot,
+                'port' => $altPort,
+                'onu_id' => $altOnuId,
+                'decoded_from' => 'alt_format'
+            ];
+        }
+        
+        // Return raw decoded values for debugging even if validation fails
+        return [
+            'frame' => $frame,
+            'slot' => $slot,
+            'port' => $port,
+            'onu_id' => $onuId,
+            'decoded_from' => 'raw_decode',
+            'warning' => 'Values may be out of expected range'
+        ];
+    }
+    
     private function parseOpticalPowerDiv10($value): ?float {
         $cleaned = $this->cleanSnmpValue((string)$value);
         if (is_numeric($cleaned)) {
@@ -720,11 +775,36 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
-        if ($onu['slot'] === null || $onu['port'] === null || $onu['onu_id'] === null) {
-            return ['success' => false, 'error' => 'ONU location (slot/port/onu_id) not set'];
+        if ($onu['onu_id'] === null) {
+            return ['success' => false, 'error' => 'ONU ID not set'];
         }
         
+        // Detect SmartOLT format: if onu_id is large (port_index) and slot/port are 0/null
         $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        
+        // SmartOLT stores port_index in onu_id field when slot/port are not set
+        if (($slot === null || $slot === 0) && ($port === null || $port === 0) && $onuIdNum > 1000) {
+            // Decode SmartOLT port_index format
+            // Format: port_index.onu_id where port_index encodes frame/slot/port
+            // port_index = (frame << 25) | (slot << 16) | port (standard Huawei encoding)
+            // But SmartOLT may use different encoding, let's try to decode
+            $decoded = $this->decodeSmartOLTPortIndex($onuIdNum);
+            if ($decoded) {
+                $frame = $decoded['frame'];
+                $slot = $decoded['slot'];
+                $port = $decoded['port'];
+                $onuIdNum = $decoded['onu_id'];
+            } else {
+                return ['success' => false, 'error' => "Cannot decode SmartOLT port_index: {$onuIdNum}. Please sync ONUs from OLT via SNMP."];
+            }
+        }
+        
+        if ($slot === null || $port === null) {
+            return ['success' => false, 'error' => 'ONU location (slot/port) not set'];
+        }
         
         // SNMP is the only method for optical power
         if (!function_exists('snmpget')) {
@@ -734,9 +814,9 @@ class HuaweiOLT {
         $optical = $this->getONUOpticalInfoViaSNMP(
             $onu['olt_id'],
             $frame,
-            $onu['slot'],
-            $onu['port'],
-            $onu['onu_id']
+            $slot,
+            $port,
+            $onuIdNum
         );
         
         if (!$optical['success']) {
