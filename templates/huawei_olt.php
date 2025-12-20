@@ -458,9 +458,61 @@ try {
         .signal-good { color: #28a745; }
         .signal-warning { color: #ffc107; }
         .signal-critical { color: #dc3545; }
+        
+        /* Loading overlay styles */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .loading-spinner-container {
+            background: white;
+            padding: 2rem 3rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e9ecef;
+            border-top-color: #1a237e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #1a237e;
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+        .btn-sync { position: relative; }
+        .btn-sync .spinner-border { display: none; }
+        .btn-sync.syncing .spinner-border { display: inline-block; }
+        .btn-sync.syncing .btn-text { display: none; }
     </style>
 </head>
 <body>
+    <!-- Loading Overlay for OLT Operations -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner-container">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">Connecting to OLT...</div>
+            <div class="text-muted small mt-2">This may take a few seconds</div>
+        </div>
+    </div>
+    
     <div class="d-flex">
         <div class="sidebar d-flex flex-column p-3" style="width: 260px;">
             <a href="?page=dashboard" class="text-decoration-none text-warning small mb-2 px-2">
@@ -503,6 +555,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'templates' ? 'active' : '' ?>" href="?page=huawei-olt&view=templates">
                     <i class="bi bi-file-earmark-code me-2"></i> Service Templates
+                </a>
+                <a class="nav-link <?= $view === 'cli_generator' ? 'active' : '' ?>" href="?page=huawei-olt&view=cli_generator">
+                    <i class="bi bi-code-square me-2"></i> CLI Script Generator
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
@@ -2662,6 +2717,297 @@ ont tr069-server-config 1 all profile-id 1</pre>
             <?php endif; ?>
             
             <?php endif; ?>
+            
+            <?php if ($view === 'cli_generator'): ?>
+            <!-- CLI Script Generator View -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-code-square me-2"></i>CLI Script Generator</h4>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Customer & ONU Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="cliGeneratorForm">
+                                <div class="mb-3">
+                                    <label class="form-label">Customer Name / Account</label>
+                                    <input type="text" id="genCustomerName" class="form-control" placeholder="e.g., SNS001234 or John Doe" required>
+                                    <div class="form-text">Used in ONU description</div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Zone</label>
+                                        <input type="text" id="genZone" class="form-control" placeholder="e.g., Huruma" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Area / Building</label>
+                                        <input type="text" id="genArea" class="form-control" placeholder="e.g., Block A">
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6 class="text-muted mb-3"><i class="bi bi-router me-2"></i>ONU Location</h6>
+                                
+                                <div class="row">
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">Frame</label>
+                                        <input type="number" id="genFrame" class="form-control" value="0" min="0">
+                                    </div>
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">Slot</label>
+                                        <input type="number" id="genSlot" class="form-control" placeholder="e.g., 1" required min="0">
+                                    </div>
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">Port</label>
+                                        <input type="number" id="genPort" class="form-control" placeholder="e.g., 0" required min="0">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ONU ID</label>
+                                        <input type="number" id="genOnuId" class="form-control" placeholder="e.g., 1" required min="1">
+                                        <div class="form-text">Next available ID on the port</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ONU Serial Number</label>
+                                        <input type="text" id="genOnuSn" class="form-control" placeholder="e.g., 485754438B8C1234" required>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6 class="text-muted mb-3"><i class="bi bi-sliders me-2"></i>Service Configuration</h6>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Service Profile</label>
+                                        <select id="genServiceProfile" class="form-select">
+                                            <?php foreach ($profiles as $profile): ?>
+                                            <option value="<?= $profile['id'] ?>" 
+                                                    data-vlan="<?= htmlspecialchars($profile['vlan_id'] ?? '') ?>"
+                                                    data-gem="<?= htmlspecialchars($profile['gem_port'] ?? '') ?>"
+                                                    data-line="<?= htmlspecialchars($profile['line_profile'] ?? '') ?>"
+                                                    data-srv="<?= htmlspecialchars($profile['srv_profile'] ?? '') ?>"
+                                                    data-speed-up="<?= htmlspecialchars($profile['speed_profile_up'] ?? '') ?>"
+                                                    data-speed-down="<?= htmlspecialchars($profile['speed_profile_down'] ?? '') ?>"
+                                                    <?= $profile['is_default'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($profile['name']) ?> 
+                                                <?php if ($profile['vlan_id']): ?>(VLAN <?= $profile['vlan_id'] ?>)<?php endif; ?>
+                                            </option>
+                                            <?php endforeach; ?>
+                                            <option value="custom">Custom Configuration...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">VLAN ID</label>
+                                        <input type="number" id="genVlan" class="form-control" placeholder="e.g., 69">
+                                    </div>
+                                </div>
+                                
+                                <div class="row" id="customProfileFields" style="display: none;">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">GEM Port</label>
+                                        <input type="number" id="genGemPort" class="form-control" placeholder="e.g., 1">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Line Profile ID</label>
+                                        <input type="number" id="genLineProfile" class="form-control" placeholder="e.g., 10">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Service Profile ID</label>
+                                        <input type="number" id="genSrvProfile" class="form-control" placeholder="e.g., 10">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Speed (Mbps Down)</label>
+                                        <input type="number" id="genSpeedDown" class="form-control" placeholder="e.g., 20">
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="generateCLIScript()">
+                                        <i class="bi bi-lightning-charge me-2"></i>Generate CLI Script
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Generated CLI Commands</h5>
+                            <button type="button" class="btn btn-sm btn-outline-light" onclick="copyGeneratedScript()">
+                                <i class="bi bi-clipboard me-1"></i> Copy All
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <pre class="mb-0 p-3" style="background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; max-height: 600px; overflow-y: auto; border-radius: 0 0 0.375rem 0.375rem;"><code id="generatedScript"># Fill in the form and click "Generate CLI Script"
+# The commands will appear here ready to paste into your OLT terminal
+
+# Example output:
+# interface gpon 0/1
+# ont add 0 1 sn-auth "485754438B8C1234" omci ont-lineprofile-id 10 ont-srvprofile-id 10 desc "SNS001234_zone_Huruma_BlockA_authd_20241220"
+# ont port native-vlan 0 1 eth 1 vlan 69 priority 0
+# quit
+# 
+# service-port vlan 69 gpon 0/1/0 ont 1 gemport 1 multi-service user-vlan 69 tag-transform translate</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card shadow-sm mt-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Quick Reference</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>ONU Description Format:</h6>
+                                    <code class="d-block bg-light p-2 rounded mb-3">CUSTOMER_zone_ZONE_AREA_authd_YYYYMMDD</code>
+                                    
+                                    <h6>Common Commands:</h6>
+                                    <ul class="small">
+                                        <li><code>display ont autofind all</code> - Find unconfigured ONUs</li>
+                                        <li><code>display ont info 0 1</code> - Show ONUs on port 0/1</li>
+                                        <li><code>display service-port port 0/1/0</code> - Show service ports</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Service Profiles Available:</h6>
+                                    <ul class="small list-unstyled">
+                                        <?php foreach (array_slice($profiles, 0, 5) as $p): ?>
+                                        <li><i class="bi bi-check-circle text-success me-1"></i><?= htmlspecialchars($p['name']) ?> 
+                                            <?php if ($p['vlan_id']): ?><span class="text-muted">(VLAN <?= $p['vlan_id'] ?>)</span><?php endif; ?>
+                                        </li>
+                                        <?php endforeach; ?>
+                                        <?php if (count($profiles) > 5): ?>
+                                        <li class="text-muted">...and <?= count($profiles) - 5 ?> more</li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function updateProfileFields() {
+                const profileSelect = document.getElementById('genServiceProfile');
+                const customFields = document.getElementById('customProfileFields');
+                
+                if (profileSelect.value === 'custom') {
+                    customFields.style.display = 'flex';
+                } else {
+                    customFields.style.display = 'none';
+                    const option = profileSelect.options[profileSelect.selectedIndex];
+                    document.getElementById('genVlan').value = option.dataset.vlan || '';
+                    document.getElementById('genGemPort').value = option.dataset.gem || '';
+                    document.getElementById('genLineProfile').value = option.dataset.line || '';
+                    document.getElementById('genSrvProfile').value = option.dataset.srv || '';
+                }
+            }
+            
+            document.getElementById('genServiceProfile').addEventListener('change', updateProfileFields);
+            
+            // Initialize fields on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                updateProfileFields();
+            });
+            
+            // Also run immediately in case DOMContentLoaded already fired
+            if (document.readyState !== 'loading') {
+                updateProfileFields();
+            }
+            
+            function generateCLIScript() {
+                const customer = document.getElementById('genCustomerName').value.trim();
+                const zone = document.getElementById('genZone').value.trim();
+                const area = document.getElementById('genArea').value.trim() || '';
+                const frame = document.getElementById('genFrame').value || '0';
+                const slot = document.getElementById('genSlot').value;
+                const port = document.getElementById('genPort').value;
+                const onuId = document.getElementById('genOnuId').value;
+                const onuSn = document.getElementById('genOnuSn').value.trim().toUpperCase();
+                const vlan = document.getElementById('genVlan').value;
+                
+                const profileSelect = document.getElementById('genServiceProfile');
+                const option = profileSelect.options[profileSelect.selectedIndex];
+                
+                let lineProfile, srvProfile, gemPort;
+                if (profileSelect.value === 'custom') {
+                    lineProfile = document.getElementById('genLineProfile').value || '10';
+                    srvProfile = document.getElementById('genSrvProfile').value || '10';
+                    gemPort = document.getElementById('genGemPort').value || '1';
+                } else {
+                    lineProfile = option.dataset.line || '10';
+                    srvProfile = option.dataset.srv || '10';
+                    gemPort = option.dataset.gem || '1';
+                }
+                
+                if (!customer || !zone || !slot || !port || !onuId || !onuSn || !vlan) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+                
+                const today = new Date().toISOString().slice(0,10).replace(/-/g, '');
+                const areaClean = area.replace(/\s+/g, '');
+                const desc = `${customer}_zone_${zone}_${areaClean}_authd_${today}`;
+                
+                let script = `# ================================================\n`;
+                script += `# ONU Provisioning Script\n`;
+                script += `# Customer: ${customer}\n`;
+                script += `# Zone: ${zone}${area ? ', Area: ' + area : ''}\n`;
+                script += `# Generated: ${new Date().toLocaleString()}\n`;
+                script += `# ================================================\n\n`;
+                
+                script += `# Step 1: Enter GPON interface configuration\n`;
+                script += `interface gpon ${frame}/${slot}\n\n`;
+                
+                script += `# Step 2: Add ONU with authentication\n`;
+                script += `ont add ${port} ${onuId} sn-auth "${onuSn}" omci ont-lineprofile-id ${lineProfile} ont-srvprofile-id ${srvProfile} desc "${desc}"\n\n`;
+                
+                script += `# Step 3: Configure native VLAN on ONU ETH port\n`;
+                script += `ont port native-vlan ${port} ${onuId} eth 1 vlan ${vlan} priority 0\n\n`;
+                
+                script += `# Step 4: Exit interface\n`;
+                script += `quit\n\n`;
+                
+                script += `# Step 5: Create service port binding\n`;
+                script += `service-port vlan ${vlan} gpon ${frame}/${slot}/${port} ont ${onuId} gemport ${gemPort} multi-service user-vlan ${vlan} tag-transform translate\n\n`;
+                
+                script += `# ================================================\n`;
+                script += `# Verification Commands (optional)\n`;
+                script += `# ================================================\n`;
+                script += `# display ont info ${port} ${onuId}\n`;
+                script += `# display ont optical-info ${port} ${onuId}\n`;
+                script += `# display service-port port ${frame}/${slot}/${port} ont ${onuId}\n`;
+                
+                document.getElementById('generatedScript').textContent = script;
+            }
+            
+            function copyGeneratedScript() {
+                const script = document.getElementById('generatedScript').textContent;
+                navigator.clipboard.writeText(script).then(() => {
+                    alert('CLI script copied to clipboard!');
+                }).catch(() => {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = script;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('CLI script copied to clipboard!');
+                });
+            }
+            </script>
+            <?php endif; ?>
+            
         </div>
     </div>
     
@@ -3205,6 +3551,53 @@ echo "# ================================================\n";
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Loading overlay for OLT sync operations
+    const loadingMessages = {
+        'sync_onus_snmp': 'Syncing ONUs from OLT...',
+        'sync_tr069_devices': 'Syncing TR-069 devices...',
+        'sync_boards': 'Syncing board information...',
+        'sync_vlans': 'Syncing VLANs from OLT...',
+        'sync_ports': 'Syncing PON ports...',
+        'sync_uplinks': 'Syncing uplink ports...',
+        'sync_all_olt': 'Running full OLT sync...',
+        'test_connection': 'Testing connection...',
+        'discover_unconfigured': 'Discovering unconfigured ONUs...',
+        'get_olt_info_snmp': 'Getting OLT system info...',
+        'refresh_onu_optical': 'Reading optical levels...',
+        'execute_command': 'Executing CLI command...',
+        'authorize_onu': 'Authorizing ONU...',
+        'reboot_onu': 'Rebooting ONU...',
+        'delete_onu_olt': 'Removing ONU from OLT...',
+        'configure_wifi': 'Configuring WiFi...',
+        'tr069_refresh': 'Refreshing device...',
+        'tr069_reboot': 'Rebooting device...',
+        'tr069_factory_reset': 'Factory resetting device...'
+    };
+    
+    function showLoading(message) {
+        document.getElementById('loadingText').textContent = message || 'Processing...';
+        document.getElementById('loadingOverlay').classList.add('active');
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+    }
+    
+    // Intercept all form submissions that involve OLT operations
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('form').forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                const actionInput = form.querySelector('input[name="action"]');
+                if (actionInput) {
+                    const action = actionInput.value;
+                    if (loadingMessages[action]) {
+                        showLoading(loadingMessages[action]);
+                    }
+                }
+            });
+        });
+    });
+    
     function copyConfigScript() {
         const fullScriptTab = document.querySelector('#fullScriptTab code');
         navigator.clipboard.writeText(fullScriptTab.textContent).then(() => {
