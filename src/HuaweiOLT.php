@@ -983,12 +983,24 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        // First try display ont info summary (fast, gets serial + status)
-        $summaryResult = $this->discoverONUsViaCLI($oltId);
-        $summaryOnus = $summaryResult['success'] ? $summaryResult['onus'] : [];
+        set_time_limit(300);
         
-        // Then get detailed configuration for descriptions/profiles
-        $configResult = $this->executeCommand($oltId, 'display current-configuration | include "ont add"');
+        // First try display ont info summary (fast, gets serial + status + location)
+        $summaryResult = $this->discoverONUsViaCLI($oltId);
+        $summaryOnus = [];
+        if ($summaryResult['success'] && !empty($summaryResult['onus'])) {
+            foreach ($summaryResult['onus'] as $onu) {
+                $summaryOnus[$onu['sn']] = $onu;
+            }
+        }
+        
+        // Get full configuration with interface context to properly map slots
+        $configResult = $this->executeCommand($oltId, 'display current-configuration section gpon');
+        if (!$configResult['success']) {
+            // Fallback: try simpler command
+            $configResult = $this->executeCommand($oltId, 'display current-configuration | include "interface gpon\\|ont add"');
+        }
+        
         if (!$configResult['success']) {
             return ['success' => false, 'error' => 'Failed to get ONU configuration: ' . ($configResult['message'] ?? 'Unknown error')];
         }
@@ -1001,77 +1013,60 @@ class HuaweiOLT {
         $errors = [];
         $parsed = [];
         
+        // Track current interface context
+        $currentFrame = 0;
+        $currentSlot = 0;
+        
         foreach ($lines as $line) {
             $line = trim($line);
             
-            // Parse: ont add <slot> <onu_id> sn-auth "<serial>" omci ont-lineprofile-id <id> ont-srvprofile-id <id> desc "<desc>"
-            // Also handles: ont add <slot> <onu_id> sn-auth <serial> (without quotes)
+            // Track interface context: "interface gpon 0/2" means frame 0, slot 2
+            if (preg_match('/interface\s+gpon\s+(\d+)\/(\d+)/i', $line, $m)) {
+                $currentFrame = (int)$m[1];
+                $currentSlot = (int)$m[2];
+                continue;
+            }
+            
+            // Parse: ont add <port> <onu_id> sn-auth "<serial>" ...
             if (preg_match('/ont\s+add\s+(\d+)\s+(\d+)\s+(\w+)-auth\s+"?([A-Fa-f0-9]+)"?/i', $line, $matches)) {
                 $port = (int)$matches[1];
                 $onuId = (int)$matches[2];
-                $authType = strtolower($matches[3]); // sn, loid, password
+                $authType = strtolower($matches[3]);
                 $serial = strtoupper(trim($matches[4], '"'));
                 
-                // Extract line-profile-id
                 $lineProfileId = null;
                 if (preg_match('/ont-lineprofile-id\s+(\d+)/i', $line, $m)) {
                     $lineProfileId = (int)$m[1];
                 }
                 
-                // Extract srv-profile-id
                 $srvProfileId = null;
                 if (preg_match('/ont-srvprofile-id\s+(\d+)/i', $line, $m)) {
                     $srvProfileId = (int)$m[1];
                 }
                 
-                // Extract description
                 $description = '';
                 if (preg_match('/desc\s+"([^"]+)"/i', $line, $m)) {
                     $description = $m[1];
                 }
                 
-                // Parse description for zone/area info (format: SNSxxxxxx_zone_Name_Area_authd_date)
-                $zone = '';
-                $area = '';
-                $customerName = '';
-                if (preg_match('/zone_([^_]+)_([^_]+)_authd/i', $description, $m)) {
-                    $zone = $m[1];
-                    $area = $m[2];
-                }
-                if (preg_match('/^([A-Z0-9]+)_zone/i', $description, $m)) {
-                    $customerName = $m[1];
+                // Get status from summary if available
+                $status = 'online';
+                if (isset($summaryOnus[$serial])) {
+                    $status = $summaryOnus[$serial]['status'] ?? 'online';
                 }
                 
                 $parsed[] = [
                     'sn' => $serial,
+                    'frame' => $currentFrame,
+                    'slot' => $currentSlot,
                     'port' => $port,
                     'onu_id' => $onuId,
                     'auth_type' => $authType,
                     'line_profile_id' => $lineProfileId,
                     'srv_profile_id' => $srvProfileId,
                     'description' => $description,
-                    'zone' => $zone,
-                    'area' => $area,
-                    'customer_name' => $customerName,
+                    'status' => $status,
                 ];
-            }
-        }
-        
-        // Get current interface context (frame/slot) from config
-        // We need to run display current-configuration section to get interface context
-        $frameSlotResult = $this->executeCommand($oltId, 'display current-configuration | include "interface gpon"');
-        $currentFrame = 0;
-        $currentSlot = 0;
-        
-        // Parse interface gpon 0/X to get slot numbers
-        $slotMap = [];
-        if ($frameSlotResult['success'] && !empty($frameSlotResult['output'])) {
-            $ifLines = explode("\n", $frameSlotResult['output']);
-            foreach ($ifLines as $ifLine) {
-                if (preg_match('/interface\s+gpon\s+(\d+)\/(\d+)/i', $ifLine, $m)) {
-                    $currentFrame = (int)$m[1];
-                    $currentSlot = (int)$m[2];
-                }
             }
         }
         
@@ -1081,24 +1076,22 @@ class HuaweiOLT {
             
             try {
                 if ($existing) {
-                    // Update existing ONU
+                    // Update existing ONU with correct frame/slot/port from config context
                     $stmt = $this->db->prepare("
                         UPDATE huawei_onus 
-                        SET frame = ?, slot = COALESCE(slot, ?), port = ?, onu_id = ?,
+                        SET frame = ?, slot = ?, port = ?, onu_id = ?,
                             description = COALESCE(NULLIF(?, ''), description),
                             line_profile_id = COALESCE(?, line_profile_id),
                             srv_profile_id = COALESCE(?, srv_profile_id),
-                            auth_type = ?, zone = COALESCE(NULLIF(?, ''), zone),
-                            area = COALESCE(NULLIF(?, ''), area),
-                            customer_name = COALESCE(NULLIF(?, ''), customer_name),
+                            auth_type = ?, status = ?,
                             is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                     ");
                     $stmt->execute([
-                        $currentFrame, $currentSlot, $onu['port'], $onu['onu_id'],
+                        $onu['frame'], $onu['slot'], $onu['port'], $onu['onu_id'],
                         $onu['description'],
                         $onu['line_profile_id'], $onu['srv_profile_id'],
-                        $onu['auth_type'], $onu['zone'], $onu['area'], $onu['customer_name'],
+                        $onu['auth_type'], $onu['status'],
                         $existing['id']
                     ]);
                     $updated++;
@@ -1107,19 +1100,16 @@ class HuaweiOLT {
                     $this->addONU([
                         'olt_id' => $oltId,
                         'sn' => $onu['sn'],
-                        'frame' => $currentFrame,
-                        'slot' => $currentSlot,
+                        'frame' => $onu['frame'],
+                        'slot' => $onu['slot'],
                         'port' => $onu['port'],
                         'onu_id' => $onu['onu_id'],
                         'description' => $onu['description'],
                         'line_profile_id' => $onu['line_profile_id'],
                         'srv_profile_id' => $onu['srv_profile_id'],
                         'auth_type' => $onu['auth_type'],
-                        'zone' => $onu['zone'],
-                        'area' => $onu['area'],
-                        'customer_name' => $onu['customer_name'],
                         'is_authorized' => true,
-                        'status' => 'online',
+                        'status' => $onu['status'],
                     ]);
                     $added++;
                 }
