@@ -723,65 +723,34 @@ class HuaweiOLT {
         }
         
         $frame = $onu['frame'] ?? 0;
-        $snmpError = null;
-        $cliError = null;
         
-        // Try SNMP first if extension is available
-        if (function_exists('snmpget')) {
-            $optical = $this->getONUOpticalInfoViaSNMP(
-                $onu['olt_id'],
-                $frame,
-                $onu['slot'],
-                $onu['port'],
-                $onu['onu_id']
-            );
-            
-            if ($optical['success'] && ($optical['optical']['rx_power'] !== null || $optical['optical']['tx_power'] !== null)) {
-                // SNMP worked, update and return
-                $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
-                return [
-                    'success' => true,
-                    'rx_power' => $optical['optical']['rx_power'],
-                    'tx_power' => $optical['optical']['tx_power'],
-                    'method' => 'snmp'
-                ];
-            }
-            $snmpError = $optical['error'] ?? 'SNMP returned no data';
-        } else {
-            $snmpError = 'SNMP extension not installed';
+        // SNMP is the only method for optical power
+        if (!function_exists('snmpget')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed. Install with: apt install php-snmp'];
         }
         
-        // Try CLI as fallback
-        $optical = $this->getONUOpticalInfoViaCLI($onu['olt_id'], $frame, $onu['slot'], $onu['port'], $onu['onu_id']);
+        $optical = $this->getONUOpticalInfoViaSNMP(
+            $onu['olt_id'],
+            $frame,
+            $onu['slot'],
+            $onu['port'],
+            $onu['onu_id']
+        );
         
-        if ($optical['success'] && ($optical['optical']['rx_power'] !== null || $optical['optical']['tx_power'] !== null)) {
-            $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
-            return [
-                'success' => true,
-                'rx_power' => $optical['optical']['rx_power'],
-                'tx_power' => $optical['optical']['tx_power'],
-                'method' => 'cli'
-            ];
-        }
-        
-        // Build detailed CLI error
         if (!$optical['success']) {
-            $cliError = $optical['error'] ?? 'CLI command failed';
-        } else {
-            $rawOutput = $optical['raw_output'] ?? '';
-            if (empty(trim($rawOutput))) {
-                $cliError = 'CLI returned empty response (check OLT connection)';
-            } else {
-                // Show first 100 chars of output to help debug
-                $preview = substr(preg_replace('/\s+/', ' ', trim($rawOutput)), 0, 100);
-                $cliError = "No power values parsed. Output: {$preview}";
-            }
+            return ['success' => false, 'error' => $optical['error'] ?? 'SNMP query failed'];
         }
         
-        // Both methods failed
+        if ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null) {
+            return ['success' => false, 'error' => 'SNMP returned no power data (ONU may be offline or unreachable)'];
+        }
+        
+        $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
+        
         return [
-            'success' => false, 
-            'error' => "SNMP: {$snmpError}; CLI: {$cliError}"
+            'success' => true,
+            'rx_power' => $optical['optical']['rx_power'],
+            'tx_power' => $optical['optical']['tx_power']
         ];
     }
     
