@@ -763,7 +763,20 @@ class HuaweiOLT {
                 'method' => 'cli'
             ];
         }
-        $cliError = $optical['error'] ?? 'CLI returned no data';
+        
+        // Build detailed CLI error
+        if (!$optical['success']) {
+            $cliError = $optical['error'] ?? 'CLI command failed';
+        } else {
+            $rawOutput = $optical['raw_output'] ?? '';
+            if (empty(trim($rawOutput))) {
+                $cliError = 'CLI returned empty response (check OLT connection)';
+            } else {
+                // Show first 100 chars of output to help debug
+                $preview = substr(preg_replace('/\s+/', ' ', trim($rawOutput)), 0, 100);
+                $cliError = "No power values parsed. Output: {$preview}";
+            }
+        }
         
         // Both methods failed
         return [
