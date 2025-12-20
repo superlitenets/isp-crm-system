@@ -496,6 +496,33 @@ class HuaweiOLT {
     
     public function refreshAllONUOptical(int $oltId): array {
         $onus = $this->getONUs(['olt_id' => $oltId]);
+        
+        // Try bulk SNMP walk first (more efficient)
+        if (function_exists('snmprealwalk')) {
+            $bulkResult = $this->bulkPollOpticalPowerViaSNMP($oltId);
+            if ($bulkResult['success'] && !empty($bulkResult['data'])) {
+                $refreshed = 0;
+                foreach ($onus as $onu) {
+                    if ($onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id'] !== null) {
+                        $key = $this->buildOpticalKey($onu['slot'], $onu['port'], $onu['onu_id']);
+                        if (isset($bulkResult['data'][$key])) {
+                            $data = $bulkResult['data'][$key];
+                            $this->updateONUOpticalInDB($onu['id'], $data['rx_power'] ?? null, $data['tx_power'] ?? null);
+                            $refreshed++;
+                        }
+                    }
+                }
+                return [
+                    'success' => true,
+                    'refreshed' => $refreshed,
+                    'failed' => count($onus) - $refreshed,
+                    'total' => count($onus),
+                    'method' => 'snmp_bulk'
+                ];
+            }
+        }
+        
+        // Fallback to individual polling
         $refreshed = 0;
         $failed = 0;
         
@@ -514,8 +541,100 @@ class HuaweiOLT {
             'success' => true,
             'refreshed' => $refreshed,
             'failed' => $failed,
-            'total' => count($onus)
+            'total' => count($onus),
+            'method' => 'individual'
         ];
+    }
+    
+    public function bulkPollOpticalPowerViaSNMP(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmprealwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        // Huawei OIDs for bulk walk
+        $rxPowerBase = '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4';  // hwGponOltOpticsDnRx
+        $txPowerBase = '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6';  // hwGponOltOpticsUpTx
+        
+        $results = [];
+        
+        // Walk RX power table
+        $rxResults = @snmprealwalk($host, $community, $rxPowerBase, 10000000, 2);
+        if ($rxResults !== false) {
+            foreach ($rxResults as $oid => $value) {
+                $key = $this->parseOpticalOidIndex($oid, $rxPowerBase);
+                if ($key) {
+                    $power = $this->parseOpticalPowerWithValidation($value);
+                    if ($power !== null) {
+                        if (!isset($results[$key])) {
+                            $results[$key] = [];
+                        }
+                        $results[$key]['rx_power'] = $power;
+                    }
+                }
+            }
+        }
+        
+        // Walk TX power table
+        $txResults = @snmprealwalk($host, $community, $txPowerBase, 10000000, 2);
+        if ($txResults !== false) {
+            foreach ($txResults as $oid => $value) {
+                $key = $this->parseOpticalOidIndex($oid, $txPowerBase);
+                if ($key) {
+                    $power = $this->parseOpticalPowerWithValidation($value);
+                    if ($power !== null) {
+                        if (!isset($results[$key])) {
+                            $results[$key] = [];
+                        }
+                        $results[$key]['tx_power'] = $power;
+                    }
+                }
+            }
+        }
+        
+        return [
+            'success' => true,
+            'data' => $results,
+            'count' => count($results)
+        ];
+    }
+    
+    private function parseOpticalOidIndex(string $oid, string $baseOid): ?string {
+        // OID format: baseOid.portIndex.onuId
+        // portIndex = (slot * 100000000) + (port * 1000000)
+        $indexPart = substr($oid, strlen($baseOid) + 1);
+        $parts = explode('.', $indexPart);
+        if (count($parts) >= 2) {
+            $portIndex = (int)$parts[0];
+            $onuId = (int)$parts[1];
+            $slot = (int)floor($portIndex / 100000000);
+            $port = (int)(($portIndex % 100000000) / 1000000);
+            return "{$slot}.{$port}.{$onuId}";
+        }
+        return null;
+    }
+    
+    private function buildOpticalKey(int $slot, int $port, int $onuId): string {
+        return "{$slot}.{$port}.{$onuId}";
+    }
+    
+    private function parseOpticalPowerWithValidation($value): ?float {
+        $cleaned = $this->cleanSnmpValue((string)$value);
+        if (is_numeric($cleaned)) {
+            $power = round((float)$cleaned / 100, 2);
+            // Valid range check: -50 to +10 dBm
+            if ($power >= -50 && $power <= 10) {
+                return $power;
+            }
+        }
+        return null;
     }
     
     public function refreshONUOptical(int $onuId): array {
