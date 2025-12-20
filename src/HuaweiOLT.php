@@ -2341,8 +2341,9 @@ class HuaweiOLT {
             INSERT INTO huawei_service_profiles (name, description, profile_type, vlan_id, vlan_mode,
                                                   speed_profile_up, speed_profile_down, qos_profile, gem_port,
                                                   tcont_profile, line_profile, srv_profile, native_vlan,
-                                                  additional_config, is_default, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                  additional_config, is_default, is_active,
+                                                  tr069_vlan, tr069_profile_id, tr069_gem_port)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
@@ -2360,7 +2361,10 @@ class HuaweiOLT {
             $data['native_vlan'] ?? null,
             $data['additional_config'] ?? '',
             $this->castBoolean($data['is_default'] ?? false),
-            $this->castBoolean($data['is_active'] ?? true)
+            $this->castBoolean($data['is_active'] ?? true),
+            !empty($data['tr069_vlan']) ? (int)$data['tr069_vlan'] : null,
+            !empty($data['tr069_profile_id']) ? (int)$data['tr069_profile_id'] : null,
+            !empty($data['tr069_gem_port']) ? (int)$data['tr069_gem_port'] : 2
         ]);
         return (int)$this->db->lastInsertId();
     }
@@ -2368,7 +2372,7 @@ class HuaweiOLT {
     public function updateServiceProfile(int $id, array $data): bool {
         $fields = ['name', 'description', 'profile_type', 'vlan_id', 'vlan_mode', 'speed_profile_up',
                    'speed_profile_down', 'qos_profile', 'gem_port', 'tcont_profile', 'line_profile',
-                   'srv_profile', 'native_vlan', 'additional_config'];
+                   'srv_profile', 'native_vlan', 'additional_config', 'tr069_vlan', 'tr069_profile_id', 'tr069_gem_port'];
         $booleanFields = ['is_default', 'is_active'];
         $updates = [];
         $params = [];
@@ -3107,10 +3111,43 @@ class HuaweiOLT {
             $output .= "\n" . ($servicePortResult['output'] ?? '');
         }
         
+        // Configure TR-069 via OMCI if enabled in profile or options
+        $tr069Vlan = $options['tr069_vlan'] ?? $profile['tr069_vlan'] ?? null;
+        $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? null;
+        
+        if ($tr069Vlan && $assignedOnuId !== null) {
+            // Enter interface context for TR-069 configuration
+            $tr069Script = "interface gpon {$frame}/{$slot}\r\n";
+            
+            // Configure native VLAN for TR-069 on ONU
+            // ont port native-vlan <port> <onu_id> eth <eth_port> vlan <vlan> priority <priority>
+            $tr069Script .= "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
+            
+            // Configure IP mode for TR-069 (DHCP or static)
+            // ont ipconfig <port> <onu_id> ip-index 0 dhcp vlan <vlan>
+            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} ip-index 0 dhcp vlan {$tr069Vlan}\r\n";
+            
+            // Assign TR-069 server profile if specified
+            if ($tr069ProfileId) {
+                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
+            }
+            
+            $tr069Script .= "quit";
+            
+            $tr069Result = $this->executeCommand($oltId, $tr069Script);
+            $output .= "\n[TR-069 Config]\n" . ($tr069Result['output'] ?? '');
+            
+            // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
+            $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+            $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
+            $output .= "\n" . ($tr069SpResult['output'] ?? '');
+        }
+        
         $this->addLog([
             'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
             'status' => 'success',
-            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : ''),
+            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : '') . ($tr069Vlan ? " with TR-069" : ''),
             'command_sent' => $cliScript,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
@@ -3118,10 +3155,11 @@ class HuaweiOLT {
         
         return [
             'success' => true,
-            'message' => "ONU authorized successfully" . ($assignedOnuId ? " as ONU ID {$assignedOnuId}" : ''),
+            'message' => "ONU authorized successfully" . ($assignedOnuId ? " as ONU ID {$assignedOnuId}" : '') . ($tr069Vlan ? " with TR-069 configured" : ''),
             'onu_id' => $assignedOnuId,
             'description' => $description,
-            'output' => $output
+            'output' => $output,
+            'tr069_configured' => !empty($tr069Vlan)
         ];
     }
     

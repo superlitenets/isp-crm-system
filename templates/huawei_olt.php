@@ -4013,6 +4013,27 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 <input type="text" name="srv_profile" id="profileSrvProfile" class="form-control" placeholder="e.g. 10">
                             </div>
                         </div>
+                        
+                        <hr class="my-3">
+                        <h6 class="text-muted mb-3"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Configuration (Auto-config via OMCI)</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">TR-069 VLAN</label>
+                                <input type="number" name="tr069_vlan" id="profileTr069Vlan" class="form-control" placeholder="e.g. 101">
+                                <div class="form-text">Leave empty to skip TR-069</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">TR-069 Profile ID</label>
+                                <input type="number" name="tr069_profile_id" id="profileTr069ProfileId" class="form-control" placeholder="e.g. 1">
+                                <div class="form-text">OLT TR-069 server profile</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">TR-069 GEM Port</label>
+                                <input type="number" name="tr069_gem_port" id="profileTr069GemPort" class="form-control" value="2">
+                            </div>
+                        </div>
+                        
                         <div class="mb-3">
                             <label class="form-label">Description</label>
                             <textarea name="description" id="profileDesc" class="form-control" rows="2"></textarea>
@@ -4619,6 +4640,9 @@ echo "# ================================================\n";
         document.getElementById('profileSpeedDown').value = '';
         document.getElementById('profileLineProfile').value = '';
         document.getElementById('profileSrvProfile').value = '';
+        document.getElementById('profileTr069Vlan').value = '';
+        document.getElementById('profileTr069ProfileId').value = '';
+        document.getElementById('profileTr069GemPort').value = '2';
         document.getElementById('profileDesc').value = '';
         document.getElementById('profileDefault').checked = false;
         document.getElementById('profileActive').checked = true;
@@ -4637,6 +4661,9 @@ echo "# ================================================\n";
         document.getElementById('profileSpeedDown').value = profile.speed_profile_down || '';
         document.getElementById('profileLineProfile').value = profile.line_profile || '';
         document.getElementById('profileSrvProfile').value = profile.srv_profile || '';
+        document.getElementById('profileTr069Vlan').value = profile.tr069_vlan || '';
+        document.getElementById('profileTr069ProfileId').value = profile.tr069_profile_id || '';
+        document.getElementById('profileTr069GemPort').value = profile.tr069_gem_port || '2';
         document.getElementById('profileDesc').value = profile.description || '';
         document.getElementById('profileDefault').checked = profile.is_default;
         document.getElementById('profileActive').checked = profile.is_active;
