@@ -4992,7 +4992,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
                                 <option value="">-- Select Zone --</option>
                                 <?php
-                                $zonesStmt = $db->query("SELECT id, name FROM oms_zones WHERE is_active = true ORDER BY name");
+                                $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
                                 while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
                                 <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
                                     <?= htmlspecialchars($zone['name']) ?>
