@@ -419,30 +419,57 @@ class HuaweiOLT {
             snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
         }
         
-        // MA5680T uses OID base .43.1.x with index: frame.slot.pon.onu
-        // .43.1.3 = RX Power, .43.1.4 = TX Power (divide by 10 for 0.1 dBm units)
-        $indexSuffix = "{$frame}.{$slot}.{$port}.{$onuId}";
+        // MA5680T optical power OIDs (base: .51.1.x)
+        // Index: port_index.onu_id where port_index is internal port identifier
+        // port_index calculation: (frame << 25) | (slot << 19) | (port << 8) for MA5680T
+        // Or use walk to discover port indices first
+        $portIndex = ($frame << 25) | ($slot << 19) | ($port << 8);
+        $indexSuffix = "{$portIndex}.{$onuId}";
         
-        $rxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3.{$indexSuffix}";
-        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4.{$indexSuffix}";
+        // .51.1.4 = ONT RX Power, .51.1.6 = OLT RX Power (divide by 100)
+        $ontRxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}";
+        $oltRxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.{$indexSuffix}";
         
-        $rxPower = @snmpget($host, $community, $rxPowerOid, 2000000, 2);
-        $txPower = @snmpget($host, $community, $txPowerOid, 2000000, 2);
+        $ontRxPower = @snmpget($host, $community, $ontRxPowerOid, 2000000, 2);
+        $oltRxPower = @snmpget($host, $community, $oltRxPowerOid, 2000000, 2);
+        
+        // Parse values (divide by 100 for 0.01 dBm units)
+        $rxValue = $this->parseOpticalPower51($oltRxPower);
+        $txValue = $this->parseOpticalPower51($ontRxPower);
         
         return [
             'success' => true,
             'optical' => [
-                'rx_power' => $rxPower !== false ? $this->parseOpticalPowerDiv10($rxPower) : null,
-                'tx_power' => $txPower !== false ? $this->parseOpticalPowerDiv10($txPower) : null,
+                'rx_power' => $rxValue,
+                'tx_power' => $txValue,
             ],
             'debug' => [
+                'port_index' => $portIndex,
                 'index' => $indexSuffix,
-                'rx_oid' => $rxPowerOid,
-                'tx_oid' => $txPowerOid,
-                'rx_raw' => $rxPower,
-                'tx_raw' => $txPower,
+                'ont_rx_oid' => $ontRxPowerOid,
+                'olt_rx_oid' => $oltRxPowerOid,
+                'ont_rx_raw' => $ontRxPower,
+                'olt_rx_raw' => $oltRxPower,
             ]
         ];
+    }
+    
+    private function parseOpticalPower51($value): ?float {
+        if ($value === false) return null;
+        $cleaned = $this->cleanSnmpValue((string)$value);
+        if (!is_numeric($cleaned)) return null;
+        
+        $intVal = (int)$cleaned;
+        // 2147483647 = NULL/No Data
+        if ($intVal === 2147483647 || $intVal === -1) return null;
+        
+        // Divide by 100 for 0.01 dBm units
+        $power = round($intVal / 100, 2);
+        // Valid range: -40 to +10 dBm
+        if ($power >= -40 && $power <= 10) {
+            return $power;
+        }
+        return null;
     }
     
     public function syncONUsFromSNMP(int $oltId): array {
@@ -568,10 +595,10 @@ class HuaweiOLT {
         $community = $olt['snmp_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // MA5680T uses OID base .43.1.x with index: frame.slot.pon.onu
+        // MA5680T optical power OIDs (base: .51.1.x)
         $oids = [
-            'rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3',  // RX Power (divide by 10)
-            'tx' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4',  // TX Power (divide by 10)
+            'ont_rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4',  // ONT RX Power (divide by 100)
+            'olt_rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6',  // OLT RX Power from ONU (divide by 100)
         ];
         
         $results = [];
@@ -584,13 +611,13 @@ class HuaweiOLT {
             snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
         }
         
-        // Walk RX power table
-        $rxResults = @snmpwalk($host, $community, $oids['rx']);
+        // Walk OLT RX power table (this is the power received by OLT from ONU)
+        $rxResults = @snmpwalk($host, $community, $oids['olt_rx']);
         if ($rxResults !== false) {
             foreach ($rxResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['rx']);
+                $key = $this->parseHuaweiPortOnuIndex($index, $oids['olt_rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
+                    $power = $this->parseOpticalPower51($value);
                     if ($power !== null) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -601,13 +628,13 @@ class HuaweiOLT {
             }
         }
         
-        // Walk TX power table
-        $txResults = @snmpwalk($host, $community, $oids['tx']);
+        // Walk ONT RX power table (this is the power received by ONU from OLT)
+        $txResults = @snmpwalk($host, $community, $oids['ont_rx']);
         if ($txResults !== false) {
             foreach ($txResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['tx']);
+                $key = $this->parseHuaweiPortOnuIndex($index, $oids['ont_rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
+                    $power = $this->parseOpticalPower51($value);
                     if ($power !== null) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -738,7 +765,9 @@ class HuaweiOLT {
         }
         
         if ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null) {
-            return ['success' => false, 'error' => 'SNMP returned no power data (ONU may be offline or unreachable)'];
+            $debug = $optical['debug'] ?? [];
+            $debugStr = json_encode($debug);
+            return ['success' => false, 'error' => "No power data. Debug: {$debugStr}"];
         }
         
         $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
