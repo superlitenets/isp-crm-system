@@ -1252,6 +1252,17 @@ if ($page === 'login') {
     exit;
 }
 
+// OMS (ONU Management System) - standalone page with its own layout
+if ($page === 'huawei-olt') {
+    \App\Auth::requireLogin();
+    if (!\App\Auth::can('settings.view')) {
+        echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
+        exit;
+    }
+    include __DIR__ . '/../templates/huawei_olt.php';
+    exit;
+}
+
 \App\Auth::requireLogin();
 
 $customer = new \App\Customer();
@@ -5709,7 +5720,7 @@ $csrfToken = \App\Auth::generateToken();
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="?page=huawei-olt">
-                    <i class="bi bi-router text-primary"></i> Huawei OLT
+                    <i class="bi bi-router text-primary"></i> OMS
                 </a>
             </li>
             <?php endif; ?>

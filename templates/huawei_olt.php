@@ -780,7 +780,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Huawei OLT Management</title>
+    <title>OMS - ONU Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -878,7 +878,7 @@ try {
             </a>
             <div class="d-flex align-items-center mb-3 px-2">
                 <i class="bi bi-router fs-3 text-white me-2"></i>
-                <span class="brand-title">Huawei OLT</span>
+                <span class="brand-title">OMS</span>
             </div>
             <nav class="nav flex-column">
                 <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=huawei-olt&view=dashboard">
@@ -1193,7 +1193,7 @@ try {
                 <div class="card-body text-center py-5">
                     <i class="bi bi-hdd-rack fs-1 text-muted mb-3 d-block"></i>
                     <h5>No OLTs Configured</h5>
-                    <p class="text-muted">Add your first Huawei OLT device to start managing your fiber network.</p>
+                    <p class="text-muted">Add your first OLT device to start managing your fiber network.</p>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#oltModal">
                         <i class="bi bi-plus-circle me-1"></i> Add OLT
                     </button>
@@ -1647,7 +1647,7 @@ try {
                             <i class="bi bi-terminal me-2"></i>OLT Commands
                         </div>
                         <div class="card-body">
-                            <p class="text-muted small mb-2">Copy these commands to configure this ONU on the Huawei OLT:</p>
+                            <p class="text-muted small mb-2">Copy these commands to configure this ONU on the OLT:</p>
                             <pre class="bg-dark text-light p-3 rounded small" style="white-space: pre-wrap;">interface gpon 0/<?= $currentOnu['slot'] ?? '0' ?>/<?= $currentOnu['port'] ?? '0' ?>
 ont add <?= $currentOnu['port'] ?? '0' ?> <?= $currentOnu['onu_id'] ?? '0' ?> sn-auth "<?= $currentOnu['sn'] ?>" omci ont-lineprofile-id <?= $currentOnu['line_profile'] ?: '10' ?> ont-srvprofile-id <?= $currentOnu['srv_profile'] ?: '10' ?> desc "<?= $currentOnu['name'] ?: 'Customer' ?>"
 quit</pre>
