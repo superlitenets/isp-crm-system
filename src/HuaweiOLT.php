@@ -1067,47 +1067,32 @@ class HuaweiOLT {
             }
         }
         
-        // Now process parsed ONUs
+        // Now process parsed ONUs - use addONU with ON CONFLICT for reliability
         foreach ($parsed as $onu) {
-            $existing = $this->getONUBySN($onu['sn']);
-            
             try {
+                // Check if exists first for counting
+                $existing = $this->getONUBySN($onu['sn']);
+                
+                // Use addONU which has ON CONFLICT (olt_id, sn) DO UPDATE
+                $this->addONU([
+                    'olt_id' => $oltId,
+                    'sn' => $onu['sn'],
+                    'name' => $onu['description'] ?: $onu['sn'],
+                    'frame' => $onu['frame'],
+                    'slot' => $onu['slot'],
+                    'port' => $onu['port'],
+                    'onu_id' => $onu['onu_id'],
+                    'description' => $onu['description'],
+                    'line_profile_id' => $onu['line_profile_id'],
+                    'srv_profile_id' => $onu['srv_profile_id'],
+                    'auth_type' => $onu['auth_type'],
+                    'is_authorized' => true,
+                    'status' => $onu['status'],
+                ]);
+                
                 if ($existing) {
-                    // Update existing ONU with correct frame/slot/port from config context
-                    $stmt = $this->db->prepare("
-                        UPDATE huawei_onus 
-                        SET frame = ?, slot = ?, port = ?, onu_id = ?,
-                            description = COALESCE(NULLIF(?, ''), description),
-                            line_profile_id = COALESCE(?, line_profile_id),
-                            srv_profile_id = COALESCE(?, srv_profile_id),
-                            auth_type = ?, status = ?,
-                            is_authorized = TRUE, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                    ");
-                    $stmt->execute([
-                        $onu['frame'], $onu['slot'], $onu['port'], $onu['onu_id'],
-                        $onu['description'],
-                        $onu['line_profile_id'], $onu['srv_profile_id'],
-                        $onu['auth_type'], $onu['status'],
-                        $existing['id']
-                    ]);
                     $updated++;
                 } else {
-                    // Add new ONU
-                    $this->addONU([
-                        'olt_id' => $oltId,
-                        'sn' => $onu['sn'],
-                        'frame' => $onu['frame'],
-                        'slot' => $onu['slot'],
-                        'port' => $onu['port'],
-                        'onu_id' => $onu['onu_id'],
-                        'description' => $onu['description'],
-                        'line_profile_id' => $onu['line_profile_id'],
-                        'srv_profile_id' => $onu['srv_profile_id'],
-                        'auth_type' => $onu['auth_type'],
-                        'is_authorized' => true,
-                        'status' => $onu['status'],
-                    ]);
                     $added++;
                 }
             } catch (\Exception $e) {
