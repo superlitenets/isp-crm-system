@@ -1109,7 +1109,7 @@ try {
                                         ?>
                                         <span class="signal-<?= $rxClass ?>" title="RX Power"><?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
                                         / <span title="TX Power"><?= $tx !== null ? number_format($tx, 1) : '-' ?></span> dBm
-                                        <?php if ($onu['optical_updated_at']): ?>
+                                        <?php if (!empty($onu['optical_updated_at'])): ?>
                                         <br><small class="text-muted"><?= date('M j H:i', strtotime($onu['optical_updated_at'])) ?></small>
                                         <?php endif; ?>
                                     </td>
