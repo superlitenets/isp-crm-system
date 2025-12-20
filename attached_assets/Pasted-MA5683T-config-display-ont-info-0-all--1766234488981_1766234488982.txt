@@ -1,0 +1,114 @@
+MA5683T(config)#display ont info 0 all
+  -----------------------------------------------------------------------------
+  F/S/P   ONT         SN         Control     Run      Config   Match    Protect
+          ID                     flag        state    state    state    side 
+  -----------------------------------------------------------------------------
+  0/ 0/0    0  485754433D261F9B  active      offline  initial  initial  no 
+  0/ 0/0    1  48575443F2D52CC3  active      online   normal   match    no 
+  -----------------------------------------------------------------------------
+  F/S/P   ONT-ID   Description
+  -----------------------------------------------------------------------------
+  0/ 0/0       0   SNS000126_zone_Riverside_Kariobangi_descr_Qalabe_Qalicha
+                   _authd_20250606
+  0/ 0/0       1   SNS000154-01_zone_Riverside_Kariobangi_authd_20250715
+  -----------------------------------------------------------------------------
+  In port 0/ 0/0 , the total of ONTs are: 2, online: 1
+  -----------------------------------------------------------------------------
+  
+  -----------------------------------------------------------------------------
+  F/S/P   ONT         SN         Control     Run      Config   Match    Protect
+          ID                     flag        state    state    state    side 
+  -----------------------------------------------------------------------------
+  0/ 0/2    0  48575443F2DB602B  active      online   failed   match    no 
+  0/ 0/2    1  48575443F2D90B23  active      online   normal   match    no 
+  0/ 0/2    2  48575443F2D90A4B  active      offline  initial  initial  no 
+  0/ 0/2    3  4857544321A361AA  active      online   normal   mismatch no 
+  0/ 0/2    4  485754433AABA39B  active      online   failed   match    no 
+  0/ 0/2    5  48575443F2D55CD3  active      online   normal   match    no 
+  0/ 0/2    6  48575443F2D90ABB  active      online   normal   match    no 
+  0/ 0/2    7  48575443F2DB5E33  active      online   normal   match    no 
+  0/ 0/2    8  4857544346CCF99C  active      online   failed   match    no 
+  0/ 0/2    9  485754434668CF9C  active      online   normal   match    no 
+  0/ 0/2   10  48575443F2DAFFEB  active      online   normal   match    no 
+  0/ 0/2   11  48575443F2DAFECB  active      online   normal   match    no 
+  -----------------------------------------------------------------------------
+  F/S/P   ONT-ID   Description       
+  -----------------------------------------------------------------------------
+  0/ 0/2       0   SNS001517_descr_Paul Maina
+  0/ 0/2       1   SFL0034_zone_Amanu_Court_Huruma_Flats_authd_20250815
+  0/ 0/2       2   SFL0035_zone_Amanu_Court_Huruma_Flats_authd_20250815
+  0/ 0/2       3   SNS000434_zone_Huruma_Johnsagga
+  0/ 0/2       4   SNS001160_zone_Huruma_flats_authd_20250118
+  0/ 0/2       5   SNS001448_zone_Huruma_Johnsagga_descr_Amos_Mwangi_authd_
+                   20250719          
+  0/ 0/2       6   SNS000586_zone_Amani_Court_Huruma_Flats_authd_20250916
+  0/ 0/2       7   SNS001602_zone_Huruma flats_descr_Maslah                
+                   billow_authd_20251105
+  0/ 0/2       8   SNS000945_zone_NUMBER 10_descr_AIPCA MATHARE NUMBER     
+                   10_authd_20251128 
+  0/ 0/2       9   SNS001213_zone_Huruma flats_descr_Mercy                 
+                   Kamweru_authd_20251202
+  0/ 0/2      10   SNS001329_zone_Huruma flats_descr_Lawrence              
+                   mugendi_authd_20251204
+  0/ 0/2      11   SNS001004 Block L_zone_Amani Court Huruma               
+                   Flats_authd_20251217
+  -----------------------------------------------------------------------------
+  In port 0/ 0/2 , the total of ONTs are: 12, online: 11
+  -----------------------------------------------------------------------------
+                                     
+  -----------------------------------------------------------------------------
+  F/S/P   ONT         SN         Control     Run      Config   Match    Protect
+          ID                     flag        state    state    state    side 
+  -----------------------------------------------------------------------------
+  0/ 1/0    0  4857544311629792  active      online   normal   match    no 
+  0/ 1/0    1  48575443F2D55873  active      online   normal   match    no 
+  0/ 1/0    2  48575443E4E4729E  active      offline  initial  initial  no 
+  0/ 1/0    3  4857544339F5739B  active      online   failed   match    no 
+  0/ 1/0    4  48575443F2D54BAB  active      online   normal   match    no 
+  0/ 1/0    5  48575443F2D54BEB  active      online   failed   match    no 
+  0/ 1/0    6  48575443E4F2C09E  active      offline  initial  initial  no 
+  0/ 1/0    7  48575443F2D553F3  active      online   failed   match    no 
+  0/ 1/0    8  485754433D33E49B  active      online   normal   match    no 
+  0/ 1/0    9  485754430D120A9B  active      online   normal   match    no 
+  0/ 1/0   10  48575443E566089E  active      online   normal   mismatch no 
+  0/ 1/0   11  485754439406489A  active      offline  initial  initial  no 
+  0/ 1/0   12  48575443E569EE9E  active      offline  initial  initial  no 
+  0/ 1/0   13  485754433D1AB09B  active      online   normal   match    no 
+  0/ 1/0   14  48575443F2D533EB  active      online   normal   match    no 
+  0/ 1/0   15  485754431AD8DB91  active      online   normal   match    no 
+  0/ 1/0   16  48575443F2D52B9B  active      online   normal   match    no 
+  0/ 1/0   17  48575443E4D9249E  active      online   normal   mismatch no 
+  0/ 1/0   18  4857544343B6BE9B  active      online   normal   match    no 
+  0/ 1/0   19  48575443D685959F  active      online   normal   mismatch no 
+  0/ 1/0   20  48575443F2D903F3  active      online   normal   match    no 
+  0/ 1/0   21  4857544339576E9B  active      offline  initial  initial  no 
+  0/ 1/0   22  48575443F2D90A3B  active      online   failed   match    no 
+  0/ 1/0   23  48575443F2D90403  active      online   failed   match    no 
+  0/ 1/0   24  48575443F2D9098B  active      online   normal   match    no 
+  0/ 1/0   25  4857544346C13A9B  active      offline  initial  initial  no 
+  0/ 1/0   26  48575443F2DB5EEB  active      online   normal   match    no 
+  0/ 1/0   27  48575443F2DB4173  active      online   normal   match    no 
+  0/ 1/0   28  48575443F2DB5A5B  active      online   failed   match    no 
+  0/ 1/0   29  48575443F2DB4133  active      online   normal   match    no 
+  0/ 1/0   30  48575443727521B5  active      online   normal   mismatch no 
+  -----------------------------------------------------------------------------
+  F/S/P   ONT-ID   Description       
+  -----------------------------------------------------------------------------
+  0/ 1/0       0   SNS000833_zone_Huruma_Johnsagga
+  0/ 1/0       1   SNS000540_zone_Huruma_Johnsagga_descr_Martin_karanja_aut
+                   hd_20250330       
+  0/ 1/0       2   SNS000560_zone_Huruma_Johnsagga_descr_Leah_nyambura_auth
+                   d_20250330        
+  0/ 1/0       3   SNS001184_zone_Huruma_Corner_authd_20250402
+  0/ 1/0       4   SNS001277_zone_Huruma_Corner_descr_Everlyne_achieng_auth
+                   d_20250409        
+  0/ 1/0       5   SNS001286_zone_Huruma_Corner_descr_Gladys_Kariuki_authd_
+                   20250414          
+  0/ 1/0       6   SNS001294_zone_Huruma_Corner_descr_JantaBet_authd_202504
+                   16                
+  0/ 1/0       7   SNS001315_zone_fourways_huruma_descr_Emmanuel_Tabular_au
+                   thd_20250501      
+  0/ 1/0       8   SNS001319_zone_Daniel_Comboni_descr_Ian_Omondi_authd_202
+                   50501             
+  0/ 1/0       9   SNS000540-02_zone_fourways_huruma_descr_Martin_maremare_
+                   shop_2_authd_20250503

@@ -411,41 +411,43 @@ class HuaweiOLT {
                 $onuId = (int)$parts[1];
                 
                 // Huawei ifIndex bit-mask decoding for GPON interfaces
-                // ifIndex format: encodes frame/slot/port in specific bit positions
-                // Common Huawei encoding: ponIndex = frame*8192 + slot*256 + port
-                // But ifIndex can have additional bits for interface type
+                // Large ifIndex (like 4194320384 = 0xFA004000) format:
+                // - Byte 3 (bits 24-31): 0xFA = interface type (GPON)
+                // - Lower 24 bits: ponIndex encoding
                 
-                // Try standard ponIndex decoding first (for smaller values)
-                if ($ifIndex < 100000) {
-                    // Small ifIndex - use ponIndex formula: frame*8192 + slot*256 + port
-                    $frame = (int)floor($ifIndex / 8192);
-                    $remainder = $ifIndex % 8192;
-                    $slot = (int)floor($remainder / 256);
-                    $port = $remainder % 256;
+                if ($ifIndex > 0xFFFFFF) {
+                    // Strip interface type prefix (0xFA...) to get ponIndex
+                    $ponIndex = $ifIndex & 0xFFFFFF;
                 } else {
-                    // Large ifIndex (like 4194320384 = 0xFA004000) - use bit extraction
-                    // Huawei MA5680T ifIndex for GPON: 
-                    // Bits 24-31: interface type (0xFA = 250 = GPON)
-                    // Bits 16-23: slot
-                    // Bits 8-15: port  
-                    // Bits 0-7: reserved/sub-port
-                    $slot = ($ifIndex >> 16) & 0xFF;
-                    $port = ($ifIndex >> 8) & 0xFF;
-                    $frame = 0; // Usually 0 for single-chassis
+                    $ponIndex = $ifIndex;
+                }
+                
+                // MA5683T/MA5680T ponIndex encoding (verified):
+                // ponIndex bit layout:
+                // - Bits 13-15: port (0-7)
+                // - Bits 8-12: slot (0-21)
+                // - Bits 0-7: reserved/frame
+                if ($ponIndex > 0) {
+                    $port = ($ponIndex >> 13) & 0x7;   // Bits 13-15
+                    $slot = ($ponIndex >> 8) & 0x1F;   // Bits 8-12
+                    $frame = $ponIndex & 0xFF;         // Bits 0-7 (usually 0)
                     
-                    // Alternative decoding if slot seems too high
-                    if ($slot > 21) {
-                        // Try alternate bit layout: some firmware uses different encoding
-                        // ponIndex embedded in lower 24 bits
-                        $ponIndex = $ifIndex & 0xFFFFFF;
-                        $frame = (int)floor($ponIndex / 8192);
-                        $remainder = $ponIndex % 8192;
-                        $slot = (int)floor($remainder / 256);
-                        $port = $remainder % 256;
+                    // If frame seems like it contains encoded data, try alternate layout
+                    if ($frame > 7) {
+                        // Some firmware uses: slot*256 + port
+                        $slot = (int)floor($ponIndex / 256);
+                        $port = $ponIndex % 256;
+                        $frame = 0;
+                        
+                        // If still invalid, try: slot*8 + port
+                        if ($slot > 21 || $port > 15) {
+                            $slot = (int)floor($ponIndex / 8);
+                            $port = $ponIndex % 8;
+                        }
                     }
                 }
                 
-                // Sanity check - valid ranges for MA5680T
+                // Sanity check - valid ranges for MA5683T
                 if ($frame > 7) $frame = 0;
                 if ($slot > 21) $slot = 0;
                 if ($port > 15) $port = 0;
