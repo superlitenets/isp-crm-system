@@ -1091,6 +1091,15 @@ try {
                         <input type="text" name="search" class="form-control form-control-sm" placeholder="Search SN/Name..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                     </form>
+                    <?php if (isset($_GET['unconfigured']) && $oltId): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="discover_unconfigured">
+                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="bi bi-search me-1"></i> Discover New ONUs
+                        </button>
+                    </form>
+                    <?php endif; ?>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
                         <i class="bi bi-plus-circle me-1"></i> Add ONU
                     </button>
