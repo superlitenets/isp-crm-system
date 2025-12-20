@@ -1151,6 +1151,7 @@ try {
                                     <th>OLT / Port</th>
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
+                                    <th>Distance</th>
                                     <th>Customer</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1202,6 +1203,19 @@ try {
                                         / <span title="TX Power"><?= $tx !== null ? number_format($tx, 1) : '-' ?></span> dBm
                                         <?php if (!empty($onu['optical_updated_at'])): ?>
                                         <br><small class="text-muted"><?= date('M j H:i', strtotime($onu['optical_updated_at'])) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $distance = $onu['distance'] ?? null;
+                                        if ($distance !== null): 
+                                            if ($distance >= 1000): ?>
+                                                <?= number_format($distance / 1000, 2) ?> km
+                                            <?php else: ?>
+                                                <?= $distance ?> m
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            -
                                         <?php endif; ?>
                                     </td>
                                     <td><?= htmlspecialchars($onu['customer_name'] ?? '-') ?></td>

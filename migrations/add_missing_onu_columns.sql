@@ -1,6 +1,9 @@
 -- Migration: Add missing columns to huawei_onus table
 -- Run this on your production database
 
+-- Add distance column (in meters)
+ALTER TABLE huawei_onus ADD COLUMN IF NOT EXISTS distance INTEGER;
+
 -- Add vlan_id column
 ALTER TABLE huawei_onus ADD COLUMN IF NOT EXISTS vlan_id INTEGER;
 

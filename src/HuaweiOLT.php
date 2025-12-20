@@ -1236,7 +1236,12 @@ class HuaweiOLT {
                         $key = $this->buildOpticalKey($onu['slot'], $onu['port'], $onu['onu_id']);
                         if (isset($bulkResult['data'][$key])) {
                             $data = $bulkResult['data'][$key];
-                            $this->updateONUOpticalInDB($onu['id'], $data['rx_power'] ?? null, $data['tx_power'] ?? null);
+                            $this->updateONUOpticalInDB(
+                                $onu['id'], 
+                                $data['rx_power'] ?? null, 
+                                $data['tx_power'] ?? null,
+                                $data['distance'] ?? null
+                            );
                             $refreshed++;
                         }
                     }
@@ -1352,6 +1357,24 @@ class HuaweiOLT {
                             $results[$key] = [];
                         }
                         $results[$key]['tx_power'] = $power;
+                    }
+                }
+            }
+        }
+        
+        // Walk distance table (hwGponOntDistance .43.1.5 - in meters)
+        $distanceOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.5';
+        $distanceResults = @snmprealwalk($host, $community, $distanceOid, 10000000, 2);
+        if ($distanceResults !== false) {
+            foreach ($distanceResults as $oid => $value) {
+                $key = $this->parseHuaweiOpticalIndex($oid, $distanceOid);
+                if ($key) {
+                    $distance = (int)$this->cleanSnmpValue((string)$value);
+                    if ($distance > 0 && $distance < 100000) { // Reasonable range (0-100km)
+                        if (!isset($results[$key])) {
+                            $results[$key] = [];
+                        }
+                        $results[$key]['distance'] = $distance;
                     }
                 }
             }
@@ -1603,13 +1626,22 @@ class HuaweiOLT {
         ];
     }
     
-    private function updateONUOpticalInDB(int $onuId, ?float $rxPower, ?float $txPower): void {
-        $stmt = $this->db->prepare("
-            UPDATE huawei_onus 
-            SET rx_power = ?, tx_power = ?, optical_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ");
-        $stmt->execute([$rxPower, $txPower, $onuId]);
+    private function updateONUOpticalInDB(int $onuId, ?float $rxPower, ?float $txPower, ?int $distance = null): void {
+        if ($distance !== null) {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_onus 
+                SET rx_power = ?, tx_power = ?, distance = ?, optical_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$rxPower, $txPower, $distance, $onuId]);
+        } else {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_onus 
+                SET rx_power = ?, tx_power = ?, optical_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$rxPower, $txPower, $onuId]);
+        }
     }
     
     public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
