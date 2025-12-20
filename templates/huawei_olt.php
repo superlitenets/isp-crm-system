@@ -5003,9 +5003,18 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">VLAN ID <span class="text-danger">*</span></label>
-                            <input type="number" name="vlan_id" id="authVlanId" class="form-control" min="1" max="4094" required placeholder="e.g., 100">
-                            <small class="text-muted">Service VLAN for this ONU (1-4094)</small>
+                            <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
+                            <select name="vlan_id" id="authVlanId" class="form-select" required>
+                                <option value="">-- Select VLAN --</option>
+                                <?php
+                                $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description FROM huawei_vlans WHERE is_active = true ORDER BY vlan_id");
+                                while ($vlan = $vlansStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                <option value="<?= $vlan['vlan_id'] ?>">
+                                    VLAN <?= $vlan['vlan_id'] ?><?= !empty($vlan['description']) ? ' - ' . htmlspecialchars($vlan['description']) : '' ?>
+                                </option>
+                                <?php endwhile; ?>
+                            </select>
+                            <small class="text-muted">Select a service VLAN from OLT configuration</small>
                         </div>
                         
                         <div class="mb-3">
