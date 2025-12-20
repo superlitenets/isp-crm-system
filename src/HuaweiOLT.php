@@ -1537,6 +1537,93 @@ class HuaweiOLT {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
+    public function parseLineProfiles(string $config): array {
+        $profiles = [];
+        $currentProfile = null;
+        $lines = explode("\n", $config);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            if (preg_match('/ont-lineprofile\s+gpon\s+profile-id\s+(\d+)\s+profile-name\s+"([^"]+)"/i', $line, $m)) {
+                if ($currentProfile !== null) {
+                    $profiles[] = $currentProfile;
+                }
+                $currentProfile = [
+                    'profile_id' => (int)$m[1],
+                    'profile_name' => $m[2],
+                    'tr069_enabled' => false,
+                    'fec_upstream' => false,
+                    'mapping_mode' => 'vlan',
+                    'tconts' => [],
+                    'gems' => [],
+                    'gem_mappings' => []
+                ];
+                continue;
+            }
+            
+            if ($currentProfile === null) continue;
+            
+            if (preg_match('/tr069-management\s+(enable|disable)/i', $line, $m)) {
+                $currentProfile['tr069_enabled'] = strtolower($m[1]) === 'enable';
+            }
+            
+            if (preg_match('/fec-upstream\s+(enable|disable)/i', $line, $m)) {
+                $currentProfile['fec_upstream'] = strtolower($m[1]) === 'enable';
+            }
+            
+            if (preg_match('/mapping-mode\s+(\w+)/i', $line, $m)) {
+                $currentProfile['mapping_mode'] = strtolower($m[1]);
+            }
+            
+            if (preg_match('/tcont\s+(\d+)\s+dba-profile-id\s+(\d+)/i', $line, $m)) {
+                $currentProfile['tconts'][(int)$m[1]] = [
+                    'tcont_id' => (int)$m[1],
+                    'dba_profile_id' => (int)$m[2]
+                ];
+            }
+            
+            if (preg_match('/gem\s+add\s+(\d+)\s+(\w+)\s+tcont\s+(\d+)/i', $line, $m)) {
+                $currentProfile['gems'][(int)$m[1]] = [
+                    'gem_id' => (int)$m[1],
+                    'type' => strtolower($m[2]),
+                    'tcont_id' => (int)$m[3]
+                ];
+            }
+            
+            if (preg_match('/gem\s+mapping\s+(\d+)\s+(\d+)\s+vlan\s+(\d+)/i', $line, $m)) {
+                $currentProfile['gem_mappings'][] = [
+                    'gem_id' => (int)$m[1],
+                    'index' => (int)$m[2],
+                    'type' => 'vlan',
+                    'vlan_id' => (int)$m[3]
+                ];
+            }
+            
+            if (preg_match('/gem\s+mapping\s+(\d+)\s+(\d+)\s+priority\s+(\d+)/i', $line, $m)) {
+                $currentProfile['gem_mappings'][] = [
+                    'gem_id' => (int)$m[1],
+                    'index' => (int)$m[2],
+                    'type' => 'priority',
+                    'priority' => (int)$m[3]
+                ];
+            }
+            
+            if (preg_match('/^\s*quit\s*$/i', $line)) {
+                if ($currentProfile !== null) {
+                    $profiles[] = $currentProfile;
+                    $currentProfile = null;
+                }
+            }
+        }
+        
+        if ($currentProfile !== null) {
+            $profiles[] = $currentProfile;
+        }
+        
+        return $profiles;
+    }
+    
     public function syncVLANsFromOLT(int $oltId): array {
         $result = $this->getVLANs($oltId);
         if (!$result['success']) {
