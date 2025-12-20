@@ -994,12 +994,9 @@ class HuaweiOLT {
             }
         }
         
-        // Get full configuration with interface context to properly map slots
-        $configResult = $this->executeCommand($oltId, 'display current-configuration section gpon');
-        if (!$configResult['success']) {
-            // Fallback: try simpler command
-            $configResult = $this->executeCommand($oltId, 'display current-configuration | include "interface gpon\\|ont add"');
-        }
+        // Get FULL configuration - section gpon may not include ont add on some firmware
+        // Must parse full config to properly track interface gpon X/Y context
+        $configResult = $this->executeCommand($oltId, 'display current-configuration');
         
         if (!$configResult['success']) {
             return ['success' => false, 'error' => 'Failed to get ONU configuration: ' . ($configResult['message'] ?? 'Unknown error')];
@@ -1116,6 +1113,26 @@ class HuaweiOLT {
             } catch (\Exception $e) {
                 $errors[] = "Failed for {$onu['sn']}: " . $e->getMessage();
             }
+        }
+        
+        // Warn if no ONUs were parsed from config
+        if (empty($parsed)) {
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'sync_cli',
+                'status' => 'warning',
+                'message' => 'No ONUs found in configuration output',
+                'details' => 'Config lines: ' . count($lines) . ', Output size: ' . strlen($output),
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return [
+                'success' => false,
+                'error' => 'No ONUs found in OLT configuration. The OLT may have returned incomplete data.',
+                'total' => 0,
+                'config_lines' => count($lines),
+                'output_size' => strlen($output)
+            ];
         }
         
         // Now get optical power levels for all ONUs via SNMP (faster than CLI)
