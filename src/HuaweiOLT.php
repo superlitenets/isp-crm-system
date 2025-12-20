@@ -1302,45 +1302,82 @@ class HuaweiOLT {
         $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        $huaweiAutofindSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.3';
-        $huaweiAutofindTypeBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.5';
-        $huaweiAutofindPortBase = '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.1';
+        // Multiple autofind OIDs to try - different Huawei firmware versions use different tables
+        $autofindOids = [
+            '1.3.6.1.4.1.2011.6.128.1.1.2.42.1.3',  // hwGponOntAutoFindSn - common on MA5680T
+            '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.3',  // hwGponOltAutoFindOntSn - alternative
+            '1.3.6.1.4.1.2011.6.128.1.1.2.45.1.4',  // hwGponOltAutoFindOntPassword
+        ];
         
-        $serials = @snmprealwalk($host, $community, $huaweiAutofindSerialBase, 10000000, 2);
-        $types = @snmprealwalk($host, $community, $huaweiAutofindTypeBase, 10000000, 2);
+        $serials = false;
+        $usedOid = '';
+        $debugInfo = [];
         
-        if ($serials === false) {
-            return ['success' => false, 'error' => 'Failed to discover unconfigured ONUs via SNMP'];
+        foreach ($autofindOids as $tryOid) {
+            $result = @snmprealwalk($host, $community, $tryOid, 10000000, 2);
+            $debugInfo[] = "OID {$tryOid}: " . ($result === false ? 'FAILED' : count($result) . ' entries');
+            
+            if ($result !== false && !empty($result)) {
+                $serials = $result;
+                $usedOid = $tryOid;
+                break;
+            }
         }
+        
+        // Log debug info
+        error_log("Autofind discovery debug: " . implode(', ', $debugInfo));
+        
+        if ($serials === false || empty($serials)) {
+            return [
+                'success' => false, 
+                'error' => 'No unconfigured ONUs found via SNMP. Tried OIDs: .42.1.3, .45.1.3, .45.1.4. Make sure the ONU is powered on and connected to the OLT fiber.',
+                'debug' => $debugInfo
+            ];
+        }
+        
+        $huaweiAutofindTypeBase = str_replace('.3', '.5', $usedOid); // Type OID
+        $types = @snmprealwalk($host, $community, $huaweiAutofindTypeBase, 10000000, 2);
         
         $unconfigured = [];
         $added = 0;
         
         foreach ($serials as $oid => $serial) {
-            $indexPart = substr($oid, strlen($huaweiAutofindSerialBase) + 1);
+            $indexPart = substr($oid, strlen($usedOid) + 1);
             $parts = explode('.', $indexPart);
             
             if (count($parts) >= 2) {
-                $portIndex = (int)$parts[0];
+                $ponIndex = (int)$parts[0];
                 $autofindId = (int)$parts[1];
                 
-                $frame = 0;
-                $slot = floor($portIndex / 100000000);
-                $port = ($portIndex % 100000000) / 1000000;
+                // Decode Huawei ponIndex: frame*8192 + slot*256 + port (same as registered ONUs)
+                $frame = intdiv($ponIndex, 8192);
+                $remainder = $ponIndex % 8192;
+                $slot = intdiv($remainder, 256);
+                $port = $remainder % 256;
                 
                 $typeOid = $huaweiAutofindTypeBase . '.' . $indexPart;
                 $onuType = isset($types[$typeOid]) ? $this->cleanSnmpValue($types[$typeOid]) : '';
                 
                 $sn = $this->cleanSnmpValue($serial);
                 
+                // Handle hex byte format
+                if (stripos($sn, 'hex') !== false || preg_match('/^[0-9a-fA-F\s]+$/', $sn)) {
+                    $sn = preg_replace('/[^0-9a-fA-F]/', '', $sn);
+                }
+                $sn = strtoupper(trim($sn));
+                
+                if (empty($sn) || is_numeric($sn)) {
+                    continue;
+                }
+                
                 $existing = $this->getONUBySN($sn);
                 if (!$existing) {
                     $this->addONU([
                         'olt_id' => $oltId,
                         'sn' => $sn,
-                        'frame' => (int)$frame,
-                        'slot' => (int)$slot,
-                        'port' => (int)$port,
+                        'frame' => $frame,
+                        'slot' => $slot,
+                        'port' => $port,
                         'onu_type' => $onuType,
                         'status' => 'unconfigured',
                         'is_authorized' => false,
@@ -1350,9 +1387,9 @@ class HuaweiOLT {
                 
                 $unconfigured[] = [
                     'sn' => $sn,
-                    'frame' => (int)$frame,
-                    'slot' => (int)$slot,
-                    'port' => (int)$port,
+                    'frame' => $frame,
+                    'slot' => $slot,
+                    'port' => $port,
                     'onu_type' => $onuType,
                     'autofind_id' => $autofindId
                 ];
@@ -1363,7 +1400,7 @@ class HuaweiOLT {
             'olt_id' => $oltId,
             'action' => 'discover_unconfigured',
             'status' => 'success',
-            'message' => "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new",
+            'message' => "Found " . count($unconfigured) . " unconfigured ONUs, added {$added} new (used OID: {$usedOid})",
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
@@ -1371,7 +1408,8 @@ class HuaweiOLT {
             'success' => true,
             'onus' => $unconfigured,
             'count' => count($unconfigured),
-            'added' => $added
+            'added' => $added,
+            'used_oid' => $usedOid
         ];
     }
     
