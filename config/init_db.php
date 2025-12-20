@@ -586,7 +586,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024121901'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122002'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
