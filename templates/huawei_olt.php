@@ -27,9 +27,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 break;
             case 'test_connection':
-                $result = $huaweiOLT->testConnection((int)$_POST['id']);
-                $message = $result['message'];
-                $messageType = $result['success'] ? 'success' : 'danger';
+                $result = $huaweiOLT->testFullConnection((int)$_POST['id']);
+                if ($result['overall_success'] ?? false) {
+                    $message = "Connected! SNMP: ✓, CLI ({$result['cli']['type']}): ✓. " . ($result['recommendation'] ?? '');
+                    $messageType = 'success';
+                } else {
+                    $parts = [];
+                    $parts[] = "SNMP: " . (($result['snmp']['success'] ?? false) ? '✓' : '✗');
+                    $parts[] = "CLI: " . (($result['cli']['success'] ?? false) ? '✓' : '✗');
+                    $message = implode(', ', $parts) . ". " . ($result['recommendation'] ?? 'Check connection settings.');
+                    $messageType = (($result['snmp']['success'] ?? false) || ($result['cli']['success'] ?? false)) ? 'warning' : 'danger';
+                }
                 break;
             case 'add_profile':
                 $huaweiOLT->addServiceProfile($_POST);

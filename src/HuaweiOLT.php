@@ -1,6 +1,8 @@
 <?php
 namespace App;
 
+use phpseclib3\Net\SSH2;
+
 class HuaweiOLT {
     private \PDO $db;
     private string $encryptionKey;
@@ -2541,33 +2543,137 @@ class HuaweiOLT {
     }
     
     private function executeSSHCommand(string $ip, int $port, string $username, string $password, string $command): array {
-        if (!function_exists('ssh2_connect')) {
-            return ['success' => false, 'message' => 'SSH extension not available'];
+        // Use phpseclib3 for reliable SSH connections
+        try {
+            $ssh = new SSH2($ip, $port);
+            $ssh->setTimeout(30);
+            
+            if (!$ssh->login($username, $password)) {
+                return ['success' => false, 'message' => 'SSH authentication failed'];
+            }
+            
+            // Enable interactive mode for Huawei OLT
+            $ssh->enablePTY();
+            
+            // Send setup commands
+            $ssh->write("screen-length 0 temporary\n");
+            usleep(500000);
+            $ssh->read('/[>#]/', SSH2::READ_REGEX);
+            
+            // Send the actual command
+            $ssh->write($command . "\n");
+            usleep(2000000);
+            
+            // Read output until prompt
+            $output = '';
+            $startTime = time();
+            while ((time() - $startTime) < 20) {
+                $chunk = $ssh->read('/[>#]/', SSH2::READ_REGEX);
+                $output .= $chunk;
+                
+                // Handle pagination
+                if (preg_match('/----\s*More\s*----/i', $chunk)) {
+                    $ssh->write(" ");
+                    usleep(500000);
+                    continue;
+                }
+                
+                break;
+            }
+            
+            // Clean output
+            $output = preg_replace('/\x1b\[[0-9;]*[a-zA-Z]/', '', $output);
+            $output = preg_replace('/---- More.*?----/', '', $output);
+            
+            return [
+                'success' => true,
+                'message' => 'Command executed via SSH',
+                'output' => $output
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'SSH error: ' . $e->getMessage()];
+        }
+    }
+    
+    public function testFullConnection(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        $connection = @ssh2_connect($ip, $port);
-        if (!$connection) {
-            return ['success' => false, 'message' => 'SSH connection failed'];
-        }
-        
-        if (!@ssh2_auth_password($connection, $username, $password)) {
-            return ['success' => false, 'message' => 'SSH authentication failed'];
-        }
-        
-        $stream = ssh2_exec($connection, $command);
-        if (!$stream) {
-            return ['success' => false, 'message' => 'Command execution failed'];
-        }
-        
-        stream_set_blocking($stream, true);
-        $output = stream_get_contents($stream);
-        fclose($stream);
-        
-        return [
-            'success' => true,
-            'message' => 'Command executed',
-            'output' => $output
+        $results = [
+            'olt_id' => $oltId,
+            'olt_name' => $olt['name'],
+            'ip_address' => $olt['ip_address'],
+            'snmp' => ['success' => false, 'message' => 'Not tested'],
+            'cli' => ['success' => false, 'message' => 'Not tested'],
+            'snmp_power' => ['success' => false, 'message' => 'Not tested'],
+            'snmp_serials' => ['success' => false, 'message' => 'Not tested'],
         ];
+        
+        // Test 1: Basic SNMP connectivity
+        $snmpTest = $this->testSNMPConnection($olt['ip_address'], $olt['snmp_community'] ?? 'public', (int)($olt['snmp_port'] ?? 161));
+        $results['snmp'] = $snmpTest;
+        
+        // Test 2: CLI connectivity (Telnet/SSH)
+        $cliTest = $this->executeCommand($oltId, 'display version');
+        $results['cli'] = [
+            'success' => $cliTest['success'],
+            'message' => $cliTest['success'] ? 'CLI connection successful' : ($cliTest['message'] ?? 'CLI connection failed'),
+            'type' => $olt['connection_type']
+        ];
+        
+        // Test 3: SNMP optical power OIDs
+        if ($results['snmp']['success']) {
+            $powerTest = $this->bulkPollOpticalPowerViaSNMP($oltId);
+            $results['snmp_power'] = [
+                'success' => $powerTest['success'],
+                'message' => $powerTest['success'] 
+                    ? "Found {$powerTest['count']} ONU power readings" 
+                    : ($powerTest['error'] ?? 'No power data'),
+                'count' => $powerTest['count'] ?? 0
+            ];
+            
+            // Test 4: SNMP serial number OIDs
+            $onuTest = $this->getONUListViaSNMP($oltId);
+            $results['snmp_serials'] = [
+                'success' => $onuTest['success'],
+                'message' => $onuTest['success'] 
+                    ? "Found " . count($onuTest['onus'] ?? []) . " ONUs via SNMP" 
+                    : ($onuTest['error'] ?? 'No ONU data'),
+                'count' => count($onuTest['onus'] ?? [])
+            ];
+        }
+        
+        // Overall success
+        $results['overall_success'] = $results['snmp']['success'] && $results['cli']['success'];
+        $results['recommendation'] = $this->getConnectionRecommendation($results);
+        
+        // Log the test
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'full_connection_test',
+            'status' => $results['overall_success'] ? 'success' : 'warning',
+            'message' => $results['recommendation'],
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $results;
+    }
+    
+    private function getConnectionRecommendation(array $results): string {
+        if ($results['snmp']['success'] && $results['cli']['success']) {
+            if ($results['snmp_serials']['count'] > 0) {
+                return 'Full connectivity. Use "Sync from OLT" for best results.';
+            } else {
+                return 'SNMP connected but no serial data. Use CLI sync method.';
+            }
+        } elseif ($results['cli']['success'] && !$results['snmp']['success']) {
+            return 'CLI only. Configure SNMP on OLT for power monitoring.';
+        } elseif ($results['snmp']['success'] && !$results['cli']['success']) {
+            return 'SNMP only. Check Telnet/SSH credentials and port.';
+        }
+        return 'Connection failed. Check IP, credentials, and network access.';
     }
     
     public function authorizeONU(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = ''): array {
