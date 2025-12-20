@@ -463,11 +463,9 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
         }
         
-        // Use snmp_community field from database
         $community = $olt['snmp_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // Configure SNMP for plain values
         if (function_exists('snmp_set_quick_print')) {
             snmp_set_quick_print(true);
         }
@@ -475,20 +473,45 @@ class HuaweiOLT {
             snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
         }
         
-        // Huawei ONU OIDs (hwGponOnuInfo table .43.1.x)
-        // Index format: frame.slot.pon.onu (e.g., 0.1.3.12)
-        // .43.1.3 = RX Power, .43.1.4 = TX Power (divide by 10 for 0.1 dBm units)
-        $indexSuffix = "{$frame}.{$slot}.{$port}.{$onuId}";
+        // Huawei optical power OIDs - index format: ponIndex.onuId
+        // ponIndex = frame*8192 + slot*256 + port
+        $ponIndex = $frame * 8192 + $slot * 256 + $port;
+        $indexSuffix = "{$ponIndex}.{$onuId}";
         
-        $rxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3.{$indexSuffix}";
-        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4.{$indexSuffix}";
+        // Try multiple OID sets - different firmware uses different tables
+        $oidSets = [
+            // Primary: .43.1.7/.43.1.8 (raw dBm values)
+            ['rx' => "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7.{$indexSuffix}", 
+             'tx' => "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}", 
+             'divisor' => 1],
+            // Fallback: .51.1.4/.51.1.6 (0.01 dBm units)  
+            ['rx' => "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}",
+             'tx' => "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.{$indexSuffix}",
+             'divisor' => 100],
+        ];
         
-        $rxPower = @snmpget($host, $community, $rxPowerOid, 2000000, 2);
-        $txPower = @snmpget($host, $community, $txPowerOid, 2000000, 2);
+        $rxValue = null;
+        $txValue = null;
+        $usedSet = null;
         
-        // Parse values (divide by 10 for 0.1 dBm units)
-        $rxValue = $this->parseOpticalPowerDiv10($rxPower);
-        $txValue = $this->parseOpticalPowerDiv10($txPower);
+        foreach ($oidSets as $set) {
+            $rxPower = @snmpget($host, $community, $set['rx'], 3000000, 2);
+            $txPower = @snmpget($host, $community, $set['tx'], 3000000, 2);
+            
+            if ($rxPower !== false || $txPower !== false) {
+                $usedSet = $set;
+                $rxValue = $this->parseOpticalPower($rxPower, $set['divisor']);
+                $txValue = $this->parseOpticalPower($txPower, $set['divisor']);
+                
+                // Validate range
+                if ($rxValue !== null && ($rxValue < -50 || $rxValue > 10)) $rxValue = null;
+                if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
+                
+                if ($rxValue !== null || $txValue !== null) {
+                    break;
+                }
+            }
+        }
         
         return [
             'success' => true,
@@ -497,11 +520,12 @@ class HuaweiOLT {
                 'tx_power' => $txValue,
             ],
             'debug' => [
+                'ponIndex' => $ponIndex,
                 'index' => $indexSuffix,
-                'rx_oid' => $rxPowerOid,
-                'tx_oid' => $txPowerOid,
-                'rx_raw' => $rxPower,
-                'tx_raw' => $txPower,
+                'rx_oid' => $usedSet['rx'] ?? $oidSets[0]['rx'],
+                'tx_oid' => $usedSet['tx'] ?? $oidSets[0]['tx'],
+                'rx_raw' => $rxPower ?? false,
+                'tx_raw' => $txPower ?? false,
             ]
         ];
     }
