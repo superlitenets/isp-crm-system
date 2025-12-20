@@ -749,6 +749,163 @@ class HuaweiOLT {
         ];
     }
     
+    /**
+     * Import ONUs from SmartOLT API
+     * SmartOLT uses port_index encoding: (frame<<25)|(slot<<19)|(port<<8)|onu_id
+     */
+    public function importFromSmartOLT(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Initialize SmartOLT
+        require_once __DIR__ . '/SmartOLT.php';
+        $smartolt = new \SmartOLT($this->db);
+        
+        // Get all ONUs from SmartOLT
+        $detailsResult = $smartolt->getAllONUsDetails();
+        if (!isset($detailsResult['status']) || !$detailsResult['status']) {
+            return ['success' => false, 'error' => 'Failed to fetch ONUs from SmartOLT: ' . ($detailsResult['error'] ?? 'Unknown error')];
+        }
+        
+        $onus = $detailsResult['response'] ?? [];
+        if (empty($onus)) {
+            return ['success' => false, 'error' => 'No ONUs found in SmartOLT'];
+        }
+        
+        // Get statuses and signals for additional data
+        $statusesResult = $smartolt->getAllONUsStatuses();
+        $statusMap = [];
+        if (isset($statusesResult['status']) && $statusesResult['status'] && isset($statusesResult['response'])) {
+            foreach ($statusesResult['response'] as $s) {
+                $id = $s['onu_external_id'] ?? $s['id'] ?? null;
+                if ($id) {
+                    $statusMap[$id] = $s['status'] ?? 'unknown';
+                }
+            }
+        }
+        
+        $signalsResult = $smartolt->getAllONUsSignals();
+        $signalMap = [];
+        if (isset($signalsResult['status']) && $signalsResult['status'] && isset($signalsResult['response'])) {
+            foreach ($signalsResult['response'] as $sig) {
+                $id = $sig['onu_external_id'] ?? $sig['id'] ?? null;
+                if ($id) {
+                    $signalMap[$id] = [
+                        'rx_power' => $sig['onu_rx_power'] ?? null,
+                        'tx_power' => $sig['olt_rx_power'] ?? null, // OLT RX = ONU TX perspective
+                    ];
+                }
+            }
+        }
+        
+        $added = 0;
+        $updated = 0;
+        $errors = [];
+        
+        foreach ($onus as $onu) {
+            $sn = strtoupper(trim($onu['sn'] ?? $onu['serial_number'] ?? ''));
+            if (empty($sn)) continue;
+            
+            // Decode SmartOLT port_index: (frame<<25)|(slot<<19)|(port<<8)|onu_id
+            $portIndex = (int)($onu['port_index'] ?? $onu['onu_id'] ?? 0);
+            
+            // Decode using SmartOLT formula
+            $frame = ($portIndex >> 25) & 0x7F;  // 7 bits for frame
+            $slot = ($portIndex >> 19) & 0x3F;   // 6 bits for slot
+            $port = ($portIndex >> 8) & 0x7FF;   // 11 bits for port
+            $onuId = $portIndex & 0xFF;          // 8 bits for onu_id
+            
+            // Get external ID for status/signal lookup
+            $extId = $onu['onu_external_id'] ?? $onu['id'] ?? null;
+            $status = isset($statusMap[$extId]) ? strtolower($statusMap[$extId]) : 'unknown';
+            
+            // Normalize status
+            if (strpos($status, 'online') !== false) {
+                $status = 'online';
+            } elseif (strpos($status, 'los') !== false) {
+                $status = 'los';
+            } elseif (strpos($status, 'power') !== false || strpos($status, 'dying') !== false) {
+                $status = 'power_fail';
+            } else {
+                $status = 'offline';
+            }
+            
+            $rxPower = null;
+            $txPower = null;
+            if (isset($signalMap[$extId])) {
+                $rxPower = $this->parseSignalPower($signalMap[$extId]['rx_power']);
+                $txPower = $this->parseSignalPower($signalMap[$extId]['tx_power']);
+            }
+            
+            // Check if ONU exists
+            $existing = $this->getONUBySN($sn);
+            
+            try {
+                if ($existing) {
+                    // Update existing ONU
+                    $stmt = $this->db->prepare("
+                        UPDATE huawei_onus 
+                        SET frame = ?, slot = ?, port = ?, onu_id = ?, status = ?, 
+                            rx_power = COALESCE(?, rx_power), tx_power = COALESCE(?, tx_power),
+                            name = COALESCE(?, name), updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmt->execute([
+                        $frame, $slot, $port, $onuId, $status,
+                        $rxPower, $txPower,
+                        $onu['name'] ?? $onu['onu_name'] ?? null,
+                        $existing['id']
+                    ]);
+                    $updated++;
+                } else {
+                    // Add new ONU
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $sn,
+                        'frame' => $frame,
+                        'slot' => $slot,
+                        'port' => $port,
+                        'onu_id' => $onuId,
+                        'status' => $status,
+                        'rx_power' => $rxPower,
+                        'tx_power' => $txPower,
+                        'name' => $onu['name'] ?? $onu['onu_name'] ?? '',
+                        'description' => $onu['description'] ?? '',
+                    ]);
+                    $added++;
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Failed for {$sn}: " . $e->getMessage();
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'import_smartolt',
+            'status' => 'success',
+            'message' => "Imported from SmartOLT: {$added} added, {$updated} updated",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'total' => count($onus),
+            'added' => $added,
+            'updated' => $updated,
+            'errors' => $errors
+        ];
+    }
+    
+    private function parseSignalPower(?string $power): ?float {
+        if (empty($power) || $power === 'N/A' || $power === '-') {
+            return null;
+        }
+        preg_match('/([-\d.]+)/', $power, $matches);
+        return isset($matches[1]) ? (float)$matches[1] : null;
+    }
+    
     public function refreshAllONUOptical(int $oltId): array {
         $onus = $this->getONUs(['olt_id' => $oltId]);
         

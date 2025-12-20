@@ -186,6 +186,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'import_smartolt':
+                $result = $huaweiOLT->importFromSmartOLT((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "Imported from SmartOLT: {$result['added']} added, {$result['updated']} updated (total: {$result['total']})";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Import failed';
+                    $messageType = 'danger';
+                }
+                break;
             case 'save_genieacs_settings':
                 $settings = [
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
@@ -1047,6 +1057,13 @@ try {
                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                             <button type="submit" class="btn btn-warning btn-sm">
                                 <i class="bi bi-search me-1"></i> Discover Unsynced
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="action" value="import_smartolt">
+                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Import ONUs from SmartOLT? This will decode location data correctly.')">
+                                <i class="bi bi-cloud-download me-1"></i> Import SmartOLT
                             </button>
                         </form>
                     </div>
@@ -4054,6 +4071,7 @@ echo "# ================================================\n";
     const loadingMessages = {
         'sync_onus_snmp': 'Syncing ONUs from OLT...',
         'sync_onu_locations': 'Fixing ONU location data from SNMP...',
+        'import_smartolt': 'Importing ONUs from SmartOLT...',
         'sync_tr069_devices': 'Syncing TR-069 devices...',
         'sync_boards': 'Syncing board information...',
         'sync_vlans': 'Syncing VLANs from OLT...',
