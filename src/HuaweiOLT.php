@@ -569,16 +569,34 @@ class HuaweiOLT {
         foreach ($result['onus'] as $onu) {
             $existing = $this->getONUBySN($onu['sn']);
             
+            // Generate a meaningful name from description or location
+            $onuName = '';
+            $desc = $onu['description'] ?? '';
+            if (!empty($desc)) {
+                // Try to extract location from description format: HWTC..._zone_Area_Location_...
+                if (preg_match('/_zone_([^_]+)_([^_]+)/i', $desc, $m)) {
+                    $onuName = trim($m[1] . ' - ' . $m[2]);
+                } else {
+                    // Use description as-is if it's meaningful
+                    $onuName = $desc;
+                }
+            }
+            if (empty($onuName)) {
+                // Fallback to location-based name
+                $onuName = "Port {$onu['slot']}/{$onu['port']} ONU #{$onu['onu_id']}";
+            }
+            
             // ONUs visible via SNMP are already authorized on the OLT
             $data = [
                 'olt_id' => $oltId,
                 'sn' => $onu['sn'],
+                'name' => $onuName,
                 'frame' => $onu['frame'],
                 'slot' => $onu['slot'],
                 'port' => $onu['port'],
                 'onu_id' => $onu['onu_id'],
                 'status' => $onu['status'],
-                'description' => $onu['description'],
+                'description' => $desc,
                 'is_authorized' => true,
             ];
             
