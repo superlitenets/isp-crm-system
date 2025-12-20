@@ -565,11 +565,24 @@ if ($view === 'alerts' || $view === 'dashboard') {
 }
 
 $currentOnu = null;
+$onuRefreshResult = null;
 if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
-    $currentOnu = $huaweiOLT->getONU((int)$_GET['onu_id']);
+    $onuId = (int)$_GET['onu_id'];
+    $currentOnu = $huaweiOLT->getONU($onuId);
     if (!$currentOnu) {
         header('Location: ?page=huawei-olt&view=onus');
         exit;
+    }
+    
+    // Auto-refresh optical data via SNMP (with throttling - skips if updated within 60s)
+    try {
+        $onuRefreshResult = $huaweiOLT->refreshONUOptical($onuId);
+        if ($onuRefreshResult['success'] && !isset($onuRefreshResult['throttled'])) {
+            // Reload ONU data after refresh
+            $currentOnu = $huaweiOLT->getONU($onuId);
+        }
+    } catch (Exception $e) {
+        $onuRefreshResult = ['success' => false, 'error' => $e->getMessage()];
     }
 }
 

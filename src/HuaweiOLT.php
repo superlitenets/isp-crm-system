@@ -513,11 +513,35 @@ class HuaweiOLT {
             }
         }
         
+        // Also fetch distance (OID .43.1.5 - hwGponOntDistance)
+        $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.5.{$indexSuffix}";
+        $distanceRaw = @snmpget($host, $community, $distanceOID, 3000000, 2);
+        $distance = null;
+        if ($distanceRaw !== false) {
+            $cleaned = $this->cleanSnmpValue((string)$distanceRaw);
+            if (is_numeric($cleaned) && (int)$cleaned > 0) {
+                $distance = (int)$cleaned;
+            }
+        }
+        
+        // Also fetch status (OID .43.1.9 - hwGponDeviceOntControlRunStatus)
+        // Values: 1=online, 2=offline, 3=los, 4=dyingGasp, 5=authFail
+        $statusOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.{$indexSuffix}";
+        $statusRaw = @snmpget($host, $community, $statusOID, 3000000, 2);
+        $status = null;
+        if ($statusRaw !== false) {
+            $statusCode = (int)$this->cleanSnmpValue((string)$statusRaw);
+            $statusMap = [1 => 'online', 2 => 'offline', 3 => 'los', 4 => 'power_fail', 5 => 'auth_fail'];
+            $status = $statusMap[$statusCode] ?? null;
+        }
+        
         return [
             'success' => true,
             'optical' => [
                 'rx_power' => $rxValue,
                 'tx_power' => $txValue,
+                'distance' => $distance,
+                'status' => $status,
             ],
             'debug' => [
                 'ponIndex' => $ponIndex,
@@ -526,6 +550,8 @@ class HuaweiOLT {
                 'tx_oid' => $usedSet['tx'] ?? $oidSets[0]['tx'],
                 'rx_raw' => $rxPower ?? false,
                 'tx_raw' => $txPower ?? false,
+                'distance_raw' => $distanceRaw ?? false,
+                'status_raw' => $statusRaw ?? false,
             ]
         ];
     }
@@ -1556,10 +1582,25 @@ class HuaweiOLT {
         return null;
     }
     
-    public function refreshONUOptical(int $onuId): array {
+    public function refreshONUOptical(int $onuId, bool $force = false): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        // Throttle: skip if optical data was updated within 60 seconds (unless forced)
+        if (!$force && !empty($onu['optical_updated_at'])) {
+            $lastUpdate = strtotime($onu['optical_updated_at']);
+            if ($lastUpdate && (time() - $lastUpdate) < 60) {
+                return [
+                    'success' => true,
+                    'throttled' => true,
+                    'rx_power' => $onu['rx_power'],
+                    'tx_power' => $onu['tx_power'],
+                    'distance' => $onu['distance'] ?? null,
+                    'status' => $onu['status']
+                ];
+            }
         }
         
         if ($onu['onu_id'] === null) {
@@ -1617,13 +1658,27 @@ class HuaweiOLT {
             return ['success' => false, 'error' => "No power data. Debug: {$debugStr}"];
         }
         
-        $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power']);
+        $distance = $optical['optical']['distance'] ?? null;
+        $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power'], $distance);
+        
+        // Also update status if available
+        $status = $optical['optical']['status'] ?? null;
+        if ($status) {
+            $this->updateONUStatus($onuId, $status);
+        }
         
         return [
             'success' => true,
             'rx_power' => $optical['optical']['rx_power'],
-            'tx_power' => $optical['optical']['tx_power']
+            'tx_power' => $optical['optical']['tx_power'],
+            'distance' => $distance,
+            'status' => $status
         ];
+    }
+    
+    private function updateONUStatus(int $onuId, string $status): void {
+        $stmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$status, $onuId]);
     }
     
     private function updateONUOpticalInDB(int $onuId, ?float $rxPower, ?float $txPower, ?int $distance = null): void {
