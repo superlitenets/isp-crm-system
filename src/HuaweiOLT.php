@@ -1135,6 +1135,157 @@ class HuaweiOLT {
         return $this->db->exec("UPDATE huawei_alerts SET is_read = TRUE WHERE is_read = FALSE") !== false;
     }
     
+    public function checkONUSignalHealth(int $oltId = null): array {
+        // Include ALL ONUs, not just those with rx_power - LOS/offline devices often lack telemetry
+        $conditions = ['1=1'];
+        $params = [];
+        
+        if ($oltId) {
+            $conditions[] = 'olt_id = ?';
+            $params[] = $oltId;
+        }
+        
+        $sql = "SELECT id, olt_id, sn, description, status, rx_power, tx_power, 
+                       slot, port, onu_id, updated_at
+                FROM huawei_onus 
+                WHERE " . implode(' AND ', $conditions);
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $issues = [
+            'critical' => [], // rx_power <= -28
+            'warning' => [],  // rx_power <= -25
+            'offline' => [],  // status = offline
+            'los' => [],      // status = los
+            'no_signal' => [] // rx_power is null (no telemetry)
+        ];
+        
+        $alertsCreated = 0;
+        
+        foreach ($onus as $onu) {
+            $rx = $onu['rx_power'];
+            $status = strtolower($onu['status'] ?? '');
+            
+            // Check status first (these are critical issues)
+            if ($status === 'los') {
+                $issues['los'][] = $onu;
+                $this->createSignalAlert($onu, 'error', 'Loss of Signal', 
+                    "ONU {$onu['sn']} has lost signal (LOS)");
+                $alertsCreated++;
+            } elseif ($status === 'offline') {
+                $issues['offline'][] = $onu;
+            }
+            
+            // Check signal level thresholds (only if we have rx_power data)
+            if ($rx !== null) {
+                if ($rx <= -28) {
+                    $issues['critical'][] = $onu;
+                    $this->createSignalAlert($onu, 'critical', 'Critical Signal Level', 
+                        "ONU {$onu['sn']} has critical RX power: {$rx} dBm");
+                    $alertsCreated++;
+                } elseif ($rx <= -25) {
+                    $issues['warning'][] = $onu;
+                }
+            } elseif ($status === 'online') {
+                // Online but no signal data - flag as needing attention
+                $issues['no_signal'][] = $onu;
+            }
+        }
+        
+        return [
+            'success' => true,
+            'issues' => $issues,
+            'summary' => [
+                'total_checked' => count($onus),
+                'critical_signal' => count($issues['critical']),
+                'warning_signal' => count($issues['warning']),
+                'offline' => count($issues['offline']),
+                'los' => count($issues['los']),
+                'no_telemetry' => count($issues['no_signal'])
+            ],
+            'alerts_created' => $alertsCreated
+        ];
+    }
+    
+    private function createSignalAlert(array $onu, string $severity, string $title, string $message): void {
+        // Check if similar alert exists recently (within 1 hour)
+        $stmt = $this->db->prepare("
+            SELECT id FROM huawei_alerts 
+            WHERE onu_id = ? AND alert_type = 'signal' AND title = ? 
+            AND created_at > NOW() - INTERVAL '1 hour'
+        ");
+        $stmt->execute([$onu['id'], $title]);
+        
+        if (!$stmt->fetch()) {
+            $this->addAlert([
+                'olt_id' => $onu['olt_id'],
+                'onu_id' => $onu['id'],
+                'alert_type' => 'signal',
+                'severity' => $severity,
+                'title' => $title,
+                'message' => $message
+            ]);
+        }
+    }
+    
+    public function getONUSignalStats(int $oltId = null): array {
+        $conditions = ['1=1'];
+        $params = [];
+        
+        if ($oltId) {
+            $conditions[] = 'olt_id = ?';
+            $params[] = $oltId;
+        }
+        
+        $sql = "SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN LOWER(status) = 'online' THEN 1 END) as online,
+                    COUNT(CASE WHEN LOWER(status) = 'offline' THEN 1 END) as offline,
+                    COUNT(CASE WHEN LOWER(status) = 'los' THEN 1 END) as los,
+                    COUNT(CASE WHEN rx_power <= -28 THEN 1 END) as critical_signal,
+                    COUNT(CASE WHEN rx_power > -28 AND rx_power <= -25 THEN 1 END) as warning_signal,
+                    COUNT(CASE WHEN rx_power > -25 AND rx_power IS NOT NULL THEN 1 END) as good_signal,
+                    COUNT(CASE WHEN rx_power IS NULL AND LOWER(status) = 'online' THEN 1 END) as no_telemetry,
+                    AVG(rx_power) FILTER (WHERE rx_power IS NOT NULL) as avg_rx_power
+                FROM huawei_onus 
+                WHERE " . implode(' AND ', $conditions);
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getONUsWithIssues(int $oltId = null, int $limit = 20): array {
+        $conditions = ['(rx_power <= -25 OR status IN (\'offline\', \'los\'))'];
+        $params = [];
+        
+        if ($oltId) {
+            $conditions[] = 'o.olt_id = ?';
+            $params[] = $oltId;
+        }
+        
+        $params[] = $limit;
+        
+        $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name
+                FROM huawei_onus o
+                LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                LEFT JOIN customers c ON o.customer_id = c.id
+                WHERE " . implode(' AND ', $conditions) . "
+                ORDER BY 
+                    CASE WHEN o.status = 'los' THEN 0
+                         WHEN o.rx_power <= -28 THEN 1
+                         WHEN o.status = 'offline' THEN 2
+                         ELSE 3 END,
+                    o.rx_power ASC
+                LIMIT ?";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
     // ==================== ONU Operations ====================
     
     public function executeCommand(int $oltId, string $command): array {
@@ -1327,7 +1478,7 @@ class HuaweiOLT {
         ];
     }
     
-    public function authorizeONU(int $onuId, int $profileId): array {
+    public function authorizeONU(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = ''): array {
         $onu = $this->getONU($onuId);
         $profile = $this->getServiceProfile($profileId);
         
@@ -1335,7 +1486,45 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU or Profile not found'];
         }
         
-        $command = "ont add {$onu['frame']}/{$onu['slot']}/{$onu['port']} sn-auth {$onu['sn']} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']}";
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        
+        // Build command based on authentication method (Huawei MA5600/MA5800 syntax)
+        switch ($authMethod) {
+            case 'loid':
+                if (empty($loid)) {
+                    return ['success' => false, 'message' => 'LOID value is required for LOID authentication'];
+                }
+                // Huawei syntax: ont add 0/1/0 loid-auth loid <loid> [password <pwd>]
+                $authPart = "loid-auth loid {$loid}";
+                if (!empty($loidPassword)) {
+                    $authPart .= " password {$loidPassword}";
+                }
+                break;
+            case 'mac':
+                // MAC auth requires a valid MAC address stored in the ONU record
+                // Huawei syntax: ont add 0/1/0 mac-auth mac xxxx-xxxx-xxxx
+                $mac = $onu['mac_address'] ?? '';
+                if (empty($mac)) {
+                    return ['success' => false, 'message' => 'MAC address not available for this ONU. Please update the ONU record with a valid MAC address first.'];
+                }
+                // Validate MAC format and convert to Huawei format (xxxx-xxxx-xxxx)
+                $cleanMac = preg_replace('/[^a-fA-F0-9]/', '', $mac);
+                if (strlen($cleanMac) !== 12) {
+                    return ['success' => false, 'message' => 'Invalid MAC address format. Expected 12 hex characters.'];
+                }
+                $huaweiMac = strtolower(substr($cleanMac, 0, 4) . '-' . substr($cleanMac, 4, 4) . '-' . substr($cleanMac, 8, 4));
+                $authPart = "mac-auth mac {$huaweiMac}";
+                break;
+            case 'sn':
+            default:
+                // Huawei syntax: ont add 0/1/0 sn-auth <serial-number>
+                $authPart = "sn-auth {$onu['sn']}";
+                break;
+        }
+        
+        $command = "ont add {$frame}/{$slot}/{$port} {$authPart} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']}";
         
         $result = $this->executeCommand($onu['olt_id'], $command);
         
@@ -1352,7 +1541,7 @@ class HuaweiOLT {
                 'onu_id' => $onuId,
                 'action' => 'authorize',
                 'status' => 'success',
-                'message' => "ONU {$onu['sn']} authorized with profile {$profile['name']}",
+                'message' => "ONU {$onu['sn']} authorized with profile {$profile['name']} using {$authMethod} auth",
                 'command_sent' => $command,
                 'command_response' => $result['output'] ?? '',
                 'user_id' => $_SESSION['user_id'] ?? null
@@ -1410,6 +1599,271 @@ class HuaweiOLT {
         ]);
         
         return $result;
+    }
+    
+    public function resetONUConfig(int $onuId): array {
+        $onu = $this->getONU($onuId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        $command = "ont reset {$onu['frame']}/{$onu['slot']}/{$onu['port']} {$onu['onu_id']}";
+        $result = $this->executeCommand($onu['olt_id'], $command);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuId,
+            'action' => 'reset_config',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "ONU {$onu['sn']} configuration reset" : $result['message'],
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function configureONUService(int $onuId, array $config): array {
+        $onu = $this->getONU($onuId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        $oltId = $onu['olt_id'];
+        
+        $allOutput = '';
+        $commandsExecuted = [];
+        $overallSuccess = true;
+        
+        // Configure IP mode (DHCP or static) - requires interface context
+        if (isset($config['ip_mode'])) {
+            $vlan = $config['vlan_id'] ?? 69;
+            $priority = $config['vlan_priority'] ?? 0;
+            
+            // Enter interface context, configure, then exit
+            $interfaceCmd = "interface gpon {$frame}/{$slot}";
+            $configCmd = "ont ipconfig {$port} {$onuIdNum} {$config['ip_mode']} vlan {$vlan} priority {$priority}";
+            $batchedCommand = "{$interfaceCmd}\n{$configCmd}\nquit";
+            
+            $result = $this->executeCommand($oltId, $batchedCommand);
+            $commandsExecuted[] = $batchedCommand;
+            $allOutput .= ($result['output'] ?? '') . "\n";
+            
+            if (!$result['success']) {
+                $overallSuccess = false;
+                $this->addLog([
+                    'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'configure_ip_mode',
+                    'status' => 'failed', 'message' => 'IP mode configuration failed',
+                    'command_sent' => $batchedCommand, 'command_response' => $result['output'] ?? '',
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                return ['success' => false, 'message' => 'IP mode configuration failed', 'output' => $allOutput];
+            }
+        }
+        
+        // Configure service port (VLAN binding) - global command, no interface context needed
+        if (isset($config['service_vlan'])) {
+            $gemPort = $config['gem_port'] ?? 1;
+            $multiService = $config['multi_service'] ?? 'user-vlan';
+            $rxTraffic = $config['rx_traffic_table'] ?? 6;
+            $txTraffic = $config['tx_traffic_table'] ?? 6;
+            
+            $spCmd = "service-port vlan {$config['service_vlan']} gpon {$frame}/{$slot}/{$port} ont {$onuIdNum} gemport {$gemPort} multi-service {$multiService} rx-cttr {$rxTraffic} tx-cttr {$txTraffic}";
+            
+            $result = $this->executeCommand($oltId, $spCmd);
+            $commandsExecuted[] = $spCmd;
+            $allOutput .= ($result['output'] ?? '') . "\n";
+            
+            if (!$result['success']) {
+                $overallSuccess = false;
+                $this->addLog([
+                    'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'configure_service_port',
+                    'status' => 'failed', 'message' => 'Service port configuration failed',
+                    'command_sent' => $spCmd, 'command_response' => $result['output'] ?? '',
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                return ['success' => false, 'message' => 'Service port configuration failed', 'output' => $allOutput];
+            }
+        }
+        
+        // Configure bandwidth profile - requires interface context
+        if (isset($config['traffic_table_index'])) {
+            $interfaceCmd = "interface gpon {$frame}/{$slot}";
+            $trafficCmd = "ont traffic-table-index {$port} {$onuIdNum} {$config['traffic_table_index']}";
+            $batchedCommand = "{$interfaceCmd}\n{$trafficCmd}\nquit";
+            
+            $result = $this->executeCommand($oltId, $batchedCommand);
+            $commandsExecuted[] = $batchedCommand;
+            $allOutput .= ($result['output'] ?? '') . "\n";
+            
+            if (!$result['success']) {
+                $overallSuccess = false;
+            }
+        }
+        
+        if (empty($commandsExecuted)) {
+            return ['success' => false, 'message' => 'No configuration parameters provided'];
+        }
+        
+        $fullCommand = implode("\n---\n", $commandsExecuted);
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuId,
+            'action' => 'configure_service',
+            'status' => $overallSuccess ? 'success' : 'partial',
+            'message' => $overallSuccess ? "ONU {$onu['sn']} service configured" : 'Some configurations may have failed',
+            'command_sent' => $fullCommand,
+            'command_response' => $allOutput,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $overallSuccess,
+            'message' => $overallSuccess ? 'Service configured successfully' : 'Some configurations may have failed',
+            'output' => $allOutput,
+            'commands_executed' => count($commandsExecuted)
+        ];
+    }
+    
+    public function getONUServicePorts(int $onuId): array {
+        $onu = $this->getONU($onuId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        $command = "display service-port port {$onu['frame']}/{$onu['slot']}/{$onu['port']} ont {$onu['onu_id']}";
+        $result = $this->executeCommand($onu['olt_id'], $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $servicePorts = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+\d+\s+gpon\s+[\d\/]+\s+(\d+)\s+(\d+)\s+.*vlan\s+(\d+)/i', $line, $m)) {
+                $servicePorts[] = [
+                    'index' => (int)$m[1],
+                    'gem_port' => (int)$m[2],
+                    'user_vlan' => (int)$m[3],
+                    'service_vlan' => (int)$m[4]
+                ];
+            }
+        }
+        
+        return ['success' => true, 'service_ports' => $servicePorts, 'raw' => $result['output']];
+    }
+    
+    public function deleteServicePort(int $oltId, int $servicePortIndex): array {
+        $command = "undo service-port {$servicePortIndex}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'delete_service_port',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "Service port {$servicePortIndex} deleted" : 'Delete failed',
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function updateONUDescription(int $onuId, string $description): array {
+        $onu = $this->getONU($onuId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        $cleanDesc = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $description);
+        $cleanDesc = substr(trim($cleanDesc), 0, 64);
+        
+        $command = "interface gpon {$onu['frame']}/{$onu['slot']}";
+        $this->executeCommand($onu['olt_id'], $command);
+        
+        $descCommand = "ont modify {$onu['port']} {$onu['onu_id']} desc \"{$cleanDesc}\"";
+        $result = $this->executeCommand($onu['olt_id'], $descCommand);
+        
+        $this->executeCommand($onu['olt_id'], "quit");
+        
+        if ($result['success']) {
+            $this->updateONU($onuId, ['description' => $description]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuId,
+            'action' => 'update_description',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "ONU description updated to: {$cleanDesc}" : 'Update failed',
+            'command_sent' => $descCommand,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function changeONUServiceProfile(int $onuId, int $newProfileId): array {
+        $onu = $this->getONU($onuId);
+        $profile = $this->getServiceProfile($newProfileId);
+        
+        if (!$onu || !$profile) {
+            return ['success' => false, 'message' => 'ONU or Profile not found'];
+        }
+        
+        // First delete the ONU, then re-add with new profile
+        $deleteResult = $this->deleteONUFromOLT($onuId);
+        if (!$deleteResult['success']) {
+            return ['success' => false, 'message' => 'Failed to remove ONU for re-provisioning'];
+        }
+        
+        // Re-add the ONU to the database
+        $newOnuId = $this->addONU([
+            'olt_id' => $onu['olt_id'],
+            'sn' => $onu['sn'],
+            'frame' => $onu['frame'],
+            'slot' => $onu['slot'],
+            'port' => $onu['port'],
+            'onu_id' => $onu['onu_id'],
+            'description' => $onu['description'],
+            'status' => 'unconfigured',
+            'is_authorized' => false
+        ]);
+        
+        // Authorize with new profile
+        return $this->authorizeONU($newOnuId, $newProfileId);
+    }
+    
+    public function getTrafficTables(int $oltId): array {
+        $command = "display traffic table ip";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return $result;
+        }
+        
+        $tables = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\d+)\s+(\d+)/i', $line, $m)) {
+                $tables[] = [
+                    'index' => (int)$m[1],
+                    'name' => $m[2],
+                    'cir' => (int)$m[3], // Committed Information Rate (kbps)
+                    'pir' => (int)$m[4]  // Peak Information Rate (kbps)
+                ];
+            }
+        }
+        
+        return ['success' => true, 'tables' => $tables, 'raw' => $result['output']];
     }
     
     // ==================== Board & VLAN Management ====================
@@ -1837,12 +2291,33 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'Invalid VLAN ID (1-4094)'];
         }
         
+        // Huawei command to create VLAN
         $command = "vlan {$vlanId} {$type}";
-        if (!empty($description)) {
-            $command .= " description {$description}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        // If description provided, set it separately
+        if ($result['success'] && !empty($description)) {
+            // Clean description - remove special chars, limit length
+            $cleanDesc = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $description);
+            $cleanDesc = substr(trim($cleanDesc), 0, 32);
+            if (!empty($cleanDesc)) {
+                $descCommand = "vlan desc {$vlanId} description \"{$cleanDesc}\"";
+                $this->executeCommand($oltId, $descCommand);
+            }
         }
         
-        $result = $this->executeCommand($oltId, $command);
+        // Also sync the new VLAN to local cache
+        if ($result['success']) {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_vlans (olt_id, vlan_id, vlan_type, description, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (olt_id, vlan_id) DO UPDATE SET
+                    vlan_type = EXCLUDED.vlan_type,
+                    description = EXCLUDED.description,
+                    updated_at = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([$oltId, $vlanId, $type, $description]);
+        }
         
         $this->addLog([
             'olt_id' => $oltId,
@@ -1865,11 +2340,83 @@ class HuaweiOLT {
         $command = "undo vlan {$vlanId}";
         $result = $this->executeCommand($oltId, $command);
         
+        // Remove from local cache
+        if ($result['success']) {
+            $stmt = $this->db->prepare("DELETE FROM huawei_vlans WHERE olt_id = ? AND vlan_id = ?");
+            $stmt->execute([$oltId, $vlanId]);
+        }
+        
         $this->addLog([
             'olt_id' => $oltId,
             'action' => 'delete_vlan',
             'status' => $result['success'] ? 'success' : 'failed',
             'message' => $result['success'] ? "VLAN {$vlanId} deleted" : ($result['message'] ?? 'Failed'),
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function updateVLANDescription(int $oltId, int $vlanId, string $description): array {
+        if ($vlanId < 1 || $vlanId > 4094) {
+            return ['success' => false, 'message' => 'Invalid VLAN ID'];
+        }
+        
+        // Clean description
+        $cleanDesc = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $description);
+        $cleanDesc = substr(trim($cleanDesc), 0, 32);
+        
+        $command = empty($cleanDesc) 
+            ? "undo vlan desc {$vlanId}" 
+            : "vlan desc {$vlanId} description \"{$cleanDesc}\"";
+        
+        $result = $this->executeCommand($oltId, $command);
+        
+        // Update local cache
+        if ($result['success']) {
+            $stmt = $this->db->prepare("UPDATE huawei_vlans SET description = ?, updated_at = CURRENT_TIMESTAMP WHERE olt_id = ? AND vlan_id = ?");
+            $stmt->execute([$description, $oltId, $vlanId]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'update_vlan_desc',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "VLAN {$vlanId} description updated" : ($result['message'] ?? 'Failed'),
+            'command_sent' => $command,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
+    public function addVLANToUplink(int $oltId, string $portName, int $vlanId, string $mode = 'tag'): array {
+        if ($vlanId < 1 || $vlanId > 4094) {
+            return ['success' => false, 'message' => 'Invalid VLAN ID'];
+        }
+        
+        // Parse port name (e.g., "0/19/0" -> frame=0, slot=19, port=0)
+        $parts = explode('/', $portName);
+        if (count($parts) !== 3) {
+            return ['success' => false, 'message' => 'Invalid port format'];
+        }
+        
+        $frame = $parts[0];
+        $slot = $parts[1];
+        $port = $parts[2];
+        
+        // Huawei command to add VLAN to uplink port
+        $command = "port vlan {$vlanId} {$frame}/{$slot}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'add_vlan_uplink',
+            'status' => $result['success'] ? 'success' : 'failed',
+            'message' => $result['success'] ? "VLAN {$vlanId} added to uplink {$portName}" : ($result['message'] ?? 'Failed'),
             'command_sent' => $command,
             'command_response' => $result['output'] ?? '',
             'user_id' => $_SESSION['user_id'] ?? null

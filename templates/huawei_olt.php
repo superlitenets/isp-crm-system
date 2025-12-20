@@ -94,8 +94,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
                 break;
             case 'authorize_onu':
-                $result = $huaweiOLT->authorizeONU((int)$_POST['onu_id'], (int)$_POST['profile_id']);
-                $message = $result['message'];
+                $onuId = (int)$_POST['onu_id'];
+                $profileId = (int)$_POST['profile_id'];
+                $authMethod = $_POST['auth_method'] ?? 'sn';
+                $loid = $_POST['loid'] ?? '';
+                $loidPassword = $_POST['loid_password'] ?? '';
+                $description = $_POST['description'] ?? '';
+                $macAddress = $_POST['mac_address'] ?? '';
+                
+                // Update ONU record with description and/or MAC address before authorization
+                $updateFields = [];
+                if (!empty($description)) {
+                    $updateFields['description'] = $description;
+                }
+                if (!empty($macAddress)) {
+                    $updateFields['mac_address'] = $macAddress;
+                }
+                if (!empty($updateFields)) {
+                    $huaweiOLT->updateONU($onuId, $updateFields);
+                }
+                
+                // Authorize the ONU with the selected authentication method
+                $result = $huaweiOLT->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword);
+                $message = $result['message'] ?? ($result['success'] ? 'ONU authorized using ' . strtoupper($authMethod) . ' authentication' : 'Authorization failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'reboot_onu':
@@ -258,6 +279,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'VLAN deleted successfully' : ($result['message'] ?? 'Failed to delete VLAN');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'update_vlan_desc':
+                $result = $huaweiOLT->updateVLANDescription((int)$_POST['olt_id'], (int)$_POST['vlan_id'], $_POST['description'] ?? '');
+                $message = $result['success'] ? 'VLAN description updated' : ($result['message'] ?? 'Failed to update description');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'add_vlan_uplink':
+                $result = $huaweiOLT->addVLANToUplink((int)$_POST['olt_id'], $_POST['port_name'], (int)$_POST['vlan_id']);
+                $message = $result['success'] ? "VLAN {$_POST['vlan_id']} added to uplink {$_POST['port_name']}" : ($result['message'] ?? 'Failed to add VLAN');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'refresh_onu_optical':
                 $result = $huaweiOLT->refreshONUOptical((int)$_POST['onu_id']);
                 if ($result['success']) {
@@ -382,6 +413,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $huaweiOLT->deleteServiceTemplate((int)$_POST['template_id']);
                 $message = $result['success'] ? "Service template deleted" : ($result['message'] ?? 'Failed to delete template');
                 $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'reset_onu_config':
+                $result = $huaweiOLT->resetONUConfig((int)$_POST['onu_id']);
+                $message = $result['success'] ? "ONU configuration reset successfully" : ($result['message'] ?? 'Reset failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_onu_description':
+                $result = $huaweiOLT->updateONUDescription((int)$_POST['onu_id'], $_POST['description'] ?? '');
+                $message = $result['success'] ? "ONU description updated" : ($result['message'] ?? 'Update failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'configure_onu_service':
+                $config = [];
+                if (!empty($_POST['ip_mode'])) {
+                    $config['ip_mode'] = $_POST['ip_mode'];
+                    $config['vlan_id'] = (int)($_POST['mgmt_vlan'] ?? 69);
+                    $config['vlan_priority'] = (int)($_POST['vlan_priority'] ?? 0);
+                }
+                if (!empty($_POST['service_vlan'])) {
+                    $config['service_vlan'] = (int)$_POST['service_vlan'];
+                    $config['gem_port'] = (int)($_POST['gem_port'] ?? 1);
+                    $config['rx_traffic_table'] = (int)($_POST['rx_traffic_table'] ?? 6);
+                    $config['tx_traffic_table'] = (int)($_POST['tx_traffic_table'] ?? 6);
+                }
+                if (!empty($_POST['traffic_table_index'])) {
+                    $config['traffic_table_index'] = (int)$_POST['traffic_table_index'];
+                }
+                $result = $huaweiOLT->configureONUService((int)$_POST['onu_id'], $config);
+                $message = $result['success'] ? "ONU service configured successfully" : ($result['message'] ?? 'Configuration failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_service_port':
+                $result = $huaweiOLT->deleteServicePort((int)$_POST['olt_id'], (int)$_POST['service_port_index']);
+                $message = $result['success'] ? "Service port deleted" : ($result['message'] ?? 'Delete failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'change_onu_profile':
+                $result = $huaweiOLT->changeONUServiceProfile((int)$_POST['onu_id'], (int)$_POST['new_profile_id']);
+                $message = $result['success'] ? "ONU service profile changed successfully" : ($result['message'] ?? 'Profile change failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'check_signal_health':
+                $oltIdCheck = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $result = $huaweiOLT->checkONUSignalHealth($oltIdCheck);
+                if ($result['success']) {
+                    $s = $result['summary'];
+                    $message = "Checked {$s['total_checked']} ONUs. Critical: {$s['critical_signal']}, Warning: {$s['warning_signal']}, LOS: {$s['los']}, Offline: {$s['offline']}";
+                    $messageType = ($s['critical_signal'] > 0 || $s['los'] > 0) ? 'warning' : 'success';
+                } else {
+                    $message = 'Signal health check failed';
+                    $messageType = 'danger';
+                }
                 break;
             default:
                 break;
@@ -705,7 +788,90 @@ try {
                         </div>
                     </div>
                 </div>
+                <?php 
+                // Get selected OLT from query param for signal health filtering
+                $signalHealthOltId = isset($_GET['signal_olt']) ? (int)$_GET['signal_olt'] : null;
+                $signalStats = $huaweiOLT->getONUSignalStats($signalHealthOltId);
+                $issueONUs = $huaweiOLT->getONUsWithIssues($signalHealthOltId, 5);
+                ?>
                 <div class="col-md-4">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-reception-4 me-2"></i>Signal Health</h6>
+                        </div>
+                        <div class="card-body pb-2">
+                            <form method="get" class="mb-2" id="signalOltForm">
+                                <input type="hidden" name="page" value="huawei-olt">
+                                <div class="input-group input-group-sm">
+                                    <select name="signal_olt" id="signalOltSelect" class="form-select form-select-sm" onchange="this.form.submit()">
+                                        <option value="">All OLTs</option>
+                                        <?php foreach ($olts as $olt): ?>
+                                        <option value="<?= $olt['id'] ?>" <?= $signalHealthOltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </form>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="check_signal_health">
+                                <input type="hidden" name="olt_id" value="<?= $signalHealthOltId ?? '' ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary w-100" title="Run signal health check on selected OLT">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Run Health Check<?= $signalHealthOltId ? ' (' . htmlspecialchars($olts[array_search($signalHealthOltId, array_column($olts, 'id'))]['name'] ?? 'Selected') . ')' : ' (All)' ?>
+                                </button>
+                            </form>
+                        </div>
+                        <div class="card-body pt-0">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="text-muted small">Good</div>
+                                    <div class="fs-5 fw-bold text-success"><?= $signalStats['good_signal'] ?? 0 ?></div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Warning</div>
+                                    <div class="fs-5 fw-bold text-warning"><?= $signalStats['warning_signal'] ?? 0 ?></div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Critical</div>
+                                    <div class="fs-5 fw-bold text-danger"><?= $signalStats['critical_signal'] ?? 0 ?></div>
+                                </div>
+                            </div>
+                            <div class="row text-center mt-2">
+                                <div class="col-4">
+                                    <div class="text-muted small">LOS</div>
+                                    <div class="fs-6 fw-bold text-danger"><?= $signalStats['los'] ?? 0 ?></div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Offline</div>
+                                    <div class="fs-6 fw-bold text-secondary"><?= $signalStats['offline'] ?? 0 ?></div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Total</div>
+                                    <div class="fs-6 fw-bold"><?= $signalStats['total'] ?? 0 ?></div>
+                                </div>
+                            </div>
+                            <?php if (!empty($signalStats['avg_rx_power'])): ?>
+                            <div class="text-center mt-2">
+                                <small class="text-muted">Avg RX: <?= number_format((float)$signalStats['avg_rx_power'], 1) ?> dBm</small>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($issueONUs)): ?>
+                            <hr class="my-2">
+                            <div class="small">
+                                <strong>Issues:</strong>
+                                <?php foreach ($issueONUs as $issue): ?>
+                                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                    <span class="text-truncate" style="max-width: 140px;" title="<?= htmlspecialchars($issue['sn']) ?>">
+                                        <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
+                                    </span>
+                                    <span class="badge bg-<?= strtolower($issue['status']) === 'los' ? 'danger' : (($issue['rx_power'] ?? 0) <= -28 ? 'danger' : 'warning') ?>">
+                                        <?= strtolower($issue['status']) === 'los' ? 'LOS' : (isset($issue['rx_power']) ? number_format($issue['rx_power'], 1) . ' dBm' : 'N/A') ?>
+                                    </span>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h6 class="mb-0"><i class="bi bi-bell me-2"></i>Recent Alerts</h6>
@@ -951,7 +1117,7 @@ try {
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <?php if (!$onu['is_authorized']): ?>
-                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Authorize">
+                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>', <?= isset($onu['slot']) && $onu['slot'] !== null ? $onu['slot'] : 'null' ?>, <?= isset($onu['port']) && $onu['port'] !== null ? $onu['port'] : 'null' ?>)" title="Authorize">
                                                 <i class="bi bi-check-circle"></i>
                                             </button>
                                             <?php else: ?>
@@ -1150,7 +1316,7 @@ try {
                         </div>
                     </div>
                     
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm mb-4">
                         <div class="card-header bg-secondary text-white">
                             <i class="bi bi-terminal me-2"></i>OLT Commands
                         </div>
@@ -1162,6 +1328,138 @@ quit</pre>
                             <button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent); alert('Copied!')">
                                 <i class="bi bi-clipboard me-1"></i> Copy Commands
                             </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <i class="bi bi-tools me-2"></i>Remote Troubleshooting
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU configuration? The ONU will temporarily go offline.')">
+                                    <input type="hidden" name="action" value="reset_onu_config">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-warning w-100">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reset ONU Configuration
+                                    </button>
+                                </form>
+                                
+                                <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU? It will go offline temporarily.')">
+                                    <input type="hidden" name="action" value="reboot_onu">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-primary w-100">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Reboot ONU
+                                    </button>
+                                </form>
+                                
+                                <form method="post" class="d-inline" onsubmit="return confirm('WARNING: Delete this ONU from the OLT? Customer will lose connection!')">
+                                    <input type="hidden" name="action" value="delete_onu_olt">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger w-100">
+                                        <i class="bi bi-trash me-2"></i>Delete from OLT
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <hr>
+                            
+                            <h6 class="mb-3"><i class="bi bi-pencil me-2"></i>Update Description on OLT</h6>
+                            <form method="post" class="row g-2">
+                                <input type="hidden" name="action" value="update_onu_description">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <div class="col-8">
+                                    <input type="text" name="description" class="form-control form-control-sm" 
+                                           value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" 
+                                           placeholder="Customer name or location" maxlength="64">
+                                </div>
+                                <div class="col-4">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">Update</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-sliders me-2"></i>Service Configuration
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="configure_onu_service">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label small">IP Mode</label>
+                                        <select name="ip_mode" class="form-select form-select-sm">
+                                            <option value="">-- No Change --</option>
+                                            <option value="dhcp">DHCP</option>
+                                            <option value="static">Static</option>
+                                            <option value="pppoe">PPPoE</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Management VLAN</label>
+                                        <input type="number" name="mgmt_vlan" class="form-control form-control-sm" placeholder="e.g., 69">
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label small">Service VLAN</label>
+                                        <input type="number" name="service_vlan" class="form-control form-control-sm" placeholder="e.g., 100">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">GEM Port</label>
+                                        <input type="number" name="gem_port" class="form-control form-control-sm" value="1" min="1" max="8">
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label small">RX Traffic Table</label>
+                                        <input type="number" name="rx_traffic_table" class="form-control form-control-sm" placeholder="Index (e.g., 6)">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">TX Traffic Table</label>
+                                        <input type="number" name="tx_traffic_table" class="form-control form-control-sm" placeholder="Index (e.g., 6)">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success w-100" onclick="return confirm('Apply service configuration?')">
+                                    <i class="bi bi-check-lg me-1"></i> Apply Configuration
+                                </button>
+                            </form>
+                            
+                            <hr>
+                            
+                            <h6 class="mb-3"><i class="bi bi-arrow-up-circle me-2"></i>Change Service Profile (Plan Upgrade)</h6>
+                            <form method="post" onsubmit="return confirm('Change service profile? The ONU will be re-provisioned.')">
+                                <input type="hidden" name="action" value="change_onu_profile">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <div class="row g-2">
+                                    <div class="col-8">
+                                        <select name="new_profile_id" class="form-select form-select-sm" required>
+                                            <option value="">-- Select New Profile --</option>
+                                            <?php foreach ($profiles as $profile): ?>
+                                            <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($profile['name']) ?>
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-4">
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Upgrade</button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -2300,18 +2598,56 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <tr>
                                             <td><strong><?= $vlan['vlan_id'] ?></strong></td>
                                             <td><span class="badge bg-secondary"><?= htmlspecialchars($vlan['vlan_type'] ?? 'smart') ?></span></td>
-                                            <td><?= htmlspecialchars($vlan['description'] ?? '') ?></td>
                                             <td>
-                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete VLAN <?= $vlan['vlan_id'] ?>?')">
+                                                <?php if (!empty($vlan['description'])): ?>
+                                                    <?= htmlspecialchars($vlan['description']) ?>
+                                                <?php else: ?>
+                                                    <span class="text-muted fst-italic">No description</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-nowrap">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVlanModal<?= $vlan['vlan_id'] ?>" title="Edit Description">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete VLAN <?= $vlan['vlan_id'] ?>? This cannot be undone.')">
                                                     <input type="hidden" name="action" value="delete_vlan">
                                                     <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                                                     <input type="hidden" name="vlan_id" value="<?= $vlan['vlan_id'] ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete VLAN">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
                                                 </form>
                                             </td>
                                         </tr>
+                                        
+                                        <div class="modal fade" id="editVlanModal<?= $vlan['vlan_id'] ?>" tabindex="-1">
+                                            <div class="modal-dialog modal-sm">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h6 class="modal-title">Edit VLAN <?= $vlan['vlan_id'] ?></h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form method="post">
+                                                        <div class="modal-body">
+                                                            <input type="hidden" name="action" value="update_vlan_desc">
+                                                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                            <input type="hidden" name="vlan_id" value="<?= $vlan['vlan_id'] ?>">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Description</label>
+                                                                <input type="text" name="description" class="form-control" 
+                                                                       value="<?= htmlspecialchars($vlan['description'] ?? '') ?>" 
+                                                                       placeholder="Enter description" maxlength="32">
+                                                                <small class="text-muted">Max 32 characters, alphanumeric only</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">Save</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
@@ -2648,6 +2984,51 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 </div>
                 
                 <div class="col-lg-4">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Quick VLAN Assignment</h6>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($cachedUplinks) && !empty($cachedVLANs)): ?>
+                            <form method="post">
+                                <input type="hidden" name="action" value="add_vlan_uplink">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label small">Select Uplink Port</label>
+                                    <select name="port_name" class="form-select form-select-sm" required>
+                                        <?php foreach ($cachedUplinks as $uplink): ?>
+                                        <option value="<?= htmlspecialchars($uplink['port_name']) ?>">
+                                            <?= htmlspecialchars($uplink['port_name']) ?>
+                                            <?= !empty($uplink['description']) ? ' - ' . htmlspecialchars($uplink['description']) : '' ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label small">Select VLAN</label>
+                                    <select name="vlan_id" class="form-select form-select-sm" required>
+                                        <?php foreach ($cachedVLANs as $vlan): ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>">
+                                            <?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: $vlan['vlan_type'] ?? 'smart') ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary btn-sm w-100">
+                                    <i class="bi bi-plus-lg me-1"></i> Add VLAN to Uplink
+                                </button>
+                            </form>
+                            <?php else: ?>
+                            <div class="text-muted small">
+                                Sync uplinks and VLANs first to enable quick assignment.
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
                     <div class="card shadow-sm">
                         <div class="card-header bg-white">
                             <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Uplink Configuration</h6>
@@ -2656,14 +3037,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <div class="small">
                                 <p><strong>VLAN Modes:</strong></p>
                                 <ul class="ps-3">
-                                    <li><strong>Trunk</strong>: Carries multiple VLANs with 802.1Q tagging. Use for connections to core switches.</li>
-                                    <li><strong>Access</strong>: Single VLAN, untagged traffic. Use for simple connections.</li>
+                                    <li><strong>Trunk</strong>: Carries multiple VLANs with 802.1Q tagging.</li>
+                                    <li><strong>Access</strong>: Single VLAN, untagged traffic.</li>
                                     <li><strong>Hybrid</strong>: Mix of tagged and untagged VLANs.</li>
                                 </ul>
                                 
                                 <p class="mt-3"><strong>Allowed VLANs:</strong></p>
-                                <p class="text-muted">For trunk mode, specify which VLANs can pass through:</p>
-                                <ul class="ps-3">
+                                <ul class="ps-3 text-muted">
                                     <li><code>all</code> - All VLANs</li>
                                     <li><code>100,200,300</code> - Specific VLANs</li>
                                     <li><code>100-200</code> - VLAN range</li>
@@ -3311,6 +3691,118 @@ ont tr069-server-config 1 all profile-id 1</pre>
         <input type="hidden" name="id" id="actionId">
     </form>
     
+    <div class="modal fade" id="authModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" value="authorize_onu">
+                    <input type="hidden" name="onu_id" id="authOnuId">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize ONU</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-router me-2"></i>
+                            <strong>ONU:</strong> <span id="authOnuSn"></span>
+                            <span class="ms-3"><strong>Location:</strong> <span id="authOnuLocation"></span></span>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Authentication Method</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="auth_method" id="authSN" value="sn" checked>
+                                            <label class="form-check-label" for="authSN">
+                                                <strong>Serial Number (SN)</strong>
+                                                <small class="text-muted d-block">Most common. Authenticate by ONU serial number.</small>
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="auth_method" id="authLOID" value="loid">
+                                            <label class="form-check-label" for="authLOID">
+                                                <strong>LOID (Logical ID)</strong>
+                                                <small class="text-muted d-block">Pre-register with Line ID for security.</small>
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="auth_method" id="authMAC" value="mac">
+                                            <label class="form-check-label" for="authMAC">
+                                                <strong>MAC Address</strong>
+                                                <small class="text-muted d-block">Authenticate by MAC address.</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="loidInputGroup" style="display:none;">
+                                    <div class="mb-2">
+                                        <label class="form-label small">LOID Value</label>
+                                        <input type="text" name="loid" class="form-control form-control-sm" placeholder="Enter LOID">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small">LOID Password (Optional)</label>
+                                        <input type="text" name="loid_password" class="form-control form-control-sm" placeholder="Password if required">
+                                    </div>
+                                </div>
+                                <div id="macInputGroup" style="display:none;">
+                                    <div class="mb-2">
+                                        <label class="form-label small">MAC Address</label>
+                                        <input type="text" name="mac_address" class="form-control form-control-sm" placeholder="XX:XX:XX:XX:XX:XX" pattern="^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$">
+                                        <small class="text-muted">Format: XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Configuration</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Service Profile</label>
+                                            <select name="profile_id" class="form-select" required>
+                                                <?php foreach ($profiles as $profile): ?>
+                                                <option value="<?= $profile['id'] ?>" <?= $profile['is_default'] ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars($profile['name']) ?>
+                                                    (<?= $profile['speed_profile_down'] ?: '-' ?> / <?= $profile['speed_profile_up'] ?: '-' ?>)
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Description</label>
+                                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="Customer name or location">
+                                        </div>
+                                        
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="auto_configure" id="authAutoConfig" checked>
+                                            <label class="form-check-label" for="authAutoConfig">
+                                                Auto-configure service VLAN
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i> Authorize & Provision
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <div class="modal fade" id="wifiConfigModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -3731,13 +4223,20 @@ echo "# ================================================\n";
         new bootstrap.Modal(document.getElementById('provisionModal')).show();
     }
     
-    function authorizeOnu(id, sn) {
-        if (confirm('Authorize ONU ' + sn + '? This will mark it as authorized and open the configuration page.')) {
-            document.getElementById('actionType').value = 'quick_authorize';
-            document.getElementById('actionId').value = id;
-            document.getElementById('actionForm').submit();
-        }
+    function authorizeOnu(id, sn, slot, port) {
+        document.getElementById('authOnuId').value = id;
+        document.getElementById('authOnuSn').textContent = sn;
+        document.getElementById('authOnuLocation').textContent = '0/' + (slot || '-') + '/' + (port || '-');
+        document.getElementById('authDescription').value = '';
+        new bootstrap.Modal(document.getElementById('authModal')).show();
     }
+    
+    document.querySelectorAll('input[name="auth_method"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.getElementById('loidInputGroup').style.display = this.value === 'loid' ? 'block' : 'none';
+            document.getElementById('macInputGroup').style.display = this.value === 'mac' ? 'block' : 'none';
+        });
+    });
     
     function rebootOnu(id) {
         if (confirm('Reboot this ONU?')) {
