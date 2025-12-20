@@ -230,9 +230,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if ($result['success']) {
                     $opticalInfo = isset($result['optical_sync']) ? ", optical updated: {$result['optical_sync']['updated']}" : '';
                     $message = "CLI Sync: {$result['added']} added, {$result['updated']} updated (total: {$result['total']}){$opticalInfo}";
-                    $messageType = 'success';
+                    if (!empty($result['errors'])) {
+                        $errorCount = count($result['errors']);
+                        $sampleErrors = array_slice($result['errors'], 0, 3);
+                        $message .= ". ERRORS ({$errorCount}): " . implode(' | ', $sampleErrors);
+                        $messageType = ($result['added'] + $result['updated']) > 0 ? 'warning' : 'danger';
+                    } else {
+                        $messageType = 'success';
+                    }
                 } else {
                     $message = $result['error'] ?? 'CLI sync failed';
+                    if (!empty($result['errors'])) {
+                        $message .= ': ' . implode(' | ', array_slice($result['errors'], 0, 3));
+                    }
                     $messageType = 'danger';
                 }
                 break;
