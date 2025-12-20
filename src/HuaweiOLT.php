@@ -418,29 +418,44 @@ class HuaweiOLT {
             snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
         }
         
-        // Huawei ONU index: frame.slot.pon.onu
-        $indexSuffix = "{$frame}.{$slot}.{$port}.{$onuId}";
+        // Huawei port index: (frame << 25) | (slot << 16) | port
+        // OID format: base_oid.{port_index}.{onu_id}
+        $portIndex = ($frame << 25) | ($slot << 16) | $port;
+        $indexSuffix = "{$portIndex}.{$onuId}";
         
-        // Correct Huawei ONU OIDs (base: .43.1.x, divide by 10)
-        $rxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3.{$indexSuffix}";
-        $txPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4.{$indexSuffix}";
-        $distanceOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.6.{$indexSuffix}";
-        $statusOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}";
+        // Correct Huawei optical OIDs (base: .51.1.x, divide by 100)
+        // .51.1.4 = ONT RX Power, .51.1.6 = OLT RX Power (from ONU)
+        $ontRxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}";
+        $oltRxPowerOid = "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.{$indexSuffix}";
         
-        $rxPower = @snmpget($host, $community, $rxPowerOid, 2000000, 2);
-        $txPower = @snmpget($host, $community, $txPowerOid, 2000000, 2);
-        $distance = @snmpget($host, $community, $distanceOid, 2000000, 2);
-        $status = @snmpget($host, $community, $statusOid, 2000000, 2);
+        $ontRxPower = @snmpget($host, $community, $ontRxPowerOid, 2000000, 2);
+        $oltRxPower = @snmpget($host, $community, $oltRxPowerOid, 2000000, 2);
         
         return [
             'success' => true,
             'optical' => [
-                'rx_power' => $rxPower !== false ? $this->parseOpticalPowerDiv10($rxPower) : null,
-                'tx_power' => $txPower !== false ? $this->parseOpticalPowerDiv10($txPower) : null,
-                'distance_km' => $distance !== false ? round((int)$this->cleanSnmpValue($distance) / 1000, 2) : null,
-                'status' => $status !== false ? $this->parseHuaweiOnuStatus((int)$this->cleanSnmpValue($status)) : null,
+                'rx_power' => $oltRxPower !== false ? $this->parseOpticalPowerDiv100($oltRxPower) : null,
+                'tx_power' => $ontRxPower !== false ? $this->parseOpticalPowerDiv100($ontRxPower) : null,
+            ],
+            'debug' => [
+                'port_index' => $portIndex,
+                'index_suffix' => $indexSuffix,
+                'ont_rx_oid' => $ontRxPowerOid,
+                'olt_rx_oid' => $oltRxPowerOid,
             ]
         ];
+    }
+    
+    private function parseOpticalPowerDiv100($value): ?float {
+        $cleaned = $this->cleanSnmpValue((string)$value);
+        if (is_numeric($cleaned)) {
+            $power = round((float)$cleaned / 100, 2);
+            // Valid range check: -50 to +10 dBm
+            if ($power >= -50 && $power <= 10) {
+                return $power;
+            }
+        }
+        return null;
     }
     
     public function syncONUsFromSNMP(int $oltId): array {
@@ -565,13 +580,11 @@ class HuaweiOLT {
         $community = $olt['snmp_read_community'] ?? 'public';
         $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
         
-        // Huawei ONU OIDs (correct base: .43.1.x, indexed by frame.slot.pon.onu)
-        // Reference: 1.3.6.1.4.1.2011.6.128.1.1.2.43.1
+        // Correct Huawei optical power OIDs (base: .51.1.x)
+        // Index: port_index.onu_id where port_index = (frame<<25)|(slot<<16)|port
         $oids = [
-            'rx'       => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.3',  // RX Power (divide by 10)
-            'tx'       => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.4',  // TX Power (divide by 10)
-            'distance' => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.6',  // Distance (meters)
-            'status'   => '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8',  // Status (1=online, 2=offline, 3=LOS, 4=power fail)
+            'ont_rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4',  // ONT RX Power (divide by 100)
+            'olt_rx' => '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6',  // OLT RX Power from ONU (divide by 100)
         ];
         
         $results = [];
@@ -584,13 +597,13 @@ class HuaweiOLT {
             snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
         }
         
-        // Walk RX power table
-        $rxResults = @snmpwalk($host, $community, $oids['rx']);
+        // Walk OLT RX power table (this is RX from customer perspective)
+        $rxResults = @snmpwalk($host, $community, $oids['olt_rx']);
         if ($rxResults !== false) {
             foreach ($rxResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['rx']);
+                $key = $this->parseHuaweiPortOnuIndex($index, $oids['olt_rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
+                    $power = $this->parseOpticalPowerDiv100($value);
                     if ($power !== null) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -601,13 +614,13 @@ class HuaweiOLT {
             }
         }
         
-        // Walk TX power table
-        $txResults = @snmpwalk($host, $community, $oids['tx']);
+        // Walk ONT RX power table (this is TX from customer perspective)
+        $txResults = @snmpwalk($host, $community, $oids['ont_rx']);
         if ($txResults !== false) {
             foreach ($txResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['tx']);
+                $key = $this->parseHuaweiPortOnuIndex($index, $oids['ont_rx']);
                 if ($key) {
-                    $power = $this->parseOpticalPowerDiv10($value);
+                    $power = $this->parseOpticalPowerDiv100($value);
                     if ($power !== null) {
                         if (!isset($results[$key])) {
                             $results[$key] = [];
@@ -618,39 +631,35 @@ class HuaweiOLT {
             }
         }
         
-        // Walk status table
-        $statusResults = @snmpwalk($host, $community, $oids['status']);
-        if ($statusResults !== false) {
-            foreach ($statusResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['status']);
-                if ($key) {
-                    if (!isset($results[$key])) {
-                        $results[$key] = [];
-                    }
-                    $results[$key]['status'] = $this->parseHuaweiOnuStatus((int)$value);
-                }
-            }
-        }
-        
-        // Walk distance table
-        $distResults = @snmpwalk($host, $community, $oids['distance']);
-        if ($distResults !== false) {
-            foreach ($distResults as $index => $value) {
-                $key = $this->parseHuaweiOnuIndex($index, $oids['distance']);
-                if ($key) {
-                    if (!isset($results[$key])) {
-                        $results[$key] = [];
-                    }
-                    $results[$key]['distance_km'] = round((int)$value / 1000, 2);
-                }
-            }
-        }
-        
         return [
             'success' => true,
             'data' => $results,
             'count' => count($results)
         ];
+    }
+    
+    private function parseHuaweiPortOnuIndex($indexOrOid, string $baseOid): ?string {
+        // Index format: port_index.onu_id
+        // port_index = (frame<<25)|(slot<<16)|port
+        if (is_string($indexOrOid) && strpos($indexOrOid, $baseOid) !== false) {
+            $indexPart = substr($indexOrOid, strlen($baseOid) + 1);
+        } else {
+            $indexPart = (string)$indexOrOid;
+        }
+        
+        $parts = explode('.', $indexPart);
+        if (count($parts) >= 2) {
+            $portIndex = (int)$parts[0];
+            $onuId = (int)$parts[1];
+            
+            // Decode port_index: frame = bits 25-31, slot = bits 16-24, port = bits 0-15
+            $frame = ($portIndex >> 25) & 0x7F;
+            $slot = ($portIndex >> 16) & 0x1FF;
+            $port = $portIndex & 0xFFFF;
+            
+            return "{$slot}.{$port}.{$onuId}";
+        }
+        return null;
     }
     
     private function parseHuaweiOnuIndex($indexOrOid, string $baseOid): ?string {
