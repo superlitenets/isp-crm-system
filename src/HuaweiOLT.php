@@ -2555,20 +2555,20 @@ class HuaweiOLT {
     }
     
     private function executeTelnetCommand(string $ip, int $port, string $username, string $password, string $command): array {
-        $timeout = 15;
+        $timeout = 60; // Connection timeout
         $socket = @fsockopen($ip, $port, $errno, $errstr, $timeout);
         
         if (!$socket) {
             return ['success' => false, 'message' => "Connection failed: {$errstr}"];
         }
         
-        stream_set_timeout($socket, $timeout);
+        stream_set_timeout($socket, 180); // 3 minutes for large configs
         stream_set_blocking($socket, false);
         
         $response = '';
         $startTime = time();
         
-        while ((time() - $startTime) < 5) {
+        while ((time() - $startTime) < 10) {
             $chunk = @fread($socket, 4096);
             if ($chunk) {
                 $response .= $chunk;
@@ -2637,11 +2637,11 @@ class HuaweiOLT {
         $startTime = time();
         stream_set_blocking($socket, false);
         
-        while ((time() - $startTime) < 20) {
-            $chunk = @fread($socket, 8192);
+        while ((time() - $startTime) < 180) { // 3 minutes for large configs
+            $chunk = @fread($socket, 16384);
             if ($chunk) {
                 $output .= $chunk;
-                if (strlen($output) > 65536) break;
+                if (strlen($output) > 2097152) break; // 2MB limit
                 
                 // Handle "---- More ----" pagination prompts
                 if (preg_match('/----\s*More\s*----/i', $chunk)) {
@@ -2688,7 +2688,7 @@ class HuaweiOLT {
         // Use phpseclib3 for reliable SSH connections
         try {
             $ssh = new SSH2($ip, $port);
-            $ssh->setTimeout(30);
+            $ssh->setTimeout(180); // 3 minutes for large configs
             
             if (!$ssh->login($username, $password)) {
                 return ['success' => false, 'message' => 'SSH authentication failed'];
@@ -2709,7 +2709,7 @@ class HuaweiOLT {
             // Read output until prompt
             $output = '';
             $startTime = time();
-            while ((time() - $startTime) < 20) {
+            while ((time() - $startTime) < 180) { // 3 minutes for large configs
                 $chunk = $ssh->read('/[>#]/', SSH2::READ_REGEX);
                 $output .= $chunk;
                 
