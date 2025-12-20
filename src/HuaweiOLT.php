@@ -2403,6 +2403,265 @@ class HuaweiOLT {
         return $stmt->execute([$id]);
     }
     
+    // ==================== Location Management (Zones, Subzones, Apartments, ODBs) ====================
+    
+    public function getZones(bool $activeOnly = false): array {
+        $sql = "SELECT z.*, 
+                (SELECT COUNT(*) FROM huawei_subzones WHERE zone_id = z.id) as subzone_count,
+                (SELECT COUNT(*) FROM huawei_apartments WHERE zone_id = z.id) as apartment_count,
+                (SELECT COUNT(*) FROM huawei_odb_units WHERE zone_id = z.id) as odb_count,
+                (SELECT COUNT(*) FROM huawei_onus WHERE zone_id = z.id) as onu_count
+                FROM huawei_zones z";
+        if ($activeOnly) $sql .= " WHERE z.is_active = TRUE";
+        $sql .= " ORDER BY z.name";
+        return $this->db->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getZone(int $id): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM huawei_zones WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function addZone(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO huawei_zones (name, description, is_active) VALUES (?, ?, ?)");
+        $stmt->execute([$data['name'], $data['description'] ?? '', $this->castBoolean($data['is_active'] ?? true)]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updateZone(int $id, string $name, ?string $description = null, bool $isActive = true): array {
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_zones SET name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$name, $description ?? '', $this->castBoolean($isActive), $id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteZone(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_zones WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubzones(?int $zoneId = null, bool $activeOnly = false): array {
+        $sql = "SELECT s.*, z.name as zone_name,
+                (SELECT COUNT(*) FROM huawei_apartments WHERE subzone_id = s.id) as apartment_count,
+                (SELECT COUNT(*) FROM huawei_odb_units WHERE subzone_id = s.id) as odb_count
+                FROM huawei_subzones s
+                LEFT JOIN huawei_zones z ON s.zone_id = z.id";
+        $params = [];
+        $where = [];
+        if ($zoneId) { $where[] = "s.zone_id = ?"; $params[] = $zoneId; }
+        if ($activeOnly) { $where[] = "s.is_active = TRUE"; }
+        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+        $sql .= " ORDER BY z.name, s.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function addSubzone(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO huawei_subzones (zone_id, name, description, is_active) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$data['zone_id'], $data['name'], $data['description'] ?? '', $this->castBoolean($data['is_active'] ?? true)]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updateSubzone(int $id, int $zoneId, string $name, ?string $description = null, bool $isActive = true): array {
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_subzones SET zone_id = ?, name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$zoneId, $name, $description ?? '', $this->castBoolean($isActive), $id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteSubzone(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_subzones WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function getApartments(?int $zoneId = null, ?int $subzoneId = null, bool $activeOnly = false): array {
+        $sql = "SELECT a.*, z.name as zone_name, s.name as subzone_name,
+                (SELECT COUNT(*) FROM huawei_odb_units WHERE apartment_id = a.id) as odb_count,
+                (SELECT COUNT(*) FROM huawei_onus WHERE apartment_id = a.id) as onu_count
+                FROM huawei_apartments a
+                LEFT JOIN huawei_zones z ON a.zone_id = z.id
+                LEFT JOIN huawei_subzones s ON a.subzone_id = s.id";
+        $params = [];
+        $where = [];
+        if ($zoneId) { $where[] = "a.zone_id = ?"; $params[] = $zoneId; }
+        if ($subzoneId) { $where[] = "a.subzone_id = ?"; $params[] = $subzoneId; }
+        if ($activeOnly) { $where[] = "a.is_active = TRUE"; }
+        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+        $sql .= " ORDER BY z.name, a.name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function addApartment(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO huawei_apartments (zone_id, subzone_id, name, address, floors, units_count, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $data['zone_id'],
+            !empty($data['subzone_id']) ? $data['subzone_id'] : null,
+            $data['name'],
+            $data['address'] ?? '',
+            !empty($data['floors']) ? (int)$data['floors'] : null,
+            !empty($data['units_count']) ? (int)$data['units_count'] : null,
+            $this->castBoolean($data['is_active'] ?? true)
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updateApartment(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_apartments SET zone_id = ?, subzone_id = ?, name = ?, address = ?, floors = ?, units_count = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([
+                $data['zone_id'],
+                !empty($data['subzone_id']) ? $data['subzone_id'] : null,
+                $data['name'],
+                $data['address'] ?? '',
+                !empty($data['floors']) ? (int)$data['floors'] : null,
+                !empty($data['units_per_floor']) ? (int)$data['units_per_floor'] : null,
+                $this->castBoolean($data['is_active'] ?? true),
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteApartment(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_apartments WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function getODBs(?int $zoneId = null, ?int $apartmentId = null, bool $activeOnly = false): array {
+        $sql = "SELECT o.*, z.name as zone_name, s.name as subzone_name, a.name as apartment_name,
+                (SELECT COUNT(*) FROM huawei_onus WHERE odb_id = o.id) as onu_count
+                FROM huawei_odb_units o
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                LEFT JOIN huawei_subzones s ON o.subzone_id = s.id
+                LEFT JOIN huawei_apartments a ON o.apartment_id = a.id";
+        $params = [];
+        $where = [];
+        if ($zoneId) { $where[] = "o.zone_id = ?"; $params[] = $zoneId; }
+        if ($apartmentId) { $where[] = "o.apartment_id = ?"; $params[] = $apartmentId; }
+        if ($activeOnly) { $where[] = "o.is_active = TRUE"; }
+        if ($where) $sql .= " WHERE " . implode(' AND ', $where);
+        $sql .= " ORDER BY o.code";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function addODB(array $data): int {
+        $stmt = $this->db->prepare("INSERT INTO huawei_odb_units (zone_id, subzone_id, apartment_id, code, capacity, location_description, latitude, longitude, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $data['zone_id'],
+            !empty($data['subzone_id']) ? $data['subzone_id'] : null,
+            !empty($data['apartment_id']) ? $data['apartment_id'] : null,
+            $data['code'],
+            !empty($data['capacity']) ? (int)$data['capacity'] : 8,
+            $data['location_description'] ?? '',
+            !empty($data['latitude']) ? $data['latitude'] : null,
+            !empty($data['longitude']) ? $data['longitude'] : null,
+            $this->castBoolean($data['is_active'] ?? true)
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    public function updateODB(int $id, array $data): array {
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_odb_units SET zone_id = ?, subzone_id = ?, apartment_id = ?, code = ?, capacity = ?, location_description = ?, latitude = ?, longitude = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([
+                $data['zone_id'],
+                !empty($data['subzone_id']) ? $data['subzone_id'] : null,
+                !empty($data['apartment_id']) ? $data['apartment_id'] : null,
+                $data['code'],
+                !empty($data['capacity']) ? (int)$data['capacity'] : 8,
+                $data['location_description'] ?? '',
+                !empty($data['latitude']) ? $data['latitude'] : null,
+                !empty($data['longitude']) ? $data['longitude'] : null,
+                $this->castBoolean($data['is_active'] ?? true),
+                $id
+            ]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function deleteODB(int $id): array {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM huawei_odb_units WHERE id = ?");
+            $stmt->execute([$id]);
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function updateODBUsage(int $odbId): void {
+        $stmt = $this->db->prepare("UPDATE huawei_odb_units SET ports_used = (SELECT COUNT(*) FROM huawei_onus WHERE odb_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$odbId, $odbId]);
+    }
+    
+    // Wrapper methods for template compatibility
+    public function createZone(string $name, ?string $description = null, bool $isActive = true): array {
+        try {
+            $id = $this->addZone(['name' => $name, 'description' => $description, 'is_active' => $isActive]);
+            return ['success' => true, 'id' => $id];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function createSubzone(int $zoneId, string $name, ?string $description = null, bool $isActive = true): array {
+        try {
+            $id = $this->addSubzone(['zone_id' => $zoneId, 'name' => $name, 'description' => $description, 'is_active' => $isActive]);
+            return ['success' => true, 'id' => $id];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function createApartment(array $data): array {
+        try {
+            $id = $this->addApartment($data);
+            return ['success' => true, 'id' => $id];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
+    public function createODB(array $data): array {
+        try {
+            $id = $this->addODB($data);
+            return ['success' => true, 'id' => $id];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+    
     // ==================== Dashboard Stats ====================
     
     public function getDashboardStats(): array {

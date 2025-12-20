@@ -54,6 +54,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'Service profile deleted successfully';
                 $messageType = 'success';
                 break;
+            // Location Management
+            case 'add_zone':
+                $huaweiOLT->addZone($_POST);
+                $message = 'Zone added successfully';
+                $messageType = 'success';
+                break;
+            case 'update_zone':
+                $huaweiOLT->updateZone((int)$_POST['id'], $_POST);
+                $message = 'Zone updated successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_zone':
+                $huaweiOLT->deleteZone((int)$_POST['id']);
+                $message = 'Zone deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'add_subzone':
+                $huaweiOLT->addSubzone($_POST);
+                $message = 'Subzone added successfully';
+                $messageType = 'success';
+                break;
+            case 'update_subzone':
+                $huaweiOLT->updateSubzone((int)$_POST['id'], $_POST);
+                $message = 'Subzone updated successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_subzone':
+                $huaweiOLT->deleteSubzone((int)$_POST['id']);
+                $message = 'Subzone deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'add_apartment':
+                $huaweiOLT->addApartment($_POST);
+                $message = 'Apartment/Building added successfully';
+                $messageType = 'success';
+                break;
+            case 'update_apartment':
+                $huaweiOLT->updateApartment((int)$_POST['id'], $_POST);
+                $message = 'Apartment/Building updated successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_apartment':
+                $huaweiOLT->deleteApartment((int)$_POST['id']);
+                $message = 'Apartment/Building deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'add_odb':
+                $huaweiOLT->addODB($_POST);
+                $message = 'ODB added successfully';
+                $messageType = 'success';
+                break;
+            case 'update_odb':
+                $huaweiOLT->updateODB((int)$_POST['id'], $_POST);
+                $message = 'ODB updated successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_odb':
+                $huaweiOLT->deleteODB((int)$_POST['id']);
+                $message = 'ODB deleted successfully';
+                $messageType = 'success';
+                break;
             case 'add_onu':
                 $onuData = [
                     'olt_id' => (int)$_POST['olt_id'],
@@ -109,21 +170,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $loidPassword = $_POST['loid_password'] ?? '';
                 $description = $_POST['description'] ?? '';
                 $macAddress = $_POST['mac_address'] ?? '';
+                $zone = $_POST['zone'] ?? '';
+                $apartment = $_POST['apartment'] ?? '';
+                $odb = $_POST['odb'] ?? '';
+                $zoneId = !empty($_POST['zone_id']) ? (int)$_POST['zone_id'] : null;
+                $apartmentId = !empty($_POST['apartment_id']) ? (int)$_POST['apartment_id'] : null;
+                $odbId = !empty($_POST['odb_id']) ? (int)$_POST['odb_id'] : null;
                 
-                // Update ONU record with description and/or MAC address before authorization
+                // Auto-generate description from zone/apartment if not provided
+                if (empty($description) && !empty($zone)) {
+                    $descParts = [$zone];
+                    if (!empty($apartment)) $descParts[] = $apartment;
+                    if (!empty($odb)) $descParts[] = $odb;
+                    $description = implode('_', $descParts) . '_authd_' . date('Ymd');
+                }
+                
+                // Update ONU record with location and description before authorization
                 $updateFields = [];
-                if (!empty($description)) {
-                    $updateFields['description'] = $description;
-                }
-                if (!empty($macAddress)) {
-                    $updateFields['mac_address'] = $macAddress;
-                }
+                if (!empty($description)) $updateFields['description'] = $description;
+                if (!empty($macAddress)) $updateFields['mac_address'] = $macAddress;
+                if (!empty($zone)) $updateFields['zone'] = $zone;
+                if (!empty($apartment)) $updateFields['apartment'] = $apartment;
+                if (!empty($odb)) $updateFields['odb'] = $odb;
+                if ($zoneId) $updateFields['zone_id'] = $zoneId;
+                if ($apartmentId) $updateFields['apartment_id'] = $apartmentId;
+                if ($odbId) $updateFields['odb_id'] = $odbId;
+                
                 if (!empty($updateFields)) {
                     $huaweiOLT->updateONU($onuId, $updateFields);
                 }
                 
+                // Update ODB usage count if assigned
+                if ($odbId) {
+                    $huaweiOLT->updateODBUsage($odbId);
+                }
+                
                 // Authorize the ONU with the selected authentication method
-                $result = $huaweiOLT->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword);
+                $options = ['description' => $description];
+                $result = $huaweiOLT->authorizeONU($onuId, $profileId, $authMethod, $loid, $loidPassword, $options);
                 $message = $result['message'] ?? ($result['success'] ? 'ONU authorized using ' . strtoupper($authMethod) . ' authentication' : 'Authorization failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
@@ -522,6 +606,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            // Location Management
+            case 'add_zone':
+                $result = $huaweiOLT->createZone($_POST['name'], $_POST['description'] ?? null, isset($_POST['is_active']));
+                $message = $result['success'] ? 'Zone created successfully' : ($result['message'] ?? 'Failed to create zone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_zone':
+                $result = $huaweiOLT->updateZone((int)$_POST['id'], $_POST['name'], $_POST['description'] ?? null, isset($_POST['is_active']));
+                $message = $result['success'] ? 'Zone updated successfully' : ($result['message'] ?? 'Failed to update zone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_zone':
+                $result = $huaweiOLT->deleteZone((int)$_POST['id']);
+                $message = $result['success'] ? 'Zone deleted successfully' : ($result['message'] ?? 'Failed to delete zone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'add_subzone':
+                $result = $huaweiOLT->createSubzone((int)$_POST['zone_id'], $_POST['name'], $_POST['description'] ?? null, isset($_POST['is_active']));
+                $message = $result['success'] ? 'Subzone created successfully' : ($result['message'] ?? 'Failed to create subzone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_subzone':
+                $result = $huaweiOLT->updateSubzone((int)$_POST['id'], (int)$_POST['zone_id'], $_POST['name'], $_POST['description'] ?? null, isset($_POST['is_active']));
+                $message = $result['success'] ? 'Subzone updated successfully' : ($result['message'] ?? 'Failed to update subzone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_subzone':
+                $result = $huaweiOLT->deleteSubzone((int)$_POST['id']);
+                $message = $result['success'] ? 'Subzone deleted successfully' : ($result['message'] ?? 'Failed to delete subzone');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'add_apartment':
+                $data = [
+                    'zone_id' => (int)$_POST['zone_id'],
+                    'subzone_id' => !empty($_POST['subzone_id']) ? (int)$_POST['subzone_id'] : null,
+                    'name' => $_POST['name'],
+                    'address' => $_POST['address'] ?? null,
+                    'floors' => !empty($_POST['floors']) ? (int)$_POST['floors'] : null,
+                    'units_per_floor' => !empty($_POST['units_per_floor']) ? (int)$_POST['units_per_floor'] : null
+                ];
+                $result = $huaweiOLT->createApartment($data);
+                $message = $result['success'] ? 'Apartment created successfully' : ($result['message'] ?? 'Failed to create apartment');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_apartment':
+                $data = [
+                    'zone_id' => (int)$_POST['zone_id'],
+                    'subzone_id' => !empty($_POST['subzone_id']) ? (int)$_POST['subzone_id'] : null,
+                    'name' => $_POST['name'],
+                    'address' => $_POST['address'] ?? null,
+                    'floors' => !empty($_POST['floors']) ? (int)$_POST['floors'] : null,
+                    'units_per_floor' => !empty($_POST['units_per_floor']) ? (int)$_POST['units_per_floor'] : null
+                ];
+                $result = $huaweiOLT->updateApartment((int)$_POST['id'], $data);
+                $message = $result['success'] ? 'Apartment updated successfully' : ($result['message'] ?? 'Failed to update apartment');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_apartment':
+                $result = $huaweiOLT->deleteApartment((int)$_POST['id']);
+                $message = $result['success'] ? 'Apartment deleted successfully' : ($result['message'] ?? 'Failed to delete apartment');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'add_odb':
+                $data = [
+                    'zone_id' => (int)$_POST['zone_id'],
+                    'apartment_id' => !empty($_POST['apartment_id']) ? (int)$_POST['apartment_id'] : null,
+                    'code' => $_POST['code'],
+                    'capacity' => (int)$_POST['capacity'],
+                    'location_description' => $_POST['location_description'] ?? null,
+                    'is_active' => isset($_POST['is_active'])
+                ];
+                $result = $huaweiOLT->createODB($data);
+                $message = $result['success'] ? 'ODB created successfully' : ($result['message'] ?? 'Failed to create ODB');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'update_odb':
+                $data = [
+                    'zone_id' => (int)$_POST['zone_id'],
+                    'apartment_id' => !empty($_POST['apartment_id']) ? (int)$_POST['apartment_id'] : null,
+                    'code' => $_POST['code'],
+                    'capacity' => (int)$_POST['capacity'],
+                    'location_description' => $_POST['location_description'] ?? null,
+                    'is_active' => isset($_POST['is_active'])
+                ];
+                $result = $huaweiOLT->updateODB((int)$_POST['id'], $data);
+                $message = $result['success'] ? 'ODB updated successfully' : ($result['message'] ?? 'Failed to update ODB');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'delete_odb':
+                $result = $huaweiOLT->deleteODB((int)$_POST['id']);
+                $message = $result['success'] ? 'ODB deleted successfully' : ($result['message'] ?? 'Failed to delete ODB');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             default:
                 break;
         }
@@ -563,6 +740,12 @@ if ($view === 'logs') {
 if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
 }
+
+// Load location data for locations view and authorization modal
+$zones = $huaweiOLT->getZones(false);
+$subzones = $huaweiOLT->getSubzones();
+$apartments = $huaweiOLT->getApartments();
+$odbs = $huaweiOLT->getODBs();
 
 $currentOnu = null;
 $onuRefreshResult = null;
@@ -715,6 +898,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
                     <i class="bi bi-sliders me-2"></i> Service Profiles
+                </a>
+                <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
+                    <i class="bi bi-geo-alt me-2"></i> Locations
                 </a>
                 <a class="nav-link <?= $view === 'logs' ? 'active' : '' ?>" href="?page=huawei-olt&view=logs">
                     <i class="bi bi-journal-text me-2"></i> Provisioning Logs
@@ -2271,6 +2457,298 @@ quit</pre>
                         </table>
                     </div>
                     <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php elseif ($view === 'locations'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Location Management</h4>
+            </div>
+            
+            <ul class="nav nav-tabs mb-4" id="locationTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="zones-tab" data-bs-toggle="tab" data-bs-target="#zonesTab" type="button">
+                        <i class="bi bi-map me-1"></i> Zones <span class="badge bg-secondary"><?= count($zones) ?></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="subzones-tab" data-bs-toggle="tab" data-bs-target="#subzonesTab" type="button">
+                        <i class="bi bi-diagram-3 me-1"></i> Subzones <span class="badge bg-secondary"><?= count($subzones) ?></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="apartments-tab" data-bs-toggle="tab" data-bs-target="#apartmentsTab" type="button">
+                        <i class="bi bi-building me-1"></i> Apartments <span class="badge bg-secondary"><?= count($apartments) ?></span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="odbs-tab" data-bs-toggle="tab" data-bs-target="#odbsTab" type="button">
+                        <i class="bi bi-box me-1"></i> ODB Units <span class="badge bg-secondary"><?= count($odbs) ?></span>
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="locationTabContent">
+                <!-- Zones Tab -->
+                <div class="tab-pane fade show active" id="zonesTab" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-map me-2"></i>Zones</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#zoneModal" onclick="resetZoneForm()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Zone
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($zones)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-map fs-1 mb-2 d-block"></i>
+                                No zones configured. Add zones to organize ONU locations.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Zone Name</th>
+                                            <th>Description</th>
+                                            <th>Subzones</th>
+                                            <th>Apartments</th>
+                                            <th>ODBs</th>
+                                            <th>ONUs</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($zones as $zone): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($zone['name']) ?></strong></td>
+                                            <td class="text-muted"><?= htmlspecialchars($zone['description'] ?? '-') ?></td>
+                                            <td><span class="badge bg-info"><?= $zone['subzone_count'] ?></span></td>
+                                            <td><span class="badge bg-secondary"><?= $zone['apartment_count'] ?></span></td>
+                                            <td><span class="badge bg-warning text-dark"><?= $zone['odb_count'] ?></span></td>
+                                            <td><span class="badge bg-primary"><?= $zone['onu_count'] ?></span></td>
+                                            <td>
+                                                <?php if ($zone['is_active']): ?>
+                                                <span class="badge bg-success">Active</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary" onclick="editZone(<?= htmlspecialchars(json_encode($zone)) ?>)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteZone(<?= $zone['id'] ?>, '<?= htmlspecialchars($zone['name']) ?>')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Subzones Tab -->
+                <div class="tab-pane fade" id="subzonesTab" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Subzones</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#subzoneModal" onclick="resetSubzoneForm()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Subzone
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($subzones)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-diagram-3 fs-1 mb-2 d-block"></i>
+                                No subzones. Subzones help divide zones into smaller areas.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Subzone Name</th>
+                                            <th>Zone</th>
+                                            <th>Description</th>
+                                            <th>Apartments</th>
+                                            <th>ODBs</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($subzones as $sz): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($sz['name']) ?></strong></td>
+                                            <td><span class="badge bg-primary"><?= htmlspecialchars($sz['zone_name']) ?></span></td>
+                                            <td class="text-muted"><?= htmlspecialchars($sz['description'] ?? '-') ?></td>
+                                            <td><span class="badge bg-secondary"><?= $sz['apartment_count'] ?></span></td>
+                                            <td><span class="badge bg-warning text-dark"><?= $sz['odb_count'] ?></span></td>
+                                            <td>
+                                                <?php if ($sz['is_active']): ?>
+                                                <span class="badge bg-success">Active</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary" onclick="editSubzone(<?= htmlspecialchars(json_encode($sz)) ?>)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteSubzone(<?= $sz['id'] ?>, '<?= htmlspecialchars($sz['name']) ?>')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Apartments Tab -->
+                <div class="tab-pane fade" id="apartmentsTab" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-building me-2"></i>Apartments / Buildings</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#apartmentModal" onclick="resetApartmentForm()">
+                                <i class="bi bi-plus-circle me-1"></i> Add Apartment
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($apartments)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-building fs-1 mb-2 d-block"></i>
+                                No apartments/buildings. Add locations where ONUs are installed.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Zone</th>
+                                            <th>Subzone</th>
+                                            <th>Address</th>
+                                            <th>Floors</th>
+                                            <th>ODBs</th>
+                                            <th>ONUs</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($apartments as $apt): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($apt['name']) ?></strong></td>
+                                            <td><span class="badge bg-primary"><?= htmlspecialchars($apt['zone_name']) ?></span></td>
+                                            <td><?= $apt['subzone_name'] ? htmlspecialchars($apt['subzone_name']) : '<span class="text-muted">-</span>' ?></td>
+                                            <td class="text-muted small"><?= htmlspecialchars($apt['address'] ?? '-') ?></td>
+                                            <td><?= $apt['floors'] ?: '-' ?></td>
+                                            <td><span class="badge bg-warning text-dark"><?= $apt['odb_count'] ?></span></td>
+                                            <td><span class="badge bg-success"><?= $apt['onu_count'] ?></span></td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary" onclick="editApartment(<?= htmlspecialchars(json_encode($apt)) ?>)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteApartment(<?= $apt['id'] ?>, '<?= htmlspecialchars($apt['name']) ?>')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ODBs Tab -->
+                <div class="tab-pane fade" id="odbsTab" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-box me-2"></i>Optical Distribution Boxes (ODB)</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#odbModal" onclick="resetOdbForm()">
+                                <i class="bi bi-plus-circle me-1"></i> Add ODB
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($odbs)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-box fs-1 mb-2 d-block"></i>
+                                No ODB units. ODBs are the fiber distribution boxes where ONUs connect.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ODB Code</th>
+                                            <th>Zone</th>
+                                            <th>Apartment</th>
+                                            <th>Capacity</th>
+                                            <th>Used</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($odbs as $odb): ?>
+                                        <tr>
+                                            <td><strong><code><?= htmlspecialchars($odb['code']) ?></code></strong></td>
+                                            <td><span class="badge bg-primary"><?= htmlspecialchars($odb['zone_name']) ?></span></td>
+                                            <td><?= $odb['apartment_name'] ? htmlspecialchars($odb['apartment_name']) : '<span class="text-muted">-</span>' ?></td>
+                                            <td><?= $odb['capacity'] ?> ports</td>
+                                            <td>
+                                                <?php 
+                                                $usage = $odb['capacity'] > 0 ? ($odb['onu_count'] / $odb['capacity']) * 100 : 0;
+                                                $usageClass = $usage >= 90 ? 'danger' : ($usage >= 70 ? 'warning' : 'success');
+                                                ?>
+                                                <span class="badge bg-<?= $usageClass ?>"><?= $odb['onu_count'] ?>/<?= $odb['capacity'] ?></span>
+                                            </td>
+                                            <td class="text-muted small"><?= htmlspecialchars($odb['location_description'] ?? '-') ?></td>
+                                            <td>
+                                                <?php if ($odb['is_active']): ?>
+                                                <span class="badge bg-success">Active</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary" onclick="editOdb(<?= htmlspecialchars(json_encode($odb)) ?>)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteOdb(<?= $odb['id'] ?>, '<?= htmlspecialchars($odb['code']) ?>')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -4838,6 +5316,51 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <div class="col-md-6">
                                 <div class="card mb-3">
                                     <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Location Details</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                            <input type="text" name="zone" id="authZone" class="form-control" placeholder="e.g., Huruma, CBD, Industrial" required list="zoneList">
+                                            <datalist id="zoneList">
+                                                <?php
+                                                // Get distinct zones from existing ONUs
+                                                $zoneStmt = $db->query("SELECT DISTINCT zone FROM huawei_onus WHERE zone IS NOT NULL AND zone != '' ORDER BY zone");
+                                                while ($z = $zoneStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                                <option value="<?= htmlspecialchars($z['zone']) ?>">
+                                                <?php endwhile; ?>
+                                            </datalist>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">Apartment/Building</label>
+                                                <input type="text" name="apartment" id="authApartment" class="form-control" placeholder="e.g., Sunrise Apts" list="apartmentList">
+                                                <datalist id="apartmentList">
+                                                    <?php
+                                                    $aptStmt = $db->query("SELECT DISTINCT apartment FROM huawei_onus WHERE apartment IS NOT NULL AND apartment != '' ORDER BY apartment");
+                                                    while ($a = $aptStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                                    <option value="<?= htmlspecialchars($a['apartment']) ?>">
+                                                    <?php endwhile; ?>
+                                                </datalist>
+                                            </div>
+                                            <div class="col-6 mb-3">
+                                                <label class="form-label">ODB (Optical Box)</label>
+                                                <input type="text" name="odb" id="authOdb" class="form-control" placeholder="e.g., ODB-001" list="odbList">
+                                                <datalist id="odbList">
+                                                    <?php
+                                                    $odbStmt = $db->query("SELECT DISTINCT odb FROM huawei_onus WHERE odb IS NOT NULL AND odb != '' ORDER BY odb");
+                                                    while ($o = $odbStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                                    <option value="<?= htmlspecialchars($o['odb']) ?>">
+                                                    <?php endwhile; ?>
+                                                </datalist>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
                                         <h6 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Configuration</h6>
                                     </div>
                                     <div class="card-body">
@@ -4855,13 +5378,14 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Description</label>
-                                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="Customer name or location">
+                                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="Auto-generated from Zone/Apartment">
+                                            <small class="text-muted">Leave empty to auto-generate from location</small>
                                         </div>
                                         
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" name="auto_configure" id="authAutoConfig" checked>
                                             <label class="form-check-label" for="authAutoConfig">
-                                                Auto-configure service VLAN
+                                                Auto-configure service VLAN & TR-069
                                             </label>
                                         </div>
                                     </div>
@@ -5121,6 +5645,203 @@ echo "# ================================================\n";
             </div>
         </div>
     </div>
+    
+    <!-- Zone Modal -->
+    <div class="modal fade" id="zoneModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" id="zoneAction" value="add_zone">
+                    <input type="hidden" name="id" id="zoneId">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="zoneModalTitle">Add Zone</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Zone Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="zoneName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" id="zoneDescription" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="is_active" id="zoneActive" class="form-check-input" value="1" checked>
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Zone</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Subzone Modal -->
+    <div class="modal fade" id="subzoneModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" id="subzoneAction" value="add_subzone">
+                    <input type="hidden" name="id" id="subzoneId">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="subzoneModalTitle">Add Subzone</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Zone <span class="text-danger">*</span></label>
+                            <select name="zone_id" id="subzoneZoneId" class="form-select" required>
+                                <option value="">-- Select Zone --</option>
+                                <?php foreach ($zones as $zone): ?>
+                                <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Subzone Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="subzoneName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" id="subzoneDescription" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="is_active" id="subzoneActive" class="form-check-input" value="1" checked>
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Subzone</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Apartment Modal -->
+    <div class="modal fade" id="apartmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" id="apartmentAction" value="add_apartment">
+                    <input type="hidden" name="id" id="apartmentId">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="apartmentModalTitle">Add Apartment / Building</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                <select name="zone_id" id="apartmentZoneId" class="form-select" required onchange="filterApartmentSubzones()">
+                                    <option value="">-- Select Zone --</option>
+                                    <?php foreach ($zones as $zone): ?>
+                                    <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Subzone</label>
+                                <select name="subzone_id" id="apartmentSubzoneId" class="form-select">
+                                    <option value="">-- None --</option>
+                                    <?php foreach ($subzones as $sz): ?>
+                                    <option value="<?= $sz['id'] ?>" data-zone="<?= $sz['zone_id'] ?>"><?= htmlspecialchars($sz['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Apartment / Building Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="apartmentName" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="address" id="apartmentAddress" class="form-control">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Number of Floors</label>
+                                <input type="number" name="floors" id="apartmentFloors" class="form-control" min="1">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Units per Floor</label>
+                                <input type="number" name="units_per_floor" id="apartmentUnits" class="form-control" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Apartment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ODB Modal -->
+    <div class="modal fade" id="odbModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" id="odbAction" value="add_odb">
+                    <input type="hidden" name="id" id="odbId">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="odbModalTitle">Add ODB Unit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                <select name="zone_id" id="odbZoneId" class="form-select" required onchange="filterOdbApartments()">
+                                    <option value="">-- Select Zone --</option>
+                                    <?php foreach ($zones as $zone): ?>
+                                    <option value="<?= $zone['id'] ?>"><?= htmlspecialchars($zone['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Apartment</label>
+                                <select name="apartment_id" id="odbApartmentId" class="form-select">
+                                    <option value="">-- None --</option>
+                                    <?php foreach ($apartments as $apt): ?>
+                                    <option value="<?= $apt['id'] ?>" data-zone="<?= $apt['zone_id'] ?>"><?= htmlspecialchars($apt['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">ODB Code <span class="text-danger">*</span></label>
+                                <input type="text" name="code" id="odbCode" class="form-control" required placeholder="e.g., ODB-001">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Capacity <span class="text-danger">*</span></label>
+                                <input type="number" name="capacity" id="odbCapacity" class="form-control" required min="1" value="8">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location Description</label>
+                            <input type="text" name="location_description" id="odbLocation" class="form-control" placeholder="e.g., Floor 2, Near Elevator">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="is_active" id="odbActive" class="form-check-input" value="1" checked>
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save ODB</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -5353,6 +6074,157 @@ echo "# ================================================\n";
         document.getElementById('wifiDeviceId').value = deviceId;
         document.getElementById('wifiDeviceSn').textContent = serialNumber;
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+    }
+    
+    // Location Management Functions
+    function resetZoneForm() {
+        document.getElementById('zoneAction').value = 'add_zone';
+        document.getElementById('zoneId').value = '';
+        document.getElementById('zoneModalTitle').textContent = 'Add Zone';
+        document.getElementById('zoneName').value = '';
+        document.getElementById('zoneDescription').value = '';
+        document.getElementById('zoneActive').checked = true;
+    }
+    
+    function editZone(zone) {
+        document.getElementById('zoneAction').value = 'update_zone';
+        document.getElementById('zoneId').value = zone.id;
+        document.getElementById('zoneModalTitle').textContent = 'Edit Zone';
+        document.getElementById('zoneName').value = zone.name;
+        document.getElementById('zoneDescription').value = zone.description || '';
+        document.getElementById('zoneActive').checked = zone.is_active;
+        new bootstrap.Modal(document.getElementById('zoneModal')).show();
+    }
+    
+    function deleteZone(id, name) {
+        if (confirm('Delete zone "' + name + '"? This will also remove all subzones, apartments, and ODB units in this zone.')) {
+            document.getElementById('actionType').value = 'delete_zone';
+            document.getElementById('actionId').value = id;
+            document.getElementById('actionForm').submit();
+        }
+    }
+    
+    function resetSubzoneForm() {
+        document.getElementById('subzoneAction').value = 'add_subzone';
+        document.getElementById('subzoneId').value = '';
+        document.getElementById('subzoneModalTitle').textContent = 'Add Subzone';
+        document.getElementById('subzoneZoneId').value = '';
+        document.getElementById('subzoneName').value = '';
+        document.getElementById('subzoneDescription').value = '';
+        document.getElementById('subzoneActive').checked = true;
+    }
+    
+    function editSubzone(sz) {
+        document.getElementById('subzoneAction').value = 'update_subzone';
+        document.getElementById('subzoneId').value = sz.id;
+        document.getElementById('subzoneModalTitle').textContent = 'Edit Subzone';
+        document.getElementById('subzoneZoneId').value = sz.zone_id;
+        document.getElementById('subzoneName').value = sz.name;
+        document.getElementById('subzoneDescription').value = sz.description || '';
+        document.getElementById('subzoneActive').checked = sz.is_active;
+        new bootstrap.Modal(document.getElementById('subzoneModal')).show();
+    }
+    
+    function deleteSubzone(id, name) {
+        if (confirm('Delete subzone "' + name + '"?')) {
+            document.getElementById('actionType').value = 'delete_subzone';
+            document.getElementById('actionId').value = id;
+            document.getElementById('actionForm').submit();
+        }
+    }
+    
+    function resetApartmentForm() {
+        document.getElementById('apartmentAction').value = 'add_apartment';
+        document.getElementById('apartmentId').value = '';
+        document.getElementById('apartmentModalTitle').textContent = 'Add Apartment / Building';
+        document.getElementById('apartmentZoneId').value = '';
+        document.getElementById('apartmentSubzoneId').value = '';
+        document.getElementById('apartmentName').value = '';
+        document.getElementById('apartmentAddress').value = '';
+        document.getElementById('apartmentFloors').value = '';
+        document.getElementById('apartmentUnits').value = '';
+        filterApartmentSubzones();
+    }
+    
+    function editApartment(apt) {
+        document.getElementById('apartmentAction').value = 'update_apartment';
+        document.getElementById('apartmentId').value = apt.id;
+        document.getElementById('apartmentModalTitle').textContent = 'Edit Apartment / Building';
+        document.getElementById('apartmentZoneId').value = apt.zone_id;
+        filterApartmentSubzones();
+        setTimeout(function() {
+            document.getElementById('apartmentSubzoneId').value = apt.subzone_id || '';
+        }, 100);
+        document.getElementById('apartmentName').value = apt.name;
+        document.getElementById('apartmentAddress').value = apt.address || '';
+        document.getElementById('apartmentFloors').value = apt.floors || '';
+        document.getElementById('apartmentUnits').value = apt.units_per_floor || '';
+        new bootstrap.Modal(document.getElementById('apartmentModal')).show();
+    }
+    
+    function deleteApartment(id, name) {
+        if (confirm('Delete apartment "' + name + '"? This will also remove all ODB units in this apartment.')) {
+            document.getElementById('actionType').value = 'delete_apartment';
+            document.getElementById('actionId').value = id;
+            document.getElementById('actionForm').submit();
+        }
+    }
+    
+    function filterApartmentSubzones() {
+        var zoneId = document.getElementById('apartmentZoneId').value;
+        var subzoneSelect = document.getElementById('apartmentSubzoneId');
+        var options = subzoneSelect.querySelectorAll('option[data-zone]');
+        options.forEach(function(opt) {
+            opt.style.display = (!zoneId || opt.dataset.zone === zoneId) ? '' : 'none';
+        });
+        subzoneSelect.value = '';
+    }
+    
+    function resetOdbForm() {
+        document.getElementById('odbAction').value = 'add_odb';
+        document.getElementById('odbId').value = '';
+        document.getElementById('odbModalTitle').textContent = 'Add ODB Unit';
+        document.getElementById('odbZoneId').value = '';
+        document.getElementById('odbApartmentId').value = '';
+        document.getElementById('odbCode').value = '';
+        document.getElementById('odbCapacity').value = '8';
+        document.getElementById('odbLocation').value = '';
+        document.getElementById('odbActive').checked = true;
+        filterOdbApartments();
+    }
+    
+    function editOdb(odb) {
+        document.getElementById('odbAction').value = 'update_odb';
+        document.getElementById('odbId').value = odb.id;
+        document.getElementById('odbModalTitle').textContent = 'Edit ODB Unit';
+        document.getElementById('odbZoneId').value = odb.zone_id;
+        filterOdbApartments();
+        setTimeout(function() {
+            document.getElementById('odbApartmentId').value = odb.apartment_id || '';
+        }, 100);
+        document.getElementById('odbCode').value = odb.code;
+        document.getElementById('odbCapacity').value = odb.capacity;
+        document.getElementById('odbLocation').value = odb.location_description || '';
+        document.getElementById('odbActive').checked = odb.is_active;
+        new bootstrap.Modal(document.getElementById('odbModal')).show();
+    }
+    
+    function deleteOdb(id, code) {
+        if (confirm('Delete ODB "' + code + '"?')) {
+            document.getElementById('actionType').value = 'delete_odb';
+            document.getElementById('actionId').value = id;
+            document.getElementById('actionForm').submit();
+        }
+    }
+    
+    function filterOdbApartments() {
+        var zoneId = document.getElementById('odbZoneId').value;
+        var aptSelect = document.getElementById('odbApartmentId');
+        var options = aptSelect.querySelectorAll('option[data-zone]');
+        options.forEach(function(opt) {
+            opt.style.display = (!zoneId || opt.dataset.zone === zoneId) ? '' : 'none';
+        });
+        aptSelect.value = '';
     }
     </script>
 </body>
