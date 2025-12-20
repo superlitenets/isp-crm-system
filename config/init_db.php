@@ -584,6 +584,29 @@ function initializeDatabase(): void {
 }
 
 function runMigrations(PDO $db): void {
+    // Check if migrations have already been applied using a version hash
+    // This reduces ~110 queries per page load to just 1-2 queries
+    $migrationVersion = 'v2024121901'; // Increment this when adding new migrations
+    
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
+            id SERIAL PRIMARY KEY,
+            version VARCHAR(50) NOT NULL,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+        
+        $stmt = $db->prepare("SELECT version FROM schema_migrations ORDER BY id DESC LIMIT 1");
+        $stmt->execute();
+        $currentVersion = $stmt->fetchColumn();
+        
+        if ($currentVersion === $migrationVersion) {
+            // Migrations are up to date, skip all checks
+            return;
+        }
+    } catch (PDOException $e) {
+        error_log("Migration version check failed: " . $e->getMessage());
+    }
+    
     $tables = [
         'biometric_devices' => "
             CREATE TABLE IF NOT EXISTS biometric_devices (
@@ -1785,6 +1808,15 @@ function runMigrations(PDO $db): void {
     seedLeaveTypes($db);
     seedHRNotificationTemplates($db);
     seedISPEquipmentCategories($db);
+    
+    // Record that migrations are complete
+    try {
+        $stmt = $db->prepare("INSERT INTO schema_migrations (version) VALUES (?)");
+        $stmt->execute([$migrationVersion]);
+        error_log("Migrations completed and recorded: $migrationVersion");
+    } catch (PDOException $e) {
+        error_log("Failed to record migration version: " . $e->getMessage());
+    }
 }
 
 function seedRolesAndPermissions(PDO $db): void {
