@@ -724,7 +724,20 @@ if ($view === 'onus' || $view === 'dashboard') {
         $onuFilters['is_authorized'] = false;
         // Auto-discover unconfigured ONUs when viewing Pending Authorization tab
         if ($oltId) {
+            // Discover from specific OLT
             $huaweiOLT->discoverUnconfiguredONUs($oltId);
+        } else {
+            // Discover from ALL active OLTs
+            foreach ($olts as $olt) {
+                if ($olt['is_active']) {
+                    try {
+                        $huaweiOLT->discoverUnconfiguredONUs($olt['id']);
+                    } catch (Exception $e) {
+                        // Continue with other OLTs if one fails
+                        error_log("Failed to discover ONUs from OLT {$olt['name']}: " . $e->getMessage());
+                    }
+                }
+            }
         }
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
