@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
     && a2enmod rewrite headers \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN echo "max_execution_time=300" >> /usr/local/etc/php/conf.d/timeouts.ini \
+    && echo "max_input_time=300" >> /usr/local/etc/php/conf.d/timeouts.ini \
+    && echo "default_socket_timeout=300" >> /usr/local/etc/php/conf.d/timeouts.ini \
+    && echo "memory_limit=256M" >> /usr/local/etc/php/conf.d/timeouts.ini
+
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
 WORKDIR /var/www/html
