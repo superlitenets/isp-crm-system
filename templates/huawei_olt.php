@@ -671,26 +671,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? "ONU description updated" : ($result['message'] ?? 'Update failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
-            case 'configure_onu_service':
-                $config = [];
-                if (!empty($_POST['ip_mode'])) {
-                    $config['ip_mode'] = $_POST['ip_mode'];
-                    $config['vlan_id'] = (int)($_POST['mgmt_vlan'] ?? 69);
-                    $config['vlan_priority'] = (int)($_POST['vlan_priority'] ?? 0);
-                }
-                if (!empty($_POST['service_vlan'])) {
-                    $config['service_vlan'] = (int)$_POST['service_vlan'];
-                    $config['gem_port'] = (int)($_POST['gem_port'] ?? 1);
-                    $config['rx_traffic_table'] = (int)($_POST['rx_traffic_table'] ?? 6);
-                    $config['tx_traffic_table'] = (int)($_POST['tx_traffic_table'] ?? 6);
-                }
-                if (!empty($_POST['traffic_table_index'])) {
-                    $config['traffic_table_index'] = (int)$_POST['traffic_table_index'];
-                }
-                $result = $huaweiOLT->configureONUService((int)$_POST['onu_id'], $config);
-                $message = $result['success'] ? "ONU service configured successfully" : ($result['message'] ?? 'Configuration failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
-                break;
             case 'delete_service_port':
                 $result = $huaweiOLT->deleteServicePort((int)$_POST['olt_id'], (int)$_POST['service_port_index']);
                 $message = $result['success'] ? "Service port deleted" : ($result['message'] ?? 'Delete failed');
@@ -2092,60 +2072,46 @@ quit</pre>
                 <div class="col-md-6">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-success text-white">
-                            <i class="bi bi-sliders me-2"></i>Service Configuration
+                            <i class="bi bi-sliders me-2"></i>Service Profile
                         </div>
                         <div class="card-body">
-                            <form method="post">
-                                <input type="hidden" name="action" value="configure_onu_service">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small">IP Mode</label>
-                                        <select name="ip_mode" class="form-select form-select-sm">
-                                            <option value="">-- No Change --</option>
-                                            <option value="dhcp">DHCP</option>
-                                            <option value="static">Static</option>
-                                            <option value="pppoe">PPPoE</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small">Management VLAN</label>
-                                        <input type="number" name="mgmt_vlan" class="form-control form-control-sm" placeholder="e.g., 69">
-                                    </div>
+                            <div class="alert alert-info small mb-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>OMCI configuration is applied automatically</strong> based on the assigned service profile.
+                                Customer-facing settings (WAN, Wi-Fi) are managed via TR-069/ACS below.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Current Profile</label>
+                                <div class="d-flex align-items-center">
+                                    <?php if ($currentOnu['service_profile_id']): ?>
+                                        <?php 
+                                        $currentProfile = null;
+                                        foreach ($profiles as $p) {
+                                            if ($p['id'] == $currentOnu['service_profile_id']) {
+                                                $currentProfile = $p;
+                                                break;
+                                            }
+                                        }
+                                        ?>
+                                        <span class="badge bg-primary fs-6 me-2">
+                                            <?= htmlspecialchars($currentProfile['name'] ?? 'Unknown') ?>
+                                        </span>
+                                        <?php if ($currentProfile): ?>
+                                        <small class="text-muted">
+                                            <?= htmlspecialchars($currentProfile['download_speed'] ?? '') ?>/<?= htmlspecialchars($currentProfile['upload_speed'] ?? '') ?> Mbps
+                                        </small>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary fs-6">No Profile Assigned</span>
+                                    <?php endif; ?>
                                 </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small">Service VLAN</label>
-                                        <input type="number" name="service_vlan" class="form-control form-control-sm" placeholder="e.g., 100">
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small">GEM Port</label>
-                                        <input type="number" name="gem_port" class="form-control form-control-sm" value="1" min="1" max="8">
-                                    </div>
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-6">
-                                        <label class="form-label small">RX Traffic Table</label>
-                                        <input type="number" name="rx_traffic_table" class="form-control form-control-sm" placeholder="Index (e.g., 6)">
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small">TX Traffic Table</label>
-                                        <input type="number" name="tx_traffic_table" class="form-control form-control-sm" placeholder="Index (e.g., 6)">
-                                    </div>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-success w-100" onclick="return confirm('Apply service configuration?')">
-                                    <i class="bi bi-check-lg me-1"></i> Apply Configuration
-                                </button>
-                            </form>
+                            </div>
                             
                             <hr>
                             
-                            <h6 class="mb-3"><i class="bi bi-arrow-up-circle me-2"></i>Change Service Profile (Plan Upgrade)</h6>
-                            <form method="post" onsubmit="return confirm('Change service profile? The ONU will be re-provisioned.')">
+                            <h6 class="mb-3"><i class="bi bi-arrow-up-circle me-2"></i>Change Service Profile</h6>
+                            <form method="post" onsubmit="return confirm('Change service profile? OMCI will be re-applied automatically.')">
                                 <input type="hidden" name="action" value="change_onu_profile">
                                 <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                 <div class="row g-2">
@@ -2155,30 +2121,39 @@ quit</pre>
                                             <?php foreach ($profiles as $profile): ?>
                                             <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($profile['name']) ?>
+                                                (<?= $profile['download_speed'] ?? '?' ?>/<?= $profile['upload_speed'] ?? '?' ?> Mbps)
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-4">
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">Upgrade</button>
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
                                     </div>
                                 </div>
+                                <small class="text-muted mt-2 d-block">
+                                    Changing the profile will automatically update OMCI settings (VLAN, speed, QoS).
+                                </small>
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- TR-069 Remote Management Section -->
+            <!-- TR-069 Remote Management Section - Customer-facing CPE Configuration -->
             <?php if ($currentOnu['is_authorized']): ?>
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Remote Management</span>
-                    <span class="badge bg-light text-dark">
-                        <i class="bi bi-wifi me-1"></i>OMCI / GenieACS
+                    <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 CPE Configuration</span>
+                    <span class="badge bg-success">
+                        <i class="bi bi-cloud-check me-1"></i>ACS Managed
                     </span>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-secondary small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Customer-facing settings</strong> (WAN, Wi-Fi, LAN) are managed via TR-069/ACS.
+                        Configuration intents are pushed to GenieACS which applies them to the CPE.
+                    </div>
                     <!-- TR-069 Tabs -->
                     <ul class="nav nav-tabs mb-3" id="tr069Tabs" role="tablist">
                         <li class="nav-item" role="presentation">
