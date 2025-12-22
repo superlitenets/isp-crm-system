@@ -1,10 +1,12 @@
 const express = require('express');
 const OLTSessionManager = require('./OLTSessionManager');
+const DiscoveryWorker = require('./DiscoveryWorker');
 
 const app = express();
 app.use(express.json());
 
 const sessionManager = new OLTSessionManager();
+const discoveryWorker = new DiscoveryWorker(sessionManager);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
@@ -71,19 +73,38 @@ app.get('/status/:oltId', (req, res) => {
     res.json(status);
 });
 
+app.post('/discovery/run', async (req, res) => {
+    try {
+        await discoveryWorker.runDiscovery();
+        res.json({ success: true, message: 'Discovery completed' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/discovery/status', (req, res) => {
+    res.json({ 
+        isRunning: discoveryWorker.isRunning,
+        cronActive: discoveryWorker.cronJob !== null
+    });
+});
+
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
+    discoveryWorker.start();
 });
 
 process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');
+    discoveryWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     console.log('Shutting down OLT Session Manager...');
+    discoveryWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });
