@@ -556,9 +556,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'add_vpn_server':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
-                $wgService->createServer($_POST);
-                $message = 'VPN server added successfully';
-                $messageType = 'success';
+                $serverData = [
+                    'name' => $_POST['name'] ?? '',
+                    'description' => $_POST['description'] ?? null,
+                    'public_endpoint' => $_POST['public_endpoint'] ?? '',
+                    'listen_port' => (int)($_POST['listen_port'] ?? 51820),
+                    'address' => $_POST['address'] ?? '',
+                    'interface_name' => $_POST['interface_name'] ?? 'wg0',
+                    'mtu' => (int)($_POST['mtu'] ?? 1420),
+                    'dns_servers' => $_POST['dns_servers'] ?? null,
+                    'is_active' => true
+                ];
+                $serverId = $wgService->createServer($serverData);
+                if ($serverId) {
+                    $message = 'VPN server added successfully';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add VPN server';
+                    $messageType = 'danger';
+                }
                 break;
             case 'delete_vpn_server':
                 require_once __DIR__ . '/../src/WireGuardService.php';
@@ -570,9 +586,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'add_vpn_peer':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
-                $wgService->createPeer($_POST);
-                $message = 'VPN peer added successfully';
-                $messageType = 'success';
+                $peerData = [
+                    'server_id' => (int)$_POST['server_id'],
+                    'name' => $_POST['name'] ?? '',
+                    'description' => $_POST['description'] ?? null,
+                    'allowed_ips' => $_POST['allowed_ips'] ?? '',
+                    'endpoint' => $_POST['endpoint'] ?? null,
+                    'persistent_keepalive' => (int)($_POST['persistent_keepalive'] ?? 25),
+                    'is_active' => true,
+                    'is_olt_site' => isset($_POST['is_olt_site']),
+                    'olt_id' => !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null
+                ];
+                $peerId = $wgService->createPeer($peerData);
+                if ($peerId) {
+                    $message = 'VPN peer added successfully';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to add VPN peer';
+                    $messageType = 'danger';
+                }
                 break;
             case 'delete_vpn_peer':
                 require_once __DIR__ . '/../src/WireGuardService.php';
