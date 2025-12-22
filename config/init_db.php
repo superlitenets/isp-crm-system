@@ -588,7 +588,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122206'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122207'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1839,7 +1839,10 @@ function runMigrations(PDO $db): void {
         ['huawei_olts', 'snmp_sys_location', 'ALTER TABLE huawei_olts ADD COLUMN snmp_sys_location VARCHAR(255)'],
         ['huawei_olts', 'snmp_status', "ALTER TABLE huawei_olts ADD COLUMN snmp_status VARCHAR(50) DEFAULT 'unknown'"],
         ['huawei_olts', 'snmp_read_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_read_community VARCHAR(100)'],
-        ['huawei_olts', 'snmp_write_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_write_community VARCHAR(100)']
+        ['huawei_olts', 'snmp_write_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_write_community VARCHAR(100)'],
+        ['huawei_olts', 'software_version', 'ALTER TABLE huawei_olts ADD COLUMN software_version VARCHAR(100)'],
+        ['huawei_olts', 'firmware_version', 'ALTER TABLE huawei_olts ADD COLUMN firmware_version VARCHAR(100)'],
+        ['huawei_olts', 'uptime', 'ALTER TABLE huawei_olts ADD COLUMN uptime VARCHAR(100)']
     ];
     
     foreach ($columnMigrations as $migration) {
