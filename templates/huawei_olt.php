@@ -5341,14 +5341,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 script += `# ================================================\n`;
                 script += `# SETUP COMPLETE!\n`;
                 script += `# ================================================\n`;
+                script += `# OLT infrastructure is now configured.\n`;
+                script += `# \n`;
                 script += `# Next steps:\n`;
-                script += `# 1. Connect ONU to PON port\n`;
-                script += `# 2. Run: display ont autofind all\n`;
-                script += `# 3. Authorize ONUs using the web interface or:\n`;
-                script += `#    interface gpon 0/X\n`;
-                script += `#    ont add Y sn-auth "SERIAL" omci ont-lineprofile-id ${lineProfileId} ont-srvprofile-id ${srvProfileId} desc "SNS000001"\n`;
-                script += `#    quit\n`;
-                script += `#    service-port vlan ${dataVlan} gpon 0/X/Y ont Z gemport 1 multi-service user-vlan ${dataVlan}\n`;
+                script += `# 1. Save configuration: save\n`;
+                script += `# 2. Connect ONUs to PON ports\n`;
+                script += `# 3. Use OMS web interface to discover and authorize ONUs\n`;
+                script += `#    (Navigate to: OMS > Pending Authorization)\n`;
                 script += `# ================================================\n`;
                 
                 document.getElementById('oltSetupScript').textContent = script;
