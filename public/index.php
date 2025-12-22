@@ -976,6 +976,56 @@ if ($page === 'api' && $action === 'attendance_status') {
     exit;
 }
 
+if ($page === 'api' && $action === 'get_vpn_server_config') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $serverId = (int)($_GET['id'] ?? 0);
+    if ($serverId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid server ID']);
+        exit;
+    }
+    
+    try {
+        $wgService = new \App\WireGuardService($db);
+        $config = $wgService->getServerConfig($serverId);
+        echo json_encode(['success' => true, 'config' => $config]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+if ($page === 'api' && $action === 'get_vpn_peer_config') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $peerId = (int)($_GET['id'] ?? 0);
+    if ($peerId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid peer ID']);
+        exit;
+    }
+    
+    try {
+        $wgService = new \App\WireGuardService($db);
+        $config = $wgService->getPeerConfig($peerId);
+        echo json_encode(['success' => true, 'config' => $config]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'repost_single_ticket') {
     ob_clean();
     header('Content-Type: application/json');
@@ -3732,6 +3782,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['backup_error'] = $e->getMessage();
                     header('Location: ?page=settings&subpage=backup');
                     exit;
+                }
+                break;
+
+            case 'save_vpn_settings':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can modify VPN settings.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $wgService->updateSettings([
+                        'vpn_enabled' => isset($_POST['vpn_enabled']) ? 'true' : 'false',
+                        'vpn_gateway_ip' => $_POST['vpn_gateway_ip'] ?? '10.200.0.1',
+                        'vpn_network' => $_POST['vpn_network'] ?? '10.200.0.0/24',
+                        'tr069_use_vpn_gateway' => isset($_POST['tr069_use_vpn_gateway']) ? 'true' : 'false',
+                        'tr069_acs_url' => $_POST['tr069_acs_url'] ?? 'http://localhost:7547'
+                    ]);
+                    
+                    $message = 'VPN settings saved successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error saving VPN settings: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_vpn_server':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can add VPN servers.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $serverId = $wgService->createServer([
+                        'name' => $_POST['name'] ?? 'VPN Server',
+                        'interface_name' => $_POST['interface_name'] ?? 'wg0',
+                        'interface_addr' => $_POST['interface_addr'] ?? '10.200.0.1/24',
+                        'listen_port' => (int)($_POST['listen_port'] ?? 51820),
+                        'mtu' => (int)($_POST['mtu'] ?? 1420),
+                        'dns_servers' => $_POST['dns_servers'] ?? null,
+                        'enabled' => true
+                    ]);
+                    
+                    if ($serverId) {
+                        $message = 'VPN server created successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception('Failed to create VPN server.');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating VPN server: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_vpn_server':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can delete VPN servers.');
+                    }
+                    
+                    $serverId = (int)($_POST['server_id'] ?? 0);
+                    if ($serverId <= 0) {
+                        throw new Exception('Invalid server ID.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $wgService->deleteServer($serverId);
+                    
+                    $message = 'VPN server deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting VPN server: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'add_vpn_peer':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can add VPN peers.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $peerId = $wgService->createPeer([
+                        'server_id' => (int)($_POST['server_id'] ?? 0),
+                        'name' => $_POST['name'] ?? 'VPN Peer',
+                        'description' => $_POST['description'] ?? null,
+                        'allowed_ips' => $_POST['allowed_ips'] ?? '10.200.0.2/32',
+                        'endpoint' => $_POST['endpoint'] ?? null,
+                        'persistent_keepalive' => (int)($_POST['persistent_keepalive'] ?? 25),
+                        'is_active' => true,
+                        'is_olt_site' => isset($_POST['is_olt_site']),
+                        'olt_id' => !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null
+                    ]);
+                    
+                    if ($peerId) {
+                        $message = 'VPN peer created successfully!';
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception('Failed to create VPN peer.');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error creating VPN peer: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+
+            case 'delete_vpn_peer':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can delete VPN peers.');
+                    }
+                    
+                    $peerId = (int)($_POST['peer_id'] ?? 0);
+                    if ($peerId <= 0) {
+                        throw new Exception('Invalid peer ID.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $wgService->deletePeer($peerId);
+                    
+                    $message = 'VPN peer deleted successfully!';
+                    $messageType = 'success';
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error deleting VPN peer: ' . $e->getMessage();
+                    $messageType = 'danger';
                 }
                 break;
 

@@ -43,6 +43,7 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Accounting Module**: Dashboard, Chart of Accounts, Products/Services catalog, Customer Invoices (create, track payments, M-Pesa integration), Vendors/Suppliers, Expense tracking, Quotes, Bills/Purchase Orders, and reports (P&L, AR/AP Aging).
 - **Billing System Integration**: One-ISP API integration for customer data lookup, auto-filling details during ticket creation, and importing customers.
 - **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump), download, deletion, and history tracking.
+- **WireGuard VPN Integration**: Secure VPN connectivity between VPS and OLT sites for remote management. Features include VPN server and peer management UI, automatic key generation, configuration file export (server/peer .conf files), TR-069 ACS URL integration (uses VPN gateway IP when enabled), Docker container deployment with linuxserver/wireguard image, and OLT site linking for organized peer management.
 
 **System Design Choices:**
 The system features a modular and extensible design. Configuration is managed via a `config/` directory and environment variables. Key functionalities are encapsulated in dedicated PHP classes, and users/employees are unified with central role management via HR.

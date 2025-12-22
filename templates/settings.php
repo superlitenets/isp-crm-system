@@ -141,6 +141,11 @@ if ($action === 'edit_template' && $id) {
             <i class="bi bi-terminal"></i> OLT Scripts
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link <?= $subpage === 'vpn' ? 'active' : '' ?>" href="?page=settings&subpage=vpn">
+            <i class="bi bi-shield-lock-fill"></i> VPN
+        </a>
+    </li>
 </ul>
 
 <?php if ($subpage === 'company'): ?>
@@ -6883,5 +6888,468 @@ function copyOLTSetupScript() {
         </div>
     </div>
 </div>
+
+<?php elseif ($subpage === 'vpn'):
+$wgService = new \App\WireGuardService($dbConn);
+$wgSettings = $wgService->getSettings();
+$wgServers = $wgService->getServers();
+$wgPeers = $wgService->getAllPeers();
+
+try {
+    $oltStmt = $dbConn->query("SELECT id, name FROM huawei_olts ORDER BY name");
+    $olts = $oltStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $olts = [];
+}
+?>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-shield-lock-fill me-2"></i>VPN Settings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                    <input type="hidden" name="action" value="save_vpn_settings">
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="vpnEnabled" name="vpn_enabled" <?= $wgSettings['vpn_enabled'] === 'true' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="vpnEnabled">Enable WireGuard VPN</label>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="text-muted mb-3"><i class="bi bi-hdd-network me-2"></i>Network Configuration</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">VPN Gateway IP</label>
+                        <input type="text" class="form-control" name="vpn_gateway_ip" value="<?= htmlspecialchars($wgSettings['vpn_gateway_ip']) ?>" placeholder="10.200.0.1">
+                        <div class="form-text">Server's private IP in the VPN tunnel</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">VPN Network</label>
+                        <input type="text" class="form-control" name="vpn_network" value="<?= htmlspecialchars($wgSettings['vpn_network']) ?>" placeholder="10.200.0.0/24">
+                        <div class="form-text">CIDR notation for VPN subnet</div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="text-muted mb-3"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Integration</h6>
+                    
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="tr069UseVpn" name="tr069_use_vpn_gateway" <?= $wgSettings['tr069_use_vpn_gateway'] === 'true' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="tr069UseVpn">Use VPN Gateway for TR-069 ACS URL</label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">TR-069 ACS URL</label>
+                        <input type="text" class="form-control" name="tr069_acs_url" value="<?= htmlspecialchars($wgSettings['tr069_acs_url']) ?>" placeholder="http://localhost:7547">
+                        <div class="form-text">GenieACS server URL (fallback if VPN disabled)</div>
+                    </div>
+                    
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Current ACS URL:</strong><br>
+                        <code><?= htmlspecialchars($wgService->getTR069AcsUrl()) ?></code>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-save me-2"></i>Save VPN Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-server me-2"></i>VPN Servers</h5>
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addServerModal">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+            <div class="list-group list-group-flush">
+                <?php if (empty($wgServers)): ?>
+                <div class="list-group-item text-muted text-center py-4">
+                    <i class="bi bi-server fs-3 d-block mb-2"></i>
+                    No VPN servers configured
+                </div>
+                <?php else: ?>
+                <?php foreach ($wgServers as $server): ?>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong><?= htmlspecialchars($server['name']) ?></strong>
+                        <br>
+                        <small class="text-muted">
+                            <?= htmlspecialchars($server['interface_addr']) ?> : <?= $server['listen_port'] ?>
+                        </small>
+                    </div>
+                    <div>
+                        <span class="badge <?= $server['enabled'] ? 'bg-success' : 'bg-secondary' ?>">
+                            <?= $server['enabled'] ? 'Active' : 'Disabled' ?>
+                        </span>
+                        <div class="btn-group btn-group-sm ms-2">
+                            <button class="btn btn-outline-primary" onclick="viewServerConfig(<?= $server['id'] ?>)" title="View Config">
+                                <i class="bi bi-file-code"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteServer(<?= $server['id'] ?>)" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>VPN Peers (OLT Sites)</h5>
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addPeerModal">
+                    <i class="bi bi-plus-lg me-1"></i>Add Peer
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <?php if (empty($wgPeers)): ?>
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-diagram-3 fs-1 d-block mb-3"></i>
+                    <p class="mb-0">No VPN peers configured</p>
+                    <p class="small">Add peers to connect to OLT sites</p>
+                </div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Allowed IPs</th>
+                                <th>Endpoint</th>
+                                <th>OLT Site</th>
+                                <th>Status</th>
+                                <th>Traffic</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($wgPeers as $peer): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($peer['name']) ?></strong>
+                                    <?php if ($peer['description']): ?>
+                                    <br><small class="text-muted"><?= htmlspecialchars($peer['description']) ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td><code><?= htmlspecialchars($peer['allowed_ips']) ?></code></td>
+                                <td><?= $peer['endpoint'] ? htmlspecialchars($peer['endpoint']) : '<span class="text-muted">-</span>' ?></td>
+                                <td>
+                                    <?php if ($peer['is_olt_site']): ?>
+                                    <span class="badge bg-info"><i class="bi bi-hdd-network me-1"></i>OLT</span>
+                                    <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($peer['is_active']): ?>
+                                    <span class="badge bg-success">Active</span>
+                                    <?php else: ?>
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="small">
+                                    <span class="text-success"><i class="bi bi-arrow-down"></i> <?= $wgService->formatBytes($peer['rx_bytes']) ?></span><br>
+                                    <span class="text-primary"><i class="bi bi-arrow-up"></i> <?= $wgService->formatBytes($peer['tx_bytes']) ?></span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="viewPeerConfig(<?= $peer['id'] ?>)" title="Download Config">
+                                            <i class="bi bi-download"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary" onclick="showQRCode(<?= $peer['id'] ?>)" title="QR Code">
+                                            <i class="bi bi-qr-code"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning" onclick="editPeer(<?= $peer['id'] ?>)" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="deletePeer(<?= $peer['id'] ?>)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-diagram-2 me-2"></i>Network Architecture</h5>
+            </div>
+            <div class="card-body">
+                <pre class="bg-light p-3 rounded small mb-0" style="font-family: monospace;">
+┌─────────────────────────────────────────────────────────────┐
+│                         VPS (Cloud)                         │
+│  ┌─────────┐  ┌──────────┐  ┌─────────┐  ┌───────────────┐ │
+│  │   CRM   │  │ GenieACS │  │ Postgres│  │   WireGuard   │ │
+│  │  (PHP)  │  │  (ACS)   │  │   DB    │  │  <?= htmlspecialchars($wgSettings['vpn_gateway_ip']) ?>   │ │
+│  └─────────┘  └──────────┘  └─────────┘  └───────┬───────┘ │
+│       Port 80/443   Port 7547                     │         │
+└───────────────────────────────────────────────────│─────────┘
+                                                    │ VPN Tunnel
+┌───────────────────────────────────────────────────│─────────┐
+│                    OLT Network                    │         │
+│  ┌───────────────┐                    ┌───────────┴───────┐ │
+│  │  Huawei OLT   │◄───────────────────│   WireGuard Peer  │ │
+│  │   (MA5683T)   │  Telnet/SNMP       │    (Router/GW)    │ │
+│  └───────────────┘                    └───────────────────┘ │
+│         │                                                    │
+│    ┌────┴────┐                                              │
+│    │  CPEs   │──────► Internet ──────► GenieACS (TR-069)    │
+│    └─────────┘                                              │
+└──────────────────────────────────────────────────────────────┘
+                </pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addServerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="add_vpn_server">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Add VPN Server</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Server Name</label>
+                        <input type="text" class="form-control" name="name" required placeholder="Main VPN Server">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Interface Address</label>
+                            <input type="text" class="form-control" name="interface_addr" required placeholder="10.200.0.1/24">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Listen Port</label>
+                            <input type="number" class="form-control" name="listen_port" value="51820" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Interface Name</label>
+                            <input type="text" class="form-control" name="interface_name" value="wg0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">MTU</label>
+                            <input type="number" class="form-control" name="mtu" value="1420">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">DNS Servers</label>
+                        <input type="text" class="form-control" name="dns_servers" placeholder="1.1.1.1, 8.8.8.8">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus-lg me-2"></i>Create Server
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addPeerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="add_vpn_peer">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Add VPN Peer</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Server</label>
+                        <select class="form-select" name="server_id" required>
+                            <option value="">Select VPN Server...</option>
+                            <?php foreach ($wgServers as $server): ?>
+                            <option value="<?= $server['id'] ?>"><?= htmlspecialchars($server['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Peer Name</label>
+                        <input type="text" class="form-control" name="name" required placeholder="OLT Site - Location">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" placeholder="Main OLT at data center">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Allowed IPs</label>
+                            <input type="text" class="form-control" name="allowed_ips" required placeholder="10.200.0.2/32">
+                            <div class="form-text">Peer's VPN IP address</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Keepalive</label>
+                            <input type="number" class="form-control" name="persistent_keepalive" value="25">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Endpoint (Optional)</label>
+                        <input type="text" class="form-control" name="endpoint" placeholder="102.205.239.85:51820">
+                        <div class="form-text">Public IP:Port of the peer's WireGuard</div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="isOltSite" name="is_olt_site" value="1">
+                        <label class="form-check-label" for="isOltSite">This is an OLT Site</label>
+                    </div>
+                    <div class="mb-3" id="oltSelectDiv" style="display: none;">
+                        <label class="form-label">Link to OLT</label>
+                        <select class="form-select" name="olt_id">
+                            <option value="">Select OLT...</option>
+                            <?php foreach ($olts as $olt): ?>
+                            <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus-lg me-2"></i>Create Peer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-file-code me-2"></i>WireGuard Configuration</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="configContent" class="bg-dark text-light p-3 rounded" style="font-family: 'Consolas', monospace; font-size: 0.9rem; max-height: 400px; overflow-y: auto;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="copyConfig()">
+                    <i class="bi bi-clipboard me-2"></i>Copy
+                </button>
+                <button type="button" class="btn btn-success" onclick="downloadConfig()">
+                    <i class="bi bi-download me-2"></i>Download .conf
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('isOltSite')?.addEventListener('change', function() {
+    document.getElementById('oltSelectDiv').style.display = this.checked ? 'block' : 'none';
+});
+
+function viewServerConfig(serverId) {
+    fetch(`?page=api&action=get_vpn_server_config&id=${serverId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('configContent').textContent = data.config;
+                window.currentConfigName = `wg-server-${serverId}.conf`;
+                new bootstrap.Modal(document.getElementById('configModal')).show();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to load config'));
+            }
+        });
+}
+
+function viewPeerConfig(peerId) {
+    fetch(`?page=api&action=get_vpn_peer_config&id=${peerId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('configContent').textContent = data.config;
+                window.currentConfigName = `wg-peer-${peerId}.conf`;
+                new bootstrap.Modal(document.getElementById('configModal')).show();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to load config'));
+            }
+        });
+}
+
+function showQRCode(peerId) {
+    alert('QR Code generation will be implemented with a QR library');
+}
+
+function editPeer(peerId) {
+    window.location.href = `?page=settings&subpage=vpn&action=edit_peer&id=${peerId}`;
+}
+
+function deletePeer(peerId) {
+    if (confirm('Delete this VPN peer?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = `
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="delete_vpn_peer">
+            <input type="hidden" name="peer_id" value="${peerId}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function deleteServer(serverId) {
+    if (confirm('Delete this VPN server? All peers will be removed.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = `
+            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+            <input type="hidden" name="action" value="delete_vpn_server">
+            <input type="hidden" name="server_id" value="${serverId}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function copyConfig() {
+    const config = document.getElementById('configContent').textContent;
+    navigator.clipboard.writeText(config).then(() => {
+        alert('Configuration copied to clipboard');
+    });
+}
+
+function downloadConfig() {
+    const config = document.getElementById('configContent').textContent;
+    const blob = new Blob([config], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = window.currentConfigName || 'wireguard.conf';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
 
 <?php endif; ?>

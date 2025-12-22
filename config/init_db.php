@@ -588,7 +588,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122207'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122208'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1867,6 +1867,85 @@ function runMigrations(PDO $db): void {
         }
     } catch (PDOException $e) {
         error_log("Auto-fix billing_id error: " . $e->getMessage());
+    }
+    
+    // WireGuard VPN tables
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS wireguard_servers (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            enabled BOOLEAN DEFAULT TRUE,
+            interface_name VARCHAR(20) DEFAULT 'wg0',
+            interface_addr VARCHAR(50) NOT NULL,
+            listen_port INTEGER DEFAULT 51820,
+            public_key TEXT,
+            private_key_encrypted TEXT,
+            preshared_key_encrypted TEXT,
+            mtu INTEGER DEFAULT 1420,
+            dns_servers VARCHAR(255),
+            post_up_cmd TEXT,
+            post_down_cmd TEXT,
+            health_status VARCHAR(50) DEFAULT 'unknown',
+            last_handshake_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (PDOException $e) {
+        error_log("WireGuard servers table error: " . $e->getMessage());
+    }
+    
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS wireguard_peers (
+            id SERIAL PRIMARY KEY,
+            server_id INTEGER REFERENCES wireguard_servers(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            public_key TEXT NOT NULL,
+            private_key_encrypted TEXT,
+            preshared_key_encrypted TEXT,
+            allowed_ips TEXT NOT NULL,
+            endpoint VARCHAR(255),
+            persistent_keepalive INTEGER DEFAULT 25,
+            last_handshake_at TIMESTAMP,
+            rx_bytes BIGINT DEFAULT 0,
+            tx_bytes BIGINT DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            is_olt_site BOOLEAN DEFAULT FALSE,
+            olt_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (PDOException $e) {
+        error_log("WireGuard peers table error: " . $e->getMessage());
+    }
+    
+    // WireGuard settings for TR-069 integration
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS wireguard_settings (
+            id SERIAL PRIMARY KEY,
+            setting_key VARCHAR(100) UNIQUE NOT NULL,
+            setting_value TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+        
+        // Seed default WireGuard settings
+        $wgSettingsCheck = $db->query("SELECT COUNT(*) FROM wireguard_settings")->fetchColumn();
+        if ($wgSettingsCheck == 0) {
+            $wgSettings = [
+                ['vpn_enabled', 'false'],
+                ['tr069_use_vpn_gateway', 'false'],
+                ['tr069_acs_url', 'http://localhost:7547'],
+                ['vpn_gateway_ip', '10.200.0.1'],
+                ['vpn_network', '10.200.0.0/24']
+            ];
+            $stmt = $db->prepare("INSERT INTO wireguard_settings (setting_key, setting_value) VALUES (?, ?)");
+            foreach ($wgSettings as $s) {
+                try { $stmt->execute($s); } catch (PDOException $e) {}
+            }
+        }
+    } catch (PDOException $e) {
+        error_log("WireGuard settings table error: " . $e->getMessage());
     }
     
     seedRolesAndPermissions($db);

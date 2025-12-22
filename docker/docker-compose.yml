@@ -72,11 +72,40 @@ services:
     networks:
       - isp-crm-network
 
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: isp-crm-wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Africa/Nairobi
+      - SERVERURL=auto
+      - SERVERPORT=51820
+      - PEERS=0
+      - PEERDNS=1.1.1.1,8.8.8.8
+      - INTERNAL_SUBNET=10.200.0.0/24
+      - ALLOWEDIPS=0.0.0.0/0
+    volumes:
+      - wireguard_config:/config
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "51820:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    networks:
+      - isp-crm-network
+
 volumes:
   postgres_data:
   uploads_data:
   logs_data:
   genieacs_mongo_data:
+  wireguard_config:
 
 networks:
   isp-crm-network:
