@@ -509,6 +509,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'GenieACS settings saved successfully';
                 $messageType = 'success';
                 break;
+            case 'save_vpn_settings':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $vpnSettings = [
+                    'vpn_enabled' => isset($_POST['vpn_enabled']) ? 'true' : 'false',
+                    'vpn_gateway_ip' => $_POST['vpn_gateway_ip'] ?? '10.200.0.1',
+                    'vpn_network' => $_POST['vpn_network'] ?? '10.200.0.0/24',
+                    'tr069_use_vpn_gateway' => isset($_POST['tr069_use_vpn_gateway']) ? 'true' : 'false',
+                    'tr069_acs_url' => $_POST['tr069_acs_url'] ?? ''
+                ];
+                $wgService->updateSettings($vpnSettings);
+                $message = 'VPN settings saved successfully';
+                $messageType = 'success';
+                break;
+            case 'add_vpn_server':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $wgService->addServer($_POST);
+                $message = 'VPN server added successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_vpn_server':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $wgService->deleteServer((int)$_POST['server_id']);
+                $message = 'VPN server deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'add_vpn_peer':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $wgService->addPeer($_POST);
+                $message = 'VPN peer added successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_vpn_peer':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $wgService->deletePeer((int)$_POST['peer_id']);
+                $message = 'VPN peer deleted successfully';
+                $messageType = 'success';
+                break;
             case 'test_genieacs':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
