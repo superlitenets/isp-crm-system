@@ -38,6 +38,69 @@ if (isset($_GET['action']) && $view === 'vpn') {
     }
 }
 
+// Handle AJAX requests for ONU discovery (async background discovery)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
+    header('Content-Type: application/json');
+    
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+    
+    try {
+        if ($oltId) {
+            // Discover from specific OLT
+            $result = $huaweiOLT->discoverUnconfiguredONUs($oltId);
+            if ($result['success']) {
+                echo json_encode(['success' => true, 'count' => $result['count'], 'message' => "Found {$result['count']} unconfigured ONUs"]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Discovery failed']);
+            }
+        } else {
+            // Discover from all OLTs
+            $totalFound = 0;
+            $results = [];
+            $allOlts = $huaweiOLT->getOLTs(false);
+            foreach ($allOlts as $olt) {
+                if ($olt['is_active']) {
+                    try {
+                        $result = $huaweiOLT->discoverUnconfiguredONUs($olt['id']);
+                        if ($result['success']) {
+                            $totalFound += $result['count'];
+                            $results[] = ['olt' => $olt['name'], 'count' => $result['count'], 'success' => true];
+                        } else {
+                            $results[] = ['olt' => $olt['name'], 'error' => $result['error'] ?? 'failed', 'success' => false];
+                        }
+                    } catch (Exception $e) {
+                        $results[] = ['olt' => $olt['name'], 'error' => $e->getMessage(), 'success' => false];
+                    }
+                }
+            }
+            echo json_encode(['success' => true, 'count' => $totalFound, 'details' => $results, 'message' => "Found {$totalFound} unconfigured ONUs"]);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint to get current unconfigured ONU count (fast, no discovery)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
+    header('Content-Type: application/json');
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+    
+    try {
+        if ($oltId) {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM huawei_onus WHERE olt_id = ? AND is_authorized = false");
+            $stmt->execute([$oltId]);
+        } else {
+            $stmt = $db->query("SELECT COUNT(*) FROM huawei_onus WHERE is_authorized = false");
+        }
+        $count = $stmt->fetchColumn();
+        echo json_encode(['success' => true, 'count' => (int)$count]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
@@ -2221,45 +2284,97 @@ try {
                 const refreshInterval = isUnconfigured ? 30000 : 60000; // 30s for Non Auth discovery, 1 min for status
                 let countdown = refreshInterval / 1000;
                 let timerPaused = false;
+                let isDiscovering = false;
                 
                 // Add refresh indicator to header
                 const header = document.querySelector('.d-flex.justify-content-between.align-items-center.mb-4');
+                let indicator;
                 if (header) {
-                    const indicator = document.createElement('div');
+                    indicator = document.createElement('div');
                     indicator.className = 'badge bg-info ms-2';
                     indicator.id = 'refreshCountdown';
                     indicator.style.cursor = 'pointer';
                     indicator.title = 'Click to pause/resume';
-                    indicator.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>' + (isUnconfigured ? 'Discovery' : 'Refresh') + ' in <span id="countdownTimer">' + countdown + '</span>s';
+                    updateIndicator();
                     header.querySelector('h4').appendChild(indicator);
                     
                     indicator.onclick = () => {
+                        if (isDiscovering) return;
                         timerPaused = !timerPaused;
-                        indicator.className = timerPaused ? 'badge bg-secondary ms-2' : 'badge bg-info ms-2';
-                        indicator.innerHTML = timerPaused 
-                            ? '<i class="bi bi-pause-fill me-1"></i>Paused (click to resume)'
-                            : '<i class="bi bi-arrow-repeat me-1"></i>' + (isUnconfigured ? 'Discovery' : 'Refresh') + ' in <span id="countdownTimer">' + countdown + '</span>s';
+                        updateIndicator();
                     };
+                }
+                
+                function updateIndicator() {
+                    if (!indicator) return;
+                    if (isDiscovering) {
+                        indicator.className = 'badge bg-warning ms-2';
+                        indicator.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Discovering...';
+                    } else if (timerPaused) {
+                        indicator.className = 'badge bg-secondary ms-2';
+                        indicator.innerHTML = '<i class="bi bi-pause-fill me-1"></i>Paused (click to resume)';
+                    } else {
+                        indicator.className = 'badge bg-info ms-2';
+                        indicator.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>' + (isUnconfigured ? 'Discovery' : 'Refresh') + ' in <span id="countdownTimer">' + countdown + '</span>s';
+                    }
+                }
+                
+                function runDiscovery() {
+                    if (isDiscovering) return;
+                    isDiscovering = true;
+                    updateIndicator();
+                    
+                    const url = '?page=huawei-olt&ajax=discover_onus' + (oltId ? '&olt_id=' + oltId : '');
+                    fetch(url)
+                        .then(r => r.json())
+                        .then(data => {
+                            isDiscovering = false;
+                            countdown = refreshInterval / 1000;
+                            updateIndicator();
+                            
+                            if (data.success) {
+                                // Show toast notification
+                                showToast('Discovery complete: ' + data.message, 'success');
+                                // Reload page to show new ONUs
+                                if (data.count > 0) {
+                                    setTimeout(() => window.location.reload(), 1000);
+                                }
+                            } else {
+                                showToast('Discovery failed: ' + (data.error || 'Unknown error'), 'danger');
+                            }
+                        })
+                        .catch(err => {
+                            isDiscovering = false;
+                            countdown = refreshInterval / 1000;
+                            updateIndicator();
+                            showToast('Discovery error: ' + err.message, 'danger');
+                        });
+                }
+                
+                function showToast(message, type) {
+                    const toast = document.createElement('div');
+                    toast.className = 'position-fixed bottom-0 end-0 p-3';
+                    toast.style.zIndex = '9999';
+                    toast.innerHTML = `
+                        <div class="toast show align-items-center text-white bg-${type} border-0" role="alert">
+                            <div class="d-flex">
+                                <div class="toast-body">${message}</div>
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 5000);
                 }
                 
                 // Countdown timer
                 const countdownTimer = setInterval(() => {
-                    if (timerPaused) return;
+                    if (timerPaused || isDiscovering) return;
                     countdown--;
                     const timerEl = document.getElementById('countdownTimer');
                     if (timerEl) timerEl.textContent = countdown;
                     if (countdown <= 0) {
-                        clearInterval(countdownTimer);
                         if (isUnconfigured) {
-                            // Trigger actual discovery via form submission
-                            const form = document.createElement('form');
-                            form.method = 'POST';
-                            form.innerHTML = '<input type="hidden" name="action" value="' + (oltId ? 'discover_unconfigured' : 'discover_all_unconfigured') + '">';
-                            if (oltId) {
-                                form.innerHTML += '<input type="hidden" name="olt_id" value="' + oltId + '">';
-                            }
-                            document.body.appendChild(form);
-                            form.submit();
+                            runDiscovery();
                         } else {
                             window.location.reload();
                         }
@@ -2268,8 +2383,8 @@ try {
                 
                 // Pause auto-refresh when modal is open
                 document.querySelectorAll('.modal').forEach(modal => {
-                    modal.addEventListener('show.bs.modal', () => { timerPaused = true; });
-                    modal.addEventListener('hide.bs.modal', () => { timerPaused = false; countdown = refreshInterval / 1000; });
+                    modal.addEventListener('show.bs.modal', () => { timerPaused = true; updateIndicator(); });
+                    modal.addEventListener('hide.bs.modal', () => { timerPaused = false; countdown = refreshInterval / 1000; updateIndicator(); });
                 });
             })();
             </script>
