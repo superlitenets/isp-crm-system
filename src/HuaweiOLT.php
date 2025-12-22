@@ -4433,18 +4433,18 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'Invalid VLAN ID'];
         }
         
-        // Parse port name (e.g., "0/19/0" -> frame=0, slot=19, port=0)
+        // Parse port name (e.g., "0/8/0" -> frame=0, slot=8, port=0)
         $parts = explode('/', $portName);
         if (count($parts) !== 3) {
-            return ['success' => false, 'message' => 'Invalid port format'];
+            return ['success' => false, 'message' => 'Invalid port format (use frame/slot/port)'];
         }
         
         $frame = $parts[0];
         $slot = $parts[1];
         $port = $parts[2];
         
-        // Huawei command to add VLAN to uplink port
-        $command = "port vlan {$vlanId} {$frame}/{$slot}";
+        // Huawei MA5683T command: port vlan {vlan_id} {frame}/{slot} {port}
+        $command = "port vlan {$vlanId} {$frame}/{$slot} {$port}";
         $result = $this->executeCommand($oltId, $command);
         
         $this->addLog([
