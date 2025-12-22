@@ -307,6 +307,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'refresh_snmp_info':
+                $oltId = (int)$_POST['olt_id'];
+                $result = $huaweiOLT->getOLTSystemInfoViaSNMP($oltId);
+                if ($result['success'] && !empty($result['info'])) {
+                    $info = $result['info'];
+                    $db->prepare("UPDATE huawei_olts SET 
+                        snmp_last_poll = CURRENT_TIMESTAMP,
+                        snmp_sys_name = ?,
+                        snmp_sys_descr = ?,
+                        snmp_sys_uptime = ?,
+                        snmp_sys_location = ?,
+                        snmp_status = 'online'
+                        WHERE id = ?")->execute([
+                        $info['sysName'] ?? null,
+                        $info['sysDescr'] ?? null,
+                        $info['sysUpTime'] ?? null,
+                        $info['sysLocation'] ?? null,
+                        $oltId
+                    ]);
+                    $message = 'SNMP data refreshed from OLT';
+                    $messageType = 'success';
+                } else {
+                    // SNMP failed - keep existing data but update timestamp and mark offline
+                    $db->prepare("UPDATE huawei_olts SET 
+                        snmp_last_poll = CURRENT_TIMESTAMP,
+                        snmp_status = CASE WHEN snmp_status = 'simulated' THEN 'simulated' ELSE 'offline' END
+                        WHERE id = ?")->execute([$oltId]);
+                    $message = 'SNMP poll failed: ' . ($result['error'] ?? 'OLT unreachable') . '. Using cached data.';
+                    $messageType = 'warning';
+                }
+                header('Location: ?page=huawei-olt&view=olt_detail&olt_id=' . $oltId . '&tab=overview&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
             case 'discover_unconfigured':
                 $result = $huaweiOLT->discoverUnconfiguredONUs((int)$_POST['olt_id']);
                 if ($result['success']) {
@@ -3676,6 +3709,80 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                     <td><?= !empty($currentOlt['ports_synced_at']) ? date('M j, H:i', strtotime($currentOlt['ports_synced_at'])) : '<span class="text-warning">Never</span>' ?></td>
                                 </tr>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SNMP Monitoring Card -->
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-broadcast me-2"></i>SNMP Monitoring</span>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="refresh_snmp_info">
+                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                <button type="submit" class="btn btn-sm btn-light">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Refresh SNMP
+                                </button>
+                            </form>
+                        </div>
+                        <div class="card-body">
+                            <?php 
+                            $snmpStatus = $currentOlt['snmp_status'] ?? 'unknown';
+                            $snmpBadgeClass = match($snmpStatus) {
+                                'online' => 'bg-success',
+                                'simulated' => 'bg-info',
+                                'offline' => 'bg-danger',
+                                default => 'bg-secondary'
+                            };
+                            ?>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-sm mb-0">
+                                        <tr>
+                                            <td class="text-muted" width="35%">SNMP Status</td>
+                                            <td>
+                                                <span class="badge <?= $snmpBadgeClass ?>"><?= ucfirst($snmpStatus) ?></span>
+                                                <?php if ($snmpStatus === 'simulated'): ?>
+                                                <small class="text-muted ms-2">(Demo mode - no real OLT)</small>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">System Name</td>
+                                            <td><strong><?= htmlspecialchars($currentOlt['snmp_sys_name'] ?? '-') ?></strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Description</td>
+                                            <td><small><?= htmlspecialchars($currentOlt['snmp_sys_descr'] ?? '-') ?></small></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-sm mb-0">
+                                        <tr>
+                                            <td class="text-muted" width="35%">System Uptime</td>
+                                            <td><?= htmlspecialchars($currentOlt['snmp_sys_uptime'] ?? '-') ?></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Location</td>
+                                            <td><?= htmlspecialchars($currentOlt['snmp_sys_location'] ?? '-') ?></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Last SNMP Poll</td>
+                                            <td><?= !empty($currentOlt['snmp_last_poll']) ? date('M j, H:i:s', strtotime($currentOlt['snmp_last_poll'])) : '<span class="text-warning">Never</span>' ?></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="mt-3 small text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                SNMP Community: <code><?= htmlspecialchars($currentOlt['snmp_community'] ?? 'public') ?></code> | 
+                                Version: <?= htmlspecialchars($currentOlt['snmp_version'] ?? 'v2c') ?> | 
+                                Port: <?= $currentOlt['snmp_port'] ?? 161 ?>
+                            </div>
                         </div>
                     </div>
                 </div>
