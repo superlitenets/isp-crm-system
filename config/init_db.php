@@ -588,7 +588,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122205'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122206'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -1831,7 +1831,15 @@ function runMigrations(PDO $db): void {
         ['huawei_onus', 'subzone_id', 'ALTER TABLE huawei_onus ADD COLUMN subzone_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL'],
         ['huawei_onus', 'apartment_id', 'ALTER TABLE huawei_onus ADD COLUMN apartment_id INTEGER REFERENCES huawei_apartments(id) ON DELETE SET NULL'],
         ['huawei_onus', 'odb_id', 'ALTER TABLE huawei_onus ADD COLUMN odb_id INTEGER REFERENCES huawei_odb_units(id) ON DELETE SET NULL'],
-        ['huawei_onus', 'optical_updated_at', 'ALTER TABLE huawei_onus ADD COLUMN optical_updated_at TIMESTAMP']
+        ['huawei_onus', 'optical_updated_at', 'ALTER TABLE huawei_onus ADD COLUMN optical_updated_at TIMESTAMP'],
+        ['huawei_olts', 'snmp_last_poll', 'ALTER TABLE huawei_olts ADD COLUMN snmp_last_poll TIMESTAMP'],
+        ['huawei_olts', 'snmp_sys_name', 'ALTER TABLE huawei_olts ADD COLUMN snmp_sys_name VARCHAR(255)'],
+        ['huawei_olts', 'snmp_sys_descr', 'ALTER TABLE huawei_olts ADD COLUMN snmp_sys_descr TEXT'],
+        ['huawei_olts', 'snmp_sys_uptime', 'ALTER TABLE huawei_olts ADD COLUMN snmp_sys_uptime VARCHAR(100)'],
+        ['huawei_olts', 'snmp_sys_location', 'ALTER TABLE huawei_olts ADD COLUMN snmp_sys_location VARCHAR(255)'],
+        ['huawei_olts', 'snmp_status', "ALTER TABLE huawei_olts ADD COLUMN snmp_status VARCHAR(50) DEFAULT 'unknown'"],
+        ['huawei_olts', 'snmp_read_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_read_community VARCHAR(100)'],
+        ['huawei_olts', 'snmp_write_community', 'ALTER TABLE huawei_olts ADD COLUMN snmp_write_community VARCHAR(100)']
     ];
     
     foreach ($columnMigrations as $migration) {
