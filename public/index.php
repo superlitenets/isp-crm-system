@@ -1051,6 +1051,51 @@ if ($page === 'api' && $action === 'get_vpn_peer_mikrotik') {
     exit;
 }
 
+if ($page === 'api' && $action === 'vpn_peer_status') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    try {
+        $wgService = new \App\WireGuardService($db);
+        $peers = $wgService->getAllPeers();
+        $peerStatus = [];
+        
+        foreach ($peers as $peer) {
+            $connected = false;
+            $stale = false;
+            $lastHandshakeFormatted = null;
+            
+            if ($peer['last_handshake']) {
+                $handshakeTime = strtotime($peer['last_handshake']);
+                $timeDiff = time() - $handshakeTime;
+                $connected = $timeDiff < 180;
+                $stale = $timeDiff >= 180 && $timeDiff < 600;
+                $lastHandshakeFormatted = date('H:i:s', $handshakeTime);
+            }
+            
+            $peerStatus[] = [
+                'id' => $peer['id'],
+                'is_active' => (bool)$peer['is_active'],
+                'connected' => $connected,
+                'stale' => $stale,
+                'last_handshake' => $lastHandshakeFormatted,
+                'rx_formatted' => $wgService->formatBytes($peer['rx_bytes']),
+                'tx_formatted' => $wgService->formatBytes($peer['tx_bytes'])
+            ];
+        }
+        
+        echo json_encode(['success' => true, 'peers' => $peerStatus]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'repost_single_ticket') {
     ob_clean();
     header('Content-Type: application/json');
@@ -6023,6 +6068,13 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-gear"></i> Settings
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::isAdmin()): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'vpn' ? 'active' : '' ?>" href="?page=vpn">
+                    <i class="bi bi-shield-lock"></i> VPN
+                </a>
+            </li>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'branches' ? 'active' : '' ?>" href="?page=branches">
                     <i class="bi bi-building"></i> Branches
@@ -6219,6 +6271,13 @@ $csrfToken = \App\Auth::generateToken();
                 } else {
                     $smsGateway = getSMSGateway();
                     include __DIR__ . '/../templates/settings.php';
+                }
+                break;
+            case 'vpn':
+                if (!\App\Auth::isAdmin()) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/vpn.php';
                 }
                 break;
             case 'branches':
