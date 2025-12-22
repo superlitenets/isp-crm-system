@@ -5377,17 +5377,22 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <input type="hidden" name="zone" id="authZoneName">
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
+                                        <label class="form-label">TR-069 VLAN <span class="text-danger">*</span></label>
                                         <select name="vlan_id" id="authVlanId" class="form-select" required>
-                                            <option value="">-- Select VLAN --</option>
+                                            <option value="">-- Select TR-069 VLAN --</option>
                                             <?php
-                                            $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description FROM huawei_vlans WHERE is_active = true ORDER BY vlan_id");
-                                            while ($vlan = $vlansStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                            $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description FROM huawei_vlans WHERE is_active = true AND is_tr069 = true ORDER BY vlan_id");
+                                            $tr069Vlans = $vlansStmt->fetchAll(PDO::FETCH_ASSOC);
+                                            if (empty($tr069Vlans)): ?>
+                                            <option value="" disabled>No TR-069 VLANs configured. Mark a VLAN as TR-069 in VLAN settings.</option>
+                                            <?php else:
+                                            foreach ($tr069Vlans as $vlan): ?>
                                             <option value="<?= $vlan['vlan_id'] ?>">
                                                 VLAN <?= $vlan['vlan_id'] ?><?= !empty($vlan['description']) ? ' - ' . htmlspecialchars($vlan['description']) : '' ?>
                                             </option>
-                                            <?php endwhile; ?>
+                                            <?php endforeach; endif; ?>
                                         </select>
+                                        <small class="text-muted">Only VLANs marked as TR-069 are shown</small>
                                     </div>
                                 </div>
                                 <div class="mb-3">
