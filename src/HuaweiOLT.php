@@ -595,7 +595,8 @@ class HuaweiOLT {
         if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
         
         // Fetch distance via SNMP
-        $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.5.{$indexSuffix}";
+        // hwGponDeviceOntDistance OID (meters)
+        $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20.{$indexSuffix}";
         $distanceRaw = @snmpget($host, $community, $distanceOID, $timeout, $retries);
         $distance = null;
         if ($distanceRaw !== false) {
@@ -689,8 +690,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        // Huawei requires entering GPON interface context first
-        // Run optical-info command for power levels (distance retrieved separately if needed)
+        // Huawei requires entering GPON interface context first for optical-info
         $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
@@ -2188,10 +2188,11 @@ class HuaweiOLT {
         }
         
         $distance = $optical['optical']['distance'] ?? null;
+        $status = $optical['optical']['status'] ?? null;
+        
         $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power'], $distance);
         
         // Also update status if available
-        $status = $optical['optical']['status'] ?? null;
         if ($status) {
             $this->updateONUStatus($onuId, $status);
         }
