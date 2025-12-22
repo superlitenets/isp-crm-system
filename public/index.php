@@ -1026,6 +1026,31 @@ if ($page === 'api' && $action === 'get_vpn_peer_config') {
     exit;
 }
 
+if ($page === 'api' && $action === 'get_vpn_peer_mikrotik') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $peerId = (int)($_GET['id'] ?? 0);
+    if ($peerId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid peer ID']);
+        exit;
+    }
+    
+    try {
+        $wgService = new \App\WireGuardService($db);
+        $script = $wgService->getMikroTikScript($peerId);
+        echo json_encode(['success' => true, 'script' => $script]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'repost_single_ticket') {
     ob_clean();
     header('Content-Type: application/json');

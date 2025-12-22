@@ -7066,8 +7066,11 @@ try {
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" onclick="viewPeerConfig(<?= $peer['id'] ?>)" title="Download Config">
+                                        <button class="btn btn-outline-primary" onclick="viewPeerConfig(<?= $peer['id'] ?>)" title="WireGuard Config">
                                             <i class="bi bi-download"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" onclick="viewMikroTikScript(<?= $peer['id'] ?>)" title="MikroTik Script">
+                                            <i class="bi bi-terminal"></i>
                                         </button>
                                         <button class="btn btn-outline-secondary" onclick="showQRCode(<?= $peer['id'] ?>)" title="QR Code">
                                             <i class="bi bi-qr-code"></i>
@@ -7293,6 +7296,20 @@ function viewPeerConfig(peerId) {
                 new bootstrap.Modal(document.getElementById('configModal')).show();
             } else {
                 alert('Error: ' + (data.error || 'Failed to load config'));
+            }
+        });
+}
+
+function viewMikroTikScript(peerId) {
+    fetch(`?page=api&action=get_vpn_peer_mikrotik&id=${peerId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('configContent').textContent = data.script;
+                window.currentConfigName = `mikrotik-wg-peer-${peerId}.rsc`;
+                new bootstrap.Modal(document.getElementById('configModal')).show();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to load MikroTik script'));
             }
         });
 }

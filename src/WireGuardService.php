@@ -437,6 +437,97 @@ class WireGuardService {
         return trim($ips[0]);
     }
     
+    public function getMikroTikScript(int $peerId): string {
+        $peer = $this->getPeer($peerId);
+        if (!$peer) return '';
+        
+        $server = $this->getServer($peer['server_id']);
+        if (!$server) return '';
+        
+        $settings = $this->getSettings();
+        
+        $privateKey = $this->decrypt($peer['private_key_encrypted']);
+        $peerIp = $this->extractPeerIP($peer['allowed_ips']);
+        $psk = $peer['preshared_key_encrypted'] ? $this->decrypt($peer['preshared_key_encrypted']) : '';
+        
+        $interfaceName = 'wg-' . preg_replace('/[^a-zA-Z0-9]/', '', strtolower($peer['name']));
+        if (strlen($interfaceName) > 15) {
+            $interfaceName = substr($interfaceName, 0, 15);
+        }
+        
+        $endpoint = $peer['endpoint'] ?: ($settings['vpn_gateway_ip'] . ':' . $server['listen_port']);
+        $keepalive = $peer['persistent_keepalive'] ?: 25;
+        $vpnNetwork = $settings['vpn_network'] ?: '10.200.0.0/24';
+        
+        $script = "# ============================================\n";
+        $script .= "# MikroTik WireGuard Configuration Script\n";
+        $script .= "# Peer: {$peer['name']}\n";
+        $script .= "# Generated: " . date('Y-m-d H:i:s') . "\n";
+        $script .= "# ============================================\n";
+        $script .= "# IMPORTANT: RouterOS 7.x required for WireGuard\n";
+        $script .= "# Copy and paste this entire script into MikroTik terminal\n";
+        $script .= "# ============================================\n\n";
+        
+        $script .= "# Remove existing interface if exists (optional - uncomment if needed)\n";
+        $script .= "# /interface wireguard remove [find name=\"{$interfaceName}\"]\n\n";
+        
+        $script .= "# 1. Create WireGuard interface with private key\n";
+        $script .= "/interface wireguard add name=\"{$interfaceName}\" private-key=\"{$privateKey}\" listen-port=51821 mtu=" . ($server['mtu'] ?: 1420) . "\n\n";
+        
+        $script .= "# 2. Assign IP address to WireGuard interface\n";
+        $script .= "/ip address add address={$peerIp} interface=\"{$interfaceName}\" network=" . $this->extractNetwork($vpnNetwork) . "\n\n";
+        
+        $script .= "# 3. Add VPS server as peer\n";
+        $script .= "/interface wireguard peers add \\\n";
+        $script .= "    interface=\"{$interfaceName}\" \\\n";
+        $script .= "    public-key=\"{$server['public_key']}\" \\\n";
+        if ($psk) {
+            $script .= "    preshared-key=\"{$psk}\" \\\n";
+        }
+        $script .= "    endpoint-address=\"" . $this->extractHost($endpoint) . "\" \\\n";
+        $script .= "    endpoint-port=" . $this->extractPort($endpoint, $server['listen_port']) . " \\\n";
+        $script .= "    allowed-address={$vpnNetwork} \\\n";
+        $script .= "    persistent-keepalive={$keepalive}s\n\n";
+        
+        $script .= "# 4. Add firewall rules (if not already present)\n";
+        $script .= "/ip firewall filter add chain=input action=accept protocol=udp dst-port=51821 comment=\"Allow WireGuard\" place-before=0\n";
+        $script .= "/ip firewall filter add chain=input action=accept in-interface=\"{$interfaceName}\" comment=\"Allow WireGuard traffic\" place-before=1\n\n";
+        
+        $script .= "# 5. Add route to VPN network (optional - for accessing other VPN peers)\n";
+        $script .= "/ip route add dst-address={$vpnNetwork} gateway=\"{$interfaceName}\" comment=\"WireGuard VPN route\"\n\n";
+        
+        $script .= "# ============================================\n";
+        $script .= "# Verification Commands (run after setup):\n";
+        $script .= "# ============================================\n";
+        $script .= "# /interface wireguard print\n";
+        $script .= "# /interface wireguard peers print\n";
+        $script .= "# /ping " . $this->extractNetwork($vpnNetwork, true) . " interface=\"{$interfaceName}\"\n";
+        $script .= "# ============================================\n";
+        
+        return $script;
+    }
+    
+    private function extractNetwork(string $cidr, bool $firstHost = false): string {
+        $parts = explode('/', $cidr);
+        $ip = trim($parts[0]);
+        if ($firstHost) {
+            $octets = explode('.', $ip);
+            $octets[3] = '1';
+            return implode('.', $octets);
+        }
+        return $ip;
+    }
+    
+    private function extractHost(string $endpoint): string {
+        $parts = explode(':', $endpoint);
+        return trim($parts[0]);
+    }
+    
+    private function extractPort(string $endpoint, int $default = 51820): int {
+        $parts = explode(':', $endpoint);
+        return isset($parts[1]) ? (int)$parts[1] : $default;
+    }
+    
     public function getTR069AcsUrl(): string {
         $settings = $this->getSettings();
         
