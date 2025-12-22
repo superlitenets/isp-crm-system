@@ -2217,7 +2217,7 @@ try {
             <script>
             (function() {
                 const isUnconfigured = <?= isset($_GET['unconfigured']) ? 'true' : 'false' ?>;
-                const refreshInterval = isUnconfigured ? 300000 : 60000; // 5 min for Non Auth, 1 min for status
+                const refreshInterval = isUnconfigured ? 30000 : 60000; // 30s for Non Auth, 1 min for status
                 const refreshLabel = isUnconfigured ? 'Non Auth discovery' : 'Status update';
                 let countdown = refreshInterval / 1000;
                 
