@@ -512,11 +512,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'create_vlan':
+                $vlanOptions = [
+                    'is_multicast' => !empty($_POST['is_multicast']),
+                    'is_voip' => !empty($_POST['is_voip']),
+                    'dhcp_snooping' => !empty($_POST['dhcp_snooping']),
+                    'lan_to_lan' => !empty($_POST['lan_to_lan'])
+                ];
                 $result = $huaweiOLT->createVLAN(
                     (int)$_POST['olt_id'],
                     (int)$_POST['vlan_id'],
                     $_POST['description'] ?? '',
-                    $_POST['vlan_type'] ?? 'smart'
+                    $_POST['vlan_type'] ?? 'smart',
+                    $vlanOptions
                 );
                 $message = $result['success'] ? 'VLAN created successfully' : ($result['message'] ?? 'Failed to create VLAN');
                 $messageType = $result['success'] ? 'success' : 'danger';
@@ -4324,6 +4331,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <tr>
                                             <th>VLAN ID</th>
                                             <th>Type</th>
+                                            <th>Features</th>
                                             <th>Description</th>
                                             <th>Actions</th>
                                         </tr>
@@ -4333,6 +4341,23 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <tr>
                                             <td><strong><?= $vlan['vlan_id'] ?></strong></td>
                                             <td><span class="badge bg-secondary"><?= htmlspecialchars($vlan['vlan_type'] ?? 'smart') ?></span></td>
+                                            <td class="text-nowrap">
+                                                <?php if (!empty($vlan['is_multicast'])): ?>
+                                                    <span class="badge bg-info" title="Multicast (IPTV)"><i class="bi bi-broadcast"></i></span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($vlan['is_voip'])): ?>
+                                                    <span class="badge bg-success" title="VoIP/Management"><i class="bi bi-telephone"></i></span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($vlan['dhcp_snooping'])): ?>
+                                                    <span class="badge bg-warning text-dark" title="DHCP Snooping"><i class="bi bi-shield-check"></i></span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($vlan['lan_to_lan'])): ?>
+                                                    <span class="badge bg-primary" title="LAN-to-LAN"><i class="bi bi-arrow-left-right"></i></span>
+                                                <?php endif; ?>
+                                                <?php if (empty($vlan['is_multicast']) && empty($vlan['is_voip']) && empty($vlan['dhcp_snooping']) && empty($vlan['lan_to_lan'])): ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <?php if (!empty($vlan['description'])): ?>
                                                     <?= htmlspecialchars($vlan['description']) ?>
@@ -4426,6 +4451,34 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
                                     <input type="text" name="description" class="form-control" placeholder="Optional">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label d-block">VLAN Features</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_multicast" id="vlanMulticast" value="1">
+                                        <label class="form-check-label" for="vlanMulticast">
+                                            <i class="bi bi-broadcast me-1 text-info"></i>Multicast VLAN (IPTV)
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_voip" id="vlanVoip" value="1">
+                                        <label class="form-check-label" for="vlanVoip">
+                                            <i class="bi bi-telephone me-1 text-success"></i>Management / VoIP VLAN
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="dhcp_snooping" id="vlanDhcp" value="1">
+                                        <label class="form-check-label" for="vlanDhcp">
+                                            <i class="bi bi-shield-check me-1 text-warning"></i>DHCP Snooping
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="lan_to_lan" id="vlanL2L" value="1">
+                                        <label class="form-check-label" for="vlanL2L">
+                                            <i class="bi bi-arrow-left-right me-1 text-primary"></i>LAN-to-LAN (ONU direct communication)
+                                        </label>
+                                    </div>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary w-100">
