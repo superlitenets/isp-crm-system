@@ -3,7 +3,7 @@ require_once __DIR__ . '/../src/HuaweiOLT.php';
 require_once __DIR__ . '/../src/Branch.php';
 $huaweiOLT = new \App\HuaweiOLT($db);
 $branchService = new \App\Branch($db);
-$allBranches = $branchService->getAllBranches();
+$allBranches = $branchService->getAll();
 
 $view = $_GET['view'] ?? 'dashboard';
 $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
