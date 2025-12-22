@@ -651,7 +651,7 @@ class HuaweiOLT {
     }
     
     public function getONUDistanceViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -689,7 +689,8 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        $command = "display ont optical-info {$frame}/{$slot} {$port} {$onuId}";
+        // Huawei command format: display ont optical-info <frame>/<slot>/<port> <onu_id>
+        $command = "display ont optical-info {$frame}/{$slot}/{$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -736,7 +737,7 @@ class HuaweiOLT {
         }
         
         // Get distance via separate command: display ont info
-        $distanceCmd = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $distanceCmd = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
         $distanceResult = $this->executeCommand($oltId, $distanceCmd);
         
         if ($distanceResult['success']) {
