@@ -689,8 +689,9 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        // Huawei command format: display ont optical-info <frame>/<slot>/<port> <onu_id>
-        $command = "display ont optical-info {$frame}/{$slot}/{$port} {$onuId}";
+        // Huawei requires entering GPON interface context first
+        // Run optical-info command for power levels (distance retrieved separately if needed)
+        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -708,15 +709,6 @@ class HuaweiOLT {
         $status = null;
         
         // Parse optical info from CLI output
-        // Example output:
-        // ONU ID: 0
-        // Rx optical power(dBm)  : -18.50
-        // Tx optical power(dBm)  : 2.30
-        // OLT Rx ONT optical power(dBm): -19.20
-        // Temperature(C)         : 45
-        // Voltage(V)             : 3.30
-        // Current(mA)            : 15
-        
         if (preg_match('/Rx optical power\(dBm\)\s*:\s*([-\d.]+)/i', $output, $m)) {
             $rxPower = (float)$m[1];
         }
@@ -736,24 +728,12 @@ class HuaweiOLT {
             $current = (float)$m[1];
         }
         
-        // Get distance via separate command: display ont info
-        $distanceCmd = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
-        $distanceResult = $this->executeCommand($oltId, $distanceCmd);
-        
-        if ($distanceResult['success']) {
-            $distanceOutput = $distanceResult['output'] ?? '';
-            // Parse distance - formats:
-            // "Distance(m)            : 1234"
-            // "ONU Distance           : 1234"
-            // "Ont distance(m)        : 1234"
-            if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $distanceOutput, $m)) {
-                $distance = (int)$m[1];
-            }
-            // Parse run state for status
-            // "Run state              : online"
-            if (preg_match('/Run state\s*:\s*(\w+)/i', $distanceOutput, $m)) {
-                $status = strtolower($m[1]);
-            }
+        // Parse distance and status from ont info output (in same response)
+        if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
+            $distance = (int)$m[1];
+        }
+        if (preg_match('/Run state\s*:\s*(\w+)/i', $output, $m)) {
+            $status = strtolower($m[1]);
         }
         
         return [
@@ -2171,12 +2151,8 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU location (slot/port) not set'];
         }
         
-        // SNMP is the only method for optical power
-        if (!function_exists('snmpget')) {
-            return ['success' => false, 'error' => 'PHP SNMP extension not installed. Install with: apt install php-snmp'];
-        }
-        
-        $optical = $this->getONUOpticalInfoViaSNMP(
+        // Try CLI first (faster and works when SNMP is blocked), then SNMP as fallback
+        $optical = $this->getONUOpticalInfoViaCLI(
             $onu['olt_id'],
             $frame,
             $slot,
@@ -2184,8 +2160,25 @@ class HuaweiOLT {
             $onuIdNum
         );
         
+        // If CLI failed or didn't get power data, try SNMP as fallback
+        if (!$optical['success'] || 
+            ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null)) {
+            if (function_exists('snmpget')) {
+                $snmpOptical = $this->getONUOpticalInfoViaSNMP(
+                    $onu['olt_id'],
+                    $frame,
+                    $slot,
+                    $port,
+                    $onuIdNum
+                );
+                if ($snmpOptical['success']) {
+                    $optical = $snmpOptical;
+                }
+            }
+        }
+        
         if (!$optical['success']) {
-            return ['success' => false, 'error' => $optical['error'] ?? 'SNMP query failed'];
+            return ['success' => false, 'error' => $optical['error'] ?? 'Failed to get optical info'];
         }
         
         if ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null) {
@@ -3544,19 +3537,33 @@ class HuaweiOLT {
         sleep(1);
         @fread($socket, 4096);
         
-        // Send the actual command
-        fwrite($socket, $command . "\r\n");
-        sleep(3);
+        // Handle multi-command sequences (separated by \r\n within the command string)
+        // This allows entering interface mode before running commands
+        $commands = preg_split('/\r?\n/', $command);
+        foreach ($commands as $i => $cmd) {
+            $cmd = trim($cmd);
+            if (empty($cmd)) continue;
+            fwrite($socket, $cmd . "\r\n");
+            // Wait 2 seconds between commands to ensure previous command completes
+            sleep(2);
+            // Clear buffer for intermediate commands
+            if ($i < count($commands) - 1) {
+                @fread($socket, 8192);
+            }
+        }
         
         // Read output with timeout
         $output = '';
         $startTime = time();
-        $maxWait = 60; // 60 seconds for command output
+        $lastDataTime = time();
+        $maxWait = 30; // 30 seconds max for command output
+        $idleTimeout = 5; // 5 seconds without data = done
         
         while ((time() - $startTime) < $maxWait) {
             $chunk = @fread($socket, 16384);
             if ($chunk) {
                 $output .= $chunk;
+                $lastDataTime = time();
                 if (strlen($output) > 2097152) break; // 2MB limit
                 
                 // Handle "---- More ----" pagination
@@ -3579,6 +3586,11 @@ class HuaweiOLT {
                     $extra = @fread($socket, 4096);
                     if (empty($extra)) break;
                     $output .= $extra;
+                }
+            } else {
+                // No data - check idle timeout
+                if ((time() - $lastDataTime) > $idleTimeout) {
+                    break; // No data for too long, done
                 }
             }
             usleep(100000);

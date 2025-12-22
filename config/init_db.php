@@ -1828,7 +1828,8 @@ function runMigrations(PDO $db): void {
         ['huawei_onus', 'zone_id', 'ALTER TABLE huawei_onus ADD COLUMN zone_id INTEGER REFERENCES huawei_zones(id) ON DELETE SET NULL'],
         ['huawei_onus', 'subzone_id', 'ALTER TABLE huawei_onus ADD COLUMN subzone_id INTEGER REFERENCES huawei_subzones(id) ON DELETE SET NULL'],
         ['huawei_onus', 'apartment_id', 'ALTER TABLE huawei_onus ADD COLUMN apartment_id INTEGER REFERENCES huawei_apartments(id) ON DELETE SET NULL'],
-        ['huawei_onus', 'odb_id', 'ALTER TABLE huawei_onus ADD COLUMN odb_id INTEGER REFERENCES huawei_odb_units(id) ON DELETE SET NULL']
+        ['huawei_onus', 'odb_id', 'ALTER TABLE huawei_onus ADD COLUMN odb_id INTEGER REFERENCES huawei_odb_units(id) ON DELETE SET NULL'],
+        ['huawei_onus', 'optical_updated_at', 'ALTER TABLE huawei_onus ADD COLUMN optical_updated_at TIMESTAMP']
     ];
     
     foreach ($columnMigrations as $migration) {
