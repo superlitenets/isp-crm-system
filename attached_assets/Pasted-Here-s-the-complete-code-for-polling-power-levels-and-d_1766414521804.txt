@@ -1,0 +1,134 @@
+Here's the complete code for polling power levels and distance via SNMP for Huawei OLT:
+
+Huawei OIDs:
+
+const HUAWEI_OIDS = {
+  onuRxPower: "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4",   // hwGponOltOpticsDnRx (ONU → OLT)
+  onuTxPower: "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6",   // hwGponOltOpticsUpTx (OLT → ONU)
+  onuDistance: "1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20", // hwGponDeviceOntDistance (meters)
+  onuStatus: "1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15",   // hwGponDeviceOntState
+};
+Complete Polling Function:
+
+interface OnuSnmpData {
+  status?: string;
+  rxPower?: number;
+  txPower?: number;
+  distance?: number;
+}
+async bulkPollOpticalPower(): Promise<Map<string, OnuSnmpData>> {
+  const results = new Map<string, OnuSnmpData>();
+  
+  try {
+    // Walk RX power table
+    const rxResults = await this.snmpClient.walk(this.oids.onuRxPower).catch((err) => {
+      console.log(`[SNMP] RX power walk failed: ${err.message}`);
+      return new Map();
+    });
+    
+    // Walk TX power table
+    const txResults = await this.snmpClient.walk(this.oids.onuTxPower).catch((err) => {
+      console.log(`[SNMP] TX power walk failed: ${err.message}`);
+      return new Map();
+    });
+    
+    // Walk distance table  
+    const distResults = await this.snmpClient.walk(this.oids.onuDistance).catch((err) => {
+      console.log(`[SNMP] Distance walk failed: ${err.message}`);
+      return new Map();
+    });
+    
+    // Parse RX power - values in 0.01 dBm units
+    rxResults.forEach((value, oid) => {
+      try {
+        const { ponPort, onuId } = this.parseOltOidIndex(oid, this.oids.onuRxPower);
+        const key = `${ponPort}.${onuId}`;
+        
+        if (!results.has(key)) {
+          results.set(key, {});
+        }
+        
+        const rxPower = Number(value) / 100;  // Convert to dBm
+        if (rxPower > -50 && rxPower < 10) {
+          results.get(key)!.rxPower = rxPower;
+        }
+      } catch (e) {}
+    });
+    
+    // Parse TX power - values in 0.01 dBm units
+    txResults.forEach((value, oid) => {
+      try {
+        const { ponPort, onuId } = this.parseOltOidIndex(oid, this.oids.onuTxPower);
+        const key = `${ponPort}.${onuId}`;
+        
+        if (!results.has(key)) {
+          results.set(key, {});
+        }
+        
+        const txPower = Number(value) / 100;  // Convert to dBm
+        if (txPower > -50 && txPower < 10) {
+          results.get(key)!.txPower = txPower;
+        }
+      } catch (e) {}
+    });
+    
+    // Parse distance - values in meters
+    distResults.forEach((value, oid) => {
+      try {
+        const { ponPort, onuId } = this.parseOltOidIndex(oid, this.oids.onuDistance);
+        const key = `${ponPort}.${onuId}`;
+        
+        if (!results.has(key)) {
+          results.set(key, {});
+        }
+        
+        const distance = Number(value);  // Already in meters
+        if (distance > 0 && distance < 100000) {
+          results.get(key)!.distance = distance;
+        }
+      } catch (e) {}
+    });
+    
+    return results;
+  } catch (error) {
+    console.error("SNMP bulkPollOpticalPower error:", error);
+    return results;
+  }
+}
+// Parse Huawei OID index to extract ponPort and onuId
+private parseOltOidIndex(oid: string, baseOid: string): { ponPort: number; onuId: number } {
+  const oidParts = oid.split(".");
+  const baseLength = baseOid.split(".").length;
+  const indexParts = oidParts.slice(baseLength);
+  
+  let ponPort = 0;
+  let onuId = 0;
+  
+  // Huawei format: <ifIndex>.<onuId>
+  if (indexParts.length >= 2) {
+    const ifIndex = parseInt(indexParts[0]) || 0;
+    onuId = parseInt(indexParts[1]) || 0;
+    
+    // Decode ifIndex to get slot/port
+    // Huawei ifIndex encoding: baseIndex + slot*65536 + port*256
+    const baseIndex = 4194304000;
+    if (ifIndex >= baseIndex) {
+      const offset = ifIndex - baseIndex;
+      const slot = Math.floor(offset / 65536) & 0xFF;
+      const port = Math.floor((offset % 65536) / 256) & 0xFF;
+      ponPort = slot * 8 + port;  // Combined slot.port number
+    }
+  }
+  
+  ponPort = Math.max(0, Math.min(ponPort, 255));
+  onuId = Math.max(1, Math.min(onuId, 255));
+  
+  return { ponPort, onuId };
+}
+Summary:
+
+Data	OID	Unit	Conversion
+RX Power	1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4	0.01 dBm	÷ 100
+TX Power	1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6	0.01 dBm	÷ 100
+Distance	1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20	meters	none
+OID Structure: {baseOid}.{ifIndex}.{onuId}
