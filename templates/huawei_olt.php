@@ -511,6 +511,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'tr069_wireless_config':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $onuId = (int)$_POST['onu_id'];
+                $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.onu_id = o.id WHERE o.id = ?");
+                $stmt->execute([$onuId]);
+                $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($tr069Device && $tr069Device['device_id']) {
+                    $config = [
+                        'wifi_24_enable' => isset($_POST['wifi_24_enable']),
+                        'ssid_24' => $_POST['ssid_24'] ?? '',
+                        'wifi_pass_24' => $_POST['wifi_pass_24'] ?? '',
+                        'channel_24' => $_POST['channel_24'] ?? 'auto',
+                        'bandwidth_24' => $_POST['bandwidth_24'] ?? 40,
+                        'hide_ssid_24' => isset($_POST['hide_ssid_24']),
+                        'wifi_5_enable' => isset($_POST['wifi_5_enable']),
+                        'ssid_5' => $_POST['ssid_5'] ?? '',
+                        'wifi_pass_5' => $_POST['wifi_pass_5'] ?? '',
+                        'channel_5' => $_POST['channel_5'] ?? 'auto',
+                        'bandwidth_5' => $_POST['bandwidth_5'] ?? 80,
+                        'hide_ssid_5' => isset($_POST['hide_ssid_5']),
+                        'max_clients' => (int)($_POST['max_clients'] ?? 32)
+                    ];
+                    $result = $genieacs->setWirelessConfig($tr069Device['device_id'], $config);
+                    $message = $result['success'] ? 'WiFi configuration sent to device' : ($result['error'] ?? 'WiFi config failed');
+                } else {
+                    $message = 'Device not found in TR-069. Please sync devices first.';
+                    $result = ['success' => false];
+                }
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'tr069_lan_config':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $onuId = (int)$_POST['onu_id'];
+                $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.onu_id = o.id WHERE o.id = ?");
+                $stmt->execute([$onuId]);
+                $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($tr069Device && $tr069Device['device_id']) {
+                    $config = [
+                        'lan_ip' => $_POST['lan_ip'] ?? '192.168.1.1',
+                        'lan_mask' => $_POST['lan_mask'] ?? '255.255.255.0',
+                        'dhcp_enable' => isset($_POST['dhcp_enable']),
+                        'dhcp_start' => $_POST['dhcp_start'] ?? '192.168.1.100',
+                        'dhcp_end' => $_POST['dhcp_end'] ?? '192.168.1.200',
+                        'dhcp_lease' => (int)($_POST['dhcp_lease'] ?? 24)
+                    ];
+                    $result = $genieacs->setLANConfig($tr069Device['device_id'], $config);
+                    $message = $result['success'] ? 'LAN configuration sent to device' : ($result['error'] ?? 'LAN config failed');
+                } else {
+                    $message = 'Device not found in TR-069. Please sync devices first.';
+                    $result = ['success' => false];
+                }
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'tr069_wan_config':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $onuId = (int)$_POST['onu_id'];
+                $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.onu_id = o.id WHERE o.id = ?");
+                $stmt->execute([$onuId]);
+                $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($tr069Device && $tr069Device['device_id']) {
+                    $config = [
+                        'connection_type' => $_POST['connection_type'] ?? 'pppoe',
+                        'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                        'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                        'wan_vlan' => (int)($_POST['wan_vlan'] ?? 0),
+                        'wan_priority' => (int)($_POST['wan_priority'] ?? 0),
+                        'nat_enable' => isset($_POST['nat_enable']),
+                        'mtu' => (int)($_POST['mtu'] ?? 1500)
+                    ];
+                    $result = $genieacs->setWANConfig($tr069Device['device_id'], $config);
+                    $message = $result['success'] ? 'WAN configuration sent to device' : ($result['error'] ?? 'WAN config failed');
+                } else {
+                    $message = 'Device not found in TR-069. Please sync devices first.';
+                    $result = ['success' => false];
+                }
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'create_vlan':
                 $vlanOptions = [
                     'is_multicast' => !empty($_POST['is_multicast']),

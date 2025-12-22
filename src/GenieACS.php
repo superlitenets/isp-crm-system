@@ -359,4 +359,140 @@ class GenieACS {
         $query = json_encode(['_lastInform' => ['$gte' => $fiveMinutesAgo]]);
         return $this->request('GET', '/devices', null, ['query' => $query]);
     }
+    
+    public function setWirelessConfig(string $deviceId, array $config): array {
+        $params = [];
+        $base24 = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
+        $base5 = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5';
+        
+        // 2.4GHz WiFi settings
+        if (isset($config['wifi_24_enable'])) {
+            $params[] = ["{$base24}.Enable", (bool)$config['wifi_24_enable'], 'xsd:boolean'];
+        }
+        if (!empty($config['ssid_24'])) {
+            $params[] = ["{$base24}.SSID", $config['ssid_24'], 'xsd:string'];
+        }
+        if (!empty($config['wifi_pass_24'])) {
+            $params[] = ["{$base24}.PreSharedKey.1.KeyPassphrase", $config['wifi_pass_24'], 'xsd:string'];
+        }
+        if (isset($config['channel_24']) && $config['channel_24'] !== 'auto') {
+            $params[] = ["{$base24}.Channel", (int)$config['channel_24'], 'xsd:unsignedInt'];
+        }
+        if (isset($config['hide_ssid_24'])) {
+            $params[] = ["{$base24}.SSIDAdvertisementEnabled", !$config['hide_ssid_24'], 'xsd:boolean'];
+        }
+        if (isset($config['bandwidth_24'])) {
+            $params[] = ["{$base24}.X_HW_ChannelWidth", (int)$config['bandwidth_24'], 'xsd:unsignedInt'];
+        }
+        
+        // 5GHz WiFi settings
+        if (isset($config['wifi_5_enable'])) {
+            $params[] = ["{$base5}.Enable", (bool)$config['wifi_5_enable'], 'xsd:boolean'];
+        }
+        if (!empty($config['ssid_5'])) {
+            $params[] = ["{$base5}.SSID", $config['ssid_5'], 'xsd:string'];
+        }
+        if (!empty($config['wifi_pass_5'])) {
+            $params[] = ["{$base5}.PreSharedKey.1.KeyPassphrase", $config['wifi_pass_5'], 'xsd:string'];
+        }
+        if (isset($config['channel_5']) && $config['channel_5'] !== 'auto') {
+            $params[] = ["{$base5}.Channel", (int)$config['channel_5'], 'xsd:unsignedInt'];
+        }
+        if (isset($config['hide_ssid_5'])) {
+            $params[] = ["{$base5}.SSIDAdvertisementEnabled", !$config['hide_ssid_5'], 'xsd:boolean'];
+        }
+        if (isset($config['bandwidth_5'])) {
+            $params[] = ["{$base5}.X_HW_ChannelWidth", (int)$config['bandwidth_5'], 'xsd:unsignedInt'];
+        }
+        
+        // Max clients
+        if (isset($config['max_clients'])) {
+            $params[] = ["{$base24}.MaxAssociatedDevices", (int)$config['max_clients'], 'xsd:unsignedInt'];
+            $params[] = ["{$base5}.MaxAssociatedDevices", (int)$config['max_clients'], 'xsd:unsignedInt'];
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No parameters to configure'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
+    public function setLANConfig(string $deviceId, array $config): array {
+        $params = [];
+        $lanBase = 'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement';
+        
+        // LAN IP settings
+        if (!empty($config['lan_ip'])) {
+            $params[] = ["{$lanBase}.IPInterface.1.IPInterfaceIPAddress", $config['lan_ip'], 'xsd:string'];
+        }
+        if (!empty($config['lan_mask'])) {
+            $params[] = ["{$lanBase}.IPInterface.1.IPInterfaceSubnetMask", $config['lan_mask'], 'xsd:string'];
+        }
+        
+        // DHCP Server settings
+        if (isset($config['dhcp_enable'])) {
+            $params[] = ["{$lanBase}.DHCPServerEnable", (bool)$config['dhcp_enable'], 'xsd:boolean'];
+        }
+        if (!empty($config['dhcp_start'])) {
+            $params[] = ["{$lanBase}.MinAddress", $config['dhcp_start'], 'xsd:string'];
+        }
+        if (!empty($config['dhcp_end'])) {
+            $params[] = ["{$lanBase}.MaxAddress", $config['dhcp_end'], 'xsd:string'];
+        }
+        if (isset($config['dhcp_lease'])) {
+            $leaseSeconds = (int)$config['dhcp_lease'] * 3600;
+            $params[] = ["{$lanBase}.DHCPLeaseTime", $leaseSeconds, 'xsd:unsignedInt'];
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No parameters to configure'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
+    public function setWANConfig(string $deviceId, array $config): array {
+        $params = [];
+        $wanBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1';
+        
+        // PPPoE or DHCP connection
+        $connType = $config['connection_type'] ?? 'pppoe';
+        
+        if ($connType === 'pppoe') {
+            $pppBase = "{$wanBase}.WANPPPConnection.1";
+            if (!empty($config['pppoe_username'])) {
+                $params[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
+            }
+            if (!empty($config['pppoe_password'])) {
+                $params[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
+            }
+            if (isset($config['wan_vlan']) && $config['wan_vlan'] > 0) {
+                $params[] = ["{$pppBase}.X_HW_VLAN", (int)$config['wan_vlan'], 'xsd:unsignedInt'];
+            }
+            if (isset($config['wan_priority'])) {
+                $params[] = ["{$pppBase}.X_HW_PRI", (int)$config['wan_priority'], 'xsd:unsignedInt'];
+            }
+            if (isset($config['nat_enable'])) {
+                $params[] = ["{$pppBase}.NATEnabled", (bool)$config['nat_enable'], 'xsd:boolean'];
+            }
+            if (isset($config['mtu'])) {
+                $params[] = ["{$pppBase}.MaxMRUSize", (int)$config['mtu'], 'xsd:unsignedInt'];
+            }
+        } else {
+            $ipBase = "{$wanBase}.WANIPConnection.1";
+            if (isset($config['wan_vlan']) && $config['wan_vlan'] > 0) {
+                $params[] = ["{$ipBase}.X_HW_VLAN", (int)$config['wan_vlan'], 'xsd:unsignedInt'];
+            }
+            if (isset($config['nat_enable'])) {
+                $params[] = ["{$ipBase}.NATEnabled", (bool)$config['nat_enable'], 'xsd:boolean'];
+            }
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No parameters to configure'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
 }
