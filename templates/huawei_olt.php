@@ -4453,8 +4453,8 @@ try {
                     .then(data => {
                         if (data.success) {
                             document.getElementById('configModalTitle').textContent = 'MikroTik RouterOS Script';
-                            document.getElementById('configContent').textContent = data.script;
-                            window.currentConfigName = 'wireguard-setup.rsc';
+                            document.getElementById('configContent').textContent = data.config;
+                            window.currentConfigName = data.name || 'wireguard-setup.rsc';
                             new bootstrap.Modal(document.getElementById('configModal')).show();
                         } else {
                             alert(data.error || 'Failed to generate script');
