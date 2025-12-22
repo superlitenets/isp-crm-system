@@ -625,6 +625,14 @@ class HuaweiOLT {
             $status = $statusMap[$statusCode] ?? null;
         }
         
+        // If SNMP failed, try CLI fallback
+        if ($rxValue === null && $txValue === null) {
+            $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
+            if ($cliResult['success'] && !empty($cliResult['optical'])) {
+                return $cliResult;
+            }
+        }
+        
         return [
             'success' => true,
             'optical' => [
@@ -642,6 +650,76 @@ class HuaweiOLT {
                 'tx_raw' => $txPower ?? false,
                 'distance_raw' => $distanceRaw ?? false,
                 'status_raw' => $statusRaw ?? false,
+                'method' => 'snmp',
+            ]
+        ];
+    }
+    
+    public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        $command = "display ont optical-info {$frame}/{$slot} {$port} {$onuId}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'CLI command failed'];
+        }
+        
+        $output = $result['output'] ?? '';
+        
+        $rxPower = null;
+        $txPower = null;
+        $temperature = null;
+        $voltage = null;
+        $current = null;
+        
+        // Parse optical info from CLI output
+        // Example output:
+        // ONU ID: 0
+        // Rx optical power(dBm)  : -18.50
+        // Tx optical power(dBm)  : 2.30
+        // OLT Rx ONT optical power(dBm): -19.20
+        // Temperature(C)         : 45
+        // Voltage(V)             : 3.30
+        // Current(mA)            : 15
+        
+        if (preg_match('/Rx optical power\(dBm\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $rxPower = (float)$m[1];
+        }
+        if (preg_match('/OLT Rx ONT optical power\(dBm\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $rxPower = (float)$m[1]; // This is what the OLT sees from ONU
+        }
+        if (preg_match('/Tx optical power\(dBm\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $txPower = (float)$m[1];
+        }
+        if (preg_match('/Temperature\(C\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $temperature = (float)$m[1];
+        }
+        if (preg_match('/Voltage\(V\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $voltage = (float)$m[1];
+        }
+        if (preg_match('/Current\(mA\)\s*:\s*([-\d.]+)/i', $output, $m)) {
+            $current = (float)$m[1];
+        }
+        
+        return [
+            'success' => true,
+            'optical' => [
+                'rx_power' => $rxPower,
+                'tx_power' => $txPower,
+                'temperature' => $temperature,
+                'voltage' => $voltage,
+                'current' => $current,
+                'distance' => null,
+                'status' => null,
+            ],
+            'debug' => [
+                'method' => 'cli',
+                'command' => $command,
+                'output_length' => strlen($output),
             ]
         ];
     }
@@ -2104,44 +2182,6 @@ class HuaweiOLT {
             ");
             $stmt->execute([$rxPower, $txPower, $onuId]);
         }
-    }
-    
-    public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        // Use CLI command to get optical power: display ont optical-info <frame>/<slot>/<port> <onu_id>
-        $command = "display ont optical-info {$frame}/{$slot}/{$port} {$onuId}";
-        $result = $this->executeCommand($oltId, $command);
-        
-        if (!$result['success']) {
-            return ['success' => false, 'error' => $result['message'] ?? 'CLI command failed'];
-        }
-        
-        $output = $result['output'] ?? '';
-        $rxPower = null;
-        $txPower = null;
-        
-        // Parse CLI output for optical power values
-        // Huawei format: "Rx optical power(dBm)    : -18.50"
-        //                "Tx optical power(dBm)    : 2.35"
-        if (preg_match('/Rx\s+optical\s+power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
-            $rxPower = (float)$m[1];
-        }
-        if (preg_match('/Tx\s+optical\s+power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
-            $txPower = (float)$m[1];
-        }
-        
-        // Alternative format: "OLT Rx ONT optical power(dBm) : -18.50"
-        if ($rxPower === null && preg_match('/OLT\s+Rx.*power\s*\(?dBm\)?\s*:\s*([-\d.]+)/i', $output, $m)) {
-            $rxPower = (float)$m[1];
-        }
-        
-        return [
-            'success' => true,
-            'optical' => [
-                'rx_power' => $rxPower,
-                'tx_power' => $txPower,
-            ],
-            'raw_output' => $output
-        ];
     }
     
     public function discoverUnconfiguredONUs(int $oltId): array {
