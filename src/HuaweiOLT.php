@@ -363,8 +363,64 @@ class HuaweiOLT {
         }
         
         if ($anySuccess) {
-            $this->db->prepare("UPDATE huawei_olts SET last_sync_at = CURRENT_TIMESTAMP, last_status = 'online' WHERE id = ?")->execute([$oltId]);
-            return ['success' => true, 'info' => $info];
+            $firmwareVersion = null;
+            $softwareVersion = null;
+            $uptime = null;
+            
+            if (!empty($info['sysDescr'])) {
+                if (preg_match('/Version\s+([^\s,]+)/i', $info['sysDescr'], $m)) {
+                    $softwareVersion = $m[1];
+                }
+                if (preg_match('/MA\d+[A-Z]?/i', $info['sysDescr'], $m)) {
+                    $firmwareVersion = $m[0];
+                }
+            }
+            
+            if (!empty($info['sysUpTime'])) {
+                $uptimeStr = $info['sysUpTime'];
+                if (preg_match('/\((\d+)\)/', $uptimeStr, $m)) {
+                    $ticks = (int)$m[1];
+                    $seconds = $ticks / 100;
+                    $days = floor($seconds / 86400);
+                    $hours = floor(($seconds % 86400) / 3600);
+                    $mins = floor(($seconds % 3600) / 60);
+                    $uptime = "{$days}d {$hours}h {$mins}m";
+                } else {
+                    $uptime = $uptimeStr;
+                }
+            }
+            
+            $stmt = $this->db->prepare("
+                UPDATE huawei_olts SET 
+                    last_sync_at = CURRENT_TIMESTAMP, 
+                    last_status = 'online',
+                    snmp_last_poll = CURRENT_TIMESTAMP,
+                    snmp_status = 'online',
+                    snmp_sys_name = ?,
+                    snmp_sys_descr = ?,
+                    snmp_sys_uptime = ?,
+                    snmp_sys_location = ?,
+                    software_version = COALESCE(?, software_version),
+                    firmware_version = COALESCE(?, firmware_version),
+                    uptime = COALESCE(?, uptime)
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $info['sysName'] ?? null,
+                $info['sysDescr'] ?? null,
+                $uptime,
+                $info['sysLocation'] ?? null,
+                $softwareVersion,
+                $firmwareVersion,
+                $uptime,
+                $oltId
+            ]);
+            
+            return ['success' => true, 'info' => $info, 'parsed' => [
+                'software_version' => $softwareVersion,
+                'firmware_version' => $firmwareVersion,
+                'uptime' => $uptime
+            ]];
         }
         
         return ['success' => false, 'error' => 'SNMP query failed - no response from OLT', 'info' => $info];
