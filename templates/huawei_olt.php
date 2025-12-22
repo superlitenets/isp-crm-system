@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $defaultProfile = $huaweiOLT->getDefaultServiceProfile();
                 if (!$defaultProfile) {
                     // Create a default profile if none exists
-                    $defaultProfileId = $huaweiOLT->createServiceProfile([
+                    $defaultProfileId = $huaweiOLT->addServiceProfile([
                         'name' => 'Default Internet',
                         'line_profile' => 1,
                         'srv_profile' => 1,
