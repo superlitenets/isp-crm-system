@@ -1243,7 +1243,7 @@ try {
                     <i class="bi bi-check-circle me-2"></i> Authorized ONUs
                 </a>
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= $stats['unconfigured_onus'] > 0 ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
-                    <i class="bi bi-hourglass-split me-2"></i> Pending Authorization
+                    <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php if ($stats['unconfigured_onus'] > 0): ?>
                     <span class="badge bg-warning badge-pulse ms-auto"><?= $stats['unconfigured_onus'] ?></span>
                     <?php endif; ?>
@@ -1269,6 +1269,9 @@ try {
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
                     <i class="bi bi-gear-wide-connected me-2"></i> TR-069 / ACS
+                </a>
+                <a class="nav-link <?= $view === 'vpn' ? 'active' : '' ?>" href="?page=huawei-olt&view=vpn">
+                    <i class="bi bi-shield-lock-fill me-2"></i> VPN
                 </a>
                 <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings">
                     <i class="bi bi-gear me-2"></i> Settings
@@ -3891,18 +3894,8 @@ try {
             <?php endif; ?>
             <?php endif; ?>
             
-            <?php elseif ($view === 'settings'): ?>
+            <?php elseif ($view === 'vpn'): ?>
             <?php
-            $settingsTab = $_GET['tab'] ?? 'genieacs';
-            
-            $genieacsSettings = [];
-            try {
-                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'genieacs_%'");
-                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-                    $genieacsSettings[$row['setting_key']] = $row['setting_value'];
-                }
-            } catch (Exception $e) {}
-            
             $wgService = new \App\WireGuardService($db);
             $wgSettings = $wgService->getSettings();
             $wgServers = $wgService->getServers();
@@ -3917,106 +3910,8 @@ try {
             $csrfToken = $_SESSION['csrf_token'] ?? '';
             ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="mb-0"><i class="bi bi-gear me-2"></i>OMS Settings</h4>
+                <h4 class="mb-0"><i class="bi bi-shield-lock-fill me-2"></i>VPN Management</h4>
             </div>
-            
-            <ul class="nav nav-tabs mb-4">
-                <li class="nav-item">
-                    <a class="nav-link <?= $settingsTab === 'genieacs' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=genieacs">
-                        <i class="bi bi-gear-wide-connected me-1"></i> Non Auth
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?= $settingsTab === 'vpn' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=vpn">
-                        <i class="bi bi-shield-lock-fill me-1"></i> VPN
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?= $settingsTab === 'scripts' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=scripts">
-                        <i class="bi bi-terminal me-1"></i> OLT Scripts
-                    </a>
-                </li>
-            </ul>
-            
-            <?php if ($settingsTab === 'genieacs'): ?>
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>GenieACS / TR-069 Settings</h5>
-                        </div>
-                        <div class="card-body">
-                            <form method="post">
-                                <input type="hidden" name="action" value="save_genieacs_settings">
-                                
-                                <div class="mb-3 form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="genieacs_enabled" id="genieacsEnabled" <?= ($genieacsSettings['genieacs_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label" for="genieacsEnabled">Enable GenieACS Integration</label>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">GenieACS NBI URL</label>
-                                    <input type="url" name="genieacs_url" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_url'] ?? 'http://localhost:7557') ?>" placeholder="http://genieacs:7557">
-                                    <div class="form-text">The NBI (North Bound Interface) URL, usually port 7557</div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-6 mb-3">
-                                        <label class="form-label">Username (optional)</label>
-                                        <input type="text" name="genieacs_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_username'] ?? '') ?>">
-                                    </div>
-                                    <div class="col-6 mb-3">
-                                        <label class="form-label">Password</label>
-                                        <input type="password" name="genieacs_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_password'] ?? '') ?>" placeholder="Leave blank to keep existing">
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Timeout (seconds)</label>
-                                    <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
-                                </div>
-                                
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
-                                    <button type="submit" name="action" value="test_genieacs" class="btn btn-outline-secondary"><i class="bi bi-plug me-1"></i> Test Connection</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-lg-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>GenieACS Setup Guide</h5>
-                        </div>
-                        <div class="card-body">
-                            <h6>1. Deploy GenieACS</h6>
-                            <p class="small">Using Docker Compose (recommended):</p>
-                            <pre class="bg-light p-2 rounded small">services:
-  genieacs:
-    image: genieacs/genieacs
-    ports:
-      - "7547:7547"  # CWMP (for ONUs)
-      - "7557:7557"  # NBI (for CRM)
-      - "3000:3000"  # Web UI</pre>
-                            
-                            <h6 class="mt-3">2. Configure OLT TR-069 Profile</h6>
-                            <pre class="bg-light p-2 rounded small">ont tr069-server-profile add profile-id 1 \
-  url http://YOUR_SERVER:7547/ \
-  user admin admin</pre>
-                            
-                            <h6 class="mt-3">3. Apply to ONUs</h6>
-                            <pre class="bg-light p-2 rounded small">interface gpon 0/1
-ont tr069-server-config 1 all profile-id 1</pre>
-                            
-                            <h6 class="mt-3">4. Enter NBI URL Above</h6>
-                            <p class="small mb-0">Use <code>http://YOUR_SERVER:7557</code> for the NBI URL in settings.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <?php elseif ($settingsTab === 'vpn'): ?>
             
             <div class="row">
                 <div class="col-lg-4">
@@ -4025,7 +3920,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <h5 class="mb-0"><i class="bi bi-shield-lock-fill me-2"></i>VPN Settings</h5>
                         </div>
                         <div class="card-body">
-                            <form method="POST" action="?page=huawei-olt&view=settings&tab=vpn">
+                            <form method="POST" action="?page=huawei-olt&view=vpn">
                                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="action" value="save_vpn_settings">
                                 
@@ -4239,7 +4134,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
             <div class="modal fade" id="addServerModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
-                        <form method="POST" action="?page=huawei-olt&view=settings&tab=vpn">
+                        <form method="POST" action="?page=huawei-olt&view=vpn">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="add_vpn_server">
                             <div class="modal-header bg-dark text-white">
@@ -4290,7 +4185,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
             <div class="modal fade" id="addPeerModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
-                        <form method="POST" action="?page=huawei-olt&view=settings&tab=vpn">
+                        <form method="POST" action="?page=huawei-olt&view=vpn">
                             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                             <input type="hidden" name="action" value="add_vpn_peer">
                             <div class="modal-header bg-success text-white">
@@ -4348,7 +4243,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-success">
-                                    <i class="bi bi-plus-lg me-2"></i>Create Peer
+                                    <i class="bi bi-plus-lg me-2"></i>Add Peer
                                 </button>
                             </div>
                         </form>
@@ -4360,11 +4255,11 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header bg-dark text-white">
-                            <h5 class="modal-title"><i class="bi bi-file-code me-2"></i>WireGuard Configuration</h5>
+                            <h5 class="modal-title" id="configModalTitle">Configuration</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <pre id="configContent" class="bg-dark text-light p-3 rounded" style="font-family: 'Consolas', monospace; font-size: 0.9rem; max-height: 400px; overflow-y: auto;"></pre>
+                            <pre id="configContent" class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -4372,7 +4267,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 <i class="bi bi-clipboard me-2"></i>Copy
                             </button>
                             <button type="button" class="btn btn-success" onclick="downloadConfig()">
-                                <i class="bi bi-download me-2"></i>Download .conf
+                                <i class="bi bi-download me-2"></i>Download
                             </button>
                         </div>
                     </div>
@@ -4380,61 +4275,64 @@ ont tr069-server-config 1 all profile-id 1</pre>
             </div>
 
             <script>
-            document.getElementById('isOltSite')?.addEventListener('change', function() {
+            document.getElementById('isOltSite').addEventListener('change', function() {
                 document.getElementById('oltSelectDiv').style.display = this.checked ? 'block' : 'none';
             });
 
             function viewServerConfig(serverId) {
-                fetch(`?page=api&action=get_vpn_server_config&id=${serverId}`)
+                fetch(`?page=huawei-olt&view=vpn&action=get_server_config&server_id=${serverId}`)
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
+                            document.getElementById('configModalTitle').textContent = 'WireGuard Server Configuration';
                             document.getElementById('configContent').textContent = data.config;
-                            window.currentConfigName = `wg-server-${serverId}.conf`;
+                            window.currentConfigName = data.filename || 'wg0.conf';
                             new bootstrap.Modal(document.getElementById('configModal')).show();
                         } else {
-                            alert('Error: ' + (data.error || 'Failed to load config'));
+                            alert(data.error || 'Failed to get configuration');
                         }
                     });
             }
 
             function viewPeerConfig(peerId) {
-                fetch(`?page=api&action=get_vpn_peer_config&id=${peerId}`)
+                fetch(`?page=huawei-olt&view=vpn&action=get_peer_config&peer_id=${peerId}`)
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
+                            document.getElementById('configModalTitle').textContent = 'WireGuard Peer Configuration';
                             document.getElementById('configContent').textContent = data.config;
-                            window.currentConfigName = `wg-peer-${peerId}.conf`;
+                            window.currentConfigName = data.filename || 'peer.conf';
                             new bootstrap.Modal(document.getElementById('configModal')).show();
                         } else {
-                            alert('Error: ' + (data.error || 'Failed to load config'));
+                            alert(data.error || 'Failed to get configuration');
                         }
                     });
             }
 
             function viewMikroTikScript(peerId) {
-                fetch(`?page=api&action=get_vpn_peer_mikrotik&id=${peerId}`)
+                fetch(`?page=huawei-olt&view=vpn&action=get_mikrotik_script&peer_id=${peerId}`)
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
+                            document.getElementById('configModalTitle').textContent = 'MikroTik RouterOS Script';
                             document.getElementById('configContent').textContent = data.script;
-                            window.currentConfigName = `mikrotik-wg-peer-${peerId}.rsc`;
+                            window.currentConfigName = 'wireguard-setup.rsc';
                             new bootstrap.Modal(document.getElementById('configModal')).show();
                         } else {
-                            alert('Error: ' + (data.error || 'Failed to load MikroTik script'));
+                            alert(data.error || 'Failed to generate script');
                         }
                     });
             }
 
             function editPeer(peerId) {
-                window.location.href = `?page=huawei-olt&view=settings&tab=vpn&action=edit_peer&id=${peerId}`;
+                alert('Edit functionality coming soon');
             }
 
             function deletePeer(peerId) {
                 if (confirm('Delete this VPN peer?')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.action = '?page=huawei-olt&view=settings&tab=vpn';
+                    form.action = '?page=huawei-olt&view=vpn';
                     form.innerHTML = `
                         <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                         <input type="hidden" name="action" value="delete_vpn_peer">
@@ -4449,7 +4347,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 if (confirm('Delete this VPN server? All peers will be removed.')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.action = '?page=huawei-olt&view=settings&tab=vpn';
+                    form.action = '?page=huawei-olt&view=vpn';
                     form.innerHTML = `
                         <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                         <input type="hidden" name="action" value="delete_vpn_server">
@@ -4479,6 +4377,115 @@ ont tr069-server-config 1 all profile-id 1</pre>
             }
             </script>
             
+            <?php elseif ($view === 'settings'): ?>
+            <?php
+            $settingsTab = $_GET['tab'] ?? 'genieacs';
+            
+            $genieacsSettings = [];
+            try {
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'genieacs_%'");
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $genieacsSettings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch (Exception $e) {}
+            
+            $csrfToken = $_SESSION['csrf_token'] ?? '';
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-gear me-2"></i>OMS Settings</h4>
+            </div>
+            
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'genieacs' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=genieacs">
+                        <i class="bi bi-gear-wide-connected me-1"></i> GenieACS / TR-069
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'scripts' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=scripts">
+                        <i class="bi bi-terminal me-1"></i> OLT Scripts
+                    </a>
+                </li>
+            </ul>
+            
+            <?php if ($settingsTab === 'genieacs'): ?>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-gear-wide-connected me-2"></i>GenieACS / TR-069 Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_genieacs_settings">
+                                
+                                <div class="mb-3 form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="genieacs_enabled" id="genieacsEnabled" <?= ($genieacsSettings['genieacs_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="genieacsEnabled">Enable GenieACS Integration</label>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">GenieACS NBI URL</label>
+                                    <input type="url" name="genieacs_url" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_url'] ?? 'http://localhost:7557') ?>" placeholder="http://genieacs:7557">
+                                    <div class="form-text">The NBI (North Bound Interface) URL, usually port 7557</div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Username (optional)</label>
+                                        <input type="text" name="genieacs_username" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_username'] ?? '') ?>">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Password</label>
+                                        <input type="password" name="genieacs_password" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_password'] ?? '') ?>" placeholder="Leave blank to keep existing">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Timeout (seconds)</label>
+                                    <input type="number" name="genieacs_timeout" class="form-control" value="<?= htmlspecialchars($genieacsSettings['genieacs_timeout'] ?? '30') ?>" min="5" max="120">
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
+                                    <button type="submit" name="action" value="test_genieacs" class="btn btn-outline-secondary"><i class="bi bi-plug me-1"></i> Test Connection</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>GenieACS Setup Guide</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6>1. Deploy GenieACS</h6>
+                            <p class="small">Using Docker Compose (recommended):</p>
+                            <pre class="bg-light p-2 rounded small">services:
+  genieacs:
+    image: genieacs/genieacs
+    ports:
+      - "7547:7547"  # CWMP (for ONUs)
+      - "7557:7557"  # NBI (for CRM)
+      - "3000:3000"  # Web UI</pre>
+                            
+                            <h6 class="mt-3">2. Configure OLT TR-069 Profile</h6>
+                            <pre class="bg-light p-2 rounded small">ont tr069-server-profile add profile-id 1 \
+  url http://YOUR_SERVER:7547/ \
+  user admin admin</pre>
+                            
+                            <h6 class="mt-3">3. Apply to ONUs</h6>
+                            <pre class="bg-light p-2 rounded small">interface gpon 0/1
+ont tr069-server-config 1 all profile-id 1</pre>
+                            
+                            <h6 class="mt-3">4. Enter NBI URL Above</h6>
+                            <p class="small mb-0">Use <code>http://YOUR_SERVER:7557</code> for the NBI URL in settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <?php elseif ($settingsTab === 'scripts'): ?>
             
             <script>
