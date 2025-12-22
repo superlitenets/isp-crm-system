@@ -2213,6 +2213,42 @@ try {
                 </div>
             </div>
             
+            <!-- Auto-refresh functionality for ONU lists -->
+            <script>
+            (function() {
+                const isUnconfigured = <?= isset($_GET['unconfigured']) ? 'true' : 'false' ?>;
+                const refreshInterval = isUnconfigured ? 300000 : 60000; // 5 min for Non Auth, 1 min for status
+                const refreshLabel = isUnconfigured ? 'Non Auth discovery' : 'Status update';
+                let countdown = refreshInterval / 1000;
+                
+                // Add refresh indicator to header
+                const header = document.querySelector('.d-flex.justify-content-between.align-items-center.mb-4');
+                if (header) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'badge bg-info ms-2';
+                    indicator.id = 'refreshCountdown';
+                    indicator.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in <span id="countdownTimer">' + countdown + '</span>s';
+                    header.querySelector('h4').appendChild(indicator);
+                }
+                
+                // Countdown timer
+                const countdownTimer = setInterval(() => {
+                    countdown--;
+                    const timerEl = document.getElementById('countdownTimer');
+                    if (timerEl) timerEl.textContent = countdown;
+                    if (countdown <= 0) {
+                        clearInterval(countdownTimer);
+                        window.location.reload();
+                    }
+                }, 1000);
+                
+                // Pause auto-refresh when modal is open
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.addEventListener('show.bs.modal', () => clearInterval(countdownTimer));
+                });
+            })();
+            </script>
+            
             <?php elseif ($view === 'onu_detail' && $currentOnu): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
