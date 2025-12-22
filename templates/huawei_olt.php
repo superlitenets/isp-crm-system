@@ -5174,48 +5174,46 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             $onuCountBySlot[$slot]['online'] += $p['online'];
                         }
                         
-                        for ($slot = 0; $slot <= 21; $slot++): 
-                            $board = $boardsBySlot[$slot] ?? null;
-                            $boardType = $board ? $huaweiOLT->getBoardTypeCategory($board['board_name'] ?? '') : 'empty';
+                        // Only show slots that have boards (detected from OLT)
+                        $detectedSlots = array_keys($boardsBySlot);
+                        sort($detectedSlots, SORT_NUMERIC);
+                        
+                        foreach ($detectedSlots as $slot): 
+                            $board = $boardsBySlot[$slot];
+                            $boardType = $huaweiOLT->getBoardTypeCategory($board['board_name'] ?? '');
                             $slotOnus = $onuCountBySlot[$slot] ?? ['count' => 0, 'online' => 0];
                             
                             $bgColor = 'bg-light border';
                             $textColor = 'text-muted';
-                            if ($board) {
-                                switch ($boardType) {
-                                    case 'gpon': $bgColor = 'bg-success bg-opacity-25 border-success'; $textColor = 'text-success'; break;
-                                    case 'epon': $bgColor = 'bg-info bg-opacity-25 border-info'; $textColor = 'text-info'; break;
-                                    case 'uplink': $bgColor = 'bg-warning bg-opacity-25 border-warning'; $textColor = 'text-warning'; break;
-                                    case 'control': $bgColor = 'bg-primary bg-opacity-25 border-primary'; $textColor = 'text-primary'; break;
-                                    case 'power': $bgColor = 'bg-danger bg-opacity-25 border-danger'; $textColor = 'text-danger'; break;
-                                    default: $bgColor = 'bg-secondary bg-opacity-25 border-secondary'; $textColor = 'text-secondary';
-                                }
+                            switch ($boardType) {
+                                case 'gpon': $bgColor = 'bg-success bg-opacity-25 border-success'; $textColor = 'text-success'; break;
+                                case 'epon': $bgColor = 'bg-info bg-opacity-25 border-info'; $textColor = 'text-info'; break;
+                                case 'uplink': $bgColor = 'bg-warning bg-opacity-25 border-warning'; $textColor = 'text-warning'; break;
+                                case 'control': $bgColor = 'bg-primary bg-opacity-25 border-primary'; $textColor = 'text-primary'; break;
+                                case 'power': $bgColor = 'bg-danger bg-opacity-25 border-danger'; $textColor = 'text-danger'; break;
+                                default: $bgColor = 'bg-secondary bg-opacity-25 border-secondary'; $textColor = 'text-secondary';
                             }
                         ?>
                         <div class="col-6 col-md-3 col-lg-2">
                             <div class="card <?= $bgColor ?> h-100" style="min-height: 100px;">
                                 <div class="card-body p-2 text-center">
                                     <div class="small text-muted">Slot <?= $slot ?></div>
-                                    <?php if ($board): ?>
                                     <div class="fw-bold <?= $textColor ?>" style="font-size: 0.75rem;"><?= htmlspecialchars($board['board_name']) ?></div>
                                     <div class="small">
                                         <span class="badge bg-<?= strtolower($board['status'] ?? '') === 'normal' ? 'success' : 'secondary' ?>" style="font-size: 0.65rem;">
                                             <?= htmlspecialchars($board['status'] ?? '-') ?>
                                         </span>
                                     </div>
-                                    <?php if ($boardType === 'gpon' && $slotOnus['count'] > 0): ?>
+                                    <?php if (($boardType === 'gpon' || $boardType === 'epon') && $slotOnus['count'] > 0): ?>
                                     <div class="mt-1 small">
                                         <i class="bi bi-diagram-3"></i> <?= $slotOnus['count'] ?> ONUs
                                         <span class="text-success">(<?= $slotOnus['online'] ?> on)</span>
                                     </div>
                                     <?php endif; ?>
-                                    <?php else: ?>
-                                    <div class="text-muted small mt-2"><i class="bi bi-dash-lg"></i> Empty</div>
-                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
-                        <?php endfor; ?>
+                        <?php endforeach; ?>
                     </div>
                     
                     <div class="mt-3 d-flex flex-wrap gap-3 justify-content-center">
