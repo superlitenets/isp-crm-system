@@ -2127,19 +2127,19 @@ try {
                                 <div class="row mb-3">
                                     <div class="col-3">
                                         <label class="form-label">Frame</label>
-                                        <input type="number" name="frame" class="form-control" value="<?= $currentOnu['frame'] ?? 0 ?>">
+                                        <input type="number" class="form-control bg-light" value="<?= $currentOnu['frame'] ?? 0 ?>" readonly title="Read from OLT">
                                     </div>
                                     <div class="col-3">
                                         <label class="form-label">Slot</label>
-                                        <input type="number" name="slot" class="form-control" value="<?= $currentOnu['slot'] ?? '' ?>">
+                                        <input type="number" class="form-control bg-light" value="<?= $currentOnu['slot'] ?? '' ?>" readonly title="Read from OLT">
                                     </div>
                                     <div class="col-3">
                                         <label class="form-label">Port</label>
-                                        <input type="number" name="port" class="form-control" value="<?= $currentOnu['port'] ?? '' ?>">
+                                        <input type="number" class="form-control bg-light" value="<?= $currentOnu['port'] ?? '' ?>" readonly title="Read from OLT">
                                     </div>
                                     <div class="col-3">
                                         <label class="form-label">ONU ID</label>
-                                        <input type="number" name="onu_id" class="form-control" value="<?= $currentOnu['onu_id'] ?? '' ?>">
+                                        <input type="number" class="form-control bg-light" value="<?= $currentOnu['onu_id'] ?? '' ?>" readonly title="Read from OLT">
                                     </div>
                                 </div>
                                 
@@ -2279,20 +2279,6 @@ try {
                         </div>
                     </div>
                     
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-secondary text-white">
-                            <i class="bi bi-terminal me-2"></i>OLT Commands
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted small mb-2">Copy these commands to configure this ONU on the OLT:</p>
-                            <pre class="bg-dark text-light p-3 rounded small" style="white-space: pre-wrap;">interface gpon 0/<?= $currentOnu['slot'] ?? '0' ?>/<?= $currentOnu['port'] ?? '0' ?>
-ont add <?= $currentOnu['port'] ?? '0' ?> <?= $currentOnu['onu_id'] ?? '0' ?> sn-auth "<?= $currentOnu['sn'] ?>" omci ont-lineprofile-id <?= $currentOnu['line_profile'] ?: '10' ?> ont-srvprofile-id <?= $currentOnu['srv_profile'] ?: '10' ?> desc "<?= $currentOnu['name'] ?: 'Customer' ?>"
-quit</pre>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent); alert('Copied!')">
-                                <i class="bi bi-clipboard me-1"></i> Copy Commands
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
             
