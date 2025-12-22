@@ -526,7 +526,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'add_vpn_server':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
-                $wgService->addServer($_POST);
+                $wgService->createServer($_POST);
                 $message = 'VPN server added successfully';
                 $messageType = 'success';
                 break;
@@ -540,7 +540,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'add_vpn_peer':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
-                $wgService->addPeer($_POST);
+                $wgService->createPeer($_POST);
                 $message = 'VPN peer added successfully';
                 $messageType = 'success';
                 break;
