@@ -1822,6 +1822,73 @@ class HuaweiOLT {
         ];
     }
     
+    public function refreshAllONUOpticalViaCLI(int $oltId): array {
+        $onus = $this->getONUs(['olt_id' => $oltId]);
+        $refreshed = 0;
+        $failed = 0;
+        
+        foreach ($onus as $onu) {
+            if ($onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id'] !== null) {
+                $result = $this->refreshONUOptical($onu['id']);
+                if ($result['success']) {
+                    $refreshed++;
+                } else {
+                    $failed++;
+                }
+            }
+        }
+        
+        return [
+            'success' => true,
+            'refreshed' => $refreshed,
+            'failed' => $failed,
+            'total' => count($onus),
+            'method' => 'cli'
+        ];
+    }
+    
+    public function refreshAllONUOpticalViaSNMP(int $oltId): array {
+        if (!function_exists('snmprealwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed. Install with: apt install php-snmp'];
+        }
+        
+        $onus = $this->getONUs(['olt_id' => $oltId]);
+        $bulkResult = $this->bulkPollOpticalPowerViaSNMP($oltId);
+        
+        if (!$bulkResult['success']) {
+            return ['success' => false, 'error' => $bulkResult['error'] ?? 'SNMP walk failed'];
+        }
+        
+        if (empty($bulkResult['data'])) {
+            return ['success' => false, 'error' => 'No optical data received via SNMP. Check SNMP port (161) is accessible and community string is correct.'];
+        }
+        
+        $updated = 0;
+        foreach ($onus as $onu) {
+            if ($onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id'] !== null) {
+                $key = $this->buildOpticalKey($onu['slot'], $onu['port'], $onu['onu_id']);
+                if (isset($bulkResult['data'][$key])) {
+                    $data = $bulkResult['data'][$key];
+                    $this->updateONUOpticalInDB(
+                        $onu['id'], 
+                        $data['rx_power'] ?? null, 
+                        $data['tx_power'] ?? null,
+                        $data['distance'] ?? null
+                    );
+                    $updated++;
+                }
+            }
+        }
+        
+        return [
+            'success' => true,
+            'updated' => $updated,
+            'total' => count($onus),
+            'snmp_records' => count($bulkResult['data']),
+            'method' => 'snmp_bulk'
+        ];
+    }
+    
     public function bulkPollOpticalPowerViaSNMP(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
@@ -1904,8 +1971,8 @@ class HuaweiOLT {
             }
         }
         
-        // Walk distance table (hwGponOntDistance .43.1.5 - in meters)
-        $distanceOid = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.5';
+        // Walk distance table (hwGponDeviceOntDistance .46.1.20 - in meters)
+        $distanceOid = '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20';
         $distanceResults = @snmprealwalk($host, $community, $distanceOid, 10000000, 2);
         if ($distanceResults !== false) {
             foreach ($distanceResults as $oid => $value) {

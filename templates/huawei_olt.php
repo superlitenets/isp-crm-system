@@ -769,12 +769,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 break;
             case 'refresh_all_optical':
-                $result = $huaweiOLT->refreshAllONUOptical((int)$_POST['olt_id']);
+            case 'refresh_all_optical_cli':
+                $result = $huaweiOLT->refreshAllONUOpticalViaCLI((int)$_POST['olt_id']);
                 if ($result['success']) {
-                    $message = "Refreshed optical data for {$result['refreshed']}/{$result['total']} ONUs";
+                    $message = "CLI Sync: Refreshed optical data for {$result['refreshed']}/{$result['total']} ONUs";
                     $messageType = 'success';
                 } else {
-                    $message = $result['error'] ?? 'Failed to refresh optical data';
+                    $message = $result['error'] ?? 'Failed to refresh optical data via CLI';
+                    $messageType = 'danger';
+                }
+                break;
+            case 'refresh_all_optical_snmp':
+                $result = $huaweiOLT->refreshAllONUOpticalViaSNMP((int)$_POST['olt_id']);
+                if ($result['success']) {
+                    $message = "SNMP Sync: Updated {$result['updated']}/{$result['total']} ONUs (RX/TX power + distance)";
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed to refresh optical data via SNMP';
                     $messageType = 'danger';
                 }
                 break;
@@ -1870,13 +1881,31 @@ try {
                                 <i class="bi bi-arrow-repeat me-1"></i> Sync from OLT
                             </button>
                         </form>
-                        <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="refresh_all_optical">
-                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                            <button type="submit" class="btn btn-outline-primary btn-sm" title="Refresh power levels only">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" title="Refresh optical power">
                                 <i class="bi bi-reception-4"></i>
                             </button>
-                        </form>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="refresh_all_optical_cli">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item" onclick="return confirm('Sync optical power via CLI? This is slower but uses Telnet.')">
+                                            <i class="bi bi-terminal me-2"></i> CLI Sync (RX/TX)
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="refresh_all_optical_snmp">
+                                        <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                        <button type="submit" class="dropdown-item" onclick="return confirm('Sync optical power via SNMP? This is faster and includes distance data.')">
+                                            <i class="bi bi-hdd-network me-2"></i> SNMP Sync (RX/TX/Distance)
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
                         <div class="btn-group">
                             <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
                                 <i class="bi bi-three-dots"></i>
@@ -4934,13 +4963,27 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="action" value="refresh_all_optical">
-                                    <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                                    <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('Refresh optical power for all ONUs? This may take some time.')">
-                                        <i class="bi bi-broadcast me-2"></i>Refresh All ONU Optical Power
-                                    </button>
-                                </form>
+                                <p class="text-muted small mb-2"><i class="bi bi-broadcast me-1"></i> Optical Power Sync:</p>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <form method="post">
+                                            <input type="hidden" name="action" value="refresh_all_optical_cli">
+                                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                            <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('Sync optical power via CLI (Telnet)? This connects to each ONU individually and may take some time.')">
+                                                <i class="bi bi-terminal me-1"></i>CLI Sync
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="col-6">
+                                        <form method="post">
+                                            <input type="hidden" name="action" value="refresh_all_optical_snmp">
+                                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                            <button type="submit" class="btn btn-outline-success w-100" onclick="return confirm('Sync optical power via SNMP? This is faster and includes distance data. Requires SNMP port (161) to be accessible.')">
+                                                <i class="bi bi-hdd-network me-1"></i>SNMP Sync
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
                                 <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&unconfigured=1" class="btn btn-outline-warning w-100">
                                     <i class="bi bi-question-circle me-2"></i>View Pending Auth ONUs
                                 </a>
