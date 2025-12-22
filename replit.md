@@ -26,6 +26,13 @@ The system features a clean, responsive design. The public-facing landing page i
 - **Complaints Module**: Approval workflow for public complaints before ticket conversion.
 - **SmartOLT Integration**: Real-time network monitoring, ONU status tracking, and provisioning via SmartOLT cloud API.
 - **Huawei OLT Module**: Standalone direct management module for Huawei OLT devices (opens in new tab). Features include OLT device management with Telnet/SSH/SNMP connectivity, ONU inventory and status monitoring, service profile management (VLAN, QoS, speed profiles), auto-provisioning with unconfigured ONU detection, ONU operations (authorize, reboot, delete), CLI terminal for direct commands, provisioning logs and alerts. Credentials stored encrypted with AES-256-CBC using SESSION_SECRET.
+  - **Persistent Session Manager**: Node.js service (olt-service/) that maintains single persistent Telnet sessions per OLT for improved performance. Features include:
+    - One persistent connection per OLT (reused for all commands)
+    - Command queue with sequential execution (prevents session conflicts)
+    - Automatic reconnection on connection loss
+    - 60-second keepalive to prevent session timeout
+    - HTTP API on port 3001 for PHP integration
+    - ~50-100ms command execution (vs 2-3s with reconnect each time)
   - **OLT-Level Device Management**: Enhanced device discovery with system info sync (firmware version, hardware model, software version, uptime). Visual chassis layout displaying 22 slots (0-21) with color-coded board types (GPON, EPON, uplink, control, power) and real-time ONU counts per slot.
   - **Port Configuration**: PON port enable/disable controls, per-port VLAN assignment (tagged/untagged modes), bulk VLAN operations for multiple ports.
   - **Uplink Configuration**: Trunk/access/hybrid mode selection, allowed VLANs management, PVID (native VLAN) settings, port descriptions.

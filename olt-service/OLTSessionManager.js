@@ -7,11 +7,8 @@ class OLTSession {
         this.connection = null;
         this.connected = false;
         this.lastActivity = null;
-        this.commandQueue = [];
-        this.processing = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
-        this.keepaliveInterval = null;
     }
 
     async connect() {
@@ -41,9 +38,7 @@ class OLTSession {
             this.reconnectAttempts = 0;
             console.log(`[OLT ${this.oltId}] Connected to ${this.config.host}`);
             
-            this.startKeepalive();
-            
-            await this.execute('screen-length 0 temporary');
+            await this.executeRaw('screen-length 0 temporary');
             
             return true;
         } catch (error) {
@@ -53,30 +48,7 @@ class OLTSession {
         }
     }
 
-    startKeepalive() {
-        if (this.keepaliveInterval) {
-            clearInterval(this.keepaliveInterval);
-        }
-        
-        this.keepaliveInterval = setInterval(async () => {
-            if (this.connected && !this.processing) {
-                try {
-                    await this.execute('');
-                    console.log(`[OLT ${this.oltId}] Keepalive sent`);
-                } catch (error) {
-                    console.error(`[OLT ${this.oltId}] Keepalive failed:`, error.message);
-                    this.connected = false;
-                }
-            }
-        }, 60000);
-    }
-
     async disconnect() {
-        if (this.keepaliveInterval) {
-            clearInterval(this.keepaliveInterval);
-            this.keepaliveInterval = null;
-        }
-        
         if (this.connection && this.connected) {
             try {
                 await this.connection.end();
@@ -103,7 +75,7 @@ class OLTSession {
         await this.connect();
     }
 
-    async execute(command, options = {}) {
+    async executeRaw(command, options = {}) {
         if (!this.connected) {
             await this.reconnect();
         }
@@ -130,27 +102,13 @@ class OLTSession {
         }
     }
 
-    async executeBatch(commands, options = {}) {
-        const results = [];
-        for (const command of commands) {
-            try {
-                const result = await this.execute(command, options);
-                results.push({ command, success: true, output: result });
-            } catch (error) {
-                results.push({ command, success: false, error: error.message });
-            }
-        }
-        return results;
-    }
-
     getStatus() {
         return {
             oltId: this.oltId,
             host: this.config.host,
             connected: this.connected,
             lastActivity: this.lastActivity,
-            reconnectAttempts: this.reconnectAttempts,
-            queueLength: this.commandQueue.length
+            reconnectAttempts: this.reconnectAttempts
         };
     }
 }
@@ -159,6 +117,7 @@ class OLTSessionManager {
     constructor() {
         this.sessions = new Map();
         this.commandLocks = new Map();
+        this.keepaliveIntervals = new Map();
     }
 
     async connect(oltId, config) {
@@ -168,27 +127,59 @@ class OLTSessionManager {
                 console.log(`[OLT ${oltId}] Already connected`);
                 return;
             }
-            await existingSession.disconnect();
+            await this.disconnect(oltId);
         }
 
         const session = new OLTSession(oltId, config);
         await session.connect();
         this.sessions.set(oltId, session);
+        
+        this.startKeepalive(oltId);
+    }
+
+    startKeepalive(oltId) {
+        if (this.keepaliveIntervals.has(oltId)) {
+            clearInterval(this.keepaliveIntervals.get(oltId));
+        }
+        
+        const interval = setInterval(async () => {
+            const session = this.sessions.get(oltId);
+            if (session && session.connected) {
+                try {
+                    await this.execute(oltId, '');
+                    console.log(`[OLT ${oltId}] Keepalive sent`);
+                } catch (error) {
+                    console.error(`[OLT ${oltId}] Keepalive failed:`, error.message);
+                }
+            }
+        }, 60000);
+        
+        this.keepaliveIntervals.set(oltId, interval);
+    }
+
+    stopKeepalive(oltId) {
+        if (this.keepaliveIntervals.has(oltId)) {
+            clearInterval(this.keepaliveIntervals.get(oltId));
+            this.keepaliveIntervals.delete(oltId);
+        }
     }
 
     async disconnect(oltId) {
+        this.stopKeepalive(oltId);
+        
         const session = this.sessions.get(oltId);
         if (session) {
             await session.disconnect();
             this.sessions.delete(oltId);
         }
+        
+        this.commandLocks.delete(oltId);
     }
 
     async disconnectAll() {
-        for (const [oltId, session] of this.sessions) {
-            await session.disconnect();
+        for (const oltId of this.sessions.keys()) {
+            await this.disconnect(oltId);
         }
-        this.sessions.clear();
     }
 
     async execute(oltId, command, options = {}) {
@@ -204,7 +195,7 @@ class OLTSessionManager {
         const currentLock = this.commandLocks.get(oltId);
         
         const executionPromise = currentLock.then(async () => {
-            return await session.execute(command, options);
+            return await session.executeRaw(command, options);
         });
 
         this.commandLocks.set(oltId, executionPromise.catch(() => {}));
@@ -225,7 +216,16 @@ class OLTSessionManager {
         const currentLock = this.commandLocks.get(oltId);
         
         const executionPromise = currentLock.then(async () => {
-            return await session.executeBatch(commands, options);
+            const results = [];
+            for (const cmd of commands) {
+                try {
+                    const result = await session.executeRaw(cmd, options);
+                    results.push({ command: cmd, success: true, output: result });
+                } catch (error) {
+                    results.push({ command: cmd, success: false, error: error.message });
+                }
+            }
+            return results;
         });
 
         this.commandLocks.set(oltId, executionPromise.catch(() => {}));
