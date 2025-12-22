@@ -8,6 +8,36 @@ $action = $_POST['action'] ?? null;
 $message = '';
 $messageType = '';
 
+// Handle AJAX GET requests for VPN configs
+if (isset($_GET['action']) && $view === 'vpn') {
+    require_once __DIR__ . '/../src/WireGuardService.php';
+    $wgService = new \App\WireGuardService($db);
+    
+    header('Content-Type: application/json');
+    
+    switch ($_GET['action']) {
+        case 'get_server_config':
+            $serverId = (int)($_GET['server_id'] ?? 0);
+            $config = $wgService->getServerConfig($serverId);
+            echo json_encode(['success' => true, 'config' => $config, 'name' => 'wg0.conf']);
+            exit;
+        case 'get_peer_config':
+            $peerId = (int)($_GET['peer_id'] ?? 0);
+            $config = $wgService->getPeerConfig($peerId);
+            $peer = $wgService->getPeer($peerId);
+            $name = ($peer['name'] ?? 'peer') . '.conf';
+            echo json_encode(['success' => true, 'config' => $config, 'name' => $name]);
+            exit;
+        case 'get_mikrotik_script':
+            $peerId = (int)($_GET['peer_id'] ?? 0);
+            $script = $wgService->getMikroTikScript($peerId);
+            $peer = $wgService->getPeer($peerId);
+            $name = ($peer['name'] ?? 'peer') . '_mikrotik.rsc';
+            echo json_encode(['success' => true, 'config' => $script, 'name' => $name]);
+            exit;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
