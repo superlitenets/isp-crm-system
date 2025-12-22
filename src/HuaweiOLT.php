@@ -1112,6 +1112,182 @@ class HuaweiOLT {
         ];
     }
     
+    public function getONUDetailedInfo(int $oltId, ?int $slotFilter = null): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
+        
+        $socket = @fsockopen($olt['ip_address'], $olt['port'], $errno, $errstr, 10);
+        if (!$socket) {
+            return ['success' => false, 'error' => "Connection failed: {$errstr}"];
+        }
+        
+        stream_set_blocking($socket, false);
+        
+        $readResponse = function($sock, $maxWait = 10, $handleMore = true) {
+            $output = '';
+            $start = time();
+            $lastData = time();
+            while ((time() - $start) < $maxWait) {
+                $chunk = @fread($sock, 32768);
+                if ($chunk) {
+                    $output .= $chunk;
+                    $lastData = time();
+                    
+                    // Handle More pagination - check the FULL output not just chunk
+                    if ($handleMore && preg_match('/----\s*More.*?----\s*$/is', $output)) {
+                        fwrite($sock, ' ');
+                        usleep(150000);
+                        continue;
+                    }
+                    // Handle parameter prompt
+                    if (preg_match('/\{[^}]*\}\s*:\s*$/', $output)) {
+                        fwrite($sock, "\r\n");
+                        usleep(100000);
+                        continue;
+                    }
+                    // Check for command prompt (end of output)
+                    if (preg_match('/[>#]\s*$/', $output)) {
+                        break;
+                    }
+                } else {
+                    // No data received, check for timeout only if we have some output
+                    if ((time() - $lastData) > 4 && strlen($output) > 50) {
+                        break;
+                    }
+                }
+                usleep(50000);
+            }
+            return $output;
+        };
+        
+        // Login
+        $readResponse($socket, 8, false);
+        if (stripos($readResponse($socket, 5, false), 'name') === false) {
+            // Retry read for username prompt
+        }
+        fwrite($socket, $olt['username'] . "\r\n");
+        $readResponse($socket, 5, false);
+        fwrite($socket, $password . "\r\n");
+        sleep(2);
+        @fread($socket, 8192);
+        
+        fwrite($socket, "enable\r\n"); $readResponse($socket, 3, false);
+        fwrite($socket, "config\r\n"); $readResponse($socket, 3, false);
+        
+        // Get GPON slots from board info
+        fwrite($socket, "display board 0\r\n");
+        $boardOutput = $readResponse($socket, 5);
+        
+        $gponSlots = [];
+        foreach (explode("\n", $boardOutput) as $line) {
+            if (preg_match('/^\s*(\d{1,2})\s+(H\d{3}[A-Z0-9]*GP[A-Z0-9]*)\s+\w+/i', $line, $m)) {
+                $gponSlots[] = (int)$m[1];
+            }
+        }
+        if (empty($gponSlots)) $gponSlots = [0, 1];
+        if ($slotFilter !== null) $gponSlots = [$slotFilter];
+        
+        $allOnus = [];
+        
+        foreach ($gponSlots as $slot) {
+            // FIRST: Enter GPON interface and get optical data (small clean output)
+            fwrite($socket, "interface gpon 0/{$slot}\r\n");
+            $readResponse($socket, 3, false);
+            
+            // Collect all optical data for all ports (0-15)
+            $opticalData = [];
+            for ($portNum = 0; $portNum <= 15; $portNum++) {
+                fwrite($socket, "display ont optical-info {$portNum} all\r\n");
+                sleep(1);
+                $optOutput = $readResponse($socket, 8);
+                
+                foreach (explode("\n", $optOutput) as $line) {
+                    if (preg_match('/^\s*(\d+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)/i', trim($line), $m)) {
+                        $key = "{$portNum}-{$m[1]}";
+                        $opticalData[$key] = ['rx' => (float)$m[2], 'tx' => (float)$m[3]];
+                    }
+                }
+            }
+            
+            // Exit interface mode
+            fwrite($socket, "quit\r\n");
+            $readResponse($socket, 2, false);
+            
+            // SECOND: Get ONU info (large paginated output)
+            fwrite($socket, "display ont info 0 {$slot} all\r\n");
+            $output = $readResponse($socket, 60);
+            
+            // Parse ONU info
+            $currentOnus = [];
+            foreach (explode("\n", $output) as $line) {
+                $line = trim($line);
+                
+                // Parse: 0/ 0/0    1  48575443F2D52CC3  active  online  normal  match
+                if (preg_match('/(\d+)\/\s*(\d+)\/(\d+)\s+(\d+)\s+([A-F0-9]{16})\s+(\w+)\s+(\w+)\s+(\w+)\s+(\w+)/i', $line, $m)) {
+                    $runState = strtolower($m[7]);
+                    $status = ($runState === 'offline') ? 'offline' : (($runState === 'los') ? 'los' : 'online');
+                    
+                    $port = (int)$m[3];
+                    $onuId = (int)$m[4];
+                    $optKey = "{$port}-{$onuId}";
+                    
+                    $key = "{$m[1]}/{$m[2]}/{$m[3]}-{$m[4]}";
+                    $currentOnus[$key] = [
+                        'frame' => (int)$m[1],
+                        'slot' => (int)$m[2],
+                        'port' => $port,
+                        'onu_id' => $onuId,
+                        'sn' => strtoupper($m[5]),
+                        'status' => $status,
+                        'run_state' => $runState,
+                        'config_state' => strtolower($m[8]),
+                        'name' => '',
+                        'rx_power' => isset($opticalData[$optKey]) ? $opticalData[$optKey]['rx'] : null,
+                        'tx_power' => isset($opticalData[$optKey]) ? $opticalData[$optKey]['tx'] : null,
+                    ];
+                }
+                
+                // Parse description
+                if (preg_match('/(\d+)\/\s*(\d+)\/(\d+)\s+(\d+)\s+(\S.*)$/i', $line, $m)) {
+                    $descText = trim($m[5]);
+                    if (!preg_match('/^[A-F0-9]{16}/i', $descText)) {
+                        $key = "{$m[1]}/{$m[2]}/{$m[3]}-{$m[4]}";
+                        if (isset($currentOnus[$key])) {
+                            $name = $descText;
+                            if (preg_match('/(SNS\d+|SFL\d+)/i', $descText, $nameMatch)) {
+                                $name = strtoupper($nameMatch[1]);
+                            }
+                            $currentOnus[$key]['name'] = $name;
+                        }
+                    }
+                }
+            }
+            
+            $allOnus = array_merge($allOnus, array_values($currentOnus));
+        }
+        
+        fwrite($socket, "quit\r\n"); usleep(200000);
+        fwrite($socket, "quit\r\n"); usleep(200000);
+        fclose($socket);
+        
+        usort($allOnus, function($a, $b) {
+            if ($a['slot'] !== $b['slot']) return $a['slot'] - $b['slot'];
+            if ($a['port'] !== $b['port']) return $a['port'] - $b['port'];
+            return $a['onu_id'] - $b['onu_id'];
+        });
+        
+        return [
+            'success' => true,
+            'onus' => $allOnus,
+            'count' => count($allOnus),
+            'slots_scanned' => $gponSlots
+        ];
+    }
+    
     public function syncONUsFromCLI(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
@@ -4543,7 +4719,7 @@ class HuaweiOLT {
         return $this->executeCommand($oltId, $command);
     }
     
-    public function getONUDetailedInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+    public function getONUSingleInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
         $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
         return $this->executeCommand($oltId, $command);
     }
