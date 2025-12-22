@@ -5754,16 +5754,29 @@ class HuaweiOLT {
         
         try {
             require_once __DIR__ . '/WhatsApp.php';
+            require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
+            $settings = new \App\Settings();
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
-            $message = "🆕 *New ONU Discovered*\n\n";
-            $message .= "📍 Branch: {$branchName}\n";
-            $message .= "📡 OLT: {$olt['name']}\n";
-            $message .= "🔢 Serial: {$onu['sn']}\n";
-            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}\n";
-            $message .= "⏰ Time: " . date('Y-m-d H:i:s') . "\n\n";
-            $message .= "➡️ Please authorize this ONU in the OMS system.";
+            $branchCode = $olt['branch_code'] ?? '';
+            $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}";
+            
+            $defaultTemplate = "🔔 *NEW ONU DISCOVERED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n📊 *Count:* {onu_count} new ONU(s)\n⏰ *Time:* {discovery_time}\n\n📋 *Locations:*\n{onu_locations}\n\n🔢 *Serial Numbers:*\n{onu_serials}\n\n💡 Please authorize these ONUs in the OMS panel.";
+            $template = $settings->get('wa_template_oms_new_onu', $defaultTemplate);
+            
+            $placeholders = [
+                '{olt_name}' => $olt['name'],
+                '{olt_ip}' => $olt['ip_address'] ?? '',
+                '{branch_name}' => $branchName,
+                '{branch_code}' => $branchCode,
+                '{onu_count}' => '1',
+                '{discovery_time}' => date('Y-m-d H:i:s'),
+                '{onu_locations}' => "• {$onuPort}",
+                '{onu_serials}' => "• {$onu['sn']}"
+            ];
+            
+            $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
             $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
             return $result['success'] ?? false;
@@ -5780,21 +5793,34 @@ class HuaweiOLT {
         
         try {
             require_once __DIR__ . '/WhatsApp.php';
+            require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
+            $settings = new \App\Settings();
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
+            $branchCode = $olt['branch_code'] ?? '';
             $customerName = $onu['customer_name'] ?? 'Unknown Customer';
+            $customerPhone = $onu['customer_phone'] ?? '';
+            $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
-            $message = "⚠️ *ONU Loss of Signal (LOS)*\n\n";
-            $message .= "📍 Branch: {$branchName}\n";
-            $message .= "📡 OLT: {$olt['name']}\n";
-            $message .= "🔢 Serial: {$onu['sn']}\n";
-            $message .= "👤 Customer: {$customerName}\n";
-            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}\n";
-            $message .= "📝 Name: " . ($onu['name'] ?? 'N/A') . "\n";
-            $message .= "⏰ Time: " . date('Y-m-d H:i:s') . "\n\n";
-            $message .= "🔴 Status changed from *{$previousStatus}* to *LOS*\n";
-            $message .= "Please check fiber connection or customer power.";
+            $defaultTemplate = "⚠️ *ONU LOS ALERT*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n⏰ *Time:* {alert_time}\n\n⚡ *Previous Status:* {previous_status}\n❌ *Current Status:* LOS (Loss of Signal)\n\n🔧 Please check fiber connection and customer site.";
+            $template = $settings->get('wa_template_oms_los_alert', $defaultTemplate);
+            
+            $placeholders = [
+                '{olt_name}' => $olt['name'],
+                '{olt_ip}' => $olt['ip_address'] ?? '',
+                '{branch_name}' => $branchName,
+                '{branch_code}' => $branchCode,
+                '{onu_name}' => $onu['name'] ?? 'N/A',
+                '{onu_sn}' => $onu['sn'],
+                '{onu_port}' => $onuPort,
+                '{alert_time}' => date('Y-m-d H:i:s'),
+                '{previous_status}' => $previousStatus,
+                '{customer_name}' => $customerName,
+                '{customer_phone}' => $customerPhone
+            ];
+            
+            $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
             $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
             return $result['success'] ?? false;
@@ -5811,20 +5837,35 @@ class HuaweiOLT {
         
         try {
             require_once __DIR__ . '/WhatsApp.php';
+            require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
+            $settings = new \App\Settings();
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
+            $branchCode = $olt['branch_code'] ?? '';
+            $customerName = $onu['customer_name'] ?? '';
+            $customerPhone = $onu['customer_phone'] ?? '';
+            $onuPort = "{$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             
-            $message = "✅ *ONU Authorized*\n\n";
-            $message .= "📍 Branch: {$branchName}\n";
-            $message .= "📡 OLT: {$olt['name']}\n";
-            $message .= "🔢 Serial: {$onu['sn']}\n";
-            $message .= "📝 Name: " . ($onu['name'] ?? 'N/A') . "\n";
-            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}\n";
-            if ($authorizedBy) {
-                $message .= "👤 Authorized by: {$authorizedBy}\n";
-            }
-            $message .= "⏰ Time: " . date('Y-m-d H:i:s');
+            $defaultTemplate = "✅ *ONU AUTHORIZED*\n\n🏢 *OLT:* {olt_name}\n📍 *Branch:* {branch_name}\n🔌 *ONU:* {onu_name}\n🔢 *SN:* {onu_sn}\n📡 *Port:* {onu_port}\n👤 *Customer:* {customer_name}\n⏰ *Time:* {auth_time}\n\n✨ ONU is now online and ready for service.";
+            $template = $settings->get('wa_template_oms_onu_authorized', $defaultTemplate);
+            
+            $placeholders = [
+                '{olt_name}' => $olt['name'],
+                '{olt_ip}' => $olt['ip_address'] ?? '',
+                '{branch_name}' => $branchName,
+                '{branch_code}' => $branchCode,
+                '{onu_name}' => $onu['name'] ?? 'N/A',
+                '{onu_sn}' => $onu['sn'],
+                '{onu_port}' => $onuPort,
+                '{auth_time}' => date('Y-m-d H:i:s'),
+                '{customer_name}' => $customerName,
+                '{customer_phone}' => $customerPhone,
+                '{service_profile}' => $onu['service_profile'] ?? '',
+                '{authorized_by}' => $authorizedBy
+            ];
+            
+            $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
             $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
             return $result['success'] ?? false;
