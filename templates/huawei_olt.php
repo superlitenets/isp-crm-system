@@ -263,13 +263,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'wifi_pass_5' => $_POST['wifi_pass_5'] ?? ''
                     ];
                     
-                    // Store pending TR-069 config in database
+                    // Ensure TR-069 config table exists with all required columns
+                    $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                        onu_id INTEGER PRIMARY KEY,
+                        config_data TEXT,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        error_message TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP,
+                        applied_at TIMESTAMP
+                    )");
+                    // Add columns for existing installations (silently ignore if exists)
+                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN error_message TEXT"); } catch (Exception $e) {}
+                    try { $db->exec("ALTER TABLE huawei_onu_tr069_config ADD COLUMN applied_at TIMESTAMP"); } catch (Exception $e) {}
+                    
+                    // Store pending TR-069 config in database (clear error_message on re-queue)
                     $stmt = $db->prepare("
-                        INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, created_at)
-                        VALUES (?, ?, 'pending', CURRENT_TIMESTAMP)
+                        INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                        VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
                         ON CONFLICT (onu_id) DO UPDATE SET
                             config_data = EXCLUDED.config_data,
                             status = 'pending',
+                            error_message = NULL,
                             updated_at = CURRENT_TIMESTAMP
                     ");
                     try {
@@ -277,17 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $tr069Queued = true;
                         $message .= ' TR-069 config queued for push.';
                     } catch (Exception $e) {
-                        // Table may not exist, create it
-                        $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
-                            onu_id INTEGER PRIMARY KEY,
-                            config_data TEXT,
-                            status VARCHAR(20) DEFAULT 'pending',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP
-                        )");
-                        $stmt->execute([$onuId, json_encode($tr069Config)]);
-                        $tr069Queued = true;
-                        $message .= ' TR-069 config queued for push.';
+                        // Log error but don't fail the ONU authorization
+                        error_log("TR-069 config queue failed: " . $e->getMessage());
                     }
                 }
                 
@@ -561,8 +567,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $genieacs = new \App\GenieACS($db);
                 $onuId = (int)$_POST['onu_id'];
                 
+                // Check if GenieACS is configured
+                if (!$genieacs->isConfigured()) {
+                    $message = 'GenieACS is not configured. Please set the ACS URL in Settings.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
                 // Get pending config
-                $stmt = $db->prepare("SELECT config_data FROM huawei_onu_tr069_config WHERE onu_id = ? AND status = 'pending'");
+                $stmt = $db->prepare("SELECT id, config_data FROM huawei_onu_tr069_config WHERE onu_id = ? AND status = 'pending'");
                 $stmt->execute([$onuId]);
                 $pendingConfig = $stmt->fetch(\PDO::FETCH_ASSOC);
                 
@@ -575,7 +588,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
                     
                     if ($tr069Device && $tr069Device['device_id']) {
-                        $success = true;
+                        $allSuccess = true;
                         $errors = [];
                         
                         // Apply WAN config
@@ -587,7 +600,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 'wan_vlan' => $config['wan_vlan'] ?? 902,
                                 'nat_enable' => $config['nat_enable'] ?? true
                             ]);
-                            if (!$wanResult['success']) $errors[] = 'WAN config failed';
+                            if (!$wanResult['success']) {
+                                $allSuccess = false;
+                                $errors[] = 'WAN: ' . ($wanResult['error'] ?? 'failed');
+                            }
                         }
                         
                         // Apply WiFi config
@@ -600,17 +616,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 'ssid_5' => $config['wifi_ssid_5'] ?: $config['wifi_ssid_24'],
                                 'wifi_pass_5' => $config['wifi_pass_5'] ?: $config['wifi_pass_24']
                             ]);
-                            if (!$wifiResult['success']) $errors[] = 'WiFi config failed';
+                            if (!$wifiResult['success']) {
+                                $allSuccess = false;
+                                $errors[] = 'WiFi: ' . ($wifiResult['error'] ?? 'failed');
+                            }
                         }
                         
-                        // Mark as applied
-                        $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET status = 'applied', applied_at = CURRENT_TIMESTAMP WHERE onu_id = ?");
-                        $stmt->execute([$onuId]);
-                        
-                        $message = empty($errors) ? 'TR-069 configuration applied successfully' : 'Partial success: ' . implode(', ', $errors);
-                        $messageType = empty($errors) ? 'success' : 'warning';
+                        // Only mark as applied if ALL calls succeeded
+                        if ($allSuccess) {
+                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET status = 'applied', applied_at = CURRENT_TIMESTAMP, error_message = NULL WHERE id = ?");
+                            $stmt->execute([$pendingConfig['id']]);
+                            $message = 'TR-069 configuration applied successfully';
+                            $messageType = 'success';
+                        } else {
+                            // Keep status as pending and store error
+                            $errorMsg = implode('; ', $errors);
+                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                            $stmt->execute([$errorMsg, $pendingConfig['id']]);
+                            $message = 'Failed to apply TR-069 configuration: ' . $errorMsg;
+                            $messageType = 'danger';
+                        }
                     } else {
-                        $message = 'Device not found in GenieACS. Please sync TR-069 devices first.';
+                        $message = 'Device not found in GenieACS. The device must connect to ACS first.';
                         $messageType = 'warning';
                     }
                 } else {
@@ -1052,7 +1079,12 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
     $tr069Device = null;
     $tr069Info = null;
     $pendingTr069Config = null;
+    $genieacsConfigured = false;
     try {
+        require_once __DIR__ . '/../src/GenieACS.php';
+        $genieacs = new \App\GenieACS($db);
+        $genieacsConfigured = $genieacs->isConfigured();
+        
         // Check for TR-069 device by serial number
         $stmt = $db->prepare("SELECT * FROM tr069_devices WHERE serial_number = ?");
         $stmt->execute([$currentOnu['sn']]);
@@ -1066,10 +1098,8 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
             $pendingTr069Config['config'] = json_decode($pendingTr069Config['config_data'], true);
         }
         
-        // If device found in ACS, get live info
-        if ($tr069Device && $tr069Device['device_id']) {
-            require_once __DIR__ . '/../src/GenieACS.php';
-            $genieacs = new \App\GenieACS($db);
+        // If device found in ACS and GenieACS is configured, get live info
+        if ($genieacsConfigured && $tr069Device && $tr069Device['device_id']) {
             $deviceResult = $genieacs->getDeviceInfo($tr069Device['device_id']);
             if ($deviceResult['success']) {
                 $tr069Info = $deviceResult['info'];
@@ -2371,13 +2401,21 @@ quit</pre>
                     <div class="card shadow-sm">
                         <div class="card-header bg-purple text-white d-flex justify-content-between align-items-center" style="background-color:#6f42c1">
                             <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS Status</span>
-                            <?php if ($tr069Device): ?>
+                            <?php if (!$genieacsConfigured): ?>
+                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>ACS Not Configured</span>
+                            <?php elseif ($tr069Device): ?>
                             <span class="badge bg-light text-dark"><i class="bi bi-check-circle-fill text-success me-1"></i>Connected to ACS</span>
                             <?php else: ?>
                             <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Awaiting ACS Connection</span>
                             <?php endif; ?>
                         </div>
                         <div class="card-body">
+                            <?php if (!$genieacsConfigured): ?>
+                            <div class="alert alert-danger mb-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>GenieACS not configured.</strong> Please configure the ACS URL in OMS Settings to enable TR-069 remote management.
+                            </div>
+                            <?php endif; ?>
                             <div class="row">
                                 <div class="col-md-6">
                                     <h6 class="text-muted mb-3"><i class="bi bi-cpu me-2"></i>Device Information</h6>
@@ -2415,10 +2453,16 @@ quit</pre>
                                 <div class="col-md-6">
                                     <h6 class="text-muted mb-3"><i class="bi bi-sliders2 me-2"></i>Pending Configuration</h6>
                                     <?php if ($pendingTr069Config && $pendingTr069Config['status'] === 'pending'): ?>
-                                    <?php $cfg = $pendingTr069Config['config']; ?>
+                                    <?php $cfg = $pendingTr069Config['config'] ?? []; ?>
+                                    <?php if (!empty($pendingTr069Config['error_message'])): ?>
+                                    <div class="alert alert-danger mb-3">
+                                        <i class="bi bi-x-circle me-2"></i><strong>Last push failed:</strong> <?= htmlspecialchars($pendingTr069Config['error_message']) ?>
+                                    </div>
+                                    <?php else: ?>
                                     <div class="alert alert-info mb-3">
                                         <i class="bi bi-hourglass-split me-2"></i><strong>Configuration queued</strong> - waiting to push to device
                                     </div>
+                                    <?php endif; ?>
                                     <table class="table table-sm table-borderless mb-3">
                                         <?php if (!empty($cfg['pppoe_username'])): ?>
                                         <tr><th width="40%">PPPoE User</th><td><?= htmlspecialchars($cfg['pppoe_username']) ?></td></tr>
