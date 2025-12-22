@@ -515,6 +515,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $vlanOptions = [
                     'is_multicast' => !empty($_POST['is_multicast']),
                     'is_voip' => !empty($_POST['is_voip']),
+                    'is_tr069' => !empty($_POST['is_tr069']),
                     'dhcp_snooping' => !empty($_POST['dhcp_snooping']),
                     'lan_to_lan' => !empty($_POST['lan_to_lan'])
                 ];
@@ -4348,13 +4349,16 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                                 <?php if (!empty($vlan['is_voip'])): ?>
                                                     <span class="badge bg-success" title="VoIP/Management"><i class="bi bi-telephone"></i></span>
                                                 <?php endif; ?>
+                                                <?php if (!empty($vlan['is_tr069'])): ?>
+                                                    <span class="badge bg-purple" title="TR-069 Management" style="background-color:#6f42c1"><i class="bi bi-gear-wide-connected"></i></span>
+                                                <?php endif; ?>
                                                 <?php if (!empty($vlan['dhcp_snooping'])): ?>
                                                     <span class="badge bg-warning text-dark" title="DHCP Snooping"><i class="bi bi-shield-check"></i></span>
                                                 <?php endif; ?>
                                                 <?php if (!empty($vlan['lan_to_lan'])): ?>
                                                     <span class="badge bg-primary" title="LAN-to-LAN"><i class="bi bi-arrow-left-right"></i></span>
                                                 <?php endif; ?>
-                                                <?php if (empty($vlan['is_multicast']) && empty($vlan['is_voip']) && empty($vlan['dhcp_snooping']) && empty($vlan['lan_to_lan'])): ?>
+                                                <?php if (empty($vlan['is_multicast']) && empty($vlan['is_voip']) && empty($vlan['is_tr069']) && empty($vlan['dhcp_snooping']) && empty($vlan['lan_to_lan'])): ?>
                                                     <span class="text-muted">-</span>
                                                 <?php endif; ?>
                                             </td>
@@ -4465,6 +4469,12 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <input class="form-check-input" type="checkbox" name="is_voip" id="vlanVoip" value="1">
                                         <label class="form-check-label" for="vlanVoip">
                                             <i class="bi bi-telephone me-1 text-success"></i>Management / VoIP VLAN
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_tr069" id="vlanTr069" value="1">
+                                        <label class="form-check-label" for="vlanTr069">
+                                            <i class="bi bi-gear-wide-connected me-1 text-purple"></i>TR-069 Management VLAN
                                         </label>
                                     </div>
                                     <div class="form-check">

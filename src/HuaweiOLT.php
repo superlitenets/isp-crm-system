@@ -4654,22 +4654,24 @@ class HuaweiOLT {
         if ($result['success']) {
             $isMulticast = !empty($options['is_multicast']) ? 't' : 'f';
             $isVoip = !empty($options['is_voip']) ? 't' : 'f';
+            $isTr069 = !empty($options['is_tr069']) ? 't' : 'f';
             $dhcpSnooping = !empty($options['dhcp_snooping']) ? 't' : 'f';
             $lanToLan = !empty($options['lan_to_lan']) ? 't' : 'f';
             
             $stmt = $this->db->prepare("
-                INSERT INTO huawei_vlans (olt_id, vlan_id, vlan_type, description, is_multicast, is_voip, dhcp_snooping, lan_to_lan, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO huawei_vlans (olt_id, vlan_id, vlan_type, description, is_multicast, is_voip, is_tr069, dhcp_snooping, lan_to_lan, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT (olt_id, vlan_id) DO UPDATE SET
                     vlan_type = EXCLUDED.vlan_type,
                     description = EXCLUDED.description,
                     is_multicast = EXCLUDED.is_multicast,
                     is_voip = EXCLUDED.is_voip,
+                    is_tr069 = EXCLUDED.is_tr069,
                     dhcp_snooping = EXCLUDED.dhcp_snooping,
                     lan_to_lan = EXCLUDED.lan_to_lan,
                     updated_at = CURRENT_TIMESTAMP
             ");
-            $stmt->execute([$oltId, $vlanId, $type, $description, $isMulticast, $isVoip, $dhcpSnooping, $lanToLan]);
+            $stmt->execute([$oltId, $vlanId, $type, $description, $isMulticast, $isVoip, $isTr069, $dhcpSnooping, $lanToLan]);
         }
         
         $this->addLog([
