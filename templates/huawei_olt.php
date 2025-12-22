@@ -558,14 +558,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $wgService = new \App\WireGuardService($db);
                 $serverData = [
                     'name' => $_POST['name'] ?? '',
-                    'description' => $_POST['description'] ?? null,
-                    'public_endpoint' => $_POST['public_endpoint'] ?? '',
-                    'listen_port' => (int)($_POST['listen_port'] ?? 51820),
-                    'address' => $_POST['address'] ?? '',
                     'interface_name' => $_POST['interface_name'] ?? 'wg0',
+                    'interface_addr' => $_POST['address'] ?? '10.200.0.1/24',
+                    'listen_port' => (int)($_POST['listen_port'] ?? 51820),
                     'mtu' => (int)($_POST['mtu'] ?? 1420),
                     'dns_servers' => $_POST['dns_servers'] ?? null,
-                    'is_active' => true
+                    'enabled' => true
                 ];
                 $serverId = $wgService->createServer($serverData);
                 if ($serverId) {
@@ -594,16 +592,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     if (empty($existingServers)) {
                         // Create default server using VPN settings
                         $vpnSettings = $wgService->getSettings();
+                        $gatewayIp = $vpnSettings['vpn_gateway_ip'] ?? '10.200.0.1';
                         $defaultServer = [
                             'name' => 'Main VPN Server',
-                            'description' => 'Auto-created default server',
-                            'public_endpoint' => $_SERVER['HTTP_HOST'] ?? 'your-server-ip',
-                            'listen_port' => 51820,
-                            'address' => $vpnSettings['vpn_gateway_ip'] ?? '10.200.0.1',
                             'interface_name' => 'wg0',
+                            'interface_addr' => $gatewayIp . '/24',
+                            'listen_port' => 51820,
                             'mtu' => 1420,
                             'dns_servers' => '1.1.1.1',
-                            'is_active' => true
+                            'enabled' => true
                         ];
                         $serverId = $wgService->createServer($defaultServer);
                         if (!$serverId) {
