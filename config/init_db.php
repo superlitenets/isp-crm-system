@@ -570,6 +570,8 @@ function initializeDatabase(): void {
             $stmt->execute([$adminPass, $adminRoleId, $techPass, $techRoleId, $techPass, $techRoleId]);
         }
         
+        runMigrations($db);
+        
         $initialized = true;
         
         if (php_sapi_name() === 'cli') {
@@ -586,7 +588,7 @@ function initializeDatabase(): void {
 function runMigrations(PDO $db): void {
     // Check if migrations have already been applied using a version hash
     // This reduces ~110 queries per page load to just 1-2 queries
-    $migrationVersion = 'v2024122004'; // Increment this when adding new migrations
+    $migrationVersion = 'v2024122205'; // Increment this when adding new migrations
     
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (
