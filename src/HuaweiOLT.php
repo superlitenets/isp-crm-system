@@ -217,20 +217,44 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        if (!function_exists('snmpget')) {
-            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
-        }
-        
         $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
-        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        $host = $olt['ip_address'];
+        $port = $olt['snmp_port'] ?? 161;
         
-        $result = @snmpget($host, $community, $oid, $timeout, $retries);
-        
-        if ($result === false) {
-            return ['success' => false, 'error' => 'SNMP read failed for OID: ' . $oid];
+        // Try PHP extension first, fall back to CLI
+        if (function_exists('snmpget')) {
+            $result = @snmpget("{$host}:{$port}", $community, $oid, $timeout, $retries);
+            if ($result !== false) {
+                return ['success' => true, 'value' => $result, 'oid' => $oid];
+            }
         }
         
-        return ['success' => true, 'value' => $result, 'oid' => $oid];
+        // Fallback to CLI snmpget
+        $timeoutSec = max(1, intval($timeout / 1000000));
+        $cmd = sprintf(
+            'snmpget -v 2c -c %s -t %d -r %d %s:%d %s 2>&1',
+            escapeshellarg($community),
+            $timeoutSec,
+            $retries,
+            escapeshellarg($host),
+            $port,
+            escapeshellarg($oid)
+        );
+        
+        $output = [];
+        $returnCode = 0;
+        exec($cmd, $output, $returnCode);
+        
+        if ($returnCode === 0 && !empty($output)) {
+            $result = implode("\n", $output);
+            // Parse SNMP output format: OID = TYPE: value
+            if (preg_match('/=\s*(?:STRING:|INTEGER:|Timeticks:|Gauge32:|Counter32:|OID:)?\s*(.+)$/i', $result, $m)) {
+                return ['success' => true, 'value' => trim($m[1], '"'), 'oid' => $oid, 'raw' => $result];
+            }
+            return ['success' => true, 'value' => $result, 'oid' => $oid];
+        }
+        
+        return ['success' => false, 'error' => 'SNMP read failed for OID: ' . $oid];
     }
     
     public function snmpWrite(int $oltId, string $oid, string $type, $value, int $timeout = 2000000, int $retries = 2): array {
@@ -269,20 +293,46 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
-        if (!function_exists('snmpwalk')) {
-            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
-        }
-        
         $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
-        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        $host = $olt['ip_address'];
+        $port = $olt['snmp_port'] ?? 161;
         
-        $result = @snmprealwalk($host, $community, $oid, $timeout, $retries);
-        
-        if ($result === false) {
-            return ['success' => false, 'error' => 'SNMP walk failed for OID: ' . $oid];
+        // Try PHP extension first
+        if (function_exists('snmprealwalk')) {
+            $result = @snmprealwalk("{$host}:{$port}", $community, $oid, $timeout, $retries);
+            if ($result !== false) {
+                return ['success' => true, 'data' => $result, 'count' => count($result)];
+            }
         }
         
-        return ['success' => true, 'data' => $result, 'count' => count($result)];
+        // Fallback to CLI snmpwalk
+        $timeoutSec = max(1, intval($timeout / 1000000));
+        $cmd = sprintf(
+            'snmpwalk -v 2c -c %s -t %d -r %d %s:%d %s 2>&1',
+            escapeshellarg($community),
+            $timeoutSec,
+            $retries,
+            escapeshellarg($host),
+            $port,
+            escapeshellarg($oid)
+        );
+        
+        $output = [];
+        $returnCode = 0;
+        exec($cmd, $output, $returnCode);
+        
+        if ($returnCode === 0 && !empty($output)) {
+            $data = [];
+            foreach ($output as $line) {
+                // Parse: OID = TYPE: value
+                if (preg_match('/^([^\s=]+)\s*=\s*(?:STRING:|INTEGER:|Timeticks:|Gauge32:|Counter32:|OID:|Hex-STRING:)?\s*(.+)$/i', $line, $m)) {
+                    $data[$m[1]] = trim($m[2], '"');
+                }
+            }
+            return ['success' => true, 'data' => $data, 'count' => count($data)];
+        }
+        
+        return ['success' => false, 'error' => 'SNMP walk failed for OID: ' . $oid];
     }
     
     public function getOLTSystemInfoViaSNMP(int $oltId): array {
@@ -290,15 +340,6 @@ class HuaweiOLT {
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];
         }
-        
-        if (!function_exists('snmpget')) {
-            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
-        }
-        
-        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
-        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
-        $timeout = 2000000;
-        $retries = 2;
         
         $systemOIDs = [
             'sysDescr' => '1.3.6.1.2.1.1.1.0',
@@ -310,14 +351,23 @@ class HuaweiOLT {
         ];
         
         $info = [];
+        $anySuccess = false;
         foreach ($systemOIDs as $name => $oid) {
-            $result = @snmpget($host, $community, $oid, $timeout, $retries);
-            $info[$name] = $result !== false ? $this->cleanSnmpValue($result) : null;
+            $result = $this->snmpRead($oltId, $oid, 5000000, 2);
+            if ($result['success']) {
+                $info[$name] = $this->cleanSnmpValue($result['value']);
+                $anySuccess = true;
+            } else {
+                $info[$name] = null;
+            }
         }
         
-        $this->db->prepare("UPDATE huawei_olts SET last_sync_at = CURRENT_TIMESTAMP, last_status = 'online' WHERE id = ?")->execute([$oltId]);
+        if ($anySuccess) {
+            $this->db->prepare("UPDATE huawei_olts SET last_sync_at = CURRENT_TIMESTAMP, last_status = 'online' WHERE id = ?")->execute([$oltId]);
+            return ['success' => true, 'info' => $info];
+        }
         
-        return ['success' => true, 'info' => $info];
+        return ['success' => false, 'error' => 'SNMP query failed - no response from OLT', 'info' => $info];
     }
     
     public function setOLTSystemInfoViaSNMP(int $oltId, string $field, string $value): array {
