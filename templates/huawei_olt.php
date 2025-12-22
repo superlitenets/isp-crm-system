@@ -3923,7 +3923,7 @@ try {
             <ul class="nav nav-tabs mb-4">
                 <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'genieacs' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=genieacs">
-                        <i class="bi bi-gear-wide-connected me-1"></i> GenieACS / TR-069
+                        <i class="bi bi-gear-wide-connected me-1"></i> Non Auth
                     </a>
                 </li>
                 <li class="nav-item">
