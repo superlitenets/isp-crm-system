@@ -625,11 +625,22 @@ class HuaweiOLT {
             $status = $statusMap[$statusCode] ?? null;
         }
         
-        // If SNMP failed, try CLI fallback
+        // If SNMP failed for optical power, try CLI fallback for everything
         if ($rxValue === null && $txValue === null) {
             $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
             if ($cliResult['success'] && !empty($cliResult['optical'])) {
                 return $cliResult;
+            }
+        }
+        
+        // If SNMP got optical but not distance, try CLI fallback just for distance
+        if ($distance === null) {
+            $cliDistanceResult = $this->getONUDistanceViaCLI($oltId, $frame, $slot, $port, $onuId);
+            if ($cliDistanceResult['success']) {
+                $distance = $cliDistanceResult['distance'];
+                if ($status === null && !empty($cliDistanceResult['status'])) {
+                    $status = $cliDistanceResult['status'];
+                }
             }
         }
         
@@ -655,6 +666,39 @@ class HuaweiOLT {
         ];
     }
     
+    public function getONUDistanceViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
+        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $result = $this->executeCommand($oltId, $command);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'CLI command failed'];
+        }
+        
+        $output = $result['output'] ?? '';
+        $distance = null;
+        $status = null;
+        
+        // Parse distance - formats:
+        // "Distance(m)            : 1234"
+        // "ONU Distance           : 1234"
+        // "Ont distance(m)        : 1234"
+        if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
+            $distance = (int)$m[1];
+        }
+        
+        // Parse run state for status
+        // "Run state              : online"
+        if (preg_match('/Run state\s*:\s*(\w+)/i', $output, $m)) {
+            $status = strtolower($m[1]);
+        }
+        
+        return [
+            'success' => true,
+            'distance' => $distance,
+            'status' => $status,
+        ];
+    }
+    
     public function getONUOpticalInfoViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
@@ -675,6 +719,8 @@ class HuaweiOLT {
         $temperature = null;
         $voltage = null;
         $current = null;
+        $distance = null;
+        $status = null;
         
         // Parse optical info from CLI output
         // Example output:
@@ -705,6 +751,26 @@ class HuaweiOLT {
             $current = (float)$m[1];
         }
         
+        // Get distance via separate command: display ont info
+        $distanceCmd = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $distanceResult = $this->executeCommand($oltId, $distanceCmd);
+        
+        if ($distanceResult['success']) {
+            $distanceOutput = $distanceResult['output'] ?? '';
+            // Parse distance - formats:
+            // "Distance(m)            : 1234"
+            // "ONU Distance           : 1234"
+            // "Ont distance(m)        : 1234"
+            if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $distanceOutput, $m)) {
+                $distance = (int)$m[1];
+            }
+            // Parse run state for status
+            // "Run state              : online"
+            if (preg_match('/Run state\s*:\s*(\w+)/i', $distanceOutput, $m)) {
+                $status = strtolower($m[1]);
+            }
+        }
+        
         return [
             'success' => true,
             'optical' => [
@@ -713,8 +779,8 @@ class HuaweiOLT {
                 'temperature' => $temperature,
                 'voltage' => $voltage,
                 'current' => $current,
-                'distance' => null,
-                'status' => null,
+                'distance' => $distance,
+                'status' => $status,
             ],
             'debug' => [
                 'method' => 'cli',
