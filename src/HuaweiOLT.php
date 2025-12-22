@@ -52,17 +52,24 @@ class HuaweiOLT {
     // ==================== OLT Management ====================
     
     public function getOLTs(bool $activeOnly = true): array {
-        $sql = "SELECT * FROM huawei_olts";
+        $sql = "SELECT o.*, b.name as branch_name, b.whatsapp_group as branch_whatsapp_group 
+                FROM huawei_olts o 
+                LEFT JOIN branches b ON o.branch_id = b.id";
         if ($activeOnly) {
-            $sql .= " WHERE is_active = TRUE";
+            $sql .= " WHERE o.is_active = TRUE";
         }
-        $sql .= " ORDER BY name";
+        $sql .= " ORDER BY o.name";
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     public function getOLT(int $id): ?array {
-        $stmt = $this->db->prepare("SELECT * FROM huawei_olts WHERE id = ?");
+        $stmt = $this->db->prepare("
+            SELECT o.*, b.name as branch_name, b.whatsapp_group as branch_whatsapp_group 
+            FROM huawei_olts o 
+            LEFT JOIN branches b ON o.branch_id = b.id 
+            WHERE o.id = ?
+        ");
         $stmt->execute([$id]);
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $result ?: null;
@@ -71,8 +78,8 @@ class HuaweiOLT {
     public function addOLT(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_olts (name, ip_address, port, connection_type, username, password_encrypted, 
-                                     snmp_read_community, snmp_write_community, snmp_version, snmp_port, vendor, model, location, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     snmp_read_community, snmp_write_community, snmp_version, snmp_port, vendor, model, location, is_active, branch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
@@ -88,7 +95,8 @@ class HuaweiOLT {
             $data['vendor'] ?? 'Huawei',
             $data['model'] ?? '',
             $data['location'] ?? '',
-            $this->castBoolean($data['is_active'] ?? true)
+            $this->castBoolean($data['is_active'] ?? true),
+            !empty($data['branch_id']) ? (int)$data['branch_id'] : null
         ]);
         return (int)$this->db->lastInsertId();
     }
@@ -96,9 +104,17 @@ class HuaweiOLT {
     public function updateOLT(int $id, array $data): bool {
         $fields = ['name', 'ip_address', 'port', 'connection_type', 'username', 
                    'snmp_read_community', 'snmp_write_community', 'snmp_version', 'snmp_port', 'vendor', 'model', 'location'];
+        $intFields = ['branch_id'];
         $booleanFields = ['is_active'];
         $updates = [];
         $params = [];
+        
+        foreach ($intFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $updates[] = "{$field} = ?";
+                $params[] = !empty($data[$field]) ? (int)$data[$field] : null;
+            }
+        }
         
         foreach ($fields as $field) {
             if (isset($data[$field])) {
@@ -2330,8 +2346,33 @@ class HuaweiOLT {
     }
     
     private function updateONUStatus(int $onuId, string $status): void {
-        $stmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([$status, $onuId]);
+        // Get current status before update to detect LOS events
+        $stmt = $this->db->prepare("SELECT o.*, olt.id as olt_id FROM huawei_onus o LEFT JOIN huawei_olts olt ON o.olt_id = olt.id WHERE o.id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$onu) {
+            return; // ONU not found, nothing to update
+        }
+        
+        $previousStatus = $onu['status'] ?? 'unknown';
+        
+        // Update status
+        $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $updateStmt->execute([$status, $onuId]);
+        
+        // Send LOS notification if status changed to 'los' from a non-los state
+        if ($status === 'los' && $previousStatus !== 'los') {
+            $oltId = $onu['olt_id'] ?? null;
+            if ($oltId) {
+                $olt = $this->getOLT($oltId);
+                if ($olt && !empty($olt['branch_whatsapp_group'])) {
+                    $this->sendLosNotification($onu, $olt, $previousStatus);
+                } else {
+                    error_log("OMS LOS Alert: ONU {$onu['sn']} went LOS but OLT has no branch/WhatsApp group configured");
+                }
+            }
+        }
     }
     
     private function updateONUOpticalInDB(int $onuId, ?float $rxPower, ?float $txPower, ?int $distance = null): void {
@@ -2410,7 +2451,7 @@ class HuaweiOLT {
                 // Skip if already authorized
                 $existing = $this->getONUBySN($sn);
                 if (!$existing) {
-                    $this->addONU([
+                    $onuData = [
                         'olt_id' => $oltId,
                         'sn' => $sn,
                         'frame' => $currentFrame,
@@ -2418,8 +2459,12 @@ class HuaweiOLT {
                         'port' => $currentPort,
                         'status' => 'unconfigured',
                         'is_authorized' => false,
-                    ]);
+                    ];
+                    $this->addONU($onuData);
                     $added++;
+                    
+                    // Send notification for new ONU
+                    $this->sendNewOnuNotification($onuData, $olt);
                 }
                 
                 $unconfigured[] = [
@@ -2439,7 +2484,7 @@ class HuaweiOLT {
                 
                 $existing = $this->getONUBySN($sn);
                 if (!$existing) {
-                    $this->addONU([
+                    $onuData = [
                         'olt_id' => $oltId,
                         'sn' => $sn,
                         'frame' => $currentFrame,
@@ -2447,8 +2492,12 @@ class HuaweiOLT {
                         'port' => $currentPort,
                         'status' => 'unconfigured',
                         'is_authorized' => false,
-                    ]);
+                    ];
+                    $this->addONU($onuData);
                     $added++;
+                    
+                    // Send notification for new ONU
+                    $this->sendNewOnuNotification($onuData, $olt);
                 }
                 
                 $unconfigured[] = [
@@ -5694,5 +5743,94 @@ class HuaweiOLT {
         if (preg_match('/(SCUN|SCUK|SCUA|MCUD)/', $boardName)) return 'control';
         if (preg_match('/(PRTE|PILA|PRAM)/', $boardName)) return 'power';
         return 'other';
+    }
+    
+    // ==================== OMS Notifications ====================
+    
+    public function sendNewOnuNotification(array $onu, array $olt): bool {
+        if (empty($olt['branch_whatsapp_group'])) {
+            return false;
+        }
+        
+        try {
+            require_once __DIR__ . '/WhatsApp.php';
+            $whatsapp = new \App\WhatsApp($this->db);
+            
+            $branchName = $olt['branch_name'] ?? 'Unknown Branch';
+            $message = "🆕 *New ONU Discovered*\n\n";
+            $message .= "📍 Branch: {$branchName}\n";
+            $message .= "📡 OLT: {$olt['name']}\n";
+            $message .= "🔢 Serial: {$onu['sn']}\n";
+            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}\n";
+            $message .= "⏰ Time: " . date('Y-m-d H:i:s') . "\n\n";
+            $message .= "➡️ Please authorize this ONU in the OMS system.";
+            
+            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("OMS Notification Error (New ONU): " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    public function sendLosNotification(array $onu, array $olt, string $previousStatus = 'online'): bool {
+        if (empty($olt['branch_whatsapp_group'])) {
+            return false;
+        }
+        
+        try {
+            require_once __DIR__ . '/WhatsApp.php';
+            $whatsapp = new \App\WhatsApp($this->db);
+            
+            $branchName = $olt['branch_name'] ?? 'Unknown Branch';
+            $customerName = $onu['customer_name'] ?? 'Unknown Customer';
+            
+            $message = "⚠️ *ONU Loss of Signal (LOS)*\n\n";
+            $message .= "📍 Branch: {$branchName}\n";
+            $message .= "📡 OLT: {$olt['name']}\n";
+            $message .= "🔢 Serial: {$onu['sn']}\n";
+            $message .= "👤 Customer: {$customerName}\n";
+            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}\n";
+            $message .= "📝 Name: " . ($onu['name'] ?? 'N/A') . "\n";
+            $message .= "⏰ Time: " . date('Y-m-d H:i:s') . "\n\n";
+            $message .= "🔴 Status changed from *{$previousStatus}* to *LOS*\n";
+            $message .= "Please check fiber connection or customer power.";
+            
+            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("OMS Notification Error (LOS): " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    public function sendOnuAuthorizedNotification(array $onu, array $olt, string $authorizedBy = ''): bool {
+        if (empty($olt['branch_whatsapp_group'])) {
+            return false;
+        }
+        
+        try {
+            require_once __DIR__ . '/WhatsApp.php';
+            $whatsapp = new \App\WhatsApp($this->db);
+            
+            $branchName = $olt['branch_name'] ?? 'Unknown Branch';
+            
+            $message = "✅ *ONU Authorized*\n\n";
+            $message .= "📍 Branch: {$branchName}\n";
+            $message .= "📡 OLT: {$olt['name']}\n";
+            $message .= "🔢 Serial: {$onu['sn']}\n";
+            $message .= "📝 Name: " . ($onu['name'] ?? 'N/A') . "\n";
+            $message .= "📌 Port: {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}\n";
+            if ($authorizedBy) {
+                $message .= "👤 Authorized by: {$authorizedBy}\n";
+            }
+            $message .= "⏰ Time: " . date('Y-m-d H:i:s');
+            
+            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            error_log("OMS Notification Error (Authorized): " . $e->getMessage());
+            return false;
+        }
     }
 }

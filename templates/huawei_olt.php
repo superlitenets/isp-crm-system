@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../src/HuaweiOLT.php';
+require_once __DIR__ . '/../src/Branch.php';
 $huaweiOLT = new \App\HuaweiOLT($db);
+$branchService = new \App\Branch($db);
+$allBranches = $branchService->getAllBranches();
 
 $view = $_GET['view'] ?? 'dashboard';
 $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
@@ -6168,6 +6171,16 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <label class="form-label">Location</label>
                             <input type="text" name="location" id="oltLocation" class="form-control">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Branch</label>
+                            <select name="branch_id" id="oltBranchId" class="form-select">
+                                <option value="">-- No Branch --</option>
+                                <?php foreach ($allBranches as $branch): ?>
+                                <option value="<?= $branch['id'] ?>"><?= htmlspecialchars($branch['name']) ?><?= !empty($branch['whatsapp_group']) ? ' (WhatsApp)' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Link OLT to a branch for notifications</small>
+                        </div>
                         <hr>
                         <h6 class="text-muted mb-3">SNMP Configuration</h6>
                         <div class="row">
@@ -7115,6 +7128,7 @@ echo "# ================================================\n";
         document.getElementById('oltVendor').value = 'Huawei';
         document.getElementById('oltModel').value = '';
         document.getElementById('oltLocation').value = '';
+        document.getElementById('oltBranchId').value = '';
         document.getElementById('oltSnmpRead').value = 'public';
         document.getElementById('oltSnmpWrite').value = 'private';
         document.getElementById('oltSnmpVersion').value = 'v2c';
@@ -7135,6 +7149,7 @@ echo "# ================================================\n";
         document.getElementById('oltVendor').value = olt.vendor || 'Huawei';
         document.getElementById('oltModel').value = olt.model || '';
         document.getElementById('oltLocation').value = olt.location || '';
+        document.getElementById('oltBranchId').value = olt.branch_id || '';
         document.getElementById('oltSnmpRead').value = olt.snmp_read_community || 'public';
         document.getElementById('oltSnmpWrite').value = olt.snmp_write_community || 'private';
         document.getElementById('oltSnmpVersion').value = olt.snmp_version || 'v2c';
