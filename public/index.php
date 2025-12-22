@@ -6071,11 +6071,6 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::isAdmin()): ?>
             <li class="nav-item">
-                <a class="nav-link <?= $page === 'vpn' ? 'active' : '' ?>" href="?page=vpn">
-                    <i class="bi bi-shield-lock"></i> VPN
-                </a>
-            </li>
-            <li class="nav-item">
                 <a class="nav-link <?= $page === 'branches' ? 'active' : '' ?>" href="?page=branches">
                     <i class="bi bi-building"></i> Branches
                 </a>
