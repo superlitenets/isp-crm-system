@@ -2217,9 +2217,10 @@ try {
             <script>
             (function() {
                 const isUnconfigured = <?= isset($_GET['unconfigured']) ? 'true' : 'false' ?>;
-                const refreshInterval = isUnconfigured ? 30000 : 60000; // 30s for Non Auth, 1 min for status
-                const refreshLabel = isUnconfigured ? 'Non Auth discovery' : 'Status update';
+                const oltId = <?= $oltId ? $oltId : 'null' ?>;
+                const refreshInterval = isUnconfigured ? 30000 : 60000; // 30s for Non Auth discovery, 1 min for status
                 let countdown = refreshInterval / 1000;
+                let timerPaused = false;
                 
                 // Add refresh indicator to header
                 const header = document.querySelector('.d-flex.justify-content-between.align-items-center.mb-4');
@@ -2227,24 +2228,48 @@ try {
                     const indicator = document.createElement('div');
                     indicator.className = 'badge bg-info ms-2';
                     indicator.id = 'refreshCountdown';
-                    indicator.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-refresh in <span id="countdownTimer">' + countdown + '</span>s';
+                    indicator.style.cursor = 'pointer';
+                    indicator.title = 'Click to pause/resume';
+                    indicator.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>' + (isUnconfigured ? 'Discovery' : 'Refresh') + ' in <span id="countdownTimer">' + countdown + '</span>s';
                     header.querySelector('h4').appendChild(indicator);
+                    
+                    indicator.onclick = () => {
+                        timerPaused = !timerPaused;
+                        indicator.className = timerPaused ? 'badge bg-secondary ms-2' : 'badge bg-info ms-2';
+                        indicator.innerHTML = timerPaused 
+                            ? '<i class="bi bi-pause-fill me-1"></i>Paused (click to resume)'
+                            : '<i class="bi bi-arrow-repeat me-1"></i>' + (isUnconfigured ? 'Discovery' : 'Refresh') + ' in <span id="countdownTimer">' + countdown + '</span>s';
+                    };
                 }
                 
                 // Countdown timer
                 const countdownTimer = setInterval(() => {
+                    if (timerPaused) return;
                     countdown--;
                     const timerEl = document.getElementById('countdownTimer');
                     if (timerEl) timerEl.textContent = countdown;
                     if (countdown <= 0) {
                         clearInterval(countdownTimer);
-                        window.location.reload();
+                        if (isUnconfigured) {
+                            // Trigger actual discovery via form submission
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.innerHTML = '<input type="hidden" name="action" value="' + (oltId ? 'discover_unconfigured' : 'discover_all_unconfigured') + '">';
+                            if (oltId) {
+                                form.innerHTML += '<input type="hidden" name="olt_id" value="' + oltId + '">';
+                            }
+                            document.body.appendChild(form);
+                            form.submit();
+                        } else {
+                            window.location.reload();
+                        }
                     }
                 }, 1000);
                 
                 // Pause auto-refresh when modal is open
                 document.querySelectorAll('.modal').forEach(modal => {
-                    modal.addEventListener('show.bs.modal', () => clearInterval(countdownTimer));
+                    modal.addEventListener('show.bs.modal', () => { timerPaused = true; });
+                    modal.addEventListener('hide.bs.modal', () => { timerPaused = false; countdown = refreshInterval / 1000; });
                 });
             })();
             </script>
