@@ -3088,110 +3088,107 @@ class HuaweiOLT {
     }
     
     private function executeTelnetCommand(string $ip, int $port, string $username, string $password, string $command): array {
-        $timeout = 60; // Connection timeout
+        $timeout = 15;
         $socket = @fsockopen($ip, $port, $errno, $errstr, $timeout);
         
         if (!$socket) {
             return ['success' => false, 'message' => "Connection failed: {$errstr}"];
         }
         
-        stream_set_timeout($socket, 180); // 3 minutes for large configs
         stream_set_blocking($socket, false);
         
+        // Wait for login prompt
         $response = '';
         $startTime = time();
-        
-        while ((time() - $startTime) < 10) {
+        while ((time() - $startTime) < 8) {
             $chunk = @fread($socket, 4096);
-            if ($chunk) {
-                $response .= $chunk;
-            }
-            if (stripos($response, 'name') !== false || stripos($response, 'login') !== false) {
-                break;
-            }
+            if ($chunk) $response .= $chunk;
+            if (stripos($response, 'name') !== false || stripos($response, 'login') !== false) break;
             usleep(100000);
         }
         
-        if (stripos($response, 'name') !== false || stripos($response, 'login') !== false) {
-            fwrite($socket, $username . "\r\n");
-            usleep(1000000);
-            
-            $startTime = time();
-            while ((time() - $startTime) < 5) {
-                $chunk = @fread($socket, 4096);
-                if ($chunk) {
-                    $response .= $chunk;
-                }
-                if (stripos($response, 'assword') !== false) {
-                    break;
-                }
-                usleep(100000);
-            }
+        if (stripos($response, 'name') === false && stripos($response, 'login') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'No login prompt received'];
         }
         
-        if (stripos($response, 'assword') !== false) {
-            fwrite($socket, $password . "\r\n");
-            usleep(2000000);
-            
-            $startTime = time();
-            while ((time() - $startTime) < 5) {
-                $chunk = @fread($socket, 4096);
-                if ($chunk) {
-                    $response .= $chunk;
-                }
-                if (stripos($response, '>') !== false || stripos($response, '#') !== false) {
-                    break;
-                }
-                usleep(100000);
-            }
+        // Send username
+        fwrite($socket, $username . "\r\n");
+        sleep(1);
+        
+        $response = '';
+        $startTime = time();
+        while ((time() - $startTime) < 5) {
+            $chunk = @fread($socket, 4096);
+            if ($chunk) $response .= $chunk;
+            if (stripos($response, 'assword') !== false) break;
+            usleep(100000);
         }
         
+        if (stripos($response, 'assword') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'No password prompt received'];
+        }
+        
+        // Send password
+        fwrite($socket, $password . "\r\n");
+        sleep(2);
+        
+        $response = '';
+        $startTime = time();
+        while ((time() - $startTime) < 5) {
+            $chunk = @fread($socket, 4096);
+            if ($chunk) $response .= $chunk;
+            usleep(100000);
+        }
+        
+        if (stripos($response, 'invalid') !== false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'Authentication failed - invalid credentials'];
+        }
+        
+        // Enter enable mode
         fwrite($socket, "enable\r\n");
-        usleep(500000);
+        sleep(1);
         @fread($socket, 4096);
         
+        // Enter config mode
         fwrite($socket, "config\r\n");
-        usleep(500000);
+        sleep(1);
         @fread($socket, 4096);
         
-        // Disable pagination with multiple methods for compatibility
-        fwrite($socket, "screen-length 0 temporary\r\n");
-        usleep(300000);
-        @fread($socket, 4096);
-        
-        fwrite($socket, "scroll 512\r\n");
-        usleep(300000);
-        @fread($socket, 4096);
-        
+        // Send the actual command
         fwrite($socket, $command . "\r\n");
-        usleep(2000000);
+        sleep(3);
         
+        // Read output with timeout
         $output = '';
         $startTime = time();
-        stream_set_blocking($socket, false);
+        $maxWait = 60; // 60 seconds for command output
         
-        while ((time() - $startTime) < 180) { // 3 minutes for large configs
+        while ((time() - $startTime) < $maxWait) {
             $chunk = @fread($socket, 16384);
             if ($chunk) {
                 $output .= $chunk;
                 if (strlen($output) > 2097152) break; // 2MB limit
                 
-                // Handle "---- More ----" pagination prompts
+                // Handle "---- More ----" pagination
                 if (preg_match('/----\s*More\s*----/i', $chunk)) {
-                    fwrite($socket, " "); // Send space to continue
+                    fwrite($socket, " ");
                     usleep(500000);
                     continue;
                 }
                 
-                // Handle Huawei command prompts like "{ <cr>|... }:" - send Enter
+                // Handle Huawei parameter prompts like "{ <cr>|... }:"
                 if (preg_match('/\}\s*:\s*$/', $output)) {
-                    fwrite($socket, "\r\n"); // Send Enter to accept default/show all
+                    fwrite($socket, "\r\n");
                     usleep(1000000);
                     continue;
                 }
                 
+                // Check for command completion (prompt at end)
                 if (preg_match('/[>#]\s*$/', $output)) {
-                    usleep(500000);
+                    usleep(300000);
                     $extra = @fread($socket, 4096);
                     if (empty($extra)) break;
                     $output .= $extra;
@@ -3200,13 +3197,14 @@ class HuaweiOLT {
             usleep(100000);
         }
         
+        // Cleanup
         fwrite($socket, "quit\r\n");
         usleep(200000);
         fwrite($socket, "quit\r\n");
         usleep(200000);
-        
         fclose($socket);
         
+        // Clean ANSI escape codes
         $output = preg_replace('/\x1b\[[0-9;]*[a-zA-Z]/', '', $output);
         $output = preg_replace('/---- More.*?----/', '', $output);
         
