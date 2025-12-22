@@ -586,8 +586,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'add_vpn_peer':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
+                
+                // Auto-create default server if none exists and no server selected
+                $serverId = (int)($_POST['server_id'] ?? 0);
+                if ($serverId === 0) {
+                    $existingServers = $wgService->getServers();
+                    if (empty($existingServers)) {
+                        // Create default server using VPN settings
+                        $vpnSettings = $wgService->getSettings();
+                        $defaultServer = [
+                            'name' => 'Main VPN Server',
+                            'description' => 'Auto-created default server',
+                            'public_endpoint' => $_SERVER['HTTP_HOST'] ?? 'your-server-ip',
+                            'listen_port' => 51820,
+                            'address' => $vpnSettings['vpn_gateway_ip'] ?? '10.200.0.1',
+                            'interface_name' => 'wg0',
+                            'mtu' => 1420,
+                            'dns_servers' => '1.1.1.1',
+                            'is_active' => true
+                        ];
+                        $serverId = $wgService->createServer($defaultServer);
+                        if (!$serverId) {
+                            $message = 'Failed to create default VPN server';
+                            $messageType = 'danger';
+                            break;
+                        }
+                    } else {
+                        $serverId = $existingServers[0]['id'];
+                    }
+                }
+                
                 $peerData = [
-                    'server_id' => (int)$_POST['server_id'],
+                    'server_id' => $serverId,
                     'name' => $_POST['name'] ?? '',
                     'description' => $_POST['description'] ?? null,
                     'allowed_ips' => $_POST['allowed_ips'] ?? '',
@@ -4297,15 +4327,22 @@ try {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                                <?php if (!empty($wgServers)): ?>
                                 <div class="mb-3">
                                     <label class="form-label">Server</label>
-                                    <select class="form-select" name="server_id" required>
-                                        <option value="">Select VPN Server...</option>
+                                    <select class="form-select" name="server_id">
+                                        <option value="">Use default server</option>
                                         <?php foreach ($wgServers as $server): ?>
                                         <option value="<?= $server['id'] ?>"><?= htmlspecialchars($server['name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php else: ?>
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    A default VPN server will be auto-created using your VPN settings.
+                                </div>
+                                <?php endif; ?>
                                 <div class="mb-3">
                                     <label class="form-label">Peer Name</label>
                                     <input type="text" class="form-control" name="name" required placeholder="OLT Site - Location">
