@@ -2009,6 +2009,9 @@ try {
                                         <i class="bi bi-plug"></i>
                                     </button>
                                 </form>
+                                <button type="button" class="btn btn-sm btn-outline-warning" onclick="editOlt(<?= htmlspecialchars(json_encode($olt)) ?>)" title="Edit OLT">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
                                 <a href="?page=huawei-olt&view=onus&olt_id=<?= $olt['id'] ?>" class="btn btn-sm btn-primary">
                                     <i class="bi bi-diagram-3 me-1"></i> ONUs
                                 </a>
