@@ -1288,6 +1288,126 @@ class HuaweiOLT {
         ];
     }
     
+    /**
+     * Get live data for a single ONU from OLT
+     */
+    public function getSingleONULiveData(int $oltId, int $frame, ?int $slot, ?int $port, ?int $onuId, string $sn = ''): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if ($slot === null || $port === null || $onuId === null) {
+            return ['success' => false, 'error' => 'Slot, port and ONU ID required'];
+        }
+        
+        set_time_limit(120);
+        
+        $socket = @fsockopen($olt['ip_address'], $olt['telnet_port'] ?: 23, $errno, $errstr, 15);
+        if (!$socket) {
+            return ['success' => false, 'error' => "Connection failed: $errstr"];
+        }
+        
+        stream_set_timeout($socket, 30);
+        
+        $password = $this->decrypt($olt['password_encrypted']);
+        
+        // Login
+        $this->readUntilOLT($socket, ['Username:', 'User name:'], 10);
+        fwrite($socket, $olt['username'] . "\n");
+        usleep(300000);
+        
+        $this->readUntilOLT($socket, ['Password:'], 10);
+        fwrite($socket, $password . "\n");
+        usleep(500000);
+        
+        $loginResp = $this->readUntilOLT($socket, ['>', '#', 'fail', 'error'], 10);
+        if (stripos($loginResp, 'fail') !== false || stripos($loginResp, 'error') !== false) {
+            fclose($socket);
+            return ['success' => false, 'error' => 'Login failed'];
+        }
+        
+        // Disable pagination
+        fwrite($socket, "enable\n");
+        usleep(500000);
+        $this->drainSocketOLT($socket);
+        
+        fwrite($socket, "undo terminal monitor\n");
+        usleep(300000);
+        $this->drainSocketOLT($socket);
+        
+        fwrite($socket, "scroll 512\n");
+        usleep(300000);
+        $this->drainSocketOLT($socket);
+        
+        // Get ONU optical power
+        $cmd = sprintf("display ont optical-info %d %d\n", $port, $onuId);
+        fwrite($socket, "interface gpon $frame/$slot\n");
+        usleep(500000);
+        $this->drainSocketOLT($socket);
+        
+        fwrite($socket, $cmd);
+        usleep(2000000);
+        $opticalOutput = $this->drainSocketOLT($socket);
+        
+        // Get ONU info summary 
+        $cmd2 = sprintf("display ont info %d %d\n", $port, $onuId);
+        fwrite($socket, $cmd2);
+        usleep(2000000);
+        $infoOutput = $this->drainSocketOLT($socket);
+        
+        fwrite($socket, "quit\n");
+        usleep(300000);
+        fwrite($socket, "quit\n");
+        usleep(300000);
+        fclose($socket);
+        
+        // Parse optical power
+        $rxPower = null;
+        $txPower = null;
+        
+        // Parse: RX optical power(dBm)    : -22.85
+        if (preg_match('/RX\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
+            $rxPower = (float)$m[1];
+        }
+        // Parse: OLT RX ONT optical power(dBm): -22.23
+        if (preg_match('/OLT\s+RX\s+ONT\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
+            $txPower = (float)$m[1];
+        }
+        
+        // Parse status from info output
+        $status = 'offline';
+        if (preg_match('/Run\s+state\s*:\s*(\w+)/i', $infoOutput, $m)) {
+            $state = strtolower($m[1]);
+            if ($state === 'online') {
+                $status = 'online';
+            } elseif (stripos($state, 'los') !== false) {
+                $status = 'los';
+            }
+        }
+        
+        // Get name/description
+        $name = '';
+        if (preg_match('/Name\s*:\s*(.+)/i', $infoOutput, $m)) {
+            $name = trim($m[1]);
+        }
+        
+        return [
+            'success' => true,
+            'onu' => [
+                'sn' => $sn,
+                'frame' => $frame,
+                'slot' => $slot,
+                'port' => $port,
+                'onu_id' => $onuId,
+                'name' => $name,
+                'status' => $status,
+                'rx_power' => $rxPower,
+                'tx_power' => $txPower,
+            ]
+        ];
+    }
+    
     public function syncONUsFromCLI(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {

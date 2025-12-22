@@ -1285,6 +1285,231 @@ try {
                 </div>
             </div>
             
+            <?php elseif ($view === 'live_monitor'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-activity me-2"></i>Live ONU Monitor</h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <select id="liveOltSelect" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">Select OLT</option>
+                        <?php foreach ($olts as $olt): ?>
+                        <option value="<?= $olt['id'] ?>" <?= $oltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select id="liveSlotSelect" class="form-select form-select-sm" style="width: auto;">
+                        <option value="">All Slots</option>
+                        <?php for ($i = 0; $i <= 7; $i++): ?>
+                        <option value="<?= $i ?>">Slot <?= $i ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <button class="btn btn-success btn-sm" id="btnStartMonitor">
+                        <i class="bi bi-play-fill me-1"></i> Start Monitor
+                    </button>
+                    <button class="btn btn-danger btn-sm d-none" id="btnStopMonitor">
+                        <i class="bi bi-stop-fill me-1"></i> Stop
+                    </button>
+                    <span id="monitorStatus" class="badge bg-secondary">Stopped</span>
+                </div>
+            </div>
+            
+            <div class="alert alert-info small">
+                <i class="bi bi-info-circle me-1"></i>
+                Live Monitor fetches real-time ONU data directly from the OLT including optical power levels.
+                Initial load may take 30-60 seconds depending on the number of ONUs.
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-router me-2"></i>Live ONU Status</span>
+                    <span id="lastRefresh" class="text-muted small">Never refreshed</span>
+                </div>
+                <div class="card-body p-0">
+                    <div id="liveOnuLoading" class="text-center p-5 d-none">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <div class="text-muted">Fetching live ONU data from OLT...</div>
+                        <div class="text-muted small mt-1">This may take up to 60 seconds</div>
+                    </div>
+                    <div id="liveOnuEmpty" class="text-center text-muted p-5">
+                        <i class="bi bi-router fs-1 mb-2 d-block"></i>
+                        Select an OLT and click "Start Monitor" to view live ONU data
+                    </div>
+                    <div id="liveOnuTable" class="table-responsive d-none">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Serial Number</th>
+                                    <th>Name</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                    <th>RX Power</th>
+                                    <th>TX Power</th>
+                                    <th>Signal Quality</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveOnuBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <span id="onuCount" class="text-muted small">0 ONUs</span>
+                    <span id="onlineCount" class="text-muted small">0 online</span>
+                </div>
+            </div>
+            
+            <script>
+            (function() {
+                let monitorInterval = null;
+                const startBtn = document.getElementById('btnStartMonitor');
+                const stopBtn = document.getElementById('btnStopMonitor');
+                const oltSelect = document.getElementById('liveOltSelect');
+                const slotSelect = document.getElementById('liveSlotSelect');
+                const status = document.getElementById('monitorStatus');
+                const loading = document.getElementById('liveOnuLoading');
+                const empty = document.getElementById('liveOnuEmpty');
+                const table = document.getElementById('liveOnuTable');
+                const tbody = document.getElementById('liveOnuBody');
+                const lastRefresh = document.getElementById('lastRefresh');
+                const onuCount = document.getElementById('onuCount');
+                const onlineCount = document.getElementById('onlineCount');
+                
+                function getSignalQuality(rxPower) {
+                    if (rxPower === null) return { class: 'secondary', text: 'N/A', bars: 0 };
+                    if (rxPower >= -20) return { class: 'success', text: 'Excellent', bars: 4 };
+                    if (rxPower >= -24) return { class: 'success', text: 'Good', bars: 3 };
+                    if (rxPower >= -27) return { class: 'warning', text: 'Fair', bars: 2 };
+                    if (rxPower >= -30) return { class: 'danger', text: 'Weak', bars: 1 };
+                    return { class: 'danger', text: 'Critical', bars: 0 };
+                }
+                
+                function formatPower(power) {
+                    if (power === null) return '<span class="text-muted">-</span>';
+                    const cls = power <= -28 ? 'danger' : (power <= -25 ? 'warning' : 'success');
+                    return `<span class="text-${cls}">${power.toFixed(2)} dBm</span>`;
+                }
+                
+                function renderSignalBars(bars, colorClass) {
+                    let html = '<div class="d-flex gap-1 align-items-end" style="height: 20px;">';
+                    for (let i = 1; i <= 4; i++) {
+                        const h = i * 4 + 2;
+                        const active = i <= bars ? `bg-${colorClass}` : 'bg-secondary opacity-25';
+                        html += `<div class="${active}" style="width: 4px; height: ${h}px; border-radius: 1px;"></div>`;
+                    }
+                    html += '</div>';
+                    return html;
+                }
+                
+                async function fetchLiveData() {
+                    const oltId = oltSelect.value;
+                    const slot = slotSelect.value;
+                    
+                    if (!oltId) {
+                        alert('Please select an OLT');
+                        stopMonitor();
+                        return;
+                    }
+                    
+                    loading.classList.remove('d-none');
+                    empty.classList.add('d-none');
+                    status.textContent = 'Fetching...';
+                    status.className = 'badge bg-warning';
+                    
+                    try {
+                        let url = `?page=api&action=huawei_live_onus&olt_id=${oltId}`;
+                        if (slot !== '') url += `&slot=${slot}`;
+                        
+                        const resp = await fetch(url);
+                        const data = await resp.json();
+                        
+                        if (data.success) {
+                            renderOnus(data.onus);
+                            lastRefresh.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+                            status.textContent = 'Live';
+                            status.className = 'badge bg-success';
+                        } else {
+                            status.textContent = 'Error';
+                            status.className = 'badge bg-danger';
+                            console.error(data.error);
+                        }
+                    } catch (e) {
+                        status.textContent = 'Error';
+                        status.className = 'badge bg-danger';
+                        console.error(e);
+                    } finally {
+                        loading.classList.add('d-none');
+                    }
+                }
+                
+                function renderOnus(onus) {
+                    if (!onus || onus.length === 0) {
+                        table.classList.add('d-none');
+                        empty.classList.remove('d-none');
+                        empty.innerHTML = '<i class="bi bi-inbox fs-1 mb-2 d-block"></i>No ONUs found';
+                        onuCount.textContent = '0 ONUs';
+                        onlineCount.textContent = '0 online';
+                        return;
+                    }
+                    
+                    table.classList.remove('d-none');
+                    empty.classList.add('d-none');
+                    
+                    const online = onus.filter(o => o.status === 'online').length;
+                    onuCount.textContent = onus.length + ' ONUs';
+                    onlineCount.textContent = online + ' online';
+                    
+                    tbody.innerHTML = onus.map(onu => {
+                        const statusCfg = {
+                            online: { class: 'success', icon: 'check-circle-fill' },
+                            offline: { class: 'secondary', icon: 'circle' },
+                            los: { class: 'danger', icon: 'exclamation-triangle-fill' }
+                        };
+                        const st = statusCfg[onu.status] || statusCfg.offline;
+                        const sig = getSignalQuality(onu.rx_power);
+                        const loc = `${onu.frame}/${onu.slot}/${onu.port}:${onu.onu_id}`;
+                        
+                        return `<tr>
+                            <td><code>${onu.sn}</code></td>
+                            <td>${onu.name || '<span class="text-muted">-</span>'}</td>
+                            <td><small>${loc}</small></td>
+                            <td><span class="badge bg-${st.class}"><i class="bi bi-${st.icon} me-1"></i>${onu.status}</span></td>
+                            <td>${formatPower(onu.rx_power)}</td>
+                            <td>${formatPower(onu.tx_power)}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    ${renderSignalBars(sig.bars, sig.class)}
+                                    <small class="text-${sig.class}">${sig.text}</small>
+                                </div>
+                            </td>
+                        </tr>`;
+                    }).join('');
+                }
+                
+                function startMonitor() {
+                    if (!oltSelect.value) {
+                        alert('Please select an OLT first');
+                        return;
+                    }
+                    startBtn.classList.add('d-none');
+                    stopBtn.classList.remove('d-none');
+                    fetchLiveData();
+                    // Auto-refresh every 2 minutes
+                    monitorInterval = setInterval(fetchLiveData, 120000);
+                }
+                
+                function stopMonitor() {
+                    if (monitorInterval) {
+                        clearInterval(monitorInterval);
+                        monitorInterval = null;
+                    }
+                    startBtn.classList.remove('d-none');
+                    stopBtn.classList.add('d-none');
+                    status.textContent = 'Stopped';
+                    status.className = 'badge bg-secondary';
+                }
+                
+                startBtn.addEventListener('click', startMonitor);
+                stopBtn.addEventListener('click', stopMonitor);
+            })();
+            </script>
+            
             <?php elseif ($view === 'olts'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-hdd-rack me-2"></i>OLT Devices</h4>
@@ -1689,51 +1914,87 @@ try {
                 
                 <div class="col-md-6">
                     <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-info text-white">
-                            <i class="bi bi-activity me-2"></i>Status & Signal
+                        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-activity me-2"></i>Live Status & Signal</span>
+                            <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
+                                <i class="bi bi-broadcast me-1"></i> Fetch Live
+                            </button>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-4">
-                                <div class="col-4">
-                                    <div class="h6 text-muted">Status</div>
-                                    <?php
-                                    $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger', 'power_fail' => 'warning'];
-                                    ?>
-                                    <span class="badge bg-<?= $statusClass[$currentOnu['status']] ?? 'secondary' ?> fs-6">
-                                        <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
-                                    </span>
+                            <div id="liveDataLoading" class="text-center py-3 d-none">
+                                <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                                <span class="text-muted">Fetching live data from OLT...</span>
+                            </div>
+                            <div id="liveDataContent">
+                                <div class="row text-center mb-4">
+                                    <div class="col-4">
+                                        <div class="h6 text-muted">Status</div>
+                                        <?php
+                                        $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger', 'power_fail' => 'warning'];
+                                        ?>
+                                        <span id="liveStatus" class="badge bg-<?= $statusClass[$currentOnu['status']] ?? 'secondary' ?> fs-6">
+                                            <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
+                                        </span>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="h6 text-muted">RX Power</div>
+                                        <?php
+                                        $rx = $currentOnu['rx_power'];
+                                        $rxClass = 'success';
+                                        if ($rx !== null) {
+                                            if ($rx <= -28) $rxClass = 'danger';
+                                            elseif ($rx <= -25) $rxClass = 'warning';
+                                        }
+                                        ?>
+                                        <span id="liveRxPower" class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 1) . ' dBm' : 'N/A' ?></span>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="h6 text-muted">TX Power</div>
+                                        <span id="liveTxPower" class="fw-bold"><?= $currentOnu['tx_power'] !== null ? number_format($currentOnu['tx_power'], 1) . ' dBm' : 'N/A' ?></span>
+                                    </div>
                                 </div>
-                                <div class="col-4">
-                                    <div class="h6 text-muted">RX Power</div>
-                                    <?php
-                                    $rx = $currentOnu['rx_power'];
-                                    $rxClass = 'success';
-                                    if ($rx !== null) {
-                                        if ($rx <= -28) $rxClass = 'danger';
-                                        elseif ($rx <= -25) $rxClass = 'warning';
-                                    }
-                                    ?>
-                                    <span class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 1) . ' dBm' : 'N/A' ?></span>
+                                
+                                <!-- Signal Quality Bar -->
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted small">Signal Quality</span>
+                                        <span id="liveSignalQuality" class="badge bg-<?= $rxClass ?>">
+                                            <?php
+                                            if ($rx === null) echo 'N/A';
+                                            elseif ($rx >= -20) echo 'Excellent';
+                                            elseif ($rx >= -24) echo 'Good';
+                                            elseif ($rx >= -27) echo 'Fair';
+                                            elseif ($rx >= -30) echo 'Weak';
+                                            else echo 'Critical';
+                                            ?>
+                                        </span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <?php
+                                        $signalPct = $rx !== null ? min(100, max(0, ($rx + 35) * 5)) : 0;
+                                        ?>
+                                        <div id="liveSignalBar" class="progress-bar bg-<?= $rxClass ?>" role="progressbar" style="width: <?= $signalPct ?>%"></div>
+                                    </div>
                                 </div>
-                                <div class="col-4">
-                                    <div class="h6 text-muted">TX Power</div>
-                                    <span class="fw-bold"><?= $currentOnu['tx_power'] !== null ? number_format($currentOnu['tx_power'], 1) . ' dBm' : 'N/A' ?></span>
+                                
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="h6 text-muted">Authorization</div>
+                                        <?php if ($currentOnu['is_authorized']): ?>
+                                        <span class="badge bg-success fs-6">Authorized</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-warning fs-6">Pending</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="h6 text-muted">Distance</div>
+                                        <span class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <div class="h6 text-muted">Authorization</div>
-                                    <?php if ($currentOnu['is_authorized']): ?>
-                                    <span class="badge bg-success fs-6">Authorized</span>
-                                    <?php else: ?>
-                                    <span class="badge bg-warning fs-6">Pending</span>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="col-6">
-                                    <div class="h6 text-muted">Distance</div>
-                                    <span class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
-                                </div>
+                            <div id="liveDataTimestamp" class="text-center text-muted small mt-3 d-none">
+                                <i class="bi bi-clock me-1"></i>Last updated: <span id="liveTimestamp">-</span>
                             </div>
                             
                             <hr>
@@ -1743,7 +2004,7 @@ try {
                                     <input type="hidden" name="action" value="refresh_onu_optical">
                                     <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                     <button type="submit" class="btn btn-outline-info">
-                                        <i class="bi bi-arrow-repeat me-1"></i> Refresh Signal
+                                        <i class="bi bi-arrow-repeat me-1"></i> Sync to DB
                                     </button>
                                 </form>
                                 <?php if ($currentOnu['is_authorized']): ?>
@@ -2498,6 +2759,102 @@ quit</pre>
             function togglePassword(id) {
                 const input = document.getElementById(id);
                 input.type = input.type === 'password' ? 'text' : 'password';
+            }
+            
+            async function fetchLiveOnuData() {
+                const btn = document.getElementById('btnFetchLive');
+                const loading = document.getElementById('liveDataLoading');
+                const content = document.getElementById('liveDataContent');
+                const timestamp = document.getElementById('liveDataTimestamp');
+                
+                const oltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
+                const frame = <?= $currentOnu['frame'] ?? 0 ?>;
+                const slot = <?= $currentOnu['slot'] ?? 'null' ?>;
+                const port = <?= $currentOnu['port'] ?? 'null' ?>;
+                const onuId = <?= $currentOnu['onu_id'] ?? 'null' ?>;
+                const sn = '<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>';
+                
+                if (!oltId || slot === null) {
+                    alert('Missing OLT information');
+                    return;
+                }
+                
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fetching...';
+                loading.classList.remove('d-none');
+                content.style.opacity = '0.5';
+                
+                try {
+                    const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${oltId}&frame=${frame}&slot=${slot}&port=${port}&onu_id=${onuId}&sn=${encodeURIComponent(sn)}`);
+                    const data = await resp.json();
+                    
+                    if (data.success && data.onu) {
+                        updateLiveDisplay(data.onu);
+                        timestamp.classList.remove('d-none');
+                        document.getElementById('liveTimestamp').textContent = new Date().toLocaleTimeString();
+                    } else {
+                        alert('Could not fetch live data: ' + (data.error || 'ONU not found'));
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Error fetching live data');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Fetch Live';
+                    loading.classList.add('d-none');
+                    content.style.opacity = '1';
+                }
+            }
+            
+            function updateLiveDisplay(onu) {
+                const statusEl = document.getElementById('liveStatus');
+                const rxEl = document.getElementById('liveRxPower');
+                const txEl = document.getElementById('liveTxPower');
+                const qualityEl = document.getElementById('liveSignalQuality');
+                const barEl = document.getElementById('liveSignalBar');
+                
+                const statusMap = {
+                    online: { class: 'success', icon: 'check-circle-fill' },
+                    offline: { class: 'secondary', icon: 'circle' },
+                    los: { class: 'danger', icon: 'exclamation-triangle-fill' },
+                    power_fail: { class: 'warning', icon: 'exclamation-circle-fill' }
+                };
+                const st = statusMap[onu.status] || statusMap.offline;
+                statusEl.className = `badge bg-${st.class} fs-6`;
+                statusEl.innerHTML = `<i class="bi bi-${st.icon} me-1"></i>${onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown'}`;
+                
+                const rx = onu.rx_power;
+                let rxClass = 'success';
+                let quality = 'Excellent';
+                let pct = 100;
+                
+                if (rx !== null) {
+                    if (rx <= -30) { rxClass = 'danger'; quality = 'Critical'; pct = 10; }
+                    else if (rx <= -28) { rxClass = 'danger'; quality = 'Weak'; pct = 25; }
+                    else if (rx <= -27) { rxClass = 'warning'; quality = 'Fair'; pct = 50; }
+                    else if (rx <= -24) { rxClass = 'success'; quality = 'Good'; pct = 75; }
+                    else { rxClass = 'success'; quality = 'Excellent'; pct = 100; }
+                    
+                    rxEl.className = `text-${rxClass} fw-bold`;
+                    rxEl.textContent = rx.toFixed(1) + ' dBm';
+                } else {
+                    rxEl.className = 'text-muted fw-bold';
+                    rxEl.textContent = 'N/A';
+                    quality = 'N/A';
+                    pct = 0;
+                }
+                
+                if (onu.tx_power !== null) {
+                    txEl.textContent = onu.tx_power.toFixed(1) + ' dBm';
+                } else {
+                    txEl.textContent = 'N/A';
+                }
+                
+                qualityEl.className = `badge bg-${rxClass}`;
+                qualityEl.textContent = quality;
+                
+                barEl.className = `progress-bar bg-${rxClass}`;
+                barEl.style.width = pct + '%';
             }
             </script>
             <?php endif; ?>

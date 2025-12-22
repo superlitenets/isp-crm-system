@@ -748,6 +748,66 @@ if ($page === 'api' && $action === 'whatsapp_session') {
     exit;
 }
 
+// Huawei OLT Live ONU Monitor API
+if ($page === 'api' && $action === 'huawei_live_onus') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : 0;
+    $slot = isset($_GET['slot']) ? (int)$_GET['slot'] : null;
+    
+    if (!$oltId) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID required']);
+        exit;
+    }
+    
+    try {
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        $result = $huaweiOLT->getONUDetailedInfo($oltId, $slot);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// Huawei OLT Single ONU Live Data API
+if ($page === 'api' && $action === 'huawei_live_onu') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : 0;
+    $frame = isset($_GET['frame']) ? (int)$_GET['frame'] : 0;
+    $slot = isset($_GET['slot']) ? (int)$_GET['slot'] : null;
+    $port = isset($_GET['port']) ? (int)$_GET['port'] : null;
+    $onuId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : null;
+    $sn = isset($_GET['sn']) ? $_GET['sn'] : '';
+    
+    if (!$oltId) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID required']);
+        exit;
+    }
+    
+    try {
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        $result = $huaweiOLT->getSingleONULiveData($oltId, $frame, $slot, $port, $onuId, $sn);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Web Dashboard Clock In/Out API
 if ($page === 'api' && $action === 'clock_in') {
     while (ob_get_level()) ob_end_clean();
