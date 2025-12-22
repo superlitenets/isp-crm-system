@@ -549,8 +549,16 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'OLT not found'];
         }
         
+        // Try CLI first (faster and more reliable when SNMP port is blocked)
+        $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
+        if ($cliResult['success'] && !empty($cliResult['optical']) && 
+            ($cliResult['optical']['rx_power'] !== null || $cliResult['optical']['tx_power'] !== null)) {
+            return $cliResult;
+        }
+        
+        // Fall back to SNMP if CLI didn't work
         if (!function_exists('snmpget')) {
-            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+            return $cliResult; // Return CLI result even if incomplete
         }
         
         $community = $olt['snmp_community'] ?? 'public';
@@ -568,44 +576,27 @@ class HuaweiOLT {
         $ponIndex = $frame * 8192 + $slot * 256 + $port;
         $indexSuffix = "{$ponIndex}.{$onuId}";
         
-        // Try multiple OID sets - different firmware uses different tables
-        $oidSets = [
-            // Primary: .43.1.7/.43.1.8 (raw dBm values)
-            ['rx' => "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7.{$indexSuffix}", 
-             'tx' => "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}", 
-             'divisor' => 1],
-            // Fallback: .51.1.4/.51.1.6 (0.01 dBm units)  
-            ['rx' => "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4.{$indexSuffix}",
-             'tx' => "1.3.6.1.4.1.2011.6.128.1.1.2.51.1.6.{$indexSuffix}",
-             'divisor' => 100],
-        ];
+        // Use short timeout (500ms) and no retries since CLI is primary
+        $timeout = 500000; // 500ms
+        $retries = 0;
         
-        $rxValue = null;
-        $txValue = null;
-        $usedSet = null;
+        // Try primary OID set only
+        $rxOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.7.{$indexSuffix}";
+        $txOid = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.8.{$indexSuffix}";
         
-        foreach ($oidSets as $set) {
-            $rxPower = @snmpget($host, $community, $set['rx'], 3000000, 2);
-            $txPower = @snmpget($host, $community, $set['tx'], 3000000, 2);
-            
-            if ($rxPower !== false || $txPower !== false) {
-                $usedSet = $set;
-                $rxValue = $this->parseOpticalPower($rxPower, $set['divisor']);
-                $txValue = $this->parseOpticalPower($txPower, $set['divisor']);
-                
-                // Validate range
-                if ($rxValue !== null && ($rxValue < -50 || $rxValue > 10)) $rxValue = null;
-                if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
-                
-                if ($rxValue !== null || $txValue !== null) {
-                    break;
-                }
-            }
-        }
+        $rxPower = @snmpget($host, $community, $rxOid, $timeout, $retries);
+        $txPower = @snmpget($host, $community, $txOid, $timeout, $retries);
         
-        // Also fetch distance (OID .43.1.5 - hwGponOntDistance)
+        $rxValue = $this->parseOpticalPower($rxPower, 1);
+        $txValue = $this->parseOpticalPower($txPower, 1);
+        
+        // Validate range
+        if ($rxValue !== null && ($rxValue < -50 || $rxValue > 10)) $rxValue = null;
+        if ($txValue !== null && ($txValue < -50 || $txValue > 10)) $txValue = null;
+        
+        // Fetch distance via SNMP
         $distanceOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.5.{$indexSuffix}";
-        $distanceRaw = @snmpget($host, $community, $distanceOID, 3000000, 2);
+        $distanceRaw = @snmpget($host, $community, $distanceOID, $timeout, $retries);
         $distance = null;
         if ($distanceRaw !== false) {
             $cleaned = $this->cleanSnmpValue((string)$distanceRaw);
@@ -614,10 +605,9 @@ class HuaweiOLT {
             }
         }
         
-        // Also fetch status (OID .43.1.9 - hwGponDeviceOntControlRunStatus)
-        // Values: 1=online, 2=offline, 3=los, 4=dyingGasp, 5=authFail
+        // Fetch status via SNMP
         $statusOID = "1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.{$indexSuffix}";
-        $statusRaw = @snmpget($host, $community, $statusOID, 3000000, 2);
+        $statusRaw = @snmpget($host, $community, $statusOID, $timeout, $retries);
         $status = null;
         if ($statusRaw !== false) {
             $statusCode = (int)$this->cleanSnmpValue((string)$statusRaw);
@@ -625,23 +615,17 @@ class HuaweiOLT {
             $status = $statusMap[$statusCode] ?? null;
         }
         
-        // If SNMP failed for optical power, try CLI fallback for everything
-        if ($rxValue === null && $txValue === null) {
-            $cliResult = $this->getONUOpticalInfoViaCLI($oltId, $frame, $slot, $port, $onuId);
-            if ($cliResult['success'] && !empty($cliResult['optical'])) {
-                return $cliResult;
-            }
+        // Use CLI data if SNMP didn't get distance
+        if ($distance === null && isset($cliResult['optical']['distance'])) {
+            $distance = $cliResult['optical']['distance'];
+        }
+        if ($status === null && isset($cliResult['optical']['status'])) {
+            $status = $cliResult['optical']['status'];
         }
         
-        // If SNMP got optical but not distance, try CLI fallback just for distance
-        if ($distance === null) {
-            $cliDistanceResult = $this->getONUDistanceViaCLI($oltId, $frame, $slot, $port, $onuId);
-            if ($cliDistanceResult['success']) {
-                $distance = $cliDistanceResult['distance'];
-                if ($status === null && !empty($cliDistanceResult['status'])) {
-                    $status = $cliDistanceResult['status'];
-                }
-            }
+        // Return SNMP data if we got it, otherwise return CLI result
+        if ($rxValue === null && $txValue === null) {
+            return $cliResult;
         }
         
         return [
@@ -655,8 +639,8 @@ class HuaweiOLT {
             'debug' => [
                 'ponIndex' => $ponIndex,
                 'index' => $indexSuffix,
-                'rx_oid' => $usedSet['rx'] ?? $oidSets[0]['rx'],
-                'tx_oid' => $usedSet['tx'] ?? $oidSets[0]['tx'],
+                'rx_oid' => $rxOid,
+                'tx_oid' => $txOid,
                 'rx_raw' => $rxPower ?? false,
                 'tx_raw' => $txPower ?? false,
                 'distance_raw' => $distanceRaw ?? false,
