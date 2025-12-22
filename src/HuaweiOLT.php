@@ -3561,12 +3561,18 @@ class HuaweiOLT {
     
     // ==================== ONU Operations ====================
     
-    public function executeCommand(int $oltId, string $command): array {
+    public function executeCommand(int $oltId, string $command, bool $forceDirectConnection = false): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'message' => 'OLT not found'];
         }
         
+        // Try using the Node.js persistent session service first (for Telnet)
+        if (!$forceDirectConnection && $olt['connection_type'] === 'telnet' && $this->isOLTServiceAvailable()) {
+            return $this->executeViaService($oltId, $command);
+        }
+        
+        // Fall back to direct connection
         $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
         
         $result = ['success' => false, 'message' => 'Unsupported connection type for commands'];
@@ -3789,6 +3795,170 @@ class HuaweiOLT {
         } catch (\Exception $e) {
             return ['success' => false, 'message' => 'SSH error: ' . $e->getMessage()];
         }
+    }
+    
+    // ==================== Node.js OLT Session Service ====================
+    
+    private function getOLTServiceUrl(): string {
+        return getenv('OLT_SERVICE_URL') ?: 'http://localhost:3001';
+    }
+    
+    private function callOLTService(string $endpoint, array $data = [], string $method = 'POST'): array {
+        $url = $this->getOLTServiceUrl() . $endpoint;
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        
+        if ($method === 'POST') {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => "Service connection failed: {$error}"];
+        }
+        
+        $result = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return ['success' => false, 'error' => 'Invalid response from OLT service'];
+        }
+        
+        return $result;
+    }
+    
+    public function isOLTServiceAvailable(): bool {
+        $result = $this->callOLTService('/health', [], 'GET');
+        return isset($result['status']) && $result['status'] === 'ok';
+    }
+    
+    public function connectToOLTSession(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
+        
+        $data = [
+            'oltId' => (string)$oltId,
+            'host' => $olt['ip_address'],
+            'port' => (int)$olt['port'],
+            'username' => $olt['username'],
+            'password' => $password
+        ];
+        
+        $result = $this->callOLTService('/connect', $data);
+        
+        if ($result['success'] ?? false) {
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'session_connect',
+                'status' => 'success',
+                'message' => 'Persistent session established',
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+        }
+        
+        return $result;
+    }
+    
+    public function disconnectOLTSession(int $oltId): array {
+        $result = $this->callOLTService('/disconnect', ['oltId' => (string)$oltId]);
+        
+        if ($result['success'] ?? false) {
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'session_disconnect',
+                'status' => 'success',
+                'message' => 'Session disconnected',
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+        }
+        
+        return $result;
+    }
+    
+    public function getOLTSessionStatus(int $oltId): array {
+        return $this->callOLTService("/status/{$oltId}", [], 'GET');
+    }
+    
+    public function getAllOLTSessions(): array {
+        return $this->callOLTService('/sessions', [], 'GET');
+    }
+    
+    public function executeViaService(int $oltId, string $command, int $timeout = 30000): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Check if session exists, if not establish one
+        $status = $this->getOLTSessionStatus($oltId);
+        if (!($status['connected'] ?? false)) {
+            $connectResult = $this->connectToOLTSession($oltId);
+            if (!($connectResult['success'] ?? false)) {
+                return ['success' => false, 'error' => 'Failed to establish session: ' . ($connectResult['error'] ?? 'Unknown error')];
+            }
+        }
+        
+        // Execute command via service
+        $result = $this->callOLTService('/execute', [
+            'oltId' => (string)$oltId,
+            'command' => $command,
+            'timeout' => $timeout
+        ]);
+        
+        // Log the command
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'command_via_service',
+            'status' => ($result['success'] ?? false) ? 'success' : 'failed',
+            'message' => ($result['success'] ?? false) ? 'Command executed via persistent session' : ($result['error'] ?? 'Failed'),
+            'command_sent' => $command,
+            'command_response' => substr($result['output'] ?? '', 0, 10000),
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        if ($result['success'] ?? false) {
+            return [
+                'success' => true,
+                'message' => 'Command executed via persistent session',
+                'output' => $result['output'] ?? ''
+            ];
+        }
+        
+        return ['success' => false, 'message' => $result['error'] ?? 'Command execution failed'];
+    }
+    
+    public function executeBatchViaService(int $oltId, array $commands, int $timeout = 30000): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Check if session exists
+        $status = $this->getOLTSessionStatus($oltId);
+        if (!($status['connected'] ?? false)) {
+            $connectResult = $this->connectToOLTSession($oltId);
+            if (!($connectResult['success'] ?? false)) {
+                return ['success' => false, 'error' => 'Failed to establish session'];
+            }
+        }
+        
+        return $this->callOLTService('/execute-batch', [
+            'oltId' => (string)$oltId,
+            'commands' => $commands,
+            'timeout' => $timeout
+        ]);
     }
     
     public function testFullConnection(int $oltId): array {
