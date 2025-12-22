@@ -246,6 +246,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'success';
                 }
                 
+                // Queue TR-069 configuration if WAN/WiFi settings provided
+                $tr069Queued = false;
+                if (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24'])) {
+                    // Store TR-069 config to be applied when device connects to ACS
+                    $tr069Config = [
+                        'onu_id' => $onuId,
+                        'wan_vlan' => (int)($_POST['wan_vlan'] ?? 902),
+                        'connection_type' => $_POST['connection_type'] ?? 'pppoe',
+                        'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                        'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                        'nat_enable' => isset($_POST['nat_enable']),
+                        'wifi_ssid_24' => $_POST['wifi_ssid_24'] ?? '',
+                        'wifi_pass_24' => $_POST['wifi_pass_24'] ?? '',
+                        'wifi_ssid_5' => $_POST['wifi_ssid_5'] ?? '',
+                        'wifi_pass_5' => $_POST['wifi_pass_5'] ?? ''
+                    ];
+                    
+                    // Store pending TR-069 config in database
+                    $stmt = $db->prepare("
+                        INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, created_at)
+                        VALUES (?, ?, 'pending', CURRENT_TIMESTAMP)
+                        ON CONFLICT (onu_id) DO UPDATE SET
+                            config_data = EXCLUDED.config_data,
+                            status = 'pending',
+                            updated_at = CURRENT_TIMESTAMP
+                    ");
+                    try {
+                        $stmt->execute([$onuId, json_encode($tr069Config)]);
+                        $tr069Queued = true;
+                        $message .= ' TR-069 config queued for push.';
+                    } catch (Exception $e) {
+                        // Table may not exist, create it
+                        $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                            onu_id INTEGER PRIMARY KEY,
+                            config_data TEXT,
+                            status VARCHAR(20) DEFAULT 'pending',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP
+                        )");
+                        $stmt->execute([$onuId, json_encode($tr069Config)]);
+                        $tr069Queued = true;
+                        $message .= ' TR-069 config queued for push.';
+                    }
+                }
+                
                 // Redirect back to authorized ONUs list
                 header('Location: ?page=huawei-olt&view=onus&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
@@ -510,6 +555,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $genieacs->factoryReset($_POST['device_id']);
                 $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            case 'apply_pending_tr069':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $onuId = (int)$_POST['onu_id'];
+                
+                // Get pending config
+                $stmt = $db->prepare("SELECT config_data FROM huawei_onu_tr069_config WHERE onu_id = ? AND status = 'pending'");
+                $stmt->execute([$onuId]);
+                $pendingConfig = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if ($pendingConfig) {
+                    $config = json_decode($pendingConfig['config_data'], true);
+                    
+                    // Get TR-069 device ID
+                    $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.serial_number = o.sn WHERE o.id = ?");
+                    $stmt->execute([$onuId]);
+                    $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    
+                    if ($tr069Device && $tr069Device['device_id']) {
+                        $success = true;
+                        $errors = [];
+                        
+                        // Apply WAN config
+                        if (!empty($config['pppoe_username'])) {
+                            $wanResult = $genieacs->setWANConfig($tr069Device['device_id'], [
+                                'connection_type' => $config['connection_type'] ?? 'pppoe',
+                                'pppoe_username' => $config['pppoe_username'],
+                                'pppoe_password' => $config['pppoe_password'],
+                                'wan_vlan' => $config['wan_vlan'] ?? 902,
+                                'nat_enable' => $config['nat_enable'] ?? true
+                            ]);
+                            if (!$wanResult['success']) $errors[] = 'WAN config failed';
+                        }
+                        
+                        // Apply WiFi config
+                        if (!empty($config['wifi_ssid_24'])) {
+                            $wifiResult = $genieacs->setWirelessConfig($tr069Device['device_id'], [
+                                'wifi_24_enable' => true,
+                                'ssid_24' => $config['wifi_ssid_24'],
+                                'wifi_pass_24' => $config['wifi_pass_24'],
+                                'wifi_5_enable' => !empty($config['wifi_ssid_5']),
+                                'ssid_5' => $config['wifi_ssid_5'] ?: $config['wifi_ssid_24'],
+                                'wifi_pass_5' => $config['wifi_pass_5'] ?: $config['wifi_pass_24']
+                            ]);
+                            if (!$wifiResult['success']) $errors[] = 'WiFi config failed';
+                        }
+                        
+                        // Mark as applied
+                        $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET status = 'applied', applied_at = CURRENT_TIMESTAMP WHERE onu_id = ?");
+                        $stmt->execute([$onuId]);
+                        
+                        $message = empty($errors) ? 'TR-069 configuration applied successfully' : 'Partial success: ' . implode(', ', $errors);
+                        $messageType = empty($errors) ? 'success' : 'warning';
+                    } else {
+                        $message = 'Device not found in GenieACS. Please sync TR-069 devices first.';
+                        $messageType = 'warning';
+                    }
+                } else {
+                    $message = 'No pending TR-069 configuration found';
+                    $messageType = 'info';
+                }
                 break;
             case 'tr069_wireless_config':
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -939,6 +1046,37 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         }
     } catch (Exception $e) {
         $onuRefreshResult = ['success' => false, 'error' => $e->getMessage()];
+    }
+    
+    // Fetch TR-069 device info
+    $tr069Device = null;
+    $tr069Info = null;
+    $pendingTr069Config = null;
+    try {
+        // Check for TR-069 device by serial number
+        $stmt = $db->prepare("SELECT * FROM tr069_devices WHERE serial_number = ?");
+        $stmt->execute([$currentOnu['sn']]);
+        $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        // Get pending TR-069 config
+        $stmt = $db->prepare("SELECT * FROM huawei_onu_tr069_config WHERE onu_id = ?");
+        $stmt->execute([$onuId]);
+        $pendingTr069Config = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($pendingTr069Config && !empty($pendingTr069Config['config_data'])) {
+            $pendingTr069Config['config'] = json_decode($pendingTr069Config['config_data'], true);
+        }
+        
+        // If device found in ACS, get live info
+        if ($tr069Device && $tr069Device['device_id']) {
+            require_once __DIR__ . '/../src/GenieACS.php';
+            $genieacs = new \App\GenieACS($db);
+            $deviceResult = $genieacs->getDeviceInfo($tr069Device['device_id']);
+            if ($deviceResult['success']) {
+                $tr069Info = $deviceResult['info'];
+            }
+        }
+    } catch (Exception $e) {
+        // TR-069 tables may not exist yet
     }
 }
 
@@ -2222,6 +2360,101 @@ quit</pre>
                                     Changing the profile will automatically update OMCI settings (VLAN, speed, QoS).
                                 </small>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TR-069 Device Status -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-purple text-white d-flex justify-content-between align-items-center" style="background-color:#6f42c1">
+                            <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS Status</span>
+                            <?php if ($tr069Device): ?>
+                            <span class="badge bg-light text-dark"><i class="bi bi-check-circle-fill text-success me-1"></i>Connected to ACS</span>
+                            <?php else: ?>
+                            <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Awaiting ACS Connection</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3"><i class="bi bi-cpu me-2"></i>Device Information</h6>
+                                    <?php if ($tr069Info): ?>
+                                    <table class="table table-sm table-borderless mb-0">
+                                        <tr><th width="40%">Manufacturer</th><td><?= htmlspecialchars($tr069Info['manufacturer'] ?? '-') ?> (OUI: <?= htmlspecialchars($tr069Info['oui'] ?? '-') ?>)</td></tr>
+                                        <tr><th>Model</th><td><?= htmlspecialchars($tr069Info['product_class'] ?? $tr069Device['model'] ?? '-') ?></td></tr>
+                                        <tr><th>Software Ver.</th><td><?= htmlspecialchars($tr069Info['software_version'] ?? '-') ?></td></tr>
+                                        <tr><th>Hardware Ver.</th><td><?= htmlspecialchars($tr069Info['hardware_version'] ?? '-') ?></td></tr>
+                                        <tr><th>Serial</th><td><code><?= htmlspecialchars($tr069Info['serial'] ?? $currentOnu['sn']) ?></code></td></tr>
+                                        <tr><th>WAN IP</th><td><?= htmlspecialchars($tr069Info['ip_address'] ?? '-') ?></td></tr>
+                                        <tr><th>Last Inform</th><td>
+                                            <?php if (!empty($tr069Info['last_inform'])): ?>
+                                            <?= date('M j, H:i:s', strtotime($tr069Info['last_inform'])) ?>
+                                            <?php elseif (!empty($tr069Device['last_inform'])): ?>
+                                            <?= date('M j, H:i:s', strtotime($tr069Device['last_inform'])) ?>
+                                            <?php else: ?>-<?php endif; ?>
+                                        </td></tr>
+                                        <tr><th>Uptime</th><td><?= $tr069Info['uptime'] ? gmdate('d\d H\h i\m', (int)$tr069Info['uptime']) : '-' ?></td></tr>
+                                    </table>
+                                    <?php elseif ($tr069Device): ?>
+                                    <table class="table table-sm table-borderless mb-0">
+                                        <tr><th width="40%">Device ID</th><td><code class="small"><?= htmlspecialchars(substr($tr069Device['device_id'], 0, 40)) ?>...</code></td></tr>
+                                        <tr><th>Model</th><td><?= htmlspecialchars($tr069Device['model'] ?? '-') ?></td></tr>
+                                        <tr><th>Manufacturer</th><td><?= htmlspecialchars($tr069Device['manufacturer'] ?? '-') ?></td></tr>
+                                        <tr><th>Last Inform</th><td><?= $tr069Device['last_inform'] ? date('M j, H:i:s', strtotime($tr069Device['last_inform'])) : '-' ?></td></tr>
+                                    </table>
+                                    <?php else: ?>
+                                    <div class="alert alert-warning mb-0">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        Device has not connected to GenieACS yet. Once it connects via TR-069, information will appear here.
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3"><i class="bi bi-sliders2 me-2"></i>Pending Configuration</h6>
+                                    <?php if ($pendingTr069Config && $pendingTr069Config['status'] === 'pending'): ?>
+                                    <?php $cfg = $pendingTr069Config['config']; ?>
+                                    <div class="alert alert-info mb-3">
+                                        <i class="bi bi-hourglass-split me-2"></i><strong>Configuration queued</strong> - waiting to push to device
+                                    </div>
+                                    <table class="table table-sm table-borderless mb-3">
+                                        <?php if (!empty($cfg['pppoe_username'])): ?>
+                                        <tr><th width="40%">PPPoE User</th><td><?= htmlspecialchars($cfg['pppoe_username']) ?></td></tr>
+                                        <?php endif; ?>
+                                        <?php if (!empty($cfg['wan_vlan'])): ?>
+                                        <tr><th>WAN VLAN</th><td><?= $cfg['wan_vlan'] ?></td></tr>
+                                        <?php endif; ?>
+                                        <?php if (!empty($cfg['wifi_ssid_24'])): ?>
+                                        <tr><th>WiFi 2.4G SSID</th><td><?= htmlspecialchars($cfg['wifi_ssid_24']) ?></td></tr>
+                                        <?php endif; ?>
+                                        <?php if (!empty($cfg['wifi_ssid_5'])): ?>
+                                        <tr><th>WiFi 5G SSID</th><td><?= htmlspecialchars($cfg['wifi_ssid_5']) ?></td></tr>
+                                        <?php endif; ?>
+                                    </table>
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="action" value="apply_pending_tr069">
+                                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                        <button type="submit" class="btn btn-primary" <?= !$tr069Device ? 'disabled' : '' ?>>
+                                            <i class="bi bi-cloud-upload me-1"></i> Push to Device Now
+                                        </button>
+                                    </form>
+                                    <?php if (!$tr069Device): ?>
+                                    <small class="text-muted d-block mt-2">Device must connect to ACS first</small>
+                                    <?php endif; ?>
+                                    <?php elseif ($pendingTr069Config && $pendingTr069Config['status'] === 'applied'): ?>
+                                    <div class="alert alert-success mb-0">
+                                        <i class="bi bi-check-circle-fill me-2"></i>
+                                        Configuration applied on <?= date('M j, H:i', strtotime($pendingTr069Config['applied_at'])) ?>
+                                    </div>
+                                    <?php else: ?>
+                                    <div class="alert alert-secondary mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>No pending TR-069 configuration. Use the forms below to configure WAN/WiFi/LAN settings.
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5609,13 +5842,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
     </form>
     
     <div class="modal fade" id="authModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="post">
                     <input type="hidden" name="action" value="authorize_onu">
                     <input type="hidden" name="onu_id" id="authOnuId">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize ONU</h5>
+                        <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize & Configure ONU</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -5625,51 +5858,137 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <span class="ms-3"><strong>Location:</strong> <span id="authOnuLocation"></span></span>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">Zone <span class="text-danger">*</span></label>
-                            <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
-                                <option value="">-- Select Zone --</option>
-                                <?php
-                                $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
-                                while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
-                                    <?= htmlspecialchars($zone['name']) ?>
-                                </option>
-                                <?php endwhile; ?>
-                            </select>
-                            <input type="hidden" name="zone" id="authZoneName">
-                        </div>
+                        <ul class="nav nav-tabs mb-3" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#authBasic" type="button">
+                                    <i class="bi bi-gear me-1"></i> Basic
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#authWan" type="button">
+                                    <i class="bi bi-globe me-1"></i> WAN / PPPoE
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#authWifi" type="button">
+                                    <i class="bi bi-wifi me-1"></i> WiFi
+                                </button>
+                            </li>
+                        </ul>
                         
-                        <div class="mb-3">
-                            <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
-                            <select name="vlan_id" id="authVlanId" class="form-select" required>
-                                <option value="">-- Select VLAN --</option>
-                                <?php
-                                $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description FROM huawei_vlans WHERE is_active = true ORDER BY vlan_id");
-                                while ($vlan = $vlansStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                <option value="<?= $vlan['vlan_id'] ?>">
-                                    VLAN <?= $vlan['vlan_id'] ?><?= !empty($vlan['description']) ? ' - ' . htmlspecialchars($vlan['description']) : '' ?>
-                                </option>
-                                <?php endwhile; ?>
-                            </select>
-                            <small class="text-muted">Select a service VLAN from OLT configuration</small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Name / Description</label>
-                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="e.g., John_Apt5_Unit2">
-                            <small class="text-muted">Optional. Used as ONU description on OLT.</small>
-                        </div>
-                        
-                        <div class="alert alert-secondary small mb-0">
-                            <i class="bi bi-info-circle me-2"></i>
-                            After authorization, TR-069 will handle router configuration (WiFi, PPPoE, etc.)
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="authBasic">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                        <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
+                                            <option value="">-- Select Zone --</option>
+                                            <?php
+                                            $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
+                                            while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                            <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
+                                                <?= htmlspecialchars($zone['name']) ?>
+                                            </option>
+                                            <?php endwhile; ?>
+                                        </select>
+                                        <input type="hidden" name="zone" id="authZoneName">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
+                                        <select name="vlan_id" id="authVlanId" class="form-select" required>
+                                            <option value="">-- Select VLAN --</option>
+                                            <?php
+                                            $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description FROM huawei_vlans WHERE is_active = true ORDER BY vlan_id");
+                                            while ($vlan = $vlansStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                            <option value="<?= $vlan['vlan_id'] ?>">
+                                                VLAN <?= $vlan['vlan_id'] ?><?= !empty($vlan['description']) ? ' - ' . htmlspecialchars($vlan['description']) : '' ?>
+                                            </option>
+                                            <?php endwhile; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Customer Name / Description</label>
+                                    <input type="text" name="description" id="authDescription" class="form-control" placeholder="e.g., John_Apt5_Unit2">
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="authWan">
+                                <div class="alert alert-secondary small mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    WAN settings will be pushed to the ONU via TR-069 after authorization.
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">WAN VLAN ID</label>
+                                        <input type="number" name="wan_vlan" class="form-control" value="902" min="1" max="4094">
+                                        <small class="text-muted">Default: 902 (PPPoE)</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Connection Type</label>
+                                        <select name="connection_type" class="form-select">
+                                            <option value="pppoe" selected>PPPoE</option>
+                                            <option value="dhcp">DHCP</option>
+                                            <option value="static">Static IP</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row" id="pppoeCredentials">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">PPPoE Username</label>
+                                        <input type="text" name="pppoe_username" id="authPppoeUser" class="form-control" placeholder="e.g., SNS001623">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">PPPoE Password</label>
+                                        <input type="text" name="pppoe_password" id="authPppoePass" class="form-control" placeholder="e.g., SNS001623">
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" name="nat_enable" id="authNatEnable" checked>
+                                    <label class="form-check-label" for="authNatEnable">Enable NAT</label>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="authWifi">
+                                <div class="alert alert-secondary small mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    WiFi settings will be pushed to the ONU via TR-069 after authorization.
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-2"><i class="bi bi-broadcast me-1"></i> 2.4 GHz WiFi</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="wifi_ssid_24" class="form-control" placeholder="MyNetwork_2.4G">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Password</label>
+                                            <input type="text" name="wifi_pass_24" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-2"><i class="bi bi-broadcast me-1"></i> 5 GHz WiFi</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="wifi_ssid_5" class="form-control" placeholder="MyNetwork_5G">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Password</label>
+                                            <input type="text" name="wifi_pass_5" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="same_wifi" id="authSameWifi" onchange="syncWifiFields(this)">
+                                    <label class="form-check-label" for="authSameWifi">Use same credentials for both bands</label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle me-1"></i> Authorize
+                            <i class="bi bi-check-circle me-1"></i> Authorize & Configure
                         </button>
                     </div>
                 </form>
@@ -5681,6 +6000,18 @@ ont tr069-server-config 1 all profile-id 1</pre>
     function updateZoneName(select) {
         const selectedOption = select.options[select.selectedIndex];
         document.getElementById('authZoneName').value = selectedOption.dataset.name || '';
+    }
+    function syncWifiFields(checkbox) {
+        if (checkbox.checked) {
+            const ssid24 = document.querySelector('input[name="wifi_ssid_24"]');
+            const pass24 = document.querySelector('input[name="wifi_pass_24"]');
+            const ssid5 = document.querySelector('input[name="wifi_ssid_5"]');
+            const pass5 = document.querySelector('input[name="wifi_pass_5"]');
+            ssid5.value = ssid24.value;
+            pass5.value = pass24.value;
+            ssid24.addEventListener('input', function() { ssid5.value = this.value; });
+            pass24.addEventListener('input', function() { pass5.value = this.value; });
+        }
     }
     </script>
     
