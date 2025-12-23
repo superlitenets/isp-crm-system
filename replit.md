@@ -11,6 +11,7 @@ The system is built on PHP, utilizing a modular architecture to separate concern
 
 **UI/UX Decisions:**
 The system features a clean, responsive design. The public-facing landing page is modern with dynamic content, customizable hero sections, and package cards. Internal CRM interfaces prioritize clarity and ease of use for administrative and technical staff, including a mobile PWA for field personnel.
+- **Mobile Responsive Layout**: Both the main CRM and OMS (Huawei OLT) modules feature fully responsive layouts with Bootstrap 5 offcanvas navigation. On screens below 992px, the desktop sidebar is hidden and replaced with a hamburger menu that opens a slide-out navigation drawer. Touch-friendly form controls, responsive tables, and optimized card layouts ensure a seamless mobile experience.
 
 **Technical Implementations:**
 - **Authentication**: Session-based with password hashing, CSRF/SQL injection/XSS protection, and granular role-based access control (RBAC).
