@@ -3514,7 +3514,7 @@ class HuaweiOLT {
         $stats['unconfigured_onus'] = (int)$row['unconfigured'];
         
         try {
-            $stats['discovered_onus'] = (int)$this->db->query("SELECT COUNT(*) FROM onu_discovery_log WHERE is_authorized = FALSE")->fetchColumn();
+            $stats['discovered_onus'] = (int)$this->db->query("SELECT COUNT(*) FROM onu_discovery_log WHERE authorized = FALSE")->fetchColumn();
         } catch (\Exception $e) {
             $stats['discovered_onus'] = 0;
         }
