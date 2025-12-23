@@ -1,0 +1,21 @@
+,"version":"4.17.2"},"platform":"Node.js v24.11.1, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_db              | 2025-12-23 19:44:20.871 UTC [42] ERROR:  relation "mpesa_b2c_transactions" does not exist at character 403
+isp_crm_db              | 2025-12-23 19:44:20.871 UTC [42] STATEMENT:
+isp_crm_db              |                   SELECT
+isp_crm_db              |                       COUNT(*) as total,
+isp_crm_db              |                       COUNT(*) FILTER (WHERE status = 'success') as success,
+isp_crm_db              |                       COUNT(*) FILTER (WHERE status = 'failed') as failed,
+isp_crm_db              |                       COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
+isp_crm_db              |                       COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+isp_crm_db              |                   FROM mpesa_b2c_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+isp_crm_db              |
+isp_crm_php             | NOTICE: PHP message: M-Pesa dashboard init error: SQLSTATE[42P01]: Undefined table: 7 ERROR:  relation "mpesa_b2c_transactions" does not exist
+isp_crm_php             | LINE 8:             FROM mpesa_b2c_transactions WHERE created_at >= ...
+isp_crm_php             |                          ^
+isp_crm_php             | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Call to a member function getB2CTransactions() on null in /var/www/html/templates/mpesa_dashboard.php:615
+isp_crm_php             | 172.18.0.7 -  23/Dec/2025:22:44:20 +0300 "GET /index.php" 500
+isp_crm_php             | Stack trace:
+isp_crm_php             | #0 /var/www/html/public/index.php(6330): include()
+isp_crm_php             | #1 {main}
+isp_crm_php             |   thrown in /var/www/html/templates/mpesa_dashboard.php on line 615
+isp_crm_nginx           | 102.205.239.82 - - [23/Dec/2025:19:44:20 +0000] "GET /?page=mpesa HTTP/2.0" 500 30016 "https://crm.superlite.co.ke/?page=dashboard" "Mozilla/5.0 (Windows NT 10.0; Win64;

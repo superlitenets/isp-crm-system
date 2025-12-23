@@ -1071,110 +1071,127 @@ class Mpesa {
     // ==================== Dashboard Statistics ====================
     
     public function getDashboardStats(): array {
-        $stats = [];
+        $defaultStats = ['total' => 0, 'success' => 0, 'failed' => 0, 'pending' => 0, 'total_amount' => 0];
+        $stats = ['stk' => $defaultStats, 'c2b' => $defaultStats, 'b2c' => $defaultStats, 'b2b' => $defaultStats];
         
-        $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'success') as success,
-                COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
-                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
-            FROM mpesa_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-        ");
-        $stats['stk'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'success') as success,
+                    COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                    COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
+                    COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+                FROM mpesa_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+            ");
+            $stats['stk'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $defaultStats;
+        } catch (\Exception $e) {}
         
-        $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'completed' OR status = 'success') as success,
-                COALESCE(SUM(trans_amount) FILTER (WHERE status = 'completed' OR status = 'success'), 0) as total_amount
-            FROM mpesa_c2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-        ");
-        $stats['c2b'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'completed' OR status = 'success') as success,
+                    COALESCE(SUM(trans_amount) FILTER (WHERE status = 'completed' OR status = 'success'), 0) as total_amount
+                FROM mpesa_c2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+            ");
+            $stats['c2b'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $defaultStats;
+        } catch (\Exception $e) {}
         
-        $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'success') as success,
-                COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
-                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
-            FROM mpesa_b2c_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-        ");
-        $stats['b2c'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'success') as success,
+                    COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                    COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
+                    COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+                FROM mpesa_b2c_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+            ");
+            $stats['b2c'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $defaultStats;
+        } catch (\Exception $e) {}
         
-        $stmt = $this->db->query("
-            SELECT 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'success') as success,
-                COUNT(*) FILTER (WHERE status = 'failed') as failed,
-                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
-            FROM mpesa_b2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-        ");
-        $stats['b2b'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->query("
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'success') as success,
+                    COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                    COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+                FROM mpesa_b2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+            ");
+            $stats['b2b'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: $defaultStats;
+        } catch (\Exception $e) {}
         
         return $stats;
     }
     
     public function getB2CTransactions(array $filters = [], int $limit = 50, int $offset = 0): array {
-        $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2c_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
-        $params = [];
-        
-        if (!empty($filters['status'])) {
-            $sql .= " AND t.status = ?";
-            $params[] = $filters['status'];
+        try {
+            $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2c_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
+            $params = [];
+            
+            if (!empty($filters['status'])) {
+                $sql .= " AND t.status = ?";
+                $params[] = $filters['status'];
+            }
+            if (!empty($filters['purpose'])) {
+                $sql .= " AND t.purpose = ?";
+                $params[] = $filters['purpose'];
+            }
+            if (!empty($filters['phone'])) {
+                $sql .= " AND t.phone LIKE ?";
+                $params[] = '%' . $filters['phone'] . '%';
+            }
+            if (!empty($filters['date_from'])) {
+                $sql .= " AND t.created_at >= ?";
+                $params[] = $filters['date_from'];
+            }
+            if (!empty($filters['date_to'])) {
+                $sql .= " AND t.created_at <= ?";
+                $params[] = $filters['date_to'] . ' 23:59:59';
+            }
+            
+            $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
         }
-        if (!empty($filters['purpose'])) {
-            $sql .= " AND t.purpose = ?";
-            $params[] = $filters['purpose'];
-        }
-        if (!empty($filters['phone'])) {
-            $sql .= " AND t.phone LIKE ?";
-            $params[] = '%' . $filters['phone'] . '%';
-        }
-        if (!empty($filters['date_from'])) {
-            $sql .= " AND t.created_at >= ?";
-            $params[] = $filters['date_from'];
-        }
-        if (!empty($filters['date_to'])) {
-            $sql .= " AND t.created_at <= ?";
-            $params[] = $filters['date_to'] . ' 23:59:59';
-        }
-        
-        $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     public function getB2BTransactions(array $filters = [], int $limit = 50, int $offset = 0): array {
-        $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2b_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
-        $params = [];
-        
-        if (!empty($filters['status'])) {
-            $sql .= " AND t.status = ?";
-            $params[] = $filters['status'];
+        try {
+            $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2b_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
+            $params = [];
+            
+            if (!empty($filters['status'])) {
+                $sql .= " AND t.status = ?";
+                $params[] = $filters['status'];
+            }
+            if (!empty($filters['date_from'])) {
+                $sql .= " AND t.created_at >= ?";
+                $params[] = $filters['date_from'];
+            }
+            if (!empty($filters['date_to'])) {
+                $sql .= " AND t.created_at <= ?";
+                $params[] = $filters['date_to'] . ' 23:59:59';
+            }
+            
+            $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
         }
-        if (!empty($filters['date_from'])) {
-            $sql .= " AND t.created_at >= ?";
-            $params[] = $filters['date_from'];
-        }
-        if (!empty($filters['date_to'])) {
-            $sql .= " AND t.created_at <= ?";
-            $params[] = $filters['date_to'] . ' 23:59:59';
-        }
-        
-        $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     public function isB2CConfigured(): bool {

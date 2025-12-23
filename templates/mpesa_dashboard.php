@@ -406,8 +406,8 @@ if ($view === 'c2b' || $view === 'dashboard') {
 </head>
 <body>
     <?php if (!empty($initError)): ?>
-    <div class="alert alert-danger m-3">
-        <strong>Initialization Error:</strong> <?= htmlspecialchars($initError) ?>
+    <div class="alert alert-warning m-3">
+        <strong>Setup Required:</strong> Some M-Pesa database tables are missing. Please run the database migration or create the tables manually. The dashboard will show zeros until tables are created.
     </div>
     <?php endif; ?>
     <div class="mpesa-layout">
