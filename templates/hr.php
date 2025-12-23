@@ -2752,12 +2752,20 @@ $advances = $salaryAdvance->getAll(['status' => $advanceFilter]);
                                 <button type="submit" class="btn btn-sm btn-danger" title="Reject"><i class="bi bi-x"></i></button>
                             </form>
                             <?php elseif ($adv['status'] === 'approved'): ?>
-                            <form method="POST" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                                <input type="hidden" name="action" value="disburse_advance">
-                                <input type="hidden" name="id" value="<?= $adv['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-primary" title="Disburse"><i class="bi bi-cash"></i> Disburse</button>
-                            </form>
+                            <div class="btn-group">
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="disburse_advance">
+                                    <input type="hidden" name="id" value="<?= $adv['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-primary" title="Mark as Disbursed"><i class="bi bi-cash"></i> Manual</button>
+                                </form>
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                    <input type="hidden" name="action" value="disburse_advance_mpesa">
+                                    <input type="hidden" name="id" value="<?= $adv['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Send via M-Pesa"><i class="bi bi-phone"></i> M-Pesa</button>
+                                </form>
+                            </div>
                             <?php elseif (in_array($adv['status'], ['disbursed', 'repaying'])): ?>
                             <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal" 
                                 data-advance-id="<?= $adv['id'] ?>" data-balance="<?= $adv['balance'] ?>" data-installment="<?= $adv['repayment_amount'] ?>">

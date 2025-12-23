@@ -2446,6 +2446,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+            
+            case 'disburse_advance_mpesa':
+                try {
+                    require_once __DIR__ . '/../src/Mpesa.php';
+                    $mpesa = new \App\Mpesa();
+                    
+                    if (!$mpesa->isB2CConfigured()) {
+                        throw new Exception('M-Pesa B2C is not configured. Please configure it in M-Pesa settings first.');
+                    }
+                    
+                    $salaryAdvance = new \App\SalaryAdvance(Database::getConnection());
+                    $advance = $salaryAdvance->getById((int)$_POST['id']);
+                    
+                    if (!$advance) {
+                        throw new Exception('Salary advance not found.');
+                    }
+                    
+                    if ($advance['status'] !== 'approved') {
+                        throw new Exception('Only approved advances can be disbursed.');
+                    }
+                    
+                    $empStmt = Database::getConnection()->prepare("SELECT phone FROM employees WHERE id = ?");
+                    $empStmt->execute([$advance['employee_id']]);
+                    $employee = $empStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$employee || empty($employee['phone'])) {
+                        throw new Exception('Employee phone number not found.');
+                    }
+                    
+                    $result = $mpesa->b2cPayment(
+                        $employee['phone'],
+                        (float)$advance['amount'],
+                        'SalaryPayment',
+                        'Salary Advance #' . $advance['id'],
+                        'Advance',
+                        'advance',
+                        (int)$advance['id'],
+                        'salary_advance',
+                        $currentUser['id'] ?? null
+                    );
+                    
+                    if ($result['success']) {
+                        $salaryAdvance->disburse((int)$_POST['id']);
+                        
+                        $updateStmt = Database::getConnection()->prepare("
+                            UPDATE salary_advances 
+                            SET mpesa_b2c_transaction_id = ?, disbursement_status = 'processing'
+                            WHERE id = ?
+                        ");
+                        $updateStmt->execute([$result['transaction_id'], $advance['id']]);
+                        
+                        $hrNotification = new \App\HRNotification(Database::getConnection());
+                        $hrNotification->sendAdvanceNotification('advance_disbursed', $advance);
+                        
+                        $message = 'M-Pesa disbursement initiated! ' . ($result['conversation_id'] ?? '');
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['message']);
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'M-Pesa disbursement failed: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
 
             case 'record_advance_payment':
                 try {
@@ -6049,6 +6114,11 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-calculator"></i> Accounting
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="?page=mpesa">
+                    <i class="bi bi-phone text-success"></i> M-Pesa
+                </a>
+            </li>
             <?php endif; ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'whatsapp-chat' ? 'active' : '' ?>" href="?page=whatsapp-chat">
@@ -6250,6 +6320,14 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/huawei_olt.php';
+                    exit;
+                }
+                break;
+            case 'mpesa':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/mpesa_dashboard.php';
                     exit;
                 }
                 break;
