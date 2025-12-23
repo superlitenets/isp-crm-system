@@ -1352,6 +1352,7 @@ $profiles = $huaweiOLT->getServiceProfiles(false);
 $logs = [];
 $alerts = [];
 
+$discoveredOnus = [];
 if ($view === 'onus' || $view === 'dashboard') {
     $onuFilters = [];
     if ($oltId) $onuFilters['olt_id'] = $oltId;
@@ -1359,8 +1360,8 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
-        // Discovery is now triggered by button click, not on page load
-        // This prevents the page from hanging while waiting for OLT connections
+        // Also fetch discovered ONUs from onu_discovery_log (auto-populated by OLT Session Manager)
+        $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
 }
@@ -2755,12 +2756,81 @@ try {
                 </div>
             </div>
             
+            <?php if (isset($_GET['unconfigured']) && !empty($discoveredOnus)): ?>
+            <div class="card shadow-sm mb-3 border-warning">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <h6 class="mb-0"><i class="bi bi-broadcast me-2"></i>Auto-Discovered ONUs (<?= count($discoveredOnus) ?>)</h6>
+                    <small class="text-muted">Found by OLT Session Manager - refreshes every 30 seconds</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Serial Number</th>
+                                    <th>ONU Type</th>
+                                    <th>OLT / Port</th>
+                                    <th>First Seen</th>
+                                    <th>Last Seen</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($discoveredOnus as $disc): ?>
+                                <tr>
+                                    <td>
+                                        <code><?= htmlspecialchars($disc['serial_number']) ?></code>
+                                        <?php if (!empty($disc['equipment_id'])): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($disc['equipment_id']) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($disc['onu_model'])): ?>
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-router me-1"></i><?= htmlspecialchars($disc['onu_model']) ?>
+                                        </span>
+                                        <?php elseif (!empty($disc['equipment_id'])): ?>
+                                        <span class="badge bg-secondary"><?= htmlspecialchars($disc['equipment_id']) ?></span>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted"><?= htmlspecialchars($disc['olt_name'] ?? '-') ?></span>
+                                        <br><small><?= htmlspecialchars($disc['frame_slot_port'] ?? '-') ?></small>
+                                    </td>
+                                    <td>
+                                        <small><?= date('Y-m-d H:i', strtotime($disc['first_seen_at'])) ?></small>
+                                    </td>
+                                    <td>
+                                        <small><?= date('Y-m-d H:i', strtotime($disc['last_seen_at'])) ?></small>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-success" 
+                                            onclick="openAuthModal('<?= htmlspecialchars($disc['serial_number']) ?>', '<?= $disc['olt_id'] ?>', '<?= htmlspecialchars($disc['frame_slot_port'] ?? '') ?>', '<?= $disc['onu_type_id'] ?? '' ?>')">
+                                            <i class="bi bi-check-lg"></i> Authorize
+                                        </button>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <?php if (empty($onus)): ?>
+                    <?php if (empty($onus) && empty($discoveredOnus)): ?>
                     <div class="p-4 text-center text-muted">
                         <i class="bi bi-inbox fs-1 mb-2 d-block"></i>
                         No ONUs found
+                    </div>
+                    <?php elseif (empty($onus)): ?>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-check-circle fs-3 mb-2 d-block text-success"></i>
+                        All discovered ONUs shown above
                     </div>
                     <?php else: ?>
                     <div class="table-responsive">

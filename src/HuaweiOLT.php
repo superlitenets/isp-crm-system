@@ -2627,6 +2627,60 @@ class HuaweiOLT {
         return null;
     }
     
+    /**
+     * Get discovered ONUs from database (auto-populated by OLT Session Manager)
+     * These are ONUs found by the background discovery service
+     */
+    public function getDiscoveredONUs(?int $oltId = null, bool $pendingOnly = true): array {
+        $sql = "
+            SELECT d.*, 
+                   o.name as olt_name, o.ip_address as olt_ip,
+                   t.model as onu_model, t.name as onu_type_name,
+                   b.name as branch_name, b.code as branch_code
+            FROM onu_discovery_log d
+            LEFT JOIN huawei_olts o ON d.olt_id = o.id
+            LEFT JOIN huawei_onu_types t ON d.onu_type_id = t.id
+            LEFT JOIN branches b ON o.branch_id = b.id
+            WHERE 1=1
+        ";
+        $params = [];
+        
+        if ($oltId) {
+            $sql .= " AND d.olt_id = ?";
+            $params[] = $oltId;
+        }
+        
+        if ($pendingOnly) {
+            $sql .= " AND d.authorized = false";
+        }
+        
+        $sql .= " ORDER BY d.last_seen_at DESC";
+        
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+    
+    /**
+     * Mark a discovered ONU as authorized (after provisioning)
+     */
+    public function markDiscoveredONUAuthorized(int $discoveryId): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE onu_discovery_log 
+                SET authorized = true, authorized_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            ");
+            return $stmt->execute([$discoveryId]);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     public function discoverUnconfiguredONUsViaSNMP(int $oltId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
