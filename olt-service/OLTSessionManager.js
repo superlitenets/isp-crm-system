@@ -1,143 +1,198 @@
-const { Telnet } = require('telnet-client');
+const net = require('net');
 
 class OLTSession {
     constructor(oltId, config) {
         this.oltId = oltId;
         this.config = config;
-        this.connection = null;
+        this.socket = null;
         this.connected = false;
         this.lastActivity = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
         this.buffer = '';
         this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\])\s*$/;
+        this.dataListeners = [];
     }
 
     async connect() {
-        this.connection = new Telnet();
-        
-        const params = {
-            host: this.config.host,
-            port: this.config.port || 23,
-            timeout: 30000,
-            shellPrompt: false,
-            loginPrompt: /[Uu]sername:|[Ll]ogin:|>>User name:|User name:/i,
-            passwordPrompt: /[Pp]assword:/i,
-            username: this.config.username,
-            password: this.config.password,
-            ors: '\r\n',
-            sendTimeout: 30000,
-            negotiationMandatory: false,
-            initialLFCR: true,
-            debug: false
-        };
+        return new Promise((resolve, reject) => {
+            this.socket = new net.Socket();
+            this.buffer = '';
+            
+            const timeout = setTimeout(() => {
+                this.socket.destroy();
+                reject(new Error('Connection timeout'));
+            }, 30000);
 
-        try {
-            await this.connection.connect(params);
-            this.connected = true;
-            this.lastActivity = Date.now();
-            this.reconnectAttempts = 0;
-            console.log(`[OLT ${this.oltId}] Connected to ${this.config.host}`);
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            try {
-                const initResult = await this.sendAndWait('screen-length 0 temporary', 15000);
-                console.log(`[OLT ${this.oltId}] Init success, prompt detected`);
-            } catch (e) {
-                console.log(`[OLT ${this.oltId}] Init warning: ${e.message}`);
+            this.socket.connect(this.config.port || 23, this.config.host, () => {
+                clearTimeout(timeout);
+                console.log(`[OLT ${this.oltId}] TCP connected to ${this.config.host}`);
+            });
+
+            this.socket.on('data', (data) => {
+                const chunk = data.toString();
+                this.buffer += chunk;
+                
+                // Notify all listeners
+                this.dataListeners.forEach(listener => listener(chunk));
+                
+                // Handle login sequence
+                if (!this.connected) {
+                    this.handleLoginSequence();
+                }
+            });
+
+            this.socket.on('error', (err) => {
+                console.error(`[OLT ${this.oltId}] Socket error:`, err.message);
+                this.connected = false;
+            });
+
+            this.socket.on('close', () => {
+                console.log(`[OLT ${this.oltId}] Socket closed`);
+                this.connected = false;
+            });
+
+            // Wait for login to complete
+            const loginCheck = setInterval(() => {
+                if (this.connected) {
+                    clearInterval(loginCheck);
+                    clearTimeout(timeout);
+                    this.reconnectAttempts = 0;
+                    resolve(true);
+                }
+            }, 500);
+
+            setTimeout(() => {
+                clearInterval(loginCheck);
+                if (!this.connected) {
+                    reject(new Error('Login timeout'));
+                }
+            }, 30000);
+        });
+    }
+
+    handleLoginSequence() {
+        const buf = this.buffer.toLowerCase();
+        
+        // Check for username prompt
+        if (buf.includes('user name:') || buf.includes('username:') || buf.includes('login:')) {
+            if (!this.sentUsername) {
+                this.sentUsername = true;
+                this.socket.write(this.config.username + '\r\n');
+                console.log(`[OLT ${this.oltId}] Sent username`);
             }
-            
-            return true;
-        } catch (error) {
-            console.error(`[OLT ${this.oltId}] Connection failed:`, error.message);
-            this.connected = false;
-            throw error;
+        }
+        
+        // Check for password prompt
+        if (buf.includes('password:')) {
+            if (!this.sentPassword) {
+                this.sentPassword = true;
+                this.socket.write(this.config.password + '\r\n');
+                console.log(`[OLT ${this.oltId}] Sent password`);
+            }
+        }
+        
+        // Check if we're logged in (prompt detected)
+        if (this.promptPattern.test(this.buffer)) {
+            if (!this.connected) {
+                this.connected = true;
+                this.lastActivity = Date.now();
+                console.log(`[OLT ${this.oltId}] Login successful`);
+                
+                // Disable paging
+                setTimeout(() => {
+                    this.sendCommand('screen-length 0 temporary').catch(() => {});
+                }, 500);
+            }
         }
     }
 
-    async sendAndWait(command, timeout = 60000) {
-        return new Promise(async (resolve, reject) => {
-            if (!this.connection) {
-                return reject(new Error('No connection'));
+    async sendCommand(command, timeout = 60000) {
+        return new Promise((resolve, reject) => {
+            if (!this.socket || !this.connected) {
+                return reject(new Error('Not connected'));
             }
 
             let response = '';
-            let timeoutId = null;
             let resolved = false;
-
-            const cleanup = () => {
-                if (timeoutId) clearTimeout(timeoutId);
-                try {
-                    this.connection.removeListener('data', dataHandler);
-                } catch (e) {}
-            };
-
-            const dataHandler = (data) => {
-                const chunk = data.toString();
+            let timeoutId = null;
+            
+            const startMarker = `__CMD_START_${Date.now()}__`;
+            
+            const dataHandler = (chunk) => {
                 response += chunk;
                 
-                if (response.includes('---- More') || response.includes('--More--')) {
-                    try {
-                        this.connection.send(' ');
-                    } catch (e) {}
+                // Handle pagination
+                if (response.includes('---- More') || response.includes('--More--') || response.includes('Press any key')) {
+                    this.socket.write(' ');
                     response = response.replace(/---- More.*?----/gi, '');
                     response = response.replace(/--More--/gi, '');
-                    return;
+                    response = response.replace(/Press any key.*$/gi, '');
                 }
                 
+                // Check for prompt (command complete)
                 if (this.promptPattern.test(response)) {
                     if (!resolved) {
                         resolved = true;
-                        cleanup();
+                        clearTimeout(timeoutId);
+                        this.removeDataListener(dataHandler);
                         this.lastActivity = Date.now();
                         resolve(response);
                     }
                 }
             };
 
-            this.connection.on('data', dataHandler);
+            this.addDataListener(dataHandler);
 
             timeoutId = setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
-                    cleanup();
-                    console.log(`[OLT ${this.oltId}] Timeout response (${response.length} bytes): ${response.slice(-200)}`);
-                    if (response.length > 0) {
+                    this.removeDataListener(dataHandler);
+                    console.log(`[OLT ${this.oltId}] Command timeout, got ${response.length} bytes`);
+                    console.log(`[OLT ${this.oltId}] Last 300 chars: ${response.slice(-300).replace(/\r?\n/g, '\\n')}`);
+                    
+                    // Return what we have even on timeout
+                    if (response.length > 50) {
                         resolve(response);
                     } else {
-                        reject(new Error('Command timeout - no response'));
+                        reject(new Error('Command timeout'));
                     }
                 }
             }, timeout);
 
-            try {
-                await this.connection.send(command);
-            } catch (error) {
-                cleanup();
-                reject(error);
-            }
+            // Clear buffer and send command
+            this.buffer = '';
+            response = '';
+            this.socket.write(command + '\r\n');
         });
     }
 
+    addDataListener(handler) {
+        this.dataListeners.push(handler);
+    }
+
+    removeDataListener(handler) {
+        this.dataListeners = this.dataListeners.filter(h => h !== handler);
+    }
+
     async disconnect() {
-        if (this.connection && this.connected) {
+        if (this.socket) {
             try {
-                await this.connection.end();
-            } catch (error) {
-                // Ignore disconnect errors
-            }
+                this.socket.destroy();
+            } catch (e) {}
         }
-        
+        this.socket = null;
         this.connected = false;
-        this.connection = null;
+        this.sentUsername = false;
+        this.sentPassword = false;
+        this.buffer = '';
         console.log(`[OLT ${this.oltId}] Disconnected`);
     }
 
     async reconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             this.reconnectAttempts = 0;
-            throw new Error(`Max reconnect attempts (${this.maxReconnectAttempts}) reached`);
+            throw new Error('Max reconnect attempts reached');
         }
         
         this.reconnectAttempts++;
@@ -148,24 +203,21 @@ class OLTSession {
         await this.connect();
     }
 
-    async executeRaw(command, options = {}) {
-        if (!this.connected || !this.connection) {
+    async execute(command, options = {}) {
+        if (!this.connected || !this.socket) {
             await this.reconnect();
         }
 
         const timeout = options.timeout || 60000;
         
         try {
-            const result = await this.sendAndWait(command, timeout);
-            this.reconnectAttempts = 0;
-            return result;
+            return await this.sendCommand(command, timeout);
         } catch (error) {
             console.error(`[OLT ${this.oltId}] Command failed:`, error.message);
-            this.connected = false;
             
             try {
                 await this.reconnect();
-                return await this.sendAndWait(command, timeout);
+                return await this.sendCommand(command, timeout);
             } catch (retryError) {
                 throw retryError;
             }
@@ -213,15 +265,16 @@ class OLTSessionManager {
         
         const interval = setInterval(async () => {
             const session = this.sessions.get(oltId);
-            if (session && session.connected) {
+            if (session && session.connected && session.socket) {
                 try {
-                    await session.sendAndWait('', 5000);
+                    session.socket.write('\r\n');
+                    session.lastActivity = Date.now();
                 } catch (error) {
                     console.error(`[OLT ${oltId}] Keepalive failed`);
                     session.connected = false;
                 }
             }
-        }, 50000);
+        }, 45000);
         
         this.keepaliveIntervals.set(oltId, interval);
     }
@@ -257,6 +310,7 @@ class OLTSessionManager {
             throw new Error(`No session for OLT ${oltId}. Connect first.`);
         }
 
+        // Use command lock to serialize commands per OLT
         if (!this.commandLocks.has(oltId)) {
             this.commandLocks.set(oltId, Promise.resolve());
         }
@@ -264,7 +318,7 @@ class OLTSessionManager {
         const currentLock = this.commandLocks.get(oltId);
         
         const executionPromise = currentLock.then(async () => {
-            return await session.executeRaw(command, options);
+            return await session.execute(command, options);
         });
 
         this.commandLocks.set(oltId, executionPromise.catch(() => {}));
