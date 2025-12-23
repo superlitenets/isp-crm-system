@@ -13,12 +13,20 @@ class DiscoveryWorker {
         this.cronJob = null;
     }
 
-    start(schedule = '*/5 * * * *') {
+    start(schedule = '*/30 * * * * *') {
         console.log(`[Discovery] Starting scheduled discovery worker (${schedule})`);
-        this.cronJob = cron.schedule(schedule, () => {
-            this.runDiscovery();
-        });
-        setTimeout(() => this.runDiscovery(), 10000);
+        
+        if (schedule.split(' ').length === 6) {
+            this.cronJob = cron.schedule(schedule, () => {
+                this.runDiscovery();
+            }, { scheduled: true });
+        } else {
+            this.cronJob = cron.schedule(schedule, () => {
+                this.runDiscovery();
+            });
+        }
+        
+        setTimeout(() => this.runDiscovery(), 5000);
     }
 
     stop() {

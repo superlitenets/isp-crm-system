@@ -113,11 +113,15 @@ app.get('/snmp/status', async (req, res) => {
 });
 
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
+const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '*/30 * * * * *';
+const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
-    discoveryWorker.start('* * * * *');
-    snmpWorker.start(30);
-    console.log('[SNMP] Background polling started (every 30s)');
+    discoveryWorker.start(DISCOVERY_INTERVAL);
+    snmpWorker.start(SNMP_INTERVAL);
+    console.log(`[Discovery] Auto-discovery started (${DISCOVERY_INTERVAL})`);
+    console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s)`);
 });
 
 process.on('SIGTERM', async () => {
