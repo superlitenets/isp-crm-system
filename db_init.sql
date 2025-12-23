@@ -2412,7 +2412,8 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('genieacs_username', ''),
 ('genieacs_password', ''),
 ('genieacs_timeout', '30'),
-('genieacs_enabled', '0')
+('genieacs_enabled', '0'),
+('wa_provisioning_group', '')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- ============================================================================

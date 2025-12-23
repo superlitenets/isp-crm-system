@@ -35,18 +35,19 @@ try {
     
     if ($type === 'new_onu_discovery') {
         $template = $settings->get('wa_template_oms_new_onu', 
-            "*🆕 New ONU Discovery*\n\nOLT: {olt_name}\nBranch: {branch_name}\n\nFound {onu_count} unconfigured ONU(s):\n{onu_list}\n\nDiscovered at: {discovery_time}"
+            "*🆕 New ONU Discovery*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\nFound {onu_count} unconfigured ONU(s):\n{onu_list}\n\nDiscovered at: {discovery_time}"
         );
         
         $oltName = $discoveries[0]['olt_name'] ?? 'Unknown';
-        $branchName = $discoveries[0]['branch_name'] ?? 'Unknown';
+        $branchName = $discoveries[0]['branch_name'] ?? 'Unassigned';
         $branchCode = $discoveries[0]['branch_code'] ?? '';
         $oltIp = $discoveries[0]['olt_ip'] ?? '';
         
         $onuList = [];
         $onuSerials = [];
         foreach ($discoveries as $d) {
-            $onuList[] = "• SN: {$d['serial_number']} @ {$d['frame_slot_port']}";
+            $eqid = !empty($d['equipment_id']) ? " ({$d['equipment_id']})" : '';
+            $onuList[] = "• SN: {$d['serial_number']}{$eqid} @ {$d['frame_slot_port']}";
             $onuSerials[] = $d['serial_number'];
         }
         

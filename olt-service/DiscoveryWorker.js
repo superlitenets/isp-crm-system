@@ -277,6 +277,18 @@ class DiscoveryWorker {
         }
     }
 
+    async getProvisioningGroup() {
+        try {
+            const result = await this.pool.query(`
+                SELECT setting_value FROM settings WHERE setting_key = 'wa_provisioning_group'
+            `);
+            return result.rows[0]?.setting_value || null;
+        } catch (error) {
+            console.error('[Discovery] Error getting provisioning group:', error.message);
+            return null;
+        }
+    }
+
     async sendPendingNotifications() {
         const result = await this.pool.query(`
             SELECT d.*, o.name as olt_name, o.ip_address as olt_ip, 
@@ -292,48 +304,44 @@ class DiscoveryWorker {
             return;
         }
 
-        console.log(`[Discovery] Sending ${result.rows.length} notifications...`);
+        console.log(`[Discovery] Sending ${result.rows.length} new ONU notifications...`);
 
-        const grouped = {};
-        for (const row of result.rows) {
-            const key = row.whatsapp_group || 'default';
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(row);
+        const provisioningGroup = await this.getProvisioningGroup();
+        
+        if (!provisioningGroup) {
+            console.log('[Discovery] No provisioning group configured (set wa_provisioning_group in settings)');
+            return;
         }
 
-        for (const [groupId, discoveries] of Object.entries(grouped)) {
-            if (groupId === 'default' || !groupId) {
-                console.log(`[Discovery] Skipping ${discoveries.length} ONUs - no WhatsApp group configured (will retry when branch is linked)`);
-                continue;
-            }
+        const discoveries = result.rows.map(d => ({
+            id: d.id,
+            olt_name: d.olt_name,
+            olt_ip: d.olt_ip,
+            branch_name: d.branch_name || 'Unassigned',
+            branch_code: d.branch_code || '',
+            serial_number: d.serial_number,
+            frame_slot_port: d.frame_slot_port,
+            equipment_id: d.equipment_id,
+            first_seen_at: d.first_seen_at
+        }));
 
-            try {
-                const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
-                    type: 'new_onu_discovery',
-                    group_id: groupId,
-                    discoveries: discoveries.map(d => ({
-                        id: d.id,
-                        olt_name: d.olt_name,
-                        olt_ip: d.olt_ip,
-                        branch_name: d.branch_name,
-                        branch_code: d.branch_code,
-                        serial_number: d.serial_number,
-                        frame_slot_port: d.frame_slot_port,
-                        first_seen_at: d.first_seen_at
-                    }))
-                });
+        try {
+            const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+                type: 'new_onu_discovery',
+                group_id: provisioningGroup,
+                discoveries: discoveries
+            });
 
-                if (response.data && response.data.success) {
-                    for (const d of discoveries) {
-                        await this.markNotified(d.id, true);
-                    }
-                    console.log(`[Discovery] Notified group ${groupId} about ${discoveries.length} ONUs`);
-                } else {
-                    console.error(`[Discovery] PHP API returned failure for group ${groupId}:`, response.data?.error || 'Unknown error');
+            if (response.data && response.data.success) {
+                for (const d of result.rows) {
+                    await this.markNotified(d.id, true);
                 }
-            } catch (error) {
-                console.error(`[Discovery] Failed to notify group ${groupId} (will retry next cycle):`, error.message);
+                console.log(`[Discovery] Notified provisioning group about ${discoveries.length} new ONUs`);
+            } else {
+                console.error(`[Discovery] PHP API returned failure:`, response.data?.error || 'Unknown error');
             }
+        } catch (error) {
+            console.error(`[Discovery] Failed to notify provisioning group (will retry next cycle):`, error.message);
         }
     }
 
