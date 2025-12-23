@@ -1,5 +1,4 @@
 <?php
-error_log("MPESA DASHBOARD: Template loading started");
 try {
     require_once __DIR__ . '/../src/Mpesa.php';
     $mpesa = new \App\Mpesa();

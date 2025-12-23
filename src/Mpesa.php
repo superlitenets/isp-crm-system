@@ -1087,8 +1087,8 @@ class Mpesa {
         $stmt = $this->db->query("
             SELECT 
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE result_type = 'Completed') as success,
-                COALESCE(SUM(trans_amount) FILTER (WHERE result_type = 'Completed'), 0) as total_amount
+                COUNT(*) FILTER (WHERE status = 'completed' OR status = 'success') as success,
+                COALESCE(SUM(trans_amount) FILTER (WHERE status = 'completed' OR status = 'success'), 0) as total_amount
             FROM mpesa_c2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         ");
         $stats['c2b'] = $stmt->fetch(PDO::FETCH_ASSOC);
