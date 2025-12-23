@@ -717,4 +717,473 @@ class Mpesa {
     public function getConfirmationUrl(): string {
         return $this->confirmationUrl;
     }
+    
+    // ==================== B2C (Business to Customer) ====================
+    
+    private function getSecurityCredential(): string {
+        $initiatorPassword = $this->getConfigValue('mpesa_b2c_initiator_password') ?? '';
+        
+        $certPath = $this->isSandbox 
+            ? __DIR__ . '/../config/mpesa_sandbox_cert.cer'
+            : __DIR__ . '/../config/mpesa_production_cert.cer';
+        
+        if (!file_exists($certPath)) {
+            $certContent = $this->isSandbox
+                ? file_get_contents('https://developer.safaricom.co.ke/api-documentation/api-portal-docs/media/cert/SandboxCertificate.cer')
+                : '';
+            if ($certContent) {
+                @file_put_contents($certPath, $certContent);
+            }
+        }
+        
+        if (file_exists($certPath)) {
+            $cert = file_get_contents($certPath);
+            $publicKey = openssl_pkey_get_public($cert);
+            if ($publicKey) {
+                openssl_public_encrypt($initiatorPassword, $encrypted, $publicKey, OPENSSL_PKCS1_PADDING);
+                return base64_encode($encrypted);
+            }
+        }
+        
+        return $this->getConfigValue('mpesa_b2c_security_credential') ?? '';
+    }
+    
+    public function b2cPayment(
+        string $phone, 
+        float $amount, 
+        string $commandId = 'BusinessPayment',
+        string $remarks = 'Payment',
+        string $occasion = '',
+        string $purpose = 'manual',
+        ?int $linkedId = null,
+        ?string $linkedType = null,
+        ?int $userId = null
+    ): array {
+        $accessToken = $this->getAccessToken();
+        if (!$accessToken) {
+            return ['success' => false, 'message' => 'Failed to get access token'];
+        }
+        
+        $phone = $this->formatPhoneNumber($phone);
+        if (!$phone) {
+            return ['success' => false, 'message' => 'Invalid phone number'];
+        }
+        
+        $b2cShortcode = $this->getConfigValue('mpesa_b2c_shortcode') ?: $this->shortcode;
+        $initiatorName = $this->getConfigValue('mpesa_b2c_initiator_name') ?? 'testapi';
+        $securityCredential = $this->getSecurityCredential();
+        
+        if (empty($securityCredential)) {
+            return ['success' => false, 'message' => 'B2C security credential not configured'];
+        }
+        
+        $domain = $_SERVER['HTTP_HOST'] ?? '';
+        $b2cCallbackUrl = $this->getConfigValue('mpesa_b2c_callback_url') ?: "https://{$domain}/api/mpesa-b2c-callback.php";
+        $b2cTimeoutUrl = $this->getConfigValue('mpesa_b2c_timeout_url') ?: "https://{$domain}/api/mpesa-b2c-timeout.php";
+        
+        $requestId = 'B2C' . time() . rand(1000, 9999);
+        
+        $data = [
+            'InitiatorName' => $initiatorName,
+            'SecurityCredential' => $securityCredential,
+            'CommandID' => $commandId,
+            'Amount' => (int)$amount,
+            'PartyA' => $b2cShortcode,
+            'PartyB' => $phone,
+            'Remarks' => substr($remarks, 0, 100),
+            'QueueTimeOutURL' => $b2cTimeoutUrl,
+            'ResultURL' => $b2cCallbackUrl,
+            'Occasion' => substr($occasion, 0, 100)
+        ];
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO mpesa_b2c_transactions 
+            (request_id, shortcode, initiator_name, phone, amount, command_id, purpose, remarks, occasion, linked_type, linked_id, initiated_by, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ");
+        $stmt->execute([$requestId, $b2cShortcode, $initiatorName, $phone, $amount, $commandId, $purpose, $remarks, $occasion, $linkedType, $linkedId, $userId]);
+        $transactionId = $this->db->lastInsertId();
+        
+        $url = "{$this->baseUrl}/mpesa/b2c/v1/paymentrequest";
+        
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_HTTPHEADER => [
+                'Content-Type:application/json',
+                'Authorization:Bearer ' . $accessToken
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_TIMEOUT => 60
+        ]);
+        
+        $result = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        
+        $response = json_decode($result, true);
+        
+        if ($httpCode === 200 && isset($response['ConversationID'])) {
+            $stmt = $this->db->prepare("
+                UPDATE mpesa_b2c_transactions 
+                SET conversation_id = ?, originator_conversation_id = ?, status = 'queued', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$response['ConversationID'], $response['OriginatorConversationID'] ?? '', $transactionId]);
+            
+            return [
+                'success' => true,
+                'message' => 'B2C request submitted',
+                'transaction_id' => $transactionId,
+                'conversation_id' => $response['ConversationID']
+            ];
+        }
+        
+        $errorMsg = $response['errorMessage'] ?? $response['ResultDesc'] ?? 'B2C request failed';
+        $stmt = $this->db->prepare("UPDATE mpesa_b2c_transactions SET status = 'failed', result_desc = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$errorMsg, $transactionId]);
+        
+        return ['success' => false, 'message' => $errorMsg, 'response' => $response];
+    }
+    
+    public function handleB2CCallback(array $data): bool {
+        try {
+            $result = $data['Result'] ?? [];
+            $conversationId = $result['ConversationID'] ?? '';
+            $originatorConversationId = $result['OriginatorConversationID'] ?? '';
+            $resultCode = $result['ResultCode'] ?? '';
+            $resultDesc = $result['ResultDesc'] ?? '';
+            
+            $stmt = $this->db->prepare("SELECT id FROM mpesa_b2c_transactions WHERE conversation_id = ? OR originator_conversation_id = ?");
+            $stmt->execute([$conversationId, $originatorConversationId]);
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$transaction) {
+                error_log("B2C callback: Transaction not found for conversation_id: $conversationId");
+                return false;
+            }
+            
+            $status = $resultCode == '0' ? 'success' : 'failed';
+            $transactionReceipt = '';
+            $receiverName = '';
+            $utilityBalance = null;
+            $workingBalance = null;
+            
+            if (isset($result['ResultParameters']['ResultParameter'])) {
+                foreach ($result['ResultParameters']['ResultParameter'] as $param) {
+                    $key = $param['Key'] ?? '';
+                    $value = $param['Value'] ?? '';
+                    switch ($key) {
+                        case 'TransactionReceipt': $transactionReceipt = $value; break;
+                        case 'ReceiverPartyPublicName': $receiverName = $value; break;
+                        case 'B2CUtilityAccountAvailableFunds': $utilityBalance = $value; break;
+                        case 'B2CWorkingAccountAvailableFunds': $workingBalance = $value; break;
+                    }
+                }
+            }
+            
+            $stmt = $this->db->prepare("
+                UPDATE mpesa_b2c_transactions SET
+                    status = ?,
+                    result_code = ?,
+                    result_desc = ?,
+                    transaction_receipt = ?,
+                    receiver_party_public_name = ?,
+                    b2c_utility_account_balance = ?,
+                    b2c_working_account_balance = ?,
+                    callback_payload = ?,
+                    updated_at = CURRENT_TIMESTAMP,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $status, $resultCode, $resultDesc, $transactionReceipt, $receiverName,
+                $utilityBalance, $workingBalance, json_encode($data), $transaction['id']
+            ]);
+            
+            if ($status === 'success') {
+                $stmt = $this->db->prepare("SELECT linked_type, linked_id FROM mpesa_b2c_transactions WHERE id = ?");
+                $stmt->execute([$transaction['id']]);
+                $tx = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($tx['linked_type'] === 'salary_advance' && $tx['linked_id']) {
+                    $stmt = $this->db->prepare("UPDATE salary_advances SET disbursement_status = 'disbursed', disbursed_at = CURRENT_TIMESTAMP WHERE id = ?");
+                    $stmt->execute([$tx['linked_id']]);
+                }
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            error_log("B2C callback error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // ==================== B2B (Business to Business) ====================
+    
+    public function b2bPayment(
+        string $receiverShortcode,
+        float $amount,
+        string $accountRef = '',
+        string $commandId = 'BusinessPayBill',
+        string $remarks = 'Payment',
+        string $receiverType = '4',
+        ?string $linkedType = null,
+        ?int $linkedId = null,
+        ?int $userId = null
+    ): array {
+        $accessToken = $this->getAccessToken();
+        if (!$accessToken) {
+            return ['success' => false, 'message' => 'Failed to get access token'];
+        }
+        
+        $senderShortcode = $this->getConfigValue('mpesa_b2b_shortcode') ?: $this->shortcode;
+        $initiatorName = $this->getConfigValue('mpesa_b2b_initiator_name') ?: $this->getConfigValue('mpesa_b2c_initiator_name') ?? 'testapi';
+        $securityCredential = $this->getSecurityCredential();
+        
+        if (empty($securityCredential)) {
+            return ['success' => false, 'message' => 'B2B security credential not configured'];
+        }
+        
+        $domain = $_SERVER['HTTP_HOST'] ?? '';
+        $b2bCallbackUrl = $this->getConfigValue('mpesa_b2b_callback_url') ?: "https://{$domain}/api/mpesa-b2b-callback.php";
+        $b2bTimeoutUrl = $this->getConfigValue('mpesa_b2b_timeout_url') ?: "https://{$domain}/api/mpesa-b2b-timeout.php";
+        
+        $requestId = 'B2B' . time() . rand(1000, 9999);
+        
+        $data = [
+            'Initiator' => $initiatorName,
+            'SecurityCredential' => $securityCredential,
+            'CommandID' => $commandId,
+            'SenderIdentifierType' => '4',
+            'RecieverIdentifierType' => $receiverType,
+            'Amount' => (int)$amount,
+            'PartyA' => $senderShortcode,
+            'PartyB' => $receiverShortcode,
+            'AccountReference' => substr($accountRef, 0, 20),
+            'Remarks' => substr($remarks, 0, 100),
+            'QueueTimeOutURL' => $b2bTimeoutUrl,
+            'ResultURL' => $b2bCallbackUrl
+        ];
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO mpesa_b2b_transactions 
+            (request_id, sender_shortcode, receiver_shortcode, receiver_type, amount, command_id, account_reference, remarks, linked_type, linked_id, initiated_by, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ");
+        $stmt->execute([$requestId, $senderShortcode, $receiverShortcode, $receiverType, $amount, $commandId, $accountRef, $remarks, $linkedType, $linkedId, $userId]);
+        $transactionId = $this->db->lastInsertId();
+        
+        $url = "{$this->baseUrl}/mpesa/b2b/v1/paymentrequest";
+        
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_HTTPHEADER => [
+                'Content-Type:application/json',
+                'Authorization:Bearer ' . $accessToken
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_TIMEOUT => 60
+        ]);
+        
+        $result = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        
+        $response = json_decode($result, true);
+        
+        if ($httpCode === 200 && isset($response['ConversationID'])) {
+            $stmt = $this->db->prepare("
+                UPDATE mpesa_b2b_transactions 
+                SET conversation_id = ?, originator_conversation_id = ?, status = 'queued', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$response['ConversationID'], $response['OriginatorConversationID'] ?? '', $transactionId]);
+            
+            return [
+                'success' => true,
+                'message' => 'B2B request submitted',
+                'transaction_id' => $transactionId,
+                'conversation_id' => $response['ConversationID']
+            ];
+        }
+        
+        $errorMsg = $response['errorMessage'] ?? $response['ResultDesc'] ?? 'B2B request failed';
+        $stmt = $this->db->prepare("UPDATE mpesa_b2b_transactions SET status = 'failed', result_desc = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$errorMsg, $transactionId]);
+        
+        return ['success' => false, 'message' => $errorMsg, 'response' => $response];
+    }
+    
+    public function handleB2BCallback(array $data): bool {
+        try {
+            $result = $data['Result'] ?? [];
+            $conversationId = $result['ConversationID'] ?? '';
+            $resultCode = $result['ResultCode'] ?? '';
+            $resultDesc = $result['ResultDesc'] ?? '';
+            
+            $stmt = $this->db->prepare("SELECT id FROM mpesa_b2b_transactions WHERE conversation_id = ?");
+            $stmt->execute([$conversationId]);
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$transaction) {
+                return false;
+            }
+            
+            $status = $resultCode == '0' ? 'success' : 'failed';
+            $transactionId = '';
+            $debitName = '';
+            $creditName = '';
+            
+            if (isset($result['ResultParameters']['ResultParameter'])) {
+                foreach ($result['ResultParameters']['ResultParameter'] as $param) {
+                    $key = $param['Key'] ?? '';
+                    $value = $param['Value'] ?? '';
+                    switch ($key) {
+                        case 'TransactionID': $transactionId = $value; break;
+                        case 'DebitPartyName': $debitName = $value; break;
+                        case 'CreditPartyName': $creditName = $value; break;
+                    }
+                }
+            }
+            
+            $stmt = $this->db->prepare("
+                UPDATE mpesa_b2b_transactions SET
+                    status = ?, result_code = ?, result_desc = ?, transaction_id = ?,
+                    debit_party_name = ?, credit_party_name = ?, callback_payload = ?,
+                    updated_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $stmt->execute([$status, $resultCode, $resultDesc, $transactionId, $debitName, $creditName, json_encode($data), $transaction['id']]);
+            
+            return true;
+        } catch (\Exception $e) {
+            error_log("B2B callback error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // ==================== Dashboard Statistics ====================
+    
+    public function getDashboardStats(): array {
+        $stats = [];
+        
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'success') as success,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
+                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+            FROM mpesa_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ");
+        $stats['stk'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE result_type = 'Completed') as success,
+                COALESCE(SUM(trans_amount) FILTER (WHERE result_type = 'Completed'), 0) as total_amount
+            FROM mpesa_c2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ");
+        $stats['c2b'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'success') as success,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                COUNT(*) FILTER (WHERE status IN ('pending', 'queued', 'processing')) as pending,
+                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+            FROM mpesa_b2c_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ");
+        $stats['b2c'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'success') as success,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                COALESCE(SUM(amount) FILTER (WHERE status = 'success'), 0) as total_amount
+            FROM mpesa_b2b_transactions WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        ");
+        $stats['b2b'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $stats;
+    }
+    
+    public function getB2CTransactions(array $filters = [], int $limit = 50, int $offset = 0): array {
+        $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2c_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
+        $params = [];
+        
+        if (!empty($filters['status'])) {
+            $sql .= " AND t.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['purpose'])) {
+            $sql .= " AND t.purpose = ?";
+            $params[] = $filters['purpose'];
+        }
+        if (!empty($filters['phone'])) {
+            $sql .= " AND t.phone LIKE ?";
+            $params[] = '%' . $filters['phone'] . '%';
+        }
+        if (!empty($filters['date_from'])) {
+            $sql .= " AND t.created_at >= ?";
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $sql .= " AND t.created_at <= ?";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        
+        $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getB2BTransactions(array $filters = [], int $limit = 50, int $offset = 0): array {
+        $sql = "SELECT t.*, u.name as initiated_by_name FROM mpesa_b2b_transactions t LEFT JOIN users u ON t.initiated_by = u.id WHERE 1=1";
+        $params = [];
+        
+        if (!empty($filters['status'])) {
+            $sql .= " AND t.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['date_from'])) {
+            $sql .= " AND t.created_at >= ?";
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $sql .= " AND t.created_at <= ?";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        
+        $sql .= " ORDER BY t.created_at DESC LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function isB2CConfigured(): bool {
+        $initiatorName = $this->getConfigValue('mpesa_b2c_initiator_name');
+        $initiatorPassword = $this->getConfigValue('mpesa_b2c_initiator_password');
+        return !empty($initiatorName) && !empty($initiatorPassword) && $this->isConfigured();
+    }
+    
+    public function isB2BConfigured(): bool {
+        return $this->isB2CConfigured();
+    }
 }
