@@ -81,22 +81,34 @@ class OLTSession {
             await this.reconnect();
         }
 
-        const timeout = options.timeout || 30000;
+        const timeout = options.timeout || 60000;
         
         try {
             this.lastActivity = Date.now();
             const result = await this.connection.exec(command, {
                 timeout: timeout,
-                execTimeout: timeout
+                execTimeout: timeout,
+                shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/
             });
             return result;
         } catch (error) {
             console.error(`[OLT ${this.oltId}] Command failed:`, error.message);
             
-            if (error.message.includes('socket') || error.message.includes('timeout') || error.message.includes('end')) {
+            if (error.message.includes('socket') || 
+                error.message.includes('timeout') || 
+                error.message.includes('end') ||
+                error.message.includes('response not received')) {
                 this.connected = false;
-                await this.reconnect();
-                return await this.connection.exec(command, { timeout: timeout });
+                try {
+                    await this.reconnect();
+                    return await this.connection.exec(command, { 
+                        timeout: timeout,
+                        execTimeout: timeout,
+                        shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/
+                    });
+                } catch (retryError) {
+                    throw retryError;
+                }
             }
             
             throw error;
@@ -147,13 +159,13 @@ class OLTSessionManager {
             const session = this.sessions.get(oltId);
             if (session && session.connected) {
                 try {
-                    await this.execute(oltId, '');
-                    console.log(`[OLT ${oltId}] Keepalive sent`);
+                    await session.executeRaw('\n', { timeout: 10000 });
                 } catch (error) {
                     console.error(`[OLT ${oltId}] Keepalive failed:`, error.message);
+                    session.connected = false;
                 }
             }
-        }, 60000);
+        }, 45000);
         
         this.keepaliveIntervals.set(oltId, interval);
     }
