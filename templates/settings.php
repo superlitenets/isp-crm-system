@@ -1551,9 +1551,10 @@ function renderOperationsGroupList() {
     
     let html = '<div class="list-group">';
     cachedGroups.forEach(g => {
+        const groupName = g.name || g.subject || 'Unknown Group';
         const selected = g.id === currentValue ? 'active' : '';
-        html += `<a href="#" class="list-group-item list-group-item-action ${selected}" onclick="selectOperationsGroupItem('${g.id}', '${g.name.replace(/'/g, "\\'")}'); return false;">
-            <i class="bi bi-people me-2"></i> ${g.name}
+        html += `<a href="#" class="list-group-item list-group-item-action ${selected}" onclick="selectOperationsGroupItem('${g.id}', '${groupName.replace(/'/g, "\\'")}'); return false;">
+            <i class="bi bi-people me-2"></i> ${groupName}
             <small class="text-muted d-block">${g.id}</small>
         </a>`;
     });
@@ -1597,8 +1598,9 @@ function renderGroupSelectList() {
     
     let html = '';
     cachedGroups.forEach(g => {
-        html += `<button type="button" class="list-group-item list-group-item-action" onclick="selectGroup('${g.id}', '${g.name.replace(/'/g, "\\'")}')">
-            <strong>${g.name}</strong> <small class="text-muted">(${g.participantsCount || '?'} members)</small>
+        const groupName = g.name || g.subject || 'Unknown Group';
+        html += `<button type="button" class="list-group-item list-group-item-action" onclick="selectGroup('${g.id}', '${groupName.replace(/'/g, "\\'")}')">
+            <strong>${groupName}</strong> <small class="text-muted">(${g.participantsCount || '?'} members)</small>
         </button>`;
     });
     listContainer.innerHTML = html;
