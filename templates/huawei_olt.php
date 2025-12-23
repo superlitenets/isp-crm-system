@@ -1793,62 +1793,220 @@ try {
             <?php endif; ?>
             
             <?php if ($view === 'dashboard'): ?>
+            <?php
+            // Calculate additional statistics
+            $totalOnus = $stats['online_onus'] + $stats['offline_onus'] + $stats['los_onus'];
+            $uptimePercent = $totalOnus > 0 ? round(($stats['online_onus'] / $totalOnus) * 100, 1) : 0;
+            $onusByOltDashboard = $huaweiOLT->getONUsByOLT();
+            ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
-                <button class="btn btn-outline-primary" onclick="location.reload()">
-                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                </button>
+                <div>
+                    <h4 class="page-title mb-1"><i class="bi bi-speedometer2"></i> Network Dashboard</h4>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted small">Last updated: <?= date('M j, Y H:i:s') ?></span>
+                        <span class="live-indicator"><span class="live-dot"></span> Live</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-warning">
+                        <i class="bi bi-hourglass-split me-1"></i> Pending (<?= $stats['unconfigured_onus'] ?>)
+                    </a>
+                    <button class="btn btn-outline-primary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                </div>
             </div>
             
+            <!-- Primary Stats Row -->
             <div class="row g-4 mb-4">
                 <div class="col-md-3">
-                    <div class="card stat-card shadow-sm">
-                        <div class="card-body d-flex align-items-center">
-                            <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
-                                <i class="bi bi-hdd-rack fs-4"></i>
+                    <div class="card stat-card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-hdd-rack fs-4"></i>
+                                </div>
+                                <span class="badge bg-primary"><?= $stats['active_olts'] ?> Active</span>
                             </div>
-                            <div>
-                                <div class="text-muted small">Total OLTs</div>
-                                <div class="fs-4 fw-bold"><?= $stats['active_olts'] ?>/<?= $stats['total_olts'] ?></div>
+                            <div class="stat-value"><?= $stats['total_olts'] ?></div>
+                            <div class="stat-label">Total OLT Devices</div>
+                            <div class="progress mt-3" style="height: 6px;">
+                                <div class="progress-bar bg-primary" style="width: <?= $stats['total_olts'] > 0 ? ($stats['active_olts'] / $stats['total_olts'] * 100) : 0 ?>%"></div>
+                            </div>
+                            <small class="text-muted"><?= $stats['total_olts'] - $stats['active_olts'] ?> inactive</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card stat-success shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                                    <i class="bi bi-wifi fs-4"></i>
+                                </div>
+                                <span class="badge bg-success"><?= $uptimePercent ?>% Uptime</span>
+                            </div>
+                            <div class="stat-value text-success"><?= number_format($stats['online_onus']) ?></div>
+                            <div class="stat-label">Online ONUs</div>
+                            <div class="progress mt-3" style="height: 6px;">
+                                <div class="progress-bar bg-success" style="width: <?= $uptimePercent ?>%"></div>
+                            </div>
+                            <small class="text-muted">of <?= number_format($totalOnus) ?> total authorized</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card stat-danger shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="stat-icon bg-danger bg-opacity-10 text-danger">
+                                    <i class="bi bi-exclamation-triangle fs-4"></i>
+                                </div>
+                                <?php if ($stats['los_onus'] > 0): ?>
+                                <span class="badge bg-danger badge-pulse"><?= $stats['los_onus'] ?> LOS</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="stat-value text-danger"><?= $stats['offline_onus'] + $stats['los_onus'] ?></div>
+                            <div class="stat-label">Problem ONUs</div>
+                            <div class="d-flex gap-3 mt-3">
+                                <div>
+                                    <span class="text-danger fw-bold"><?= $stats['los_onus'] ?></span>
+                                    <small class="text-muted d-block">LOS</small>
+                                </div>
+                                <div>
+                                    <span class="text-secondary fw-bold"><?= $stats['offline_onus'] ?></span>
+                                    <small class="text-muted d-block">Offline</small>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card stat-card shadow-sm">
-                        <div class="card-body d-flex align-items-center">
-                            <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
-                                <i class="bi bi-wifi fs-4"></i>
+                    <div class="card stat-card stat-warning shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                                    <i class="bi bi-hourglass-split fs-4"></i>
+                                </div>
+                                <?php if ($stats['unconfigured_onus'] > 0): ?>
+                                <span class="badge bg-warning text-dark badge-pulse">New!</span>
+                                <?php endif; ?>
                             </div>
-                            <div>
-                                <div class="text-muted small">Online ONUs</div>
-                                <div class="fs-4 fw-bold text-success"><?= $stats['online_onus'] ?></div>
-                            </div>
+                            <div class="stat-value text-warning"><?= $stats['unconfigured_onus'] ?></div>
+                            <div class="stat-label">Pending Authorization</div>
+                            <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-sm btn-warning w-100 mt-3">
+                                <i class="bi bi-arrow-right me-1"></i> Authorize Now
+                            </a>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card stat-card shadow-sm">
-                        <div class="card-body d-flex align-items-center">
-                            <div class="stat-icon bg-danger bg-opacity-10 text-danger me-3">
-                                <i class="bi bi-wifi-off fs-4"></i>
+            </div>
+            
+            <!-- Secondary Stats Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-md-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>ONU Distribution by OLT</h6>
+                            <small class="text-muted">Real-time status</small>
+                        </div>
+                        <div class="card-body">
+                            <?php if (empty($onusByOltDashboard)): ?>
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                No OLT data available
                             </div>
-                            <div>
-                                <div class="text-muted small">Offline / LOS</div>
-                                <div class="fs-4 fw-bold text-danger"><?= $stats['offline_onus'] + $stats['los_onus'] ?></div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>OLT</th>
+                                            <th class="text-center">Total</th>
+                                            <th class="text-center">Online</th>
+                                            <th class="text-center">Offline</th>
+                                            <th>Distribution</th>
+                                            <th class="text-end">Health</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($onusByOltDashboard as $oltData): 
+                                            $oltTotal = $oltData['onu_count'] ?? 0;
+                                            $oltOnline = $oltData['online'] ?? 0;
+                                            $oltOffline = $oltData['offline'] ?? 0;
+                                            $oltHealth = $oltTotal > 0 ? round(($oltOnline / $oltTotal) * 100) : 0;
+                                            $healthClass = $oltHealth >= 90 ? 'success' : ($oltHealth >= 70 ? 'warning' : 'danger');
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <i class="bi bi-hdd-rack text-primary me-2"></i>
+                                                <strong><?= htmlspecialchars($oltData['name'] ?? 'Unknown') ?></strong>
+                                            </td>
+                                            <td class="text-center fw-bold"><?= $oltTotal ?></td>
+                                            <td class="text-center"><span class="text-success fw-bold"><?= $oltOnline ?></span></td>
+                                            <td class="text-center"><span class="text-danger fw-bold"><?= $oltOffline ?></span></td>
+                                            <td style="min-width: 150px;">
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-success" style="width: <?= $oltTotal > 0 ? ($oltOnline / $oltTotal * 100) : 0 ?>%"></div>
+                                                    <div class="progress-bar bg-danger" style="width: <?= $oltTotal > 0 ? ($oltOffline / $oltTotal * 100) : 0 ?>%"></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="badge bg-<?= $healthClass ?>"><?= $oltHealth ?>%</span>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
                             </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card stat-card shadow-sm">
-                        <div class="card-body d-flex align-items-center">
-                            <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
-                                <i class="bi bi-question-circle fs-4"></i>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Network Overview</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-center mb-4">
+                                <div class="position-relative" style="width: 140px; height: 140px;">
+                                    <svg viewBox="0 0 36 36" class="w-100 h-100" style="transform: rotate(-90deg);">
+                                        <circle cx="18" cy="18" r="16" fill="none" stroke="#e2e8f0" stroke-width="3"></circle>
+                                        <circle cx="18" cy="18" r="16" fill="none" stroke="var(--oms-success)" stroke-width="3" 
+                                                stroke-dasharray="<?= $uptimePercent ?> <?= 100 - $uptimePercent ?>" stroke-linecap="round"></circle>
+                                    </svg>
+                                    <div class="position-absolute top-50 start-50 translate-middle text-center">
+                                        <div class="fs-4 fw-bold text-success"><?= $uptimePercent ?>%</div>
+                                        <small class="text-muted">Uptime</small>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <div class="text-muted small">Pending Auth</div>
-                                <div class="fs-4 fw-bold text-warning"><?= $stats['unconfigured_onus'] ?></div>
+                            <div class="row text-center g-2">
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(16, 185, 129, 0.1);">
+                                        <div class="fs-5 fw-bold text-success"><?= number_format($stats['online_onus']) ?></div>
+                                        <small class="text-muted">Online</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.1);">
+                                        <div class="fs-5 fw-bold text-danger"><?= $stats['offline_onus'] + $stats['los_onus'] ?></div>
+                                        <small class="text-muted">Offline/LOS</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                                        <div class="fs-5 fw-bold text-primary"><?= number_format($totalOnus) ?></div>
+                                        <small class="text-muted">Authorized</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(245, 158, 11, 0.1);">
+                                        <div class="fs-5 fw-bold text-warning"><?= $stats['unconfigured_onus'] ?></div>
+                                        <small class="text-muted">Pending</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
