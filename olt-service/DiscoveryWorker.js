@@ -134,6 +134,12 @@ class DiscoveryWorker {
 
                 const eqidMatch = line.match(/EQID\s*:\s*(\S+)/i);
                 if (eqidMatch) currentOnu.eqid = eqidMatch[1];
+                
+                const softwareMatch = line.match(/SoftwareVer\s*:\s*(\S+)/i);
+                if (softwareMatch) currentOnu.softwareVer = softwareMatch[1];
+                
+                const versionMatch = line.match(/OnuProductID\s*:\s*(\S+)/i) || line.match(/Version\s*:\s*(\S+)/i);
+                if (versionMatch) currentOnu.productId = versionMatch[1];
             }
         }
         if (currentOnu && currentOnu.sn) onus.push(currentOnu);
@@ -141,14 +147,56 @@ class DiscoveryWorker {
         return onus;
     }
 
+    async matchOnuType(eqid) {
+        if (!eqid) return null;
+        
+        const normalizedEqid = eqid.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        
+        const result = await this.pool.query(`
+            SELECT id, model, model_aliases 
+            FROM huawei_onu_types 
+            WHERE is_active = true
+        `);
+        
+        for (const type of result.rows) {
+            const modelNorm = (type.model || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (normalizedEqid.includes(modelNorm) && modelNorm.length >= 5) {
+                return type.id;
+            }
+            
+            if (type.model_aliases) {
+                const aliases = type.model_aliases.split(',').map(a => a.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                for (const alias of aliases) {
+                    if (alias.length >= 5 && normalizedEqid.includes(alias)) {
+                        return type.id;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
     async recordDiscovery(olt, onu) {
         try {
+            const onuTypeId = await this.matchOnuType(onu.eqid);
+            
+            if (onuTypeId) {
+                console.log(`[Discovery] Matched ${onu.sn} (${onu.eqid}) to ONU type ID ${onuTypeId}`);
+            } else if (onu.eqid) {
+                console.log(`[Discovery] No match for ${onu.sn} (${onu.eqid}) - add ONU type first`);
+            }
+            
             await this.pool.query(`
-                INSERT INTO onu_discovery_log (olt_id, serial_number, frame_slot_port, last_seen_at)
-                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                INSERT INTO onu_discovery_log (olt_id, serial_number, frame_slot_port, equipment_id, onu_type_id, last_seen_at)
+                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
                 ON CONFLICT (olt_id, serial_number) 
-                DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP, frame_slot_port = $3
-            `, [olt.id, onu.sn, onu.fsp]);
+                DO UPDATE SET 
+                    last_seen_at = CURRENT_TIMESTAMP, 
+                    frame_slot_port = $3,
+                    equipment_id = COALESCE($4, onu_discovery_log.equipment_id),
+                    onu_type_id = COALESCE($5, onu_discovery_log.onu_type_id)
+            `, [olt.id, onu.sn, onu.fsp, onu.eqid || null, onuTypeId]);
         } catch (error) {
             console.error(`[Discovery] Error recording discovery:`, error.message);
         }

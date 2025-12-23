@@ -1314,6 +1314,13 @@ $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();
 $odbs = $huaweiOLT->getODBs();
 
+// Load ONU types for authorization modal
+$onuTypes = [];
+try {
+    $stmt = $db->query("SELECT * FROM huawei_onu_types WHERE is_active = true ORDER BY model");
+    $onuTypes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+
 $currentOnu = null;
 $onuRefreshResult = null;
 if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
@@ -2693,6 +2700,7 @@ try {
                             <thead class="table-light">
                                 <tr>
                                     <th>Serial Number</th>
+                                    <th>ONU Type</th>
                                     <th>Name / Description</th>
                                     <th>OLT / Port</th>
                                     <th>Status</th>
@@ -2705,7 +2713,31 @@ try {
                             <tbody>
                                 <?php foreach ($onus as $onu): ?>
                                 <tr>
-                                    <td><code><?= htmlspecialchars($onu['sn']) ?></code></td>
+                                    <td>
+                                        <code><?= htmlspecialchars($onu['sn']) ?></code>
+                                        <?php if (!empty($onu['discovered_eqid'])): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($onu['discovered_eqid']) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $typeId = $onu['onu_type_id'] ?? $onu['discovered_onu_type_id'] ?? null;
+                                        $typeName = $onu['onu_type_model'] ?? null;
+                                        if ($typeName): ?>
+                                            <span class="badge bg-info" title="<?= htmlspecialchars($onu['onu_type_name'] ?? '') ?>">
+                                                <i class="bi bi-router me-1"></i><?= htmlspecialchars($typeName) ?>
+                                            </span>
+                                            <?php if ($onu['type_wifi']): ?>
+                                            <i class="bi bi-wifi text-success ms-1" title="WiFi"></i>
+                                            <?php endif; ?>
+                                        <?php elseif ($onu['discovered_eqid'] && !$onu['is_authorized']): ?>
+                                            <span class="badge bg-warning text-dark" title="Unknown model - add ONU type first">
+                                                <i class="bi bi-question-circle me-1"></i>Unknown
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <strong><?= htmlspecialchars($onu['name'] ?: '-') ?></strong>
                                         <?php if (!empty($onu['description'])): ?>
@@ -2768,7 +2800,12 @@ try {
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <?php if (!$onu['is_authorized']): ?>
-                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>', <?= isset($onu['slot']) && $onu['slot'] !== null ? $onu['slot'] : 'null' ?>, <?= isset($onu['port']) && $onu['port'] !== null ? $onu['port'] : 'null' ?>)" title="Authorize">
+                                            <?php 
+                                            $discoveredTypeId = $onu['discovered_onu_type_id'] ?? $onu['onu_type_id'] ?? 'null';
+                                            $discoveredEqid = htmlspecialchars($onu['discovered_eqid'] ?? '', ENT_QUOTES);
+                                            $defaultMode = htmlspecialchars($onu['type_default_mode'] ?? 'bridge', ENT_QUOTES);
+                                            ?>
+                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>', <?= isset($onu['slot']) && $onu['slot'] !== null ? $onu['slot'] : 'null' ?>, <?= isset($onu['port']) && $onu['port'] !== null ? $onu['port'] : 'null' ?>, <?= $discoveredTypeId ?>, '<?= $discoveredEqid ?>', '<?= $defaultMode ?>')" title="Authorize">
                                                 <i class="bi bi-check-circle"></i>
                                             </button>
                                             <?php else: ?>
@@ -7573,6 +7610,44 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <i class="bi bi-router me-2"></i>
                             <strong>ONU:</strong> <span id="authOnuSn"></span>
                             <span class="ms-3"><strong>Location:</strong> <span id="authOnuLocation"></span></span>
+                            <small id="authEqidDisplay" class="d-block mt-1 text-muted" style="display:none;"></small>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">ONU Type / Model</label>
+                                <select name="onu_type_id" id="authOnuType" class="form-select" onchange="updateAuthModeFromType(this)">
+                                    <option value="">-- Auto-detect / Unknown --</option>
+                                    <?php foreach ($onuTypes as $type): ?>
+                                    <option value="<?= $type['id'] ?>" 
+                                            data-eth="<?= $type['eth_ports'] ?>" 
+                                            data-pots="<?= $type['pots_ports'] ?>" 
+                                            data-wifi="<?= $type['wifi_capable'] ? '1' : '0' ?>"
+                                            data-mode="<?= htmlspecialchars($type['default_mode']) ?>">
+                                        <?= htmlspecialchars($type['model']) ?> 
+                                        (<?= $type['eth_ports'] ?>ETH<?= $type['pots_ports'] > 0 ? '+' . $type['pots_ports'] . 'POTS' : '' ?><?= $type['wifi_capable'] ? '+WiFi' : '' ?>)
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Auto-matched from discovery or select manually</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">ONU Mode</label>
+                                <div class="mt-2">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeBridge" value="bridge" checked>
+                                        <label class="form-check-label" for="authModeBridge">
+                                            <i class="bi bi-box me-1"></i>Bridge (1 ETH)
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeRouter" value="router">
+                                        <label class="form-check-label" for="authModeRouter">
+                                            <i class="bi bi-router me-1"></i>Router (Multi ETH + POTS)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <ul class="nav nav-tabs mb-3" role="tablist">
@@ -8362,11 +8437,38 @@ echo "# ================================================\n";
         new bootstrap.Modal(document.getElementById('provisionModal')).show();
     }
     
-    function authorizeOnu(id, sn, slot, port) {
+    function authorizeOnu(id, sn, slot, port, onuTypeId, eqid, defaultMode) {
         document.getElementById('authOnuId').value = id;
         document.getElementById('authOnuSn').textContent = sn;
         document.getElementById('authOnuLocation').textContent = '0/' + (slot || '-') + '/' + (port || '-');
         document.getElementById('authDescription').value = '';
+        
+        // Set ONU type if matched
+        var onuTypeSelect = document.getElementById('authOnuType');
+        if (onuTypeSelect && onuTypeId) {
+            onuTypeSelect.value = onuTypeId;
+        } else if (onuTypeSelect) {
+            onuTypeSelect.value = '';
+        }
+        
+        // Show equipment ID if detected
+        var eqidDisplay = document.getElementById('authEqidDisplay');
+        if (eqidDisplay) {
+            if (eqid) {
+                eqidDisplay.textContent = 'Detected: ' + eqid;
+                eqidDisplay.style.display = 'block';
+            } else {
+                eqidDisplay.style.display = 'none';
+            }
+        }
+        
+        // Set default mode based on ONU type
+        if (defaultMode === 'router') {
+            document.getElementById('authModeRouter').checked = true;
+        } else {
+            document.getElementById('authModeBridge').checked = true;
+        }
+        
         new bootstrap.Modal(document.getElementById('authModal')).show();
     }
     
@@ -8376,6 +8478,17 @@ echo "# ================================================\n";
             document.getElementById('macInputGroup').style.display = this.value === 'mac' ? 'block' : 'none';
         });
     });
+    
+    function updateAuthModeFromType(select) {
+        var option = select.options[select.selectedIndex];
+        if (option && option.dataset.mode) {
+            if (option.dataset.mode === 'router') {
+                document.getElementById('authModeRouter').checked = true;
+            } else {
+                document.getElementById('authModeBridge').checked = true;
+            }
+        }
+    }
     
     function rebootOnu(id) {
         if (confirm('Reboot this ONU?')) {

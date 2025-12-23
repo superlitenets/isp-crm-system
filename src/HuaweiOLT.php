@@ -2673,11 +2673,16 @@ class HuaweiOLT {
     // ==================== ONU Management ====================
     
     public function getONUs(array $filters = []): array {
-        $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name
+        $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
+                       ot.name as onu_type_name, ot.model as onu_type_model, ot.eth_ports as type_eth_ports, 
+                       ot.pots_ports as type_pots_ports, ot.wifi_capable as type_wifi, ot.default_mode as type_default_mode,
+                       dl.equipment_id as discovered_eqid, dl.onu_type_id as discovered_onu_type_id
                 FROM huawei_onus o
                 LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
                 LEFT JOIN customers c ON o.customer_id = c.id
                 LEFT JOIN huawei_service_profiles sp ON o.service_profile_id = sp.id
+                LEFT JOIN huawei_onu_types ot ON o.onu_type_id = ot.id
+                LEFT JOIN onu_discovery_log dl ON o.sn = dl.serial_number AND o.olt_id = dl.olt_id
                 WHERE 1=1";
         $params = [];
         
