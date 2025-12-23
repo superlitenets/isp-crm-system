@@ -596,4 +596,94 @@ class WireGuardService {
         $pow = min($pow, count($units) - 1);
         return round($bytes / pow(1024, $pow), 2) . ' ' . $units[$pow];
     }
+    
+    /**
+     * Test connectivity to a remote IP address via ping
+     * @param string $ip IP address to ping
+     * @param int $count Number of ping attempts
+     * @param int $timeout Timeout per ping in seconds
+     * @return array Result with success, latency, and details
+     */
+    public function testConnectivity(string $ip, int $count = 3, int $timeout = 2): array {
+        if (!\filter_var($ip, FILTER_VALIDATE_IP)) {
+            return ['success' => false, 'error' => 'Invalid IP address', 'ip' => $ip];
+        }
+        
+        $output = [];
+        $returnVar = 0;
+        
+        \exec("ping -c {$count} -W {$timeout} " . \escapeshellarg($ip) . " 2>&1", $output, $returnVar);
+        
+        $result = [
+            'success' => $returnVar === 0,
+            'ip' => $ip,
+            'output' => \implode("\n", $output),
+            'packets_sent' => $count,
+            'packets_received' => 0,
+            'latency_avg' => null,
+            'latency_min' => null,
+            'latency_max' => null
+        ];
+        
+        foreach ($output as $line) {
+            if (\preg_match('/(\d+) packets transmitted, (\d+) (?:packets )?received/', $line, $matches)) {
+                $result['packets_received'] = (int)$matches[2];
+            }
+            if (\preg_match('/min\/avg\/max.*= ([\d.]+)\/([\d.]+)\/([\d.]+)/', $line, $matches)) {
+                $result['latency_min'] = (float)$matches[1];
+                $result['latency_avg'] = (float)$matches[2];
+                $result['latency_max'] = (float)$matches[3];
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Test connectivity to all routed networks of a peer
+     * @param int $peerId Peer ID
+     * @return array Results for each network
+     */
+    public function testPeerConnectivity(int $peerId): array {
+        $peer = $this->getPeer($peerId);
+        if (!$peer) {
+            return ['success' => false, 'error' => 'Peer not found'];
+        }
+        
+        $routedNetworks = \array_filter(\array_map('trim', \explode("\n", $peer['routed_networks'] ?? '')));
+        $results = [
+            'peer_name' => $peer['name'],
+            'peer_ip' => $peer['allowed_ips'],
+            'vpn_reachable' => false,
+            'networks' => []
+        ];
+        
+        $vpnIp = \explode('/', $peer['allowed_ips'])[0];
+        $vpnTest = $this->testConnectivity($vpnIp, 2, 2);
+        $results['vpn_reachable'] = $vpnTest['success'];
+        $results['vpn_latency'] = $vpnTest['latency_avg'];
+        
+        foreach ($routedNetworks as $network) {
+            $network = \trim($network);
+            if (empty($network)) continue;
+            
+            $networkIp = \explode('/', $network)[0];
+            $parts = \explode('.', $networkIp);
+            if (\count($parts) === 4) {
+                $parts[3] = '1';
+                $testIp = \implode('.', $parts);
+                
+                $test = $this->testConnectivity($testIp, 2, 2);
+                $results['networks'][] = [
+                    'network' => $network,
+                    'test_ip' => $testIp,
+                    'reachable' => $test['success'],
+                    'latency' => $test['latency_avg'],
+                    'packets_received' => $test['packets_received']
+                ];
+            }
+        }
+        
+        return $results;
+    }
 }

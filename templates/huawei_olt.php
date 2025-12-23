@@ -55,6 +55,16 @@ if (isset($_GET['action']) && $view === 'vpn') {
             } catch (Exception $e) {}
             echo json_encode(['success' => true, 'peer' => $peer, 'subnets' => $subnets]);
             exit;
+        case 'test_peer_connectivity':
+            $peerId = (int)($_GET['peer_id'] ?? 0);
+            $results = $wgService->testPeerConnectivity($peerId);
+            echo json_encode(['success' => true, 'results' => $results]);
+            exit;
+        case 'test_ip':
+            $ip = $_GET['ip'] ?? '';
+            $results = $wgService->testConnectivity($ip, 3, 2);
+            echo json_encode($results);
+            exit;
     }
 }
 
@@ -5489,6 +5499,9 @@ try {
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-success" onclick="testPeerConnectivity(<?= $peer['id'] ?>, '<?= htmlspecialchars($peer['name']) ?>')" title="Test Connectivity">
+                                                        <i class="bi bi-wifi"></i>
+                                                    </button>
                                                     <button class="btn btn-outline-primary" onclick="viewPeerConfig(<?= $peer['id'] ?>)" title="WireGuard Config">
                                                         <i class="bi bi-download"></i>
                                                     </button>
@@ -5763,6 +5776,22 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <div class="modal fade" id="connectivityModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="connectivityModalTitle"><i class="bi bi-wifi me-2"></i>Connectivity Test</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="connectivityResults">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <script>
             document.getElementById('isOltSite').addEventListener('change', function() {
@@ -5811,6 +5840,67 @@ try {
                         } else {
                             alert(data.error || 'Failed to generate script');
                         }
+                    });
+            }
+
+            function testPeerConnectivity(peerId, peerName) {
+                document.getElementById('connectivityModalTitle').textContent = `Testing Connectivity: ${peerName}`;
+                document.getElementById('connectivityResults').innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Testing connectivity to VPN peer and routed networks...</p>
+                    </div>
+                `;
+                new bootstrap.Modal(document.getElementById('connectivityModal')).show();
+                
+                fetch(`?page=huawei-olt&view=vpn&action=test_peer_connectivity&peer_id=${peerId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            const results = data.results;
+                            let html = `<div class="mb-3">
+                                <h6><i class="bi bi-router me-2"></i>VPN Tunnel: ${results.peer_ip}</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    ${results.vpn_reachable 
+                                        ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Reachable</span>' 
+                                        : '<span class="badge bg-danger"><i class="bi bi-x-lg"></i> Unreachable</span>'}
+                                    ${results.vpn_latency ? `<span class="text-muted small">${results.vpn_latency.toFixed(1)} ms</span>` : ''}
+                                </div>
+                            </div>`;
+                            
+                            if (results.networks && results.networks.length > 0) {
+                                html += `<h6 class="mt-4"><i class="bi bi-diagram-3 me-2"></i>Routed Networks</h6>`;
+                                html += `<table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr><th>Network</th><th>Test IP</th><th>Status</th><th>Latency</th></tr>
+                                    </thead>
+                                    <tbody>`;
+                                results.networks.forEach(net => {
+                                    html += `<tr>
+                                        <td><code>${net.network}</code></td>
+                                        <td><code>${net.test_ip}</code></td>
+                                        <td>${net.reachable 
+                                            ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> OK</span>' 
+                                            : '<span class="badge bg-danger"><i class="bi bi-x-lg"></i> Failed</span>'}</td>
+                                        <td>${net.latency ? net.latency.toFixed(1) + ' ms' : '-'}</td>
+                                    </tr>`;
+                                });
+                                html += `</tbody></table>`;
+                            } else {
+                                html += `<div class="alert alert-info mt-3 mb-0"><i class="bi bi-info-circle me-2"></i>No routed networks configured for this peer.</div>`;
+                            }
+                            
+                            document.getElementById('connectivityResults').innerHTML = html;
+                        } else {
+                            document.getElementById('connectivityResults').innerHTML = `
+                                <div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>${data.error || 'Connectivity test failed'}</div>
+                            `;
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById('connectivityResults').innerHTML = `
+                            <div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Error: ${err.message}</div>
+                        `;
                     });
             }
 
