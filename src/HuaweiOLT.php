@@ -2792,8 +2792,10 @@ class HuaweiOLT {
         }
         
         if (isset($filters['is_authorized'])) {
-            $conditions .= " AND o.is_authorized = ?";
-            $params[] = $this->castBoolean($filters['is_authorized']);
+            // PostgreSQL needs string 'true'/'false' for boolean params via PDO
+            $boolVal = $this->castBoolean($filters['is_authorized']) ? 'true' : 'false';
+            $conditions .= " AND o.is_authorized = ?::boolean";
+            $params[] = $boolVal;
         }
         
         $orderBy = " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
