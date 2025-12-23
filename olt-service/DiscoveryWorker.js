@@ -146,31 +146,78 @@ class DiscoveryWorker {
         const lines = output.split('\n');
         let currentOnu = null;
 
+        // Debug: log raw output length
+        console.log(`[Discovery] Parsing autofind output (${output.length} chars)`);
+
         for (const line of lines) {
-            const fspMatch = line.match(/^\s*(\d+)\s+(\d+\/\s*\d+\/\s*\d+)/);
-            if (fspMatch) {
-                if (currentOnu) onus.push(currentOnu);
+            // Huawei format: "Number : 1" starts a new ONU record
+            const numMatch = line.match(/Number\s*:\s*(\d+)/i);
+            if (numMatch) {
+                if (currentOnu && currentOnu.sn) onus.push(currentOnu);
                 currentOnu = { 
-                    index: fspMatch[1],
-                    fsp: fspMatch[2].replace(/\s/g, '')
+                    index: numMatch[1]
                 };
+                continue;
+            }
+
+            // Alternative format: table row like "1   0/0/5   48575443-12345678"
+            const tableMatch = line.match(/^\s*(\d+)\s+(\d+\/\s*\d+\/\s*\d+)\s+(\S+)/);
+            if (tableMatch) {
+                if (currentOnu && currentOnu.sn) onus.push(currentOnu);
+                currentOnu = { 
+                    index: tableMatch[1],
+                    fsp: tableMatch[2].replace(/\s/g, ''),
+                    sn: tableMatch[3]
+                };
+                continue;
             }
 
             if (currentOnu) {
-                const snMatch = line.match(/SN\s*:\s*(\S+)/i);
-                if (snMatch) currentOnu.sn = snMatch[1];
+                // F/S/P format: "F/S/P  : 0/0/5"
+                const fspMatch = line.match(/F\/S\/P\s*:\s*(\d+\/\d+\/\d+)/i);
+                if (fspMatch) {
+                    currentOnu.fsp = fspMatch[1];
+                }
 
-                const eqidMatch = line.match(/EQID\s*:\s*(\S+)/i);
-                if (eqidMatch) currentOnu.eqid = eqidMatch[1];
+                // Serial Number: "Ont SN : 48575443-12345678" or just "SN : xxx"
+                const snMatch = line.match(/(?:Ont\s+)?SN\s*:\s*(\S+)/i);
+                if (snMatch) {
+                    currentOnu.sn = snMatch[1];
+                }
+
+                // Equipment ID: "Ont EquipmentID : HG8546M"
+                const eqidMatch = line.match(/EquipmentID\s*:\s*(\S+)/i);
+                if (eqidMatch) {
+                    currentOnu.eqid = eqidMatch[1];
+                }
                 
-                const softwareMatch = line.match(/SoftwareVer\s*:\s*(\S+)/i);
-                if (softwareMatch) currentOnu.softwareVer = softwareMatch[1];
+                // Software Version: "Ont SoftwareVersion : V5R019C10S125"
+                const softwareMatch = line.match(/SoftwareVersion\s*:\s*(\S+)/i);
+                if (softwareMatch) {
+                    currentOnu.softwareVer = softwareMatch[1];
+                }
                 
-                const versionMatch = line.match(/OnuProductID\s*:\s*(\S+)/i) || line.match(/Version\s*:\s*(\S+)/i);
-                if (versionMatch) currentOnu.productId = versionMatch[1];
+                // Version: "Ont Version : 10C7.A"
+                const versionMatch = line.match(/(?:Ont\s+)?Version\s*:\s*(\S+)/i);
+                if (versionMatch && !currentOnu.version) {
+                    currentOnu.version = versionMatch[1];
+                }
+
+                // VendorID: "VendorID : HWTC"
+                const vendorMatch = line.match(/VendorID\s*:\s*(\S+)/i);
+                if (vendorMatch) {
+                    currentOnu.vendorId = vendorMatch[1];
+                }
             }
         }
+        
+        // Don't forget the last ONU
         if (currentOnu && currentOnu.sn) onus.push(currentOnu);
+
+        console.log(`[Discovery] Parsed ${onus.length} ONUs from autofind output`);
+        if (onus.length > 0) {
+            console.log(`[Discovery] First ONU: ${JSON.stringify(onus[0])}`);
+        }
 
         return onus;
     }

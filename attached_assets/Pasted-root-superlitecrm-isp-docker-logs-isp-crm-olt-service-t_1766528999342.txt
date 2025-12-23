@@ -1,0 +1,80 @@
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service --tail 150 | grep -A 50 "G45_OLT"
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***1
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent username
+[OLT 1] Sent password
+[OLT 1] Login successful - prompt detected
+[OLT 1] Sending: "enable" (hex: 656e61626c650d0a)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 87ms - Success: 2, Failed: 0
+[OLT 2] Command timeout, got 46 bytes
+[OLT 2] Last 300 chars: config\n\nMA5683T(config)#\n\nMA5683T(config)#
+[OLT 2] Init sequence error: Command timeout
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[OLT 1] Init incomplete, proceeding anyway
+[OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Already running, skipping...
+[OLT 1] Command timeout, got 669 bytes
+[OLT 1] Last 300 chars:  : HWTC\n   Ont Version         : 10C7.A\n   Ont SoftwareVersion : V5R019C10S125\n   Ont EquipmentID     : HG8546M\n   Ont autofind time   : 2025-12-22 18:11:09+03:00\n   ----------------------------------------------------------------------------\n   The number of GPON autofind ONT is 1\n\nMA5683T#
+[OLT 1] Entered enable mode
+[OLT 1] Sending: "config" (hex: 636f6e6669670d0a)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 79ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 79ms - Success: 2, Failed: 0
+[OLT 1] Command timeout, got 697 bytes
+[OLT 1] Last 300 chars: nt SoftwareVersion : V5R019C10S125\n   Ont EquipmentID     : HG8546M\n   Ont autofind time   : 2025-12-22 18:11:09+03:00\n   ----------------------------------------------------------------------------\n   The number of GPON autofind ONT is 1\n\nMA5683T#config\n\nMA5683T(config)#\n\nMA5683T(config)#
+[Discovery] Found 0 unconfigured ONUs on G45_OLT
+[Discovery] No pending notifications
+[Discovery] Discovery cycle complete
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[OLT 1] Command timeout, got 46 bytes
+[OLT 1] Last 300 chars: config\n\nMA5683T(config)#\n\nMA5683T(config)#
+[OLT 1] Init sequence error: Command timeout
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 76ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 78ms - Success: 2, Failed: 0
+[OLT 2] Command timeout, got 138 bytes
+[OLT 2] Last 300 chars: display ont autofind all\n  Failure: The automatically found ONTs do not exist\n\nMA5683T(config)#\n\nMA5683T(config)#\n\nMA5683T(config)#
+[Discovery] Found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 82ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 79ms - Success: 2, Failed: 0
+[OLT 1] Command timeout, got 699 bytes
+[OLT 1] Last 300 chars:  SoftwareVersion : V5R019C10S125\n   Ont EquipmentID     : HG8546M\n   Ont autofind time   : 2025-12-22 18:11:09+03:00\n   ----------------------------------------------------------------------------\n   The number of GPON autofind ONT is 1\n\nMA5683T(config)#\n\nMA5683T(config)#\n\nMA5683T(config)#
+[Discovery] Found 0 unconfigured ONUs on G45_OLT
+[Discovery] No pending notifications
+[Discovery] Discovery cycle complete
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
