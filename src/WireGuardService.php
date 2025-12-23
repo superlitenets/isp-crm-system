@@ -303,6 +303,40 @@ class WireGuardService {
         }
     }
     
+    /**
+     * Restart the WireGuard Docker container to apply configuration changes
+     * @return array Result with success status and message
+     */
+    public function restartContainer(): array {
+        $settings = $this->getSettings();
+        $containerName = $settings['container_name'] ?? 'wireguard';
+        
+        // Try to restart using Docker
+        $output = [];
+        $returnVar = 0;
+        
+        // First try docker restart
+        exec("docker restart {$containerName} 2>&1", $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            return ['success' => true, 'message' => 'WireGuard container restarted successfully'];
+        }
+        
+        // If docker restart fails, try docker-compose
+        $composeFile = $settings['compose_file'] ?? '/opt/wireguard/docker-compose.yml';
+        if (file_exists($composeFile)) {
+            $dir = dirname($composeFile);
+            exec("cd {$dir} && docker-compose restart wireguard 2>&1", $output, $returnVar);
+            if ($returnVar === 0) {
+                return ['success' => true, 'message' => 'WireGuard restarted via docker-compose'];
+            }
+        }
+        
+        // Log the failure but don't crash
+        error_log("WireGuard restart failed: " . implode("\n", $output));
+        return ['success' => false, 'message' => 'Could not restart WireGuard container. Manual restart may be required.'];
+    }
+    
     public function regeneratePeerKeys(int $id): bool {
         try {
             $keys = $this->generateKeyPair();

@@ -38,6 +38,23 @@ if (isset($_GET['action']) && $view === 'vpn') {
             $name = ($peer['name'] ?? 'peer') . '_mikrotik.rsc';
             echo json_encode(['success' => true, 'config' => $script, 'name' => $name]);
             exit;
+        case 'get_peer_data':
+            $peerId = (int)($_GET['peer_id'] ?? 0);
+            $peer = $wgService->getPeer($peerId);
+            if (!$peer) {
+                echo json_encode(['success' => false, 'error' => 'Peer not found']);
+                exit;
+            }
+            // Get routed subnets for this peer
+            $subnets = '';
+            try {
+                $stmt = $db->prepare("SELECT network_cidr FROM wireguard_subnets WHERE vpn_peer_id = ? AND is_active = TRUE");
+                $stmt->execute([$peerId]);
+                $subnetRows = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+                $subnets = implode("\n", $subnetRows);
+            } catch (Exception $e) {}
+            echo json_encode(['success' => true, 'peer' => $peer, 'subnets' => $subnets]);
+            exit;
     }
 }
 
@@ -747,6 +764,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $wgService = new \App\WireGuardService($db);
                 $wgService->deletePeer((int)$_POST['peer_id']);
                 $message = 'VPN peer deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'edit_vpn_peer':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $peerId = (int)$_POST['peer_id'];
+                
+                // Update peer data
+                $peerData = [
+                    'name' => $_POST['name'] ?? '',
+                    'description' => $_POST['description'] ?? null,
+                    'allowed_ips' => $_POST['allowed_ips'] ?? '',
+                    'endpoint' => $_POST['endpoint'] ?? null,
+                    'persistent_keepalive' => (int)($_POST['persistent_keepalive'] ?? 25),
+                    'is_olt_site' => isset($_POST['is_olt_site']),
+                    'olt_id' => !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null
+                ];
+                $wgService->updatePeer($peerId, $peerData);
+                
+                // Update routed networks - delete existing and re-add
+                try {
+                    $db->prepare("DELETE FROM wireguard_subnets WHERE vpn_peer_id = ?")->execute([$peerId]);
+                    
+                    $routedNetworks = trim($_POST['routed_networks'] ?? '');
+                    if (!empty($routedNetworks)) {
+                        $networks = array_filter(array_map('trim', explode("\n", $routedNetworks)));
+                        $subnetStmt = $db->prepare("INSERT INTO wireguard_subnets (vpn_peer_id, network_cidr, subnet_type, is_olt_management) VALUES (?, ?, 'management', true)");
+                        foreach ($networks as $network) {
+                            if (preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $network)) {
+                                $subnetStmt->execute([$peerId, $network]);
+                            }
+                        }
+                    }
+                    
+                    // Restart WireGuard container to apply new routes
+                    $wgService->restartContainer();
+                    $message = 'VPN peer updated and WireGuard restarted to apply routes';
+                } catch (Exception $e) {
+                    $message = 'Peer updated but subnet changes may have failed: ' . $e->getMessage();
+                }
                 $messageType = 'success';
                 break;
             case 'add_vpn_subnet':
@@ -5202,70 +5259,6 @@ try {
                     </div>
                     
                     <div class="card shadow-sm mt-4">
-                        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Routed Networks (OLT Management & TR-069)</h5>
-                            <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addSubnetModal">
-                                <i class="bi bi-plus-lg me-1"></i>Add Subnet
-                            </button>
-                        </div>
-                        <div class="card-body p-0">
-                            <?php
-                            $vpnSubnets = [];
-                            try {
-                                $stmt = $db->query("SELECT s.*, p.name as peer_name FROM wireguard_subnets s LEFT JOIN wireguard_peers p ON s.vpn_peer_id = p.id WHERE s.is_active = TRUE ORDER BY s.subnet_type, s.network_cidr");
-                                $vpnSubnets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                            } catch (Exception $e) {}
-                            ?>
-                            <?php if (empty($vpnSubnets)): ?>
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-diagram-3 fs-1 opacity-50"></i>
-                                <p class="mt-2 mb-0">No routed networks configured</p>
-                                <p class="small">Add subnets that should be reachable via VPN (OLT management, TR-069 client ranges)</p>
-                            </div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Network</th>
-                                            <th>Type</th>
-                                            <th>VPN Peer</th>
-                                            <th>Description</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($vpnSubnets as $subnet): ?>
-                                        <tr>
-                                            <td><code><?= htmlspecialchars($subnet['network_cidr']) ?></code></td>
-                                            <td>
-                                                <?php if ($subnet['is_olt_management']): ?>
-                                                <span class="badge bg-primary"><i class="bi bi-hdd-network me-1"></i>OLT Mgmt</span>
-                                                <?php elseif ($subnet['is_tr069_range']): ?>
-                                                <span class="badge bg-purple" style="background-color:#6f42c1"><i class="bi bi-gear-wide-connected me-1"></i>TR-069</span>
-                                                <?php else: ?>
-                                                <span class="badge bg-secondary"><?= htmlspecialchars($subnet['subnet_type']) ?></span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?= $subnet['peer_name'] ? htmlspecialchars($subnet['peer_name']) : '<span class="text-muted">All</span>' ?></td>
-                                            <td class="small"><?= htmlspecialchars($subnet['description'] ?? '-') ?></td>
-                                            <td>
-                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this subnet?')">
-                                                    <input type="hidden" name="action" value="delete_vpn_subnet">
-                                                    <input type="hidden" name="id" value="<?= $subnet['id'] ?>">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="card shadow-sm mt-4">
                         <div class="card-header bg-info text-white">
                             <h5 class="mb-0"><i class="bi bi-diagram-2 me-2"></i>Network Architecture</h5>
                         </div>
@@ -5429,65 +5422,70 @@ try {
                 </div>
             </div>
 
-            <div class="modal fade" id="addSubnetModal" tabindex="-1">
+            <!-- Edit Peer Modal -->
+            <div class="modal fade" id="editPeerModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
-                        <form method="POST" action="?page=huawei-olt&view=vpn">
-                            <input type="hidden" name="action" value="add_vpn_subnet">
-                            <div class="modal-header bg-success text-white">
-                                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Add Network Subnet</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <form method="POST" action="?page=huawei-olt&view=vpn" id="editPeerForm">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="edit_vpn_peer">
+                            <input type="hidden" name="peer_id" id="editPeerId">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit VPN Peer</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label">Network CIDR <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" name="network_cidr" required placeholder="192.168.1.0/24">
-                                    <div class="form-text">Network address in CIDR notation (e.g., 10.10.0.0/24)</div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Subnet Type</label>
-                                        <select class="form-select" name="subnet_type" id="subnetType" onchange="updateSubnetFlags()">
-                                            <option value="olt_management">OLT Management</option>
-                                            <option value="tr069_client">TR-069 Client Range</option>
-                                            <option value="general">General</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">VPN Peer (Optional)</label>
-                                        <select class="form-select" name="vpn_peer_id">
-                                            <option value="">All Peers</option>
-                                            <?php foreach ($wgPeers as $peer): ?>
-                                            <option value="<?= $peer['id'] ?>"><?= htmlspecialchars($peer['name']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                    <label class="form-label">Peer Name</label>
+                                    <input type="text" class="form-control" name="name" id="editPeerName" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
-                                    <input type="text" class="form-control" name="description" placeholder="e.g., OLT1 Management Network">
+                                    <input type="text" class="form-control" name="description" id="editPeerDescription">
                                 </div>
-                                <input type="hidden" name="is_olt_management" id="isOltMgmt" value="1">
-                                <input type="hidden" name="is_tr069_range" id="isTr069Range" value="0">
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label">Allowed IPs</label>
+                                        <input type="text" class="form-control" name="allowed_ips" id="editPeerAllowedIps" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Keepalive</label>
+                                        <input type="number" class="form-control" name="persistent_keepalive" id="editPeerKeepalive">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Endpoint</label>
+                                    <input type="text" class="form-control" name="endpoint" id="editPeerEndpoint">
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="editIsOltSite" name="is_olt_site" value="1">
+                                    <label class="form-check-label" for="editIsOltSite">This is an OLT Site</label>
+                                </div>
+                                <div class="mb-3" id="editOltSelectDiv" style="display: none;">
+                                    <label class="form-label">Link to OLT</label>
+                                    <select class="form-select" name="olt_id" id="editPeerOltId">
+                                        <option value="">Select OLT...</option>
+                                        <?php foreach ($oltsForVpn as $olt): ?>
+                                        <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Routed Networks (one per line)</label>
+                                    <textarea class="form-control" name="routed_networks" id="editPeerRoutedNetworks" rows="4" placeholder="192.168.1.0/24&#10;10.10.0.0/24"></textarea>
+                                    <div class="form-text">Networks accessible through this peer. Changes will restart WireGuard to apply new routes.</div>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="bi bi-plus-lg me-2"></i>Add Subnet
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-check-lg me-2"></i>Save Changes
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
-            
-            <script>
-            function updateSubnetFlags() {
-                const type = document.getElementById('subnetType').value;
-                document.getElementById('isOltMgmt').value = type === 'olt_management' ? '1' : '0';
-                document.getElementById('isTr069Range').value = type === 'tr069_client' ? '1' : '0';
-            }
-            </script>
 
             <div class="modal fade" id="configModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -5563,8 +5561,31 @@ try {
             }
 
             function editPeer(peerId) {
-                alert('Edit functionality coming soon');
+                fetch(`?page=huawei-olt&view=vpn&action=get_peer_data&peer_id=${peerId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            const peer = data.peer;
+                            document.getElementById('editPeerId').value = peer.id;
+                            document.getElementById('editPeerName').value = peer.name || '';
+                            document.getElementById('editPeerDescription').value = peer.description || '';
+                            document.getElementById('editPeerAllowedIps').value = peer.allowed_ips || '';
+                            document.getElementById('editPeerKeepalive').value = peer.persistent_keepalive || 25;
+                            document.getElementById('editPeerEndpoint').value = peer.endpoint || '';
+                            document.getElementById('editIsOltSite').checked = peer.is_olt_site;
+                            document.getElementById('editPeerOltId').value = peer.olt_id || '';
+                            document.getElementById('editOltSelectDiv').style.display = peer.is_olt_site ? 'block' : 'none';
+                            document.getElementById('editPeerRoutedNetworks').value = data.subnets || '';
+                            new bootstrap.Modal(document.getElementById('editPeerModal')).show();
+                        } else {
+                            alert(data.error || 'Failed to load peer data');
+                        }
+                    });
             }
+            
+            document.getElementById('editIsOltSite').addEventListener('change', function() {
+                document.getElementById('editOltSelectDiv').style.display = this.checked ? 'block' : 'none';
+            });
 
             function deletePeer(peerId) {
                 if (confirm('Delete this VPN peer?')) {
