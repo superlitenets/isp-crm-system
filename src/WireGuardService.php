@@ -316,7 +316,7 @@ class WireGuardService {
         $returnVar = 0;
         
         // First try docker restart
-        exec("docker restart {$containerName} 2>&1", $output, $returnVar);
+        \exec("docker restart {$containerName} 2>&1", $output, $returnVar);
         
         if ($returnVar === 0) {
             return ['success' => true, 'message' => 'WireGuard container restarted successfully'];
@@ -324,9 +324,9 @@ class WireGuardService {
         
         // If docker restart fails, try docker-compose
         $composeFile = $settings['compose_file'] ?? '/opt/wireguard/docker-compose.yml';
-        if (file_exists($composeFile)) {
-            $dir = dirname($composeFile);
-            exec("cd {$dir} && docker-compose restart wireguard 2>&1", $output, $returnVar);
+        if (\file_exists($composeFile)) {
+            $dir = \dirname($composeFile);
+            \exec("cd {$dir} && docker-compose restart wireguard 2>&1", $output, $returnVar);
             if ($returnVar === 0) {
                 return ['success' => true, 'message' => 'WireGuard restarted via docker-compose'];
             }
