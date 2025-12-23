@@ -183,7 +183,9 @@ class OLTSession {
             // Clear buffer and send command
             this.buffer = '';
             response = '';
-            this.socket.write(command + '\r\n');
+            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
+            console.log(`[OLT ${this.oltId}] Sending command: "${command}" (${cmdBuffer.length} bytes)`);
+            this.socket.write(cmdBuffer);
         });
     }
 

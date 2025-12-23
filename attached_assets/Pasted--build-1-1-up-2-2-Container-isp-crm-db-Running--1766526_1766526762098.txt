@@ -1,0 +1,44 @@
+[+] build 1/1
+[+] up 2/2
+ ✔ Container isp_crm_db          Running                                                                               0.0s
+ ✔ Container isp_crm_olt_service Recreated                                                                             0.8s
+OLT Session Manager running on port 3002
+[Discovery] Starting scheduled discovery worker (*/30 * * * * *)
+[SNMP] Starting polling worker (every 30s)
+[Discovery] Auto-discovery started (*/30 * * * * *)
+[SNMP] Background polling started (every 30s)
+[Discovery] Starting discovery cycle...
+[SNMP] Polling 2 active OLTs...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***1
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[OLT 2] TCP connected to 10.98.0.2
+[SNMP] Completed in 206ms - Success: 2, Failed: 0
+[OLT 2] Sent username
+[OLT 2] Sent password
+[OLT 2] Login successful - prompt detected
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 88ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 84ms - Success: 2, Failed: 0
+[OLT 2] Command timeout, got 205 bytes
+[OLT 2] Last 300 chars: display ontautofindall\n                ^\n  % Unknown command, the error locates at '^'\n\nMA5683T>screen-length0temporary\n        ^\n  % Unknown command, the error locates at '^'\n\nMA5683T>\n\nMA5683T>
+[Discovery] Found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Connecting to G45_OLT...
+[Discovery] Decrypted password: on***1
+[OLT 1] TCP connected to 10.98.0.3
+[OLT 1] Sent username
+[OLT 1] Sent password
+[OLT 1] Login successful - prompt detected
+[OLT 2] Command timeout, got 105 bytes
+[OLT 2] Last 300 chars: screen-length0temporary\n        ^\n  % Unknown command, the error locates at '^'\n\nMA5683T>\n\nMA5683T>
