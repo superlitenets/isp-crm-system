@@ -2673,45 +2673,66 @@ class HuaweiOLT {
     // ==================== ONU Management ====================
     
     public function getONUs(array $filters = []): array {
-        $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
-                       ot.name as onu_type_name, ot.model as onu_type_model, ot.eth_ports as type_eth_ports, 
-                       ot.pots_ports as type_pots_ports, ot.wifi_capable as type_wifi, ot.default_mode as type_default_mode,
-                       dl.equipment_id as discovered_eqid, dl.onu_type_id as discovered_onu_type_id
-                FROM huawei_onus o
-                LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
-                LEFT JOIN customers c ON o.customer_id = c.id
-                LEFT JOIN huawei_service_profiles sp ON o.service_profile_id = sp.id
-                LEFT JOIN huawei_onu_types ot ON o.onu_type_id = ot.id
-                LEFT JOIN onu_discovery_log dl ON o.sn = dl.serial_number AND o.olt_id = dl.olt_id
-                WHERE 1=1";
+        // Build filter conditions
+        $conditions = " WHERE 1=1";
         $params = [];
         
         if (!empty($filters['olt_id'])) {
-            $sql .= " AND o.olt_id = ?";
+            $conditions .= " AND o.olt_id = ?";
             $params[] = $filters['olt_id'];
         }
         
         if (!empty($filters['status'])) {
-            $sql .= " AND o.status = ?";
+            $conditions .= " AND o.status = ?";
             $params[] = $filters['status'];
         }
         
         if (!empty($filters['search'])) {
-            $sql .= " AND (o.sn ILIKE ? OR o.name ILIKE ? OR o.description ILIKE ? OR c.name ILIKE ?)";
+            $conditions .= " AND (o.sn ILIKE ? OR o.name ILIKE ? OR o.description ILIKE ? OR c.name ILIKE ?)";
             $term = "%{$filters['search']}%";
             $params = array_merge($params, [$term, $term, $term, $term]);
         }
         
         if (isset($filters['is_authorized'])) {
-            $sql .= " AND o.is_authorized = ?";
+            $conditions .= " AND o.is_authorized = ?";
             $params[] = $this->castBoolean($filters['is_authorized']);
         }
         
-        $sql .= " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
+        $orderBy = " ORDER BY olt.name, o.frame, o.slot, o.port, o.onu_id";
         
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        // Try enhanced query with ONU types (may fail if tables don't exist yet)
+        try {
+            $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
+                           ot.name as onu_type_name, ot.model as onu_type_model, ot.eth_ports as type_eth_ports, 
+                           ot.pots_ports as type_pots_ports, ot.wifi_capable as type_wifi, ot.default_mode as type_default_mode,
+                           dl.equipment_id as discovered_eqid, dl.onu_type_id as discovered_onu_type_id
+                    FROM huawei_onus o
+                    LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                    LEFT JOIN customers c ON o.customer_id = c.id
+                    LEFT JOIN huawei_service_profiles sp ON o.service_profile_id = sp.id
+                    LEFT JOIN huawei_onu_types ot ON o.onu_type_id = ot.id
+                    LEFT JOIN onu_discovery_log dl ON o.sn = dl.serial_number AND o.olt_id = dl.olt_id"
+                    . $conditions . $orderBy;
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            // Fall back to basic query without optional tables
+            $sql = "SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
+                           NULL as onu_type_name, NULL as onu_type_model, NULL as type_eth_ports,
+                           NULL as type_pots_ports, NULL as type_wifi, NULL as type_default_mode,
+                           NULL as discovered_eqid, NULL as discovered_onu_type_id
+                    FROM huawei_onus o
+                    LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
+                    LEFT JOIN customers c ON o.customer_id = c.id
+                    LEFT JOIN huawei_service_profiles sp ON o.service_profile_id = sp.id"
+                    . $conditions . $orderBy;
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
     }
     
     public function getONU(int $id): ?array {
