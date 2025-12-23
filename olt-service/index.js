@@ -1,12 +1,14 @@
 const express = require('express');
 const OLTSessionManager = require('./OLTSessionManager');
 const DiscoveryWorker = require('./DiscoveryWorker');
+const SNMPPollingWorker = require('./SNMPPollingWorker');
 
 const app = express();
 app.use(express.json());
 
 const sessionManager = new OLTSessionManager();
 const discoveryWorker = new DiscoveryWorker(sessionManager);
+const snmpWorker = new SNMPPollingWorker();
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
@@ -89,16 +91,39 @@ app.get('/discovery/status', (req, res) => {
     });
 });
 
+app.post('/snmp/poll', async (req, res) => {
+    try {
+        await snmpWorker.runPolling();
+        res.json({ success: true, message: 'SNMP polling completed' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/snmp/status', async (req, res) => {
+    try {
+        const status = await snmpWorker.getPollingStatus();
+        res.json({ 
+            isRunning: snmpWorker.isRunning,
+            olts: status 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
-    // Run discovery every minute for near-instant ONU detection
     discoveryWorker.start('* * * * *');
+    snmpWorker.start(30);
+    console.log('[SNMP] Background polling started (every 30s)');
 });
 
 process.on('SIGTERM', async () => {
     console.log('Shutting down OLT Session Manager...');
     discoveryWorker.stop();
+    snmpWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });
@@ -106,6 +131,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     console.log('Shutting down OLT Session Manager...');
     discoveryWorker.stop();
+    snmpWorker.stop();
     await sessionManager.disconnectAll();
     process.exit(0);
 });

@@ -605,6 +605,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'GenieACS settings saved successfully';
                 $messageType = 'success';
                 break;
+            case 'save_onu_type':
+                $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+                $data = [
+                    'name' => $_POST['name'] ?? '',
+                    'model' => $_POST['model'] ?? '',
+                    'eth_ports' => (int)($_POST['eth_ports'] ?? 1),
+                    'pots_ports' => (int)($_POST['pots_ports'] ?? 0),
+                    'default_mode' => $_POST['default_mode'] ?? 'bridge',
+                    'tcont_count' => (int)($_POST['tcont_count'] ?? 1),
+                    'gemport_count' => (int)($_POST['gemport_count'] ?? 1),
+                    'wifi_capable' => isset($_POST['wifi_capable']),
+                    'omci_capable' => isset($_POST['omci_capable']),
+                    'tr069_capable' => isset($_POST['tr069_capable']),
+                    'description' => $_POST['description'] ?? ''
+                ];
+                if ($id) {
+                    $stmt = $db->prepare("UPDATE huawei_onu_types SET name=?, model=?, eth_ports=?, pots_ports=?, default_mode=?, tcont_count=?, gemport_count=?, wifi_capable=?, omci_capable=?, tr069_capable=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?");
+                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description'], $id]);
+                    $message = 'ONU type updated successfully';
+                } else {
+                    $stmt = $db->prepare("INSERT INTO huawei_onu_types (name, model, eth_ports, pots_ports, default_mode, tcont_count, gemport_count, wifi_capable, omci_capable, tr069_capable, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$data['name'], $data['model'], $data['eth_ports'], $data['pots_ports'], $data['default_mode'], $data['tcont_count'], $data['gemport_count'], $data['wifi_capable'], $data['omci_capable'], $data['tr069_capable'], $data['description']]);
+                    $message = 'ONU type added successfully';
+                }
+                $messageType = 'success';
+                break;
+            case 'delete_onu_type':
+                $stmt = $db->prepare("UPDATE huawei_onu_types SET is_active = FALSE WHERE id = ?");
+                $stmt->execute([(int)$_POST['id']]);
+                $message = 'ONU type deleted successfully';
+                $messageType = 'success';
+                break;
             case 'save_vpn_settings':
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
@@ -704,6 +736,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $wgService = new \App\WireGuardService($db);
                 $wgService->deletePeer((int)$_POST['peer_id']);
                 $message = 'VPN peer deleted successfully';
+                $messageType = 'success';
+                break;
+            case 'add_vpn_subnet':
+                $peerId = !empty($_POST['vpn_peer_id']) ? (int)$_POST['vpn_peer_id'] : null;
+                $stmt = $db->prepare("INSERT INTO wireguard_subnets (vpn_peer_id, network_cidr, description, subnet_type, is_olt_management, is_tr069_range) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $peerId,
+                    $_POST['network_cidr'] ?? '',
+                    $_POST['description'] ?? '',
+                    $_POST['subnet_type'] ?? 'management',
+                    isset($_POST['is_olt_management']) && $_POST['is_olt_management'] === '1',
+                    isset($_POST['is_tr069_range']) && $_POST['is_tr069_range'] === '1'
+                ]);
+                $message = 'Network subnet added successfully';
+                $messageType = 'success';
+                break;
+            case 'delete_vpn_subnet':
+                $stmt = $db->prepare("UPDATE wireguard_subnets SET is_active = FALSE WHERE id = ?");
+                $stmt->execute([(int)$_POST['id']]);
+                $message = 'Network subnet deleted successfully';
                 $messageType = 'success';
                 break;
             case 'test_genieacs':
@@ -5151,6 +5203,70 @@ try {
                     </div>
                     
                     <div class="card shadow-sm mt-4">
+                        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Routed Networks (OLT Management & TR-069)</h5>
+                            <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addSubnetModal">
+                                <i class="bi bi-plus-lg me-1"></i>Add Subnet
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php
+                            $vpnSubnets = [];
+                            try {
+                                $stmt = $db->query("SELECT s.*, p.name as peer_name FROM wireguard_subnets s LEFT JOIN wireguard_peers p ON s.vpn_peer_id = p.id WHERE s.is_active = TRUE ORDER BY s.subnet_type, s.network_cidr");
+                                $vpnSubnets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                            } catch (Exception $e) {}
+                            ?>
+                            <?php if (empty($vpnSubnets)): ?>
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-diagram-3 fs-1 opacity-50"></i>
+                                <p class="mt-2 mb-0">No routed networks configured</p>
+                                <p class="small">Add subnets that should be reachable via VPN (OLT management, TR-069 client ranges)</p>
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Network</th>
+                                            <th>Type</th>
+                                            <th>VPN Peer</th>
+                                            <th>Description</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($vpnSubnets as $subnet): ?>
+                                        <tr>
+                                            <td><code><?= htmlspecialchars($subnet['network_cidr']) ?></code></td>
+                                            <td>
+                                                <?php if ($subnet['is_olt_management']): ?>
+                                                <span class="badge bg-primary"><i class="bi bi-hdd-network me-1"></i>OLT Mgmt</span>
+                                                <?php elseif ($subnet['is_tr069_range']): ?>
+                                                <span class="badge bg-purple" style="background-color:#6f42c1"><i class="bi bi-gear-wide-connected me-1"></i>TR-069</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-secondary"><?= htmlspecialchars($subnet['subnet_type']) ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= $subnet['peer_name'] ? htmlspecialchars($subnet['peer_name']) : '<span class="text-muted">All</span>' ?></td>
+                                            <td class="small"><?= htmlspecialchars($subnet['description'] ?? '-') ?></td>
+                                            <td>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this subnet?')">
+                                                    <input type="hidden" name="action" value="delete_vpn_subnet">
+                                                    <input type="hidden" name="id" value="<?= $subnet['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="card shadow-sm mt-4">
                         <div class="card-header bg-info text-white">
                             <h5 class="mb-0"><i class="bi bi-diagram-2 me-2"></i>Network Architecture</h5>
                         </div>
@@ -5309,6 +5425,66 @@ try {
                 </div>
             </div>
 
+            <div class="modal fade" id="addSubnetModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="?page=huawei-olt&view=vpn">
+                            <input type="hidden" name="action" value="add_vpn_subnet">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Add Network Subnet</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Network CIDR <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="network_cidr" required placeholder="192.168.1.0/24">
+                                    <div class="form-text">Network address in CIDR notation (e.g., 10.10.0.0/24)</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Subnet Type</label>
+                                        <select class="form-select" name="subnet_type" id="subnetType" onchange="updateSubnetFlags()">
+                                            <option value="olt_management">OLT Management</option>
+                                            <option value="tr069_client">TR-069 Client Range</option>
+                                            <option value="general">General</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">VPN Peer (Optional)</label>
+                                        <select class="form-select" name="vpn_peer_id">
+                                            <option value="">All Peers</option>
+                                            <?php foreach ($wgPeers as $peer): ?>
+                                            <option value="<?= $peer['id'] ?>"><?= htmlspecialchars($peer['name']) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <input type="text" class="form-control" name="description" placeholder="e.g., OLT1 Management Network">
+                                </div>
+                                <input type="hidden" name="is_olt_management" id="isOltMgmt" value="1">
+                                <input type="hidden" name="is_tr069_range" id="isTr069Range" value="0">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-plus-lg me-2"></i>Add Subnet
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function updateSubnetFlags() {
+                const type = document.getElementById('subnetType').value;
+                document.getElementById('isOltMgmt').value = type === 'olt_management' ? '1' : '0';
+                document.getElementById('isTr069Range').value = type === 'tr069_client' ? '1' : '0';
+            }
+            </script>
+
             <div class="modal fade" id="configModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -5460,6 +5636,11 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=onu_types">
+                        <i class="bi bi-router me-1"></i> ONU Types
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'scripts' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=scripts">
                         <i class="bi bi-terminal me-1"></i> OLT Scripts
                     </a>
@@ -5544,6 +5725,201 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     </div>
                 </div>
             </div>
+            <?php elseif ($settingsTab === 'onu_types'): ?>
+            <?php
+            $onuTypes = [];
+            try {
+                $stmt = $db->query("SELECT * FROM huawei_onu_types WHERE is_active = TRUE ORDER BY name");
+                $onuTypes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (Exception $e) {}
+            ?>
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-router me-2"></i>ONU Types</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addOnuTypeModal">
+                                <i class="bi bi-plus-lg me-1"></i>Add ONU Type
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Model</th>
+                                            <th>Ports</th>
+                                            <th>Mode</th>
+                                            <th>Capabilities</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (empty($onuTypes)): ?>
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                <i class="bi bi-info-circle me-1"></i>No ONU types defined. Add some ONU types to use during authorization.
+                                            </td>
+                                        </tr>
+                                        <?php else: ?>
+                                        <?php foreach ($onuTypes as $type): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($type['name']) ?></strong></td>
+                                            <td><code><?= htmlspecialchars($type['model'] ?? '-') ?></code></td>
+                                            <td>
+                                                <span class="badge bg-primary"><?= $type['eth_ports'] ?> ETH</span>
+                                                <?php if ($type['pots_ports'] > 0): ?>
+                                                <span class="badge bg-secondary"><?= $type['pots_ports'] ?> POTS</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge <?= $type['default_mode'] === 'bridge' ? 'bg-info' : 'bg-success' ?>">
+                                                    <?= ucfirst($type['default_mode']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <?php if ($type['wifi_capable']): ?><span class="badge bg-purple" title="WiFi"><i class="bi bi-wifi"></i></span><?php endif; ?>
+                                                <?php if ($type['tr069_capable']): ?><span class="badge bg-secondary" title="TR-069"><i class="bi bi-gear-wide-connected"></i></span><?php endif; ?>
+                                                <?php if ($type['omci_capable']): ?><span class="badge bg-dark" title="OMCI"><i class="bi bi-cpu"></i></span><?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="editOnuType(<?= htmlspecialchars(json_encode($type)) ?>)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this ONU type?')">
+                                                    <input type="hidden" name="action" value="delete_onu_type">
+                                                    <input type="hidden" name="id" value="<?= $type['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-lightbulb me-2"></i>About ONU Types</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small">Define ONU types to use during authorization. Each type specifies:</p>
+                            <ul class="small">
+                                <li><strong>Ports</strong> - Number of Ethernet and POTS ports</li>
+                                <li><strong>Mode</strong> - Bridge or Router default configuration</li>
+                                <li><strong>T-CONT/GEM</strong> - Traffic container and GEM port counts</li>
+                                <li><strong>Profiles</strong> - Recommended line and service profiles</li>
+                            </ul>
+                            <p class="small text-muted mb-0">
+                                Bridge mode pushes configuration via OMCI. Router mode allows TR-069 remote management.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="addOnuTypeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="save_onu_type">
+                            <input type="hidden" name="id" id="onuTypeId">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-router me-2"></i>ONU Type</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="name" id="onuTypeName" class="form-control" required placeholder="e.g., Bridge ONU (1 ETH)">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">Model</label>
+                                        <input type="text" name="model" id="onuTypeModel" class="form-control" placeholder="e.g., HG8010H">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">ETH Ports</label>
+                                        <input type="number" name="eth_ports" id="onuTypeEthPorts" class="form-control" value="1" min="0" max="8">
+                                    </div>
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">POTS Ports</label>
+                                        <input type="number" name="pots_ports" id="onuTypePotsports" class="form-control" value="0" min="0" max="4">
+                                    </div>
+                                    <div class="col-4 mb-3">
+                                        <label class="form-label">Default Mode</label>
+                                        <select name="default_mode" id="onuTypeDefaultMode" class="form-select">
+                                            <option value="bridge">Bridge</option>
+                                            <option value="router">Router</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">T-CONT Count</label>
+                                        <input type="number" name="tcont_count" id="onuTypeTcontCount" class="form-control" value="1" min="1" max="8">
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <label class="form-label">GEM Port Count</label>
+                                        <input type="number" name="gemport_count" id="onuTypeGemportCount" class="form-control" value="1" min="1" max="32">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Capabilities</label>
+                                    <div class="d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="wifi_capable" id="onuTypeWifi" value="1">
+                                            <label class="form-check-label" for="onuTypeWifi">WiFi</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="omci_capable" id="onuTypeOmci" value="1" checked>
+                                            <label class="form-check-label" for="onuTypeOmci">OMCI</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="tr069_capable" id="onuTypeTr069" value="1" checked>
+                                            <label class="form-check-label" for="onuTypeTr069">TR-069</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="onuTypeDescription" class="form-control" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function editOnuType(type) {
+                document.getElementById('onuTypeId').value = type.id;
+                document.getElementById('onuTypeName').value = type.name || '';
+                document.getElementById('onuTypeModel').value = type.model || '';
+                document.getElementById('onuTypeEthPorts').value = type.eth_ports || 1;
+                document.getElementById('onuTypePotsports').value = type.pots_ports || 0;
+                document.getElementById('onuTypeDefaultMode').value = type.default_mode || 'bridge';
+                document.getElementById('onuTypeTcontCount').value = type.tcont_count || 1;
+                document.getElementById('onuTypeGemportCount').value = type.gemport_count || 1;
+                document.getElementById('onuTypeWifi').checked = type.wifi_capable;
+                document.getElementById('onuTypeOmci').checked = type.omci_capable;
+                document.getElementById('onuTypeTr069').checked = type.tr069_capable;
+                document.getElementById('onuTypeDescription').value = type.description || '';
+                new bootstrap.Modal(document.getElementById('addOnuTypeModal')).show();
+            }
+            </script>
+            
             <?php elseif ($settingsTab === 'scripts'): ?>
             
             <script>

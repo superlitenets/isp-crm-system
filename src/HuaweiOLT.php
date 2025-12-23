@@ -3390,28 +3390,30 @@ class HuaweiOLT {
             ];
             
             $portStmt = $this->db->prepare("
-                SELECT DISTINCT frame_slot_port, 
+                SELECT DISTINCT COALESCE(frame, 0) || '/' || slot || '/' || port as frame_slot_port,
+                       frame, slot, port,
                        COUNT(id) as onu_count,
                        COUNT(*) FILTER (WHERE status = 'online') as online,
                        COUNT(*) FILTER (WHERE status = 'offline') as offline,
                        COUNT(*) FILTER (WHERE status = 'los') as los
                 FROM huawei_onus 
-                WHERE olt_id = :olt_id 
-                GROUP BY frame_slot_port 
-                ORDER BY frame_slot_port
+                WHERE olt_id = :olt_id AND is_authorized = TRUE AND slot IS NOT NULL AND port IS NOT NULL
+                GROUP BY frame, slot, port 
+                ORDER BY frame, slot, port
             ");
             $portStmt->execute([':olt_id' => $olt['id']]);
             $ports = $portStmt->fetchAll(\PDO::FETCH_ASSOC);
             
             foreach ($ports as $port) {
-                $portNodeId = 'port_' . $olt['id'] . '_' . str_replace('/', '_', $port['frame_slot_port']);
+                $frameSlotPort = $port['frame_slot_port'];
+                $portNodeId = 'port_' . $olt['id'] . '_' . str_replace('/', '_', $frameSlotPort);
                 $portStatus = $port['los'] > 0 ? 'warning' : ($port['offline'] > 0 ? 'partial' : 'online');
                 
                 $topology['nodes'][] = [
                     'id' => $portNodeId,
-                    'label' => $port['frame_slot_port'],
+                    'label' => $frameSlotPort,
                     'type' => 'port',
-                    'title' => "Port: {$port['frame_slot_port']}\nONUs: {$port['onu_count']}\nOnline: {$port['online']}, Offline: {$port['offline']}, LOS: {$port['los']}",
+                    'title' => "Port: {$frameSlotPort}\nONUs: {$port['onu_count']}\nOnline: {$port['online']}, Offline: {$port['offline']}, LOS: {$port['los']}",
                     'status' => $portStatus,
                     'onu_count' => $port['onu_count'],
                     'online' => $port['online'],
@@ -3428,10 +3430,10 @@ class HuaweiOLT {
                     SELECT id, name, sn, status, onu_id, rx_power, tx_power,
                            (SELECT c.name FROM customers c WHERE c.id = o.customer_id) as customer_name
                     FROM huawei_onus o
-                    WHERE olt_id = :olt_id AND frame_slot_port = :port
+                    WHERE olt_id = :olt_id AND COALESCE(frame, 0) = :frame AND slot = :slot AND port = :port AND is_authorized = TRUE
                     ORDER BY onu_id
                 ");
-                $onuStmt->execute([':olt_id' => $olt['id'], ':port' => $port['frame_slot_port']]);
+                $onuStmt->execute([':olt_id' => $olt['id'], ':frame' => $port['frame'] ?? 0, ':slot' => $port['slot'], ':port' => $port['port']]);
                 $onus = $onuStmt->fetchAll(\PDO::FETCH_ASSOC);
                 
                 foreach ($onus as $onu) {
