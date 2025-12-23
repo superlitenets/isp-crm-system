@@ -724,6 +724,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 ];
                 $peerId = $wgService->createPeer($peerData);
                 if ($peerId) {
+                    // Process routed networks if provided
+                    $routedNetworks = trim($_POST['routed_networks'] ?? '');
+                    if (!empty($routedNetworks)) {
+                        $networks = array_filter(array_map('trim', explode("\n", $routedNetworks)));
+                        $subnetStmt = $db->prepare("INSERT INTO wireguard_subnets (vpn_peer_id, network_cidr, subnet_type, is_olt_management) VALUES (?, ?, 'management', true)");
+                        foreach ($networks as $network) {
+                            if (preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $network)) {
+                                $subnetStmt->execute([$peerId, $network]);
+                            }
+                        }
+                    }
                     $message = 'VPN peer added successfully';
                     $messageType = 'success';
                 } else {
@@ -5449,6 +5460,11 @@ try {
                                         <option value="<?= $olt['id'] ?>"><?= htmlspecialchars($olt['name']) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Routed Networks (one per line)</label>
+                                    <textarea class="form-control" name="routed_networks" rows="4" placeholder="192.168.1.0/24&#10;10.10.0.0/24&#10;172.16.0.0/24"></textarea>
+                                    <div class="form-text">Networks accessible through this peer (OLT management, TR-069 client ranges, etc.)</div>
                                 </div>
                             </div>
                             <div class="modal-footer">
