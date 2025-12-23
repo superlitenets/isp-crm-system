@@ -92,7 +92,8 @@ app.get('/discovery/status', (req, res) => {
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
-    discoveryWorker.start();
+    // Run discovery every minute for near-instant ONU detection
+    discoveryWorker.start('* * * * *');
 });
 
 process.on('SIGTERM', async () => {
