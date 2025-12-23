@@ -36,17 +36,17 @@ class HuaweiOLT {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv) ?: '';
     }
     
-    private function castBoolean($value): string {
+    private function castBoolean($value): bool {
         if ($value === '' || $value === null || $value === false || $value === 0 || $value === '0') {
-            return 'false';
+            return false;
         }
         if ($value === true || $value === 1) {
-            return 'true';
+            return true;
         }
         if (is_string($value)) {
-            return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true) ? 'true' : 'false';
+            return in_array(strtolower($value), ['1', 'true', 'yes', 'on'], true);
         }
-        return $value ? 'true' : 'false';
+        return (bool)$value;
     }
     
     // ==================== OLT Management ====================
@@ -2425,90 +2425,88 @@ class HuaweiOLT {
         $currentFrame = 0;
         $currentSlot = 0;
         $currentPort = 0;
+        $currentOnu = null;
         
+        // Parse multi-line ONU entries (each ONU may have SN, EQID, SoftwareVer on separate lines)
         foreach ($lines as $line) {
             $line = trim($line);
             
-            // Parse port header: "   ----------------------------------------------------------------------------"
-            // followed by "   Port : 0/1/0" or "   F/S/P : 0/1/0"
+            // Parse port header: "F/S/P : 0/1/0" or "Port : 0/1/0"
             if (preg_match('/(?:Port|F\/S\/P)\s*:\s*(\d+)\/(\d+)\/(\d+)/i', $line, $m)) {
+                // Save previous ONU before changing port
+                if ($currentOnu && !empty($currentOnu['sn'])) {
+                    $unconfigured[] = $currentOnu;
+                    $added += $this->saveDiscoveredONU($currentOnu, $oltId, $olt);
+                }
+                $currentOnu = null;
                 $currentFrame = (int)$m[1];
                 $currentSlot = (int)$m[2];
                 $currentPort = (int)$m[3];
                 continue;
             }
             
-            // Parse ONU entry - formats vary by firmware:
-            // Format 1: "   1    HWTC12345678    auto    0    SN"
-            // Format 2: "   Ont SN           : HWTC12345678"
-            // Format 3: Table row with Number, SN, Password, LOID, etc.
-            
-            // Table format: Number | SN/MAC | Password/LOID | Type | Auth mode
-            if (preg_match('/^\s*(\d+)\s+([A-Fa-f0-9]{8,16})\s+/i', $line, $m)) {
-                $autofindId = (int)$m[1];
-                $sn = strtoupper($m[2]);
-                
-                // Skip if already authorized
-                $existing = $this->getONUBySN($sn);
-                if (!$existing) {
-                    $onuData = [
-                        'olt_id' => $oltId,
-                        'sn' => $sn,
-                        'frame' => $currentFrame,
-                        'slot' => $currentSlot,
-                        'port' => $currentPort,
-                        'status' => 'unconfigured',
-                        'is_authorized' => false,
-                    ];
-                    $this->addONU($onuData);
-                    $added++;
-                    
-                    // Send notification for new ONU
-                    $this->sendNewOnuNotification($onuData, $olt);
+            // New ONU entry starts with index and F/S/P (table format)
+            if (preg_match('/^\s*(\d+)\s+(\d+\/\s*\d+\/\s*\d+)/i', $line, $m)) {
+                // Save previous ONU
+                if ($currentOnu && !empty($currentOnu['sn'])) {
+                    $unconfigured[] = $currentOnu;
+                    $added += $this->saveDiscoveredONU($currentOnu, $oltId, $olt);
                 }
-                
-                $unconfigured[] = [
-                    'sn' => $sn,
-                    'frame' => $currentFrame,
-                    'slot' => $currentSlot,
-                    'port' => $currentPort,
-                    'autofind_id' => $autofindId,
+                $fsp = preg_replace('/\s/', '', $m[2]);
+                $parts = explode('/', $fsp);
+                $currentOnu = [
+                    'index' => (int)$m[1],
+                    'frame' => (int)($parts[0] ?? $currentFrame),
+                    'slot' => (int)($parts[1] ?? $currentSlot),
+                    'port' => (int)($parts[2] ?? $currentPort),
                     'method' => 'cli'
                 ];
                 continue;
             }
             
-            // Alternative format: "Ont SN : HWTC12345678"
-            if (preg_match('/Ont\s+SN\s*:\s*([A-Fa-f0-9]{8,16})/i', $line, $m)) {
-                $sn = strtoupper($m[1]);
-                
-                $existing = $this->getONUBySN($sn);
-                if (!$existing) {
-                    $onuData = [
-                        'olt_id' => $oltId,
-                        'sn' => $sn,
-                        'frame' => $currentFrame,
-                        'slot' => $currentSlot,
-                        'port' => $currentPort,
-                        'status' => 'unconfigured',
-                        'is_authorized' => false,
-                    ];
-                    $this->addONU($onuData);
-                    $added++;
-                    
-                    // Send notification for new ONU
-                    $this->sendNewOnuNotification($onuData, $olt);
+            // Table format: Number | SN/MAC | Password/LOID | Type | Auth mode
+            if (preg_match('/^\s*(\d+)\s+([A-Fa-f0-9]{8,16})\s+/i', $line, $m)) {
+                // Save previous ONU
+                if ($currentOnu && !empty($currentOnu['sn'])) {
+                    $unconfigured[] = $currentOnu;
+                    $added += $this->saveDiscoveredONU($currentOnu, $oltId, $olt);
                 }
-                
-                $unconfigured[] = [
-                    'sn' => $sn,
+                $currentOnu = [
+                    'index' => (int)$m[1],
+                    'sn' => strtoupper($m[2]),
                     'frame' => $currentFrame,
                     'slot' => $currentSlot,
                     'port' => $currentPort,
-                    'autofind_id' => count($unconfigured) + 1,
                     'method' => 'cli'
                 ];
+                continue;
             }
+            
+            // Parse additional fields for current ONU
+            if ($currentOnu) {
+                // SN line: "SN : HWTC12345678" or "Ont SN : HWTC12345678"
+                if (preg_match('/(?:Ont\s+)?SN\s*:\s*([A-Fa-f0-9]{8,16})/i', $line, $m)) {
+                    $currentOnu['sn'] = strtoupper($m[1]);
+                }
+                // EQID line: "EQID : EchoLife-HG8145V5" or "EquipmentID : HG8010H"
+                if (preg_match('/(?:EQID|EquipmentID)\s*:\s*(\S+)/i', $line, $m)) {
+                    $currentOnu['eqid'] = $m[1];
+                }
+                // Software version: "SoftwareVer : V5R020C00S125"
+                if (preg_match('/SoftwareVer\s*:\s*(\S+)/i', $line, $m)) {
+                    $currentOnu['software_ver'] = $m[1];
+                }
+                // Product ID: "OnuProductID : EG8145V5"
+                if (preg_match('/OnuProductID\s*:\s*(\S+)/i', $line, $m)) {
+                    $currentOnu['product_id'] = $m[1];
+                }
+            }
+        }
+        
+        // Save last ONU
+        if ($currentOnu && !empty($currentOnu['sn'])) {
+            $unconfigured[] = $currentOnu;
+            $added += $this->saveDiscoveredONU($currentOnu, $oltId, $olt);
         }
         
         $this->addLog([
@@ -2527,6 +2525,106 @@ class HuaweiOLT {
             'method' => 'cli',
             'raw_output' => $output
         ];
+    }
+    
+    /**
+     * Save a discovered ONU to the database with EQID/type matching
+     * @return int 1 if new ONU was added, 0 if already existed
+     */
+    private function saveDiscoveredONU(array $onuData, int $oltId, array $olt): int {
+        $sn = $onuData['sn'] ?? '';
+        if (empty($sn)) return 0;
+        
+        $existing = $this->getONUBySN($sn);
+        if ($existing && $existing['is_authorized']) {
+            return 0; // Already authorized, don't overwrite
+        }
+        
+        // Determine ONU type from EQID if available
+        $onuType = $onuData['eqid'] ?? $onuData['product_id'] ?? '';
+        $onuTypeId = null;
+        
+        if ($onuType) {
+            $onuTypeId = $this->matchOnuTypeByEqid($onuType);
+        }
+        
+        $data = [
+            'olt_id' => $oltId,
+            'sn' => $sn,
+            'frame' => $onuData['frame'] ?? 0,
+            'slot' => $onuData['slot'] ?? 0,
+            'port' => $onuData['port'] ?? 0,
+            'onu_type' => $onuType,
+            'status' => 'unconfigured',
+            'is_authorized' => false,
+        ];
+        
+        $this->addONU($data);
+        
+        // Also update discovery log with equipment_id and matched type
+        if ($onuType || $onuTypeId) {
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO onu_discovery_log (olt_id, serial_number, frame_slot_port, equipment_id, onu_type_id, last_seen_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (olt_id, serial_number) 
+                    DO UPDATE SET 
+                        last_seen_at = CURRENT_TIMESTAMP,
+                        frame_slot_port = EXCLUDED.frame_slot_port,
+                        equipment_id = COALESCE(EXCLUDED.equipment_id, onu_discovery_log.equipment_id),
+                        onu_type_id = COALESCE(EXCLUDED.onu_type_id, onu_discovery_log.onu_type_id)
+                ");
+                $fsp = "{$data['frame']}/{$data['slot']}/{$data['port']}";
+                $stmt->execute([$oltId, $sn, $fsp, $onuType ?: null, $onuTypeId]);
+            } catch (\Exception $e) {
+                // Discovery log table may not exist yet, ignore
+            }
+        }
+        
+        // Send notification only for new ONUs
+        if (!$existing) {
+            $this->sendNewOnuNotification($data, $olt);
+            return 1;
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * Match EQID string to a known ONU type in the database
+     */
+    private function matchOnuTypeByEqid(string $eqid): ?int {
+        if (empty($eqid)) return null;
+        
+        $normalizedEqid = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $eqid));
+        
+        try {
+            $stmt = $this->db->query("SELECT id, model, model_aliases FROM huawei_onu_types WHERE is_active = true");
+            $types = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            foreach ($types as $type) {
+                $modelNorm = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $type['model'] ?? ''));
+                if ($modelNorm && strlen($modelNorm) >= 5 && strpos($normalizedEqid, $modelNorm) !== false) {
+                    return (int)$type['id'];
+                }
+                
+                if (!empty($type['model_aliases'])) {
+                    $aliases = array_map(function($a) {
+                        return strtoupper(preg_replace('/[^A-Z0-9]/i', '', trim($a)));
+                    }, explode(',', $type['model_aliases']));
+                    
+                    foreach ($aliases as $alias) {
+                        if ($alias && strlen($alias) >= 5 && strpos($normalizedEqid, $alias) !== false) {
+                            return (int)$type['id'];
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Table may not exist yet
+        }
+        
+        return null;
     }
     
     public function discoverUnconfiguredONUsViaSNMP(int $oltId): array {
