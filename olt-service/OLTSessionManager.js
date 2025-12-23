@@ -258,9 +258,18 @@ class OLTSession {
             // Clear buffer and send command
             this.buffer = '';
             response = '';
-            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
-            console.log(`[OLT ${this.oltId}] Sending command: "${command}" (${cmdBuffer.length} bytes)`);
-            this.socket.write(cmdBuffer);
+            
+            // Send command character by character with tiny delay to avoid buffering issues
+            const sendCharByChar = async () => {
+                const fullCmd = command + '\r\n';
+                for (let i = 0; i < fullCmd.length; i++) {
+                    this.socket.write(fullCmd[i]);
+                    await new Promise(r => setTimeout(r, 5));
+                }
+            };
+            
+            console.log(`[OLT ${this.oltId}] Sending command: "${command}"`);
+            sendCharByChar();
         });
     }
 
