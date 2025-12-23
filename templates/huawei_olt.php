@@ -1997,8 +1997,9 @@ try {
                 </a>
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
-                    <?php if ($stats['unconfigured_onus'] > 0): ?>
-                    <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
+                    <?php $mobileTotalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
+                    <?php if ($mobileTotalPending > 0): ?>
+                    <span class="badge bg-warning ms-auto"><?= $mobileTotalPending ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
@@ -2057,10 +2058,11 @@ try {
                 <a class="nav-link <?= ($view === 'onus' && !isset($_GET['unconfigured'])) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
                     <i class="bi bi-check-circle me-2"></i> Authorized ONUs
                 </a>
-                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= $stats['unconfigured_onus'] > 0 ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
+                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= ($stats['unconfigured_onus'] > 0 || $stats['discovered_onus'] > 0) ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
-                    <?php if ($stats['unconfigured_onus'] > 0): ?>
-                    <span class="badge bg-warning badge-pulse ms-auto"><?= $stats['unconfigured_onus'] ?></span>
+                    <?php $totalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
+                    <?php if ($totalPending > 0): ?>
+                    <span class="badge bg-warning badge-pulse ms-auto"><?= $totalPending ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
@@ -7841,6 +7843,9 @@ ont tr069-server-config 1 all profile-id 1</pre>
                 <form method="post">
                     <input type="hidden" name="action" value="authorize_onu">
                     <input type="hidden" name="onu_id" id="authOnuId">
+                    <input type="hidden" name="olt_id" id="authOltId">
+                    <input type="hidden" name="sn" id="authSnInput">
+                    <input type="hidden" name="frame_slot_port" id="authFsp">
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize & Configure ONU</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -8708,6 +8713,39 @@ echo "# ================================================\n";
         } else {
             document.getElementById('authModeBridge').checked = true;
         }
+        
+        new bootstrap.Modal(document.getElementById('authModal')).show();
+    }
+    
+    function openAuthModal(sn, oltId, frameSlotPort, onuTypeId) {
+        document.getElementById('authOnuId').value = '';
+        document.getElementById('authOnuSn').textContent = sn;
+        document.getElementById('authOnuLocation').textContent = frameSlotPort || '-';
+        document.getElementById('authDescription').value = '';
+        
+        var onuTypeSelect = document.getElementById('authOnuType');
+        if (onuTypeSelect && onuTypeId) {
+            onuTypeSelect.value = onuTypeId;
+        } else if (onuTypeSelect) {
+            onuTypeSelect.value = '';
+        }
+        
+        var oltSelect = document.getElementById('authOltId');
+        if (oltSelect && oltId) {
+            oltSelect.value = oltId;
+        }
+        
+        var snInput = document.getElementById('authSnInput');
+        if (snInput) {
+            snInput.value = sn;
+        }
+        
+        var fspInput = document.getElementById('authFsp');
+        if (fspInput) {
+            fspInput.value = frameSlotPort || '';
+        }
+        
+        document.getElementById('authModeBridge').checked = true;
         
         new bootstrap.Modal(document.getElementById('authModal')).show();
     }

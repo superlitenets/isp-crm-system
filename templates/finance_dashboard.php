@@ -120,21 +120,21 @@ if ($view === 'c2b' || $view === 'dashboard') {
     <style>
         :root {
             --mpesa-primary: #00a650;
-            --mpesa-secondary: #1a1a2e;
-            --mpesa-accent: #4ade80;
-            --mpesa-bg: #0f172a;
-            --mpesa-card: #1e293b;
-            --mpesa-text: #f1f5f9;
-            --mpesa-muted: #94a3b8;
-            --mpesa-border: #334155;
-            --mpesa-success: #10b981;
-            --mpesa-danger: #ef4444;
-            --mpesa-warning: #f59e0b;
+            --mpesa-secondary: #f8f9fa;
+            --mpesa-accent: #198754;
+            --mpesa-bg: #f8f9fa;
+            --mpesa-card: #ffffff;
+            --mpesa-text: #212529;
+            --mpesa-muted: #6c757d;
+            --mpesa-border: #dee2e6;
+            --mpesa-success: #198754;
+            --mpesa-danger: #dc3545;
+            --mpesa-warning: #ffc107;
         }
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            background: var(--mpesa-bg);
             min-height: 100vh;
         }
         
@@ -145,8 +145,8 @@ if ($view === 'c2b' || $view === 'dashboard') {
         
         .mpesa-sidebar {
             width: 260px;
-            background: linear-gradient(180deg, #0f172a 0%, #1a1a2e 100%);
-            border-right: 1px solid var(--mpesa-border);
+            background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);
+            border-right: 1px solid rgba(255,255,255,0.1);
             padding: 1.5rem 0;
             position: fixed;
             height: 100vh;
@@ -155,12 +155,12 @@ if ($view === 'c2b' || $view === 'dashboard') {
         
         .mpesa-sidebar .brand {
             padding: 0 1.5rem 1.5rem;
-            border-bottom: 1px solid var(--mpesa-border);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
             margin-bottom: 1rem;
         }
         
         .mpesa-sidebar .brand h4 {
-            color: var(--mpesa-primary);
+            color: #fff;
             font-weight: 700;
             margin: 0;
             display: flex;
@@ -169,12 +169,12 @@ if ($view === 'c2b' || $view === 'dashboard') {
         }
         
         .mpesa-sidebar .brand small {
-            color: var(--mpesa-muted);
+            color: rgba(255,255,255,0.6);
             font-size: 0.75rem;
         }
         
         .mpesa-sidebar .nav-link {
-            color: var(--mpesa-muted);
+            color: rgba(255,255,255,0.7);
             padding: 0.75rem 1.5rem;
             display: flex;
             align-items: center;
@@ -184,13 +184,13 @@ if ($view === 'c2b' || $view === 'dashboard') {
         }
         
         .mpesa-sidebar .nav-link:hover {
-            color: var(--mpesa-text);
-            background: rgba(0, 166, 80, 0.1);
+            color: #fff;
+            background: rgba(255,255,255,0.1);
         }
         
         .mpesa-sidebar .nav-link.active {
-            color: var(--mpesa-primary);
-            background: rgba(0, 166, 80, 0.15);
+            color: #fff;
+            background: rgba(0, 166, 80, 0.3);
             border-left-color: var(--mpesa-primary);
         }
         
@@ -198,6 +198,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
             flex: 1;
             margin-left: 260px;
             padding: 2rem;
+            background: var(--mpesa-bg);
         }
         
         .stat-card {
@@ -211,7 +212,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
         
         .stat-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 166, 80, 0.15);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
         }
         
         .stat-card.incoming {
@@ -262,7 +263,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
         }
         
         .table thead th {
-            background: rgba(0, 0, 0, 0.2);
+            background: #f8f9fa;
             border-color: var(--mpesa-border);
             color: var(--mpesa-muted);
             font-weight: 600;
@@ -286,13 +287,13 @@ if ($view === 'c2b' || $view === 'dashboard') {
         .badge-pending { background: #6366f1; }
         
         .form-control, .form-select {
-            background: var(--mpesa-bg);
+            background: #ffffff;
             border-color: var(--mpesa-border);
             color: var(--mpesa-text);
         }
         
         .form-control:focus, .form-select:focus {
-            background: var(--mpesa-bg);
+            background: #ffffff;
             border-color: var(--mpesa-primary);
             color: var(--mpesa-text);
             box-shadow: 0 0 0 0.2rem rgba(0, 166, 80, 0.25);
@@ -378,7 +379,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
         }
         
         .quick-action-btn {
-            background: rgba(0, 166, 80, 0.1);
+            background: #ffffff;
             border: 1px solid var(--mpesa-border);
             color: var(--mpesa-text);
             padding: 1rem 1.5rem;
@@ -387,13 +388,15 @@ if ($view === 'c2b' || $view === 'dashboard') {
             transition: all 0.2s;
             text-decoration: none;
             display: block;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
         .quick-action-btn:hover {
-            background: rgba(0, 166, 80, 0.2);
+            background: #f8f9fa;
             border-color: var(--mpesa-primary);
             color: var(--mpesa-text);
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 166, 80, 0.15);
         }
         
         .quick-action-btn i {
@@ -402,16 +405,141 @@ if ($view === 'c2b' || $view === 'dashboard') {
             display: block;
             margin-bottom: 0.5rem;
         }
+        
+        .finance-mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);
+            z-index: 1050;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .finance-mobile-header .brand-mobile {
+            color: #fff;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .finance-mobile-header .hamburger-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+        }
+        .finance-offcanvas {
+            background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%) !important;
+            width: 280px !important;
+        }
+        .finance-offcanvas .offcanvas-header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .finance-offcanvas .btn-close {
+            filter: invert(1);
+        }
+        .finance-offcanvas .nav-link {
+            color: rgba(255,255,255,0.7);
+            padding: 0.75rem 1rem;
+        }
+        .finance-offcanvas .nav-link:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+        .finance-offcanvas .nav-link.active {
+            color: #fff;
+            background: rgba(0, 166, 80, 0.3);
+        }
+        
+        @media (max-width: 991.98px) {
+            .mpesa-sidebar {
+                display: none !important;
+            }
+            .finance-mobile-header {
+                display: flex !important;
+            }
+            .mpesa-content {
+                margin-left: 0 !important;
+                padding: 1rem !important;
+                padding-top: 70px !important;
+            }
+            .stat-value {
+                font-size: 1.5rem !important;
+            }
+        }
+        
+        @media (max-width: 767.98px) {
+            .form-control, .form-select, .btn {
+                min-height: 44px;
+            }
+        }
+        
+        @media (min-width: 992px) {
+            .finance-mobile-header {
+                display: none !important;
+            }
+            .mpesa-sidebar {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Finance Mobile Header -->
+    <div class="finance-mobile-header">
+        <div class="brand-mobile">
+            <i class="bi bi-bank"></i> Finance
+        </div>
+        <button class="hamburger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#financeMobileSidebar">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+    
+    <!-- Finance Mobile Offcanvas Sidebar -->
+    <div class="offcanvas offcanvas-start finance-offcanvas" tabindex="-1" id="financeMobileSidebar">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title text-white"><i class="bi bi-bank me-2"></i>Finance</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <nav class="nav flex-column">
+                <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=finance&view=dashboard">
+                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                </a>
+                <a class="nav-link <?= $view === 'c2b' ? 'active' : '' ?>" href="?page=finance&view=c2b">
+                    <i class="bi bi-arrow-down-circle me-2"></i> C2B Collections
+                </a>
+                <a class="nav-link <?= $view === 'b2c' ? 'active' : '' ?>" href="?page=finance&view=b2c">
+                    <i class="bi bi-arrow-up-circle me-2"></i> B2C Disbursements
+                </a>
+                <a class="nav-link <?= $view === 'b2b' ? 'active' : '' ?>" href="?page=finance&view=b2b">
+                    <i class="bi bi-arrow-left-right me-2"></i> B2B Payments
+                </a>
+                <hr class="my-2 border-light opacity-25">
+                <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=finance&view=settings">
+                    <i class="bi bi-gear me-2"></i> M-Pesa Settings
+                </a>
+                <hr class="my-2 border-light opacity-25">
+                <a class="nav-link" href="?page=dashboard">
+                    <i class="bi bi-arrow-left me-2"></i> Back to CRM
+                </a>
+            </nav>
+        </div>
+    </div>
+    
     <?php if (!empty($initError)): ?>
     <div class="alert alert-warning m-3">
         <strong>Setup Required:</strong> Some finance database tables are missing. Please run the database migration or create the tables manually. The dashboard will show zeros until tables are created.
     </div>
     <?php endif; ?>
     <div class="mpesa-layout">
-        <aside class="mpesa-sidebar">
+        <aside class="mpesa-sidebar d-none d-lg-block">
             <div class="brand">
                 <h4><i class="bi bi-bank"></i> Finance</h4>
                 <small>Payment & Disbursement</small>
@@ -526,21 +654,21 @@ if ($view === 'c2b' || $view === 'dashboard') {
             
             <div class="row g-4 mb-4">
                 <div class="col-md-4">
-                    <a href="?page=mpesa&view=c2b" class="quick-action-btn">
+                    <a href="?page=finance&view=c2b" class="quick-action-btn">
                         <i class="bi bi-arrow-down-circle"></i>
                         <strong>View Collections</strong>
                         <small class="d-block text-muted">STK Push & C2B payments</small>
                     </a>
                 </div>
                 <div class="col-md-4">
-                    <a href="?page=mpesa&view=b2c" class="quick-action-btn">
+                    <a href="?page=finance&view=b2c" class="quick-action-btn">
                         <i class="bi bi-send"></i>
                         <strong>Send Money</strong>
                         <small class="d-block text-muted">B2C disbursements</small>
                     </a>
                 </div>
                 <div class="col-md-4">
-                    <a href="?page=mpesa&view=b2b" class="quick-action-btn">
+                    <a href="?page=finance&view=b2b" class="quick-action-btn">
                         <i class="bi bi-building"></i>
                         <strong>Business Payments</strong>
                         <small class="d-block text-muted">B2B transfers</small>
@@ -553,7 +681,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h6 class="mb-0"><i class="bi bi-arrow-down-circle me-2"></i>Recent STK Push</h6>
-                            <a href="?page=mpesa&view=c2b" class="btn btn-sm btn-outline-mpesa">View All</a>
+                            <a href="?page=finance&view=c2b" class="btn btn-sm btn-outline-mpesa">View All</a>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -597,7 +725,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h6 class="mb-0"><i class="bi bi-arrow-up-circle me-2"></i>Recent B2C Disbursements</h6>
-                            <a href="?page=mpesa&view=b2c" class="btn btn-sm btn-outline-mpesa">View All</a>
+                            <a href="?page=finance&view=b2c" class="btn btn-sm btn-outline-mpesa">View All</a>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -756,7 +884,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
             <?php if (!$mpesa->isB2CConfigured()): ?>
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                <strong>B2C not configured.</strong> Please configure B2C credentials in <a href="?page=mpesa&view=settings">Settings</a> first.
+                <strong>B2C not configured.</strong> Please configure B2C credentials in <a href="?page=finance&view=settings">Settings</a> first.
             </div>
             <?php endif; ?>
             
@@ -867,7 +995,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
             <?php if (!$mpesa->isB2BConfigured()): ?>
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle me-2"></i>
-                <strong>B2B not configured.</strong> Please configure B2B credentials in <a href="?page=mpesa&view=settings">Settings</a> first.
+                <strong>B2B not configured.</strong> Please configure B2B credentials in <a href="?page=finance&view=settings">Settings</a> first.
             </div>
             <?php endif; ?>
             

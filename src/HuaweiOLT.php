@@ -3488,6 +3488,7 @@ class HuaweiOLT {
             'offline_onus' => 0,
             'los_onus' => 0,
             'unconfigured_onus' => 0,
+            'discovered_onus' => 0,
             'total_profiles' => 0,
             'recent_alerts' => 0
         ];
@@ -3511,6 +3512,12 @@ class HuaweiOLT {
         $stats['offline_onus'] = (int)$row['offline'];
         $stats['los_onus'] = (int)$row['los'];
         $stats['unconfigured_onus'] = (int)$row['unconfigured'];
+        
+        try {
+            $stats['discovered_onus'] = (int)$this->db->query("SELECT COUNT(*) FROM onu_discovery_log WHERE is_authorized = FALSE")->fetchColumn();
+        } catch (\Exception $e) {
+            $stats['discovered_onus'] = 0;
+        }
         
         $stats['total_profiles'] = (int)$this->db->query("SELECT COUNT(*) FROM huawei_service_profiles WHERE is_active = TRUE")->fetchColumn();
         $stats['recent_alerts'] = (int)$this->db->query("SELECT COUNT(*) FROM huawei_alerts WHERE is_read = FALSE")->fetchColumn();
