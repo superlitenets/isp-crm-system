@@ -109,14 +109,34 @@ class DiscoveryWorker {
             const key = process.env.SESSION_SECRET || 'default-secret-key-change-me';
             const keyHash = crypto.createHash('sha256').update(key).digest();
             const parts = encrypted.split(':');
-            if (parts.length !== 2) return encrypted;
+            if (parts.length !== 2) {
+                console.log(`[Discovery] Password not in iv:cipher format, using as-is`);
+                return encrypted;
+            }
             const iv = Buffer.from(parts[0], 'hex');
-            const encryptedText = Buffer.from(parts[1], 'hex');
+            
+            // Try hex first, then base64 if hex fails
+            let encryptedText;
+            const hexPart = parts[1];
+            
+            // Check if it's hex-encoded base64 (our PHP format)
+            const decoded = Buffer.from(hexPart, 'hex').toString();
+            if (decoded.match(/^[A-Za-z0-9+/=]+$/)) {
+                // It's hex-encoded base64, decode to get actual ciphertext
+                encryptedText = Buffer.from(decoded, 'base64');
+            } else {
+                // It's raw hex ciphertext
+                encryptedText = Buffer.from(hexPart, 'hex');
+            }
+            
             const decipher = crypto.createDecipheriv('aes-256-cbc', keyHash, iv);
             let decrypted = decipher.update(encryptedText);
             decrypted = Buffer.concat([decrypted, decipher.final()]);
-            return decrypted.toString();
+            const password = decrypted.toString();
+            console.log(`[Discovery] Decrypted password: ${password.substring(0, 2)}***${password.substring(password.length-1)}`);
+            return password;
         } catch (e) {
+            console.error(`[Discovery] Password decryption failed:`, e.message);
             return encrypted;
         }
     }
