@@ -40,11 +40,22 @@ class OLTSession {
                     } else if (cmd === DO || cmd === DONT || cmd === WILL || cmd === WONT) {
                         if (i + 2 < data.length) {
                             const option = data[i + 2];
-                            // Respond negatively to all negotiations
+                            // Handle Telnet options
+                            // Option 1 = ECHO, Option 3 = SGA (Suppress Go Ahead)
                             if (cmd === DO) {
-                                this.socket.write(Buffer.from([IAC, WONT, option]));
+                                // Accept ECHO and SGA, reject others
+                                if (option === 1 || option === 3) {
+                                    this.socket.write(Buffer.from([IAC, WILL, option]));
+                                } else {
+                                    this.socket.write(Buffer.from([IAC, WONT, option]));
+                                }
                             } else if (cmd === WILL) {
-                                this.socket.write(Buffer.from([IAC, DONT, option]));
+                                // Accept ECHO and SGA from server
+                                if (option === 1 || option === 3) {
+                                    this.socket.write(Buffer.from([IAC, DO, option]));
+                                } else {
+                                    this.socket.write(Buffer.from([IAC, DONT, option]));
+                                }
                             }
                             i += 3;
                         } else {
