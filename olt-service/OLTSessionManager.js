@@ -9,6 +9,14 @@ const WILL = 251;
 const SB = 250;   // Sub-negotiation Begin
 const SE = 240;   // Sub-negotiation End
 
+// Telnet options
+const OPT_ECHO = 1;
+const OPT_SGA = 3;          // Suppress Go Ahead
+const OPT_TTYPE = 24;       // Terminal Type
+const OPT_NAWS = 31;        // Window Size
+const OPT_LINEMODE = 34;    // Linemode - MUST REJECT
+const OPT_BINARY = 0;       // Binary Transmission
+
 class OLTSession {
     constructor(oltId, config) {
         this.oltId = oltId;
@@ -40,20 +48,36 @@ class OLTSession {
                     } else if (cmd === DO || cmd === DONT || cmd === WILL || cmd === WONT) {
                         if (i + 2 < data.length) {
                             const option = data[i + 2];
-                            // Handle Telnet options
-                            // Option 1 = ECHO, Option 3 = SGA (Suppress Go Ahead)
+                            // Critical: Reject LINEMODE to prevent space stripping
+                            // Accept SGA (Suppress Go Ahead) for proper character mode
                             if (cmd === DO) {
-                                // Accept ECHO and SGA, reject others
-                                if (option === 1 || option === 3) {
+                                if (option === OPT_SGA) {
+                                    // Accept Suppress Go Ahead - needed for character mode
                                     this.socket.write(Buffer.from([IAC, WILL, option]));
+                                    console.log(`[OLT ${this.oltId}] WILL SGA`);
+                                } else if (option === OPT_LINEMODE) {
+                                    // CRITICAL: Reject LINEMODE - this causes space stripping!
+                                    this.socket.write(Buffer.from([IAC, WONT, option]));
+                                    console.log(`[OLT ${this.oltId}] WONT LINEMODE (critical)`);
+                                } else if (option === OPT_ECHO) {
+                                    // Reject local echo - let server echo
+                                    this.socket.write(Buffer.from([IAC, WONT, option]));
+                                } else if (option === OPT_TTYPE) {
+                                    // Accept terminal type negotiation
+                                    this.socket.write(Buffer.from([IAC, WILL, option]));
+                                } else if (option === OPT_NAWS) {
+                                    // Reject window size negotiation
+                                    this.socket.write(Buffer.from([IAC, WONT, option]));
                                 } else {
+                                    // Reject unknown options
                                     this.socket.write(Buffer.from([IAC, WONT, option]));
                                 }
                             } else if (cmd === WILL) {
-                                // Accept ECHO and SGA from server
-                                if (option === 1 || option === 3) {
+                                if (option === OPT_ECHO || option === OPT_SGA) {
+                                    // Accept server echo and SGA
                                     this.socket.write(Buffer.from([IAC, DO, option]));
                                 } else {
+                                    // Reject other server offers
                                     this.socket.write(Buffer.from([IAC, DONT, option]));
                                 }
                             }
@@ -259,17 +283,10 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command character by character with tiny delay to avoid buffering issues
-            const sendCharByChar = async () => {
-                const fullCmd = command + '\r\n';
-                for (let i = 0; i < fullCmd.length; i++) {
-                    this.socket.write(fullCmd[i]);
-                    await new Promise(r => setTimeout(r, 5));
-                }
-            };
-            
-            console.log(`[OLT ${this.oltId}] Sending command: "${command}"`);
-            sendCharByChar();
+            // Send command as single buffer (LINEMODE rejection should prevent space stripping)
+            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
+            console.log(`[OLT ${this.oltId}] Sending: "${command}"`);
+            this.socket.write(cmdBuffer);
         });
     }
 
