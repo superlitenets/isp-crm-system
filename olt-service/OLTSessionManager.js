@@ -151,12 +151,13 @@ class OLTSession {
                 this.connected = false;
             });
 
-            // Wait for login to complete
+            // Wait for login AND init sequence to complete
             const loginCheck = setInterval(() => {
-                if (this.connected) {
+                if (this.connected && this.initComplete) {
                     clearInterval(loginCheck);
                     clearTimeout(timeout);
                     this.reconnectAttempts = 0;
+                    console.log(`[OLT ${this.oltId}] Connection ready`);
                     resolve(true);
                 }
             }, 500);
@@ -165,8 +166,12 @@ class OLTSession {
                 clearInterval(loginCheck);
                 if (!this.connected) {
                     reject(new Error('Login timeout'));
+                } else if (!this.initComplete) {
+                    // Login worked but init not complete - still usable
+                    console.log(`[OLT ${this.oltId}] Init incomplete, proceeding anyway`);
+                    resolve(true);
                 }
-            }, 30000);
+            }, 45000);
         });
     }
 
@@ -217,21 +222,31 @@ class OLTSession {
                 this.connected = true;
                 this.lastActivity = Date.now();
                 console.log(`[OLT ${this.oltId}] Login successful - prompt detected`);
+                this.initComplete = false;
                 
                 // Enter enable mode, then config mode, then disable paging
-                setTimeout(async () => {
-                    try {
-                        await this.sendCommand('enable');
-                        console.log(`[OLT ${this.oltId}] Entered enable mode`);
-                        await this.sendCommand('config');
-                        console.log(`[OLT ${this.oltId}] Entered config mode`);
-                        await this.sendCommand('screen-length 0 temporary');
-                        console.log(`[OLT ${this.oltId}] Disabled paging`);
-                    } catch (e) {
-                        console.log(`[OLT ${this.oltId}] Init sequence: ${e.message}`);
-                    }
-                }, 500);
+                this.runInitSequence();
             }
+        }
+    }
+    
+    async runInitSequence() {
+        try {
+            await new Promise(r => setTimeout(r, 500));
+            
+            await this.sendCommand('enable');
+            console.log(`[OLT ${this.oltId}] Entered enable mode`);
+            
+            await this.sendCommand('config');
+            console.log(`[OLT ${this.oltId}] Entered config mode`);
+            
+            await this.sendCommand('screen-length 0 temporary');
+            console.log(`[OLT ${this.oltId}] Disabled paging - ready for commands`);
+            
+            this.initComplete = true;
+        } catch (e) {
+            console.log(`[OLT ${this.oltId}] Init sequence error: ${e.message}`);
+            this.initComplete = true; // Allow commands anyway
         }
     }
 
