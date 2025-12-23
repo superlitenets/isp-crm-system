@@ -77,3 +77,21 @@ The system features a modular and extensible design. Configuration is managed vi
 - **One-ISP Billing API**: For customer data lookup and import.
 - **Huawei OLT Devices**: Direct Telnet/SSH/SNMP connectivity for fiber network provisioning and management.
 - **GenieACS**: Open-source TR-069 ACS server for remote ONU configuration (WiFi, VoIP, firmware).
+
+## Database Initialization
+A comprehensive database initialization script is available at `db_init.sql`. This single file contains:
+- All table definitions (100+ tables across all modules)
+- All indexes for performance optimization
+- All foreign key relationships
+- Seed data (roles, permissions, leave types, ONU types, equipment categories, etc.)
+
+**Usage:**
+```bash
+# Local development
+psql -U crm -d isp_crm < db_init.sql
+
+# Docker deployment
+docker exec -i isp_crm_db psql -U crm -d isp_crm < db_init.sql
+```
+
+**Important:** This script uses `CREATE TABLE IF NOT EXISTS` and `ON CONFLICT DO NOTHING` for idempotency - safe to run multiple times without data loss.
