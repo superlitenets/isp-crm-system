@@ -9,6 +9,8 @@ class OLTSession {
         this.lastActivity = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
+        this.buffer = '';
+        this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\])\s*$/;
     }
 
     async connect() {
@@ -18,17 +20,15 @@ class OLTSession {
             host: this.config.host,
             port: this.config.port || 23,
             timeout: 30000,
-            shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/,
-            loginPrompt: /[Uu]sername:|[Ll]ogin:|>>User name:/i,
-            passwordPrompt: /[Pp]assword:/,
+            shellPrompt: false,
+            loginPrompt: /[Uu]sername:|[Ll]ogin:|>>User name:|User name:/i,
+            passwordPrompt: /[Pp]assword:/i,
             username: this.config.username,
             password: this.config.password,
-            pageSeparator: /---- More.*----|--More--|Press any key/i,
             ors: '\r\n',
-            sendTimeout: 15000,
-            execTimeout: 60000,
+            sendTimeout: 30000,
             negotiationMandatory: false,
-            stripShellPrompt: false,
+            initialLFCR: true,
             debug: false
         };
 
@@ -39,7 +39,9 @@ class OLTSession {
             this.reconnectAttempts = 0;
             console.log(`[OLT ${this.oltId}] Connected to ${this.config.host}`);
             
-            await this.executeRaw('screen-length 0 temporary');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await this.sendAndWait('screen-length 0 temporary', 10000);
             
             return true;
         } catch (error) {
@@ -49,12 +51,67 @@ class OLTSession {
         }
     }
 
+    async sendAndWait(command, timeout = 60000) {
+        return new Promise(async (resolve, reject) => {
+            if (!this.connection) {
+                return reject(new Error('No connection'));
+            }
+
+            let response = '';
+            let timeoutId = null;
+            let resolved = false;
+
+            const cleanup = () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                this.connection.removeListener('data', dataHandler);
+            };
+
+            const dataHandler = (data) => {
+                const chunk = data.toString();
+                response += chunk;
+                
+                response = response.replace(/---- More.*?----/gi, '');
+                response = response.replace(/--More--/gi, '');
+                
+                if (this.promptPattern.test(response)) {
+                    if (!resolved) {
+                        resolved = true;
+                        cleanup();
+                        this.lastActivity = Date.now();
+                        resolve(response);
+                    }
+                }
+            };
+
+            this.connection.on('data', dataHandler);
+
+            timeoutId = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    if (response.length > 0) {
+                        resolve(response);
+                    } else {
+                        reject(new Error('Command timeout'));
+                    }
+                }
+            }, timeout);
+
+            try {
+                await this.connection.send(command);
+            } catch (error) {
+                cleanup();
+                reject(error);
+            }
+        });
+    }
+
     async disconnect() {
         if (this.connection && this.connected) {
             try {
                 await this.connection.end();
             } catch (error) {
-                console.error(`[OLT ${this.oltId}] Disconnect error:`, error.message);
+                // Ignore disconnect errors
             }
         }
         
@@ -65,6 +122,7 @@ class OLTSession {
 
     async reconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            this.reconnectAttempts = 0;
             throw new Error(`Max reconnect attempts (${this.maxReconnectAttempts}) reached`);
         }
         
@@ -72,46 +130,31 @@ class OLTSession {
         console.log(`[OLT ${this.oltId}] Reconnecting (attempt ${this.reconnectAttempts})...`);
         
         await this.disconnect();
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
         await this.connect();
     }
 
     async executeRaw(command, options = {}) {
-        if (!this.connected) {
+        if (!this.connected || !this.connection) {
             await this.reconnect();
         }
 
         const timeout = options.timeout || 60000;
         
         try {
-            this.lastActivity = Date.now();
-            const result = await this.connection.exec(command, {
-                timeout: timeout,
-                execTimeout: timeout,
-                shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/
-            });
+            const result = await this.sendAndWait(command, timeout);
+            this.reconnectAttempts = 0;
             return result;
         } catch (error) {
             console.error(`[OLT ${this.oltId}] Command failed:`, error.message);
+            this.connected = false;
             
-            if (error.message.includes('socket') || 
-                error.message.includes('timeout') || 
-                error.message.includes('end') ||
-                error.message.includes('response not received')) {
-                this.connected = false;
-                try {
-                    await this.reconnect();
-                    return await this.connection.exec(command, { 
-                        timeout: timeout,
-                        execTimeout: timeout,
-                        shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/
-                    });
-                } catch (retryError) {
-                    throw retryError;
-                }
+            try {
+                await this.reconnect();
+                return await this.sendAndWait(command, timeout);
+            } catch (retryError) {
+                throw retryError;
             }
-            
-            throw error;
         }
     }
 
@@ -137,7 +180,6 @@ class OLTSessionManager {
         if (this.sessions.has(oltId)) {
             const existingSession = this.sessions.get(oltId);
             if (existingSession.connected) {
-                console.log(`[OLT ${oltId}] Already connected`);
                 return;
             }
             await this.disconnect(oltId);
@@ -159,13 +201,13 @@ class OLTSessionManager {
             const session = this.sessions.get(oltId);
             if (session && session.connected) {
                 try {
-                    await session.executeRaw('\n', { timeout: 10000 });
+                    await session.sendAndWait('', 5000);
                 } catch (error) {
-                    console.error(`[OLT ${oltId}] Keepalive failed:`, error.message);
+                    console.error(`[OLT ${oltId}] Keepalive failed`);
                     session.connected = false;
                 }
             }
-        }, 45000);
+        }, 50000);
         
         this.keepaliveIntervals.set(oltId, interval);
     }
@@ -217,53 +259,29 @@ class OLTSessionManager {
     }
 
     async executeBatch(oltId, commands, options = {}) {
-        const session = this.sessions.get(oltId);
-        if (!session) {
-            throw new Error(`No session for OLT ${oltId}. Connect first.`);
+        const results = [];
+        for (const command of commands) {
+            const result = await this.execute(oltId, command, options);
+            results.push(result);
         }
-
-        if (!this.commandLocks.has(oltId)) {
-            this.commandLocks.set(oltId, Promise.resolve());
-        }
-
-        const currentLock = this.commandLocks.get(oltId);
-        
-        const executionPromise = currentLock.then(async () => {
-            const results = [];
-            for (const cmd of commands) {
-                try {
-                    const result = await session.executeRaw(cmd, options);
-                    results.push({ command: cmd, success: true, output: result });
-                } catch (error) {
-                    results.push({ command: cmd, success: false, error: error.message });
-                }
-            }
-            return results;
-        });
-
-        this.commandLocks.set(oltId, executionPromise.catch(() => {}));
-        
-        return await executionPromise;
-    }
-
-    getSessionStatus(oltId) {
-        const session = this.sessions.get(oltId);
-        if (!session) {
-            return { oltId, connected: false, error: 'No session' };
-        }
-        return session.getStatus();
-    }
-
-    getAllSessionStatus() {
-        const statuses = [];
-        for (const [oltId, session] of this.sessions) {
-            statuses.push(session.getStatus());
-        }
-        return statuses;
+        return results;
     }
 
     getSessionCount() {
         return this.sessions.size;
+    }
+
+    getSessionStatus(oltId) {
+        const session = this.sessions.get(oltId);
+        return session ? session.getStatus() : { connected: false };
+    }
+
+    getAllSessionStatus() {
+        const status = {};
+        for (const [oltId, session] of this.sessions) {
+            status[oltId] = session.getStatus();
+        }
+        return status;
     }
 }
 
