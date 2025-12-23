@@ -1,17 +1,28 @@
 <?php
-require_once __DIR__ . '/../src/Mpesa.php';
-$mpesa = new \App\Mpesa();
-$db = \Database::getConnection();
-
-$view = $_GET['view'] ?? 'dashboard';
-$stats = $mpesa->getDashboardStats();
-$config = $mpesa->getConfig();
+error_log("MPESA DASHBOARD: Template loading started");
+try {
+    require_once __DIR__ . '/../src/Mpesa.php';
+    $mpesa = new \App\Mpesa();
+    $db = \Database::getConnection();
+    
+    $view = $_GET['view'] ?? 'dashboard';
+    $stats = $mpesa->getDashboardStats();
+    $config = $mpesa->getConfig();
+} catch (\Exception $e) {
+    error_log("M-Pesa dashboard init error: " . $e->getMessage());
+    $mpesa = null;
+    $db = \Database::getConnection();
+    $view = $_GET['view'] ?? 'dashboard';
+    $stats = ['stk' => ['total' => 0, 'success' => 0, 'failed' => 0, 'pending' => 0, 'total_amount' => 0], 'c2b' => ['total' => 0, 'success' => 0, 'total_amount' => 0], 'b2c' => ['total' => 0, 'success' => 0, 'failed' => 0, 'pending' => 0, 'total_amount' => 0], 'b2b' => ['total' => 0, 'success' => 0, 'failed' => 0, 'total_amount' => 0]];
+    $config = [];
+    $initError = $e->getMessage();
+}
 
 $success = $_SESSION['success'] ?? null;
 $error = $_SESSION['error'] ?? null;
 unset($_SESSION['success'], $_SESSION['error']);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $mpesa) {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'save_b2c_config') {
@@ -83,10 +94,10 @@ $b2bTransactions = [];
 $stkTransactions = [];
 $c2bTransactions = [];
 
-if ($view === 'b2c') {
+if ($view === 'b2c' && $mpesa) {
     $b2cTransactions = $mpesa->getB2CTransactions($_GET, 50);
 }
-if ($view === 'b2b') {
+if ($view === 'b2b' && $mpesa) {
     $b2bTransactions = $mpesa->getB2BTransactions($_GET, 50);
 }
 if ($view === 'c2b' || $view === 'dashboard') {
@@ -395,6 +406,11 @@ if ($view === 'c2b' || $view === 'dashboard') {
     </style>
 </head>
 <body>
+    <?php if (!empty($initError)): ?>
+    <div class="alert alert-danger m-3">
+        <strong>Initialization Error:</strong> <?= htmlspecialchars($initError) ?>
+    </div>
+    <?php endif; ?>
     <div class="mpesa-layout">
         <aside class="mpesa-sidebar">
             <div class="brand">
