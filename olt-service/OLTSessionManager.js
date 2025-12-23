@@ -218,9 +218,18 @@ class OLTSession {
                 this.lastActivity = Date.now();
                 console.log(`[OLT ${this.oltId}] Login successful - prompt detected`);
                 
-                // Disable paging
-                setTimeout(() => {
-                    this.sendCommand('screen-length 0 temporary').catch(() => {});
+                // Enter enable mode, then config mode, then disable paging
+                setTimeout(async () => {
+                    try {
+                        await this.sendCommand('enable');
+                        console.log(`[OLT ${this.oltId}] Entered enable mode`);
+                        await this.sendCommand('config');
+                        console.log(`[OLT ${this.oltId}] Entered config mode`);
+                        await this.sendCommand('screen-length 0 temporary');
+                        console.log(`[OLT ${this.oltId}] Disabled paging`);
+                    } catch (e) {
+                        console.log(`[OLT ${this.oltId}] Init sequence: ${e.message}`);
+                    }
                 }, 500);
             }
         }
@@ -283,9 +292,9 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command as single buffer (LINEMODE rejection should prevent space stripping)
+            // Send command as single buffer
             const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
-            console.log(`[OLT ${this.oltId}] Sending: "${command}"`);
+            console.log(`[OLT ${this.oltId}] Sending: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
             this.socket.write(cmdBuffer);
         });
     }
