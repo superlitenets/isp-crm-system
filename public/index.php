@@ -6115,8 +6115,8 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="?page=mpesa">
-                    <i class="bi bi-phone text-success"></i> M-Pesa
+                <a class="nav-link" href="?page=finance">
+                    <i class="bi bi-bank text-success"></i> Finance
                 </a>
             </li>
             <?php endif; ?>
@@ -6323,11 +6323,11 @@ $csrfToken = \App\Auth::generateToken();
                     exit;
                 }
                 break;
-            case 'mpesa':
+            case 'finance':
                 if (!\App\Auth::can('settings.view')) {
                     $accessDenied = true;
                 } else {
-                    include __DIR__ . '/../templates/mpesa_dashboard.php';
+                    include __DIR__ . '/../templates/finance_dashboard.php';
                     exit;
                 }
                 break;

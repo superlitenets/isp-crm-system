@@ -8,7 +8,7 @@ try {
     $stats = $mpesa->getDashboardStats();
     $config = $mpesa->getConfig();
 } catch (\Exception $e) {
-    error_log("M-Pesa dashboard init error: " . $e->getMessage());
+    error_log("Finance dashboard init error: " . $e->getMessage());
     $mpesa = null;
     $db = \Database::getConnection();
     $view = $_GET['view'] ?? 'dashboard';
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $mpesa) {
         $mpesa->saveConfig('mpesa_b2c_callback_url', $_POST['b2c_callback_url'] ?? '');
         $mpesa->saveConfig('mpesa_b2c_timeout_url', $_POST['b2c_timeout_url'] ?? '');
         $_SESSION['success'] = 'B2C configuration saved successfully';
-        header('Location: ?page=mpesa&view=settings');
+        header('Location: ?page=finance&view=settings');
         exit;
     }
     
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $mpesa) {
         $mpesa->saveConfig('mpesa_b2b_callback_url', $_POST['b2b_callback_url'] ?? '');
         $mpesa->saveConfig('mpesa_b2b_timeout_url', $_POST['b2b_timeout_url'] ?? '');
         $_SESSION['success'] = 'B2B configuration saved successfully';
-        header('Location: ?page=mpesa&view=settings');
+        header('Location: ?page=finance&view=settings');
         exit;
     }
     
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $mpesa) {
         } else {
             $_SESSION['error'] = 'B2C payment failed: ' . $result['message'];
         }
-        header('Location: ?page=mpesa&view=b2c');
+        header('Location: ?page=finance&view=b2c');
         exit;
     }
     
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $mpesa) {
         } else {
             $_SESSION['error'] = 'B2B payment failed: ' . $result['message'];
         }
-        header('Location: ?page=mpesa&view=b2b');
+        header('Location: ?page=finance&view=b2b');
         exit;
     }
 }
@@ -114,7 +114,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M-Pesa Dashboard - ISP CRM</title>
+    <title>Finance Dashboard - ISP CRM</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -407,32 +407,32 @@ if ($view === 'c2b' || $view === 'dashboard') {
 <body>
     <?php if (!empty($initError)): ?>
     <div class="alert alert-warning m-3">
-        <strong>Setup Required:</strong> Some M-Pesa database tables are missing. Please run the database migration or create the tables manually. The dashboard will show zeros until tables are created.
+        <strong>Setup Required:</strong> Some finance database tables are missing. Please run the database migration or create the tables manually. The dashboard will show zeros until tables are created.
     </div>
     <?php endif; ?>
     <div class="mpesa-layout">
         <aside class="mpesa-sidebar">
             <div class="brand">
-                <h4><i class="bi bi-phone"></i> M-Pesa</h4>
-                <small>Payment Gateway</small>
+                <h4><i class="bi bi-bank"></i> Finance</h4>
+                <small>Payment & Disbursement</small>
             </div>
             
             <nav class="nav flex-column">
-                <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=mpesa&view=dashboard">
+                <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=finance&view=dashboard">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
-                <a class="nav-link <?= $view === 'c2b' ? 'active' : '' ?>" href="?page=mpesa&view=c2b">
+                <a class="nav-link <?= $view === 'c2b' ? 'active' : '' ?>" href="?page=finance&view=c2b">
                     <i class="bi bi-arrow-down-circle"></i> C2B Collections
                 </a>
-                <a class="nav-link <?= $view === 'b2c' ? 'active' : '' ?>" href="?page=mpesa&view=b2c">
+                <a class="nav-link <?= $view === 'b2c' ? 'active' : '' ?>" href="?page=finance&view=b2c">
                     <i class="bi bi-arrow-up-circle"></i> B2C Disbursements
                 </a>
-                <a class="nav-link <?= $view === 'b2b' ? 'active' : '' ?>" href="?page=mpesa&view=b2b">
+                <a class="nav-link <?= $view === 'b2b' ? 'active' : '' ?>" href="?page=finance&view=b2b">
                     <i class="bi bi-arrow-left-right"></i> B2B Payments
                 </a>
                 <hr class="my-2 border-secondary opacity-25">
-                <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=mpesa&view=settings">
-                    <i class="bi bi-gear"></i> Settings
+                <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=finance&view=settings">
+                    <i class="bi bi-gear"></i> M-Pesa Settings
                 </a>
                 <hr class="my-2 border-secondary opacity-25">
                 <a class="nav-link" href="?page=dashboard">
@@ -459,7 +459,7 @@ if ($view === 'c2b' || $view === 'dashboard') {
             <?php if ($view === 'dashboard'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h4 class="page-title mb-1"><i class="bi bi-speedometer2"></i> M-Pesa Dashboard</h4>
+                    <h4 class="page-title mb-1"><i class="bi bi-speedometer2"></i> Finance Dashboard</h4>
                     <div class="d-flex align-items-center gap-3">
                         <span class="text-muted small">Last 30 days overview</span>
                         <span class="live-indicator"><span class="live-dot"></span> Live</span>
