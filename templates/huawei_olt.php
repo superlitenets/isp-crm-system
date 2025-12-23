@@ -2008,9 +2008,7 @@ try {
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php $mobileTotalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
-                    <?php if ($mobileTotalPending > 0): ?>
-                    <span class="badge bg-warning ms-auto"><?= $mobileTotalPending ?></span>
-                    <?php endif; ?>
+                    <span class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
                     <i class="bi bi-sliders me-2"></i> Service Profiles
@@ -2071,9 +2069,7 @@ try {
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= ($stats['unconfigured_onus'] > 0 || $stats['discovered_onus'] > 0) ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php $totalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
-                    <?php if ($totalPending > 0): ?>
-                    <span class="badge bg-warning badge-pulse ms-auto"><?= $totalPending ?></span>
-                    <?php endif; ?>
+                    <span class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
                     <i class="bi bi-sliders me-2"></i> Service Profiles
