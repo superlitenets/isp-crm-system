@@ -1233,6 +1233,24 @@ function resetToDefaults() {
                         </div>
                     </div>
                     
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold"><i class="bi bi-router text-info"></i> Provisioning & Mapping WhatsApp Group</label>
+                            <input type="text" class="form-control" name="wa_provisioning_group" id="waProvisioningGroup"
+                                   value="<?= htmlspecialchars($settings->get('wa_provisioning_group', '')) ?>" 
+                                   placeholder="e.g., 254712345678-1234567890@g.us">
+                            <small class="text-muted">This group receives notifications for newly discovered unconfigured ONUs across all OLTs. Used by the OLT Session Manager for auto-provisioning alerts.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-info" onclick="selectGroupFor('waProvisioningGroup')">
+                                    <i class="bi bi-people"></i> Select from Groups
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <hr class="my-3">
                     
                     <div class="row g-3">
