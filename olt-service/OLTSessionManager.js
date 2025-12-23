@@ -1,5 +1,14 @@
 const net = require('net');
 
+// Telnet protocol constants
+const IAC = 255;  // Interpret As Command
+const DONT = 254;
+const DO = 253;
+const WONT = 252;
+const WILL = 251;
+const SB = 250;   // Sub-negotiation Begin
+const SE = 240;   // Sub-negotiation End
+
 class OLTSession {
     constructor(oltId, config) {
         this.oltId = oltId;
@@ -12,6 +21,59 @@ class OLTSession {
         this.buffer = '';
         this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\])\s*$/;
         this.dataListeners = [];
+    }
+
+    // Handle Telnet protocol negotiations
+    handleTelnetNegotiation(data) {
+        const cleanData = [];
+        let i = 0;
+        
+        while (i < data.length) {
+            if (data[i] === IAC) {
+                if (i + 1 < data.length) {
+                    const cmd = data[i + 1];
+                    
+                    if (cmd === IAC) {
+                        // Escaped IAC, keep one 255 byte
+                        cleanData.push(255);
+                        i += 2;
+                    } else if (cmd === DO || cmd === DONT || cmd === WILL || cmd === WONT) {
+                        if (i + 2 < data.length) {
+                            const option = data[i + 2];
+                            // Respond negatively to all negotiations
+                            if (cmd === DO) {
+                                this.socket.write(Buffer.from([IAC, WONT, option]));
+                            } else if (cmd === WILL) {
+                                this.socket.write(Buffer.from([IAC, DONT, option]));
+                            }
+                            i += 3;
+                        } else {
+                            i++;
+                        }
+                    } else if (cmd === SB) {
+                        // Skip sub-negotiation until SE
+                        let j = i + 2;
+                        while (j < data.length - 1) {
+                            if (data[j] === IAC && data[j + 1] === SE) {
+                                i = j + 2;
+                                break;
+                            }
+                            j++;
+                        }
+                        if (j >= data.length - 1) i = data.length;
+                    } else {
+                        i += 2;
+                    }
+                } else {
+                    i++;
+                }
+            } else {
+                cleanData.push(data[i]);
+                i++;
+            }
+        }
+        
+        return Buffer.from(cleanData);
     }
 
     async connect() {
@@ -30,7 +92,9 @@ class OLTSession {
             });
 
             this.socket.on('data', (data) => {
-                const chunk = data.toString();
+                // Strip Telnet negotiation bytes
+                const cleanData = this.handleTelnetNegotiation(data);
+                const chunk = cleanData.toString('utf8');
                 this.buffer += chunk;
                 
                 // Notify all listeners
