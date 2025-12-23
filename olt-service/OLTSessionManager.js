@@ -39,9 +39,14 @@ class OLTSession {
             this.reconnectAttempts = 0;
             console.log(`[OLT ${this.oltId}] Connected to ${this.config.host}`);
             
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            await this.sendAndWait('screen-length 0 temporary', 10000);
+            try {
+                const initResult = await this.sendAndWait('screen-length 0 temporary', 15000);
+                console.log(`[OLT ${this.oltId}] Init success, prompt detected`);
+            } catch (e) {
+                console.log(`[OLT ${this.oltId}] Init warning: ${e.message}`);
+            }
             
             return true;
         } catch (error) {
@@ -63,15 +68,23 @@ class OLTSession {
 
             const cleanup = () => {
                 if (timeoutId) clearTimeout(timeoutId);
-                this.connection.removeListener('data', dataHandler);
+                try {
+                    this.connection.removeListener('data', dataHandler);
+                } catch (e) {}
             };
 
             const dataHandler = (data) => {
                 const chunk = data.toString();
                 response += chunk;
                 
-                response = response.replace(/---- More.*?----/gi, '');
-                response = response.replace(/--More--/gi, '');
+                if (response.includes('---- More') || response.includes('--More--')) {
+                    try {
+                        this.connection.send(' ');
+                    } catch (e) {}
+                    response = response.replace(/---- More.*?----/gi, '');
+                    response = response.replace(/--More--/gi, '');
+                    return;
+                }
                 
                 if (this.promptPattern.test(response)) {
                     if (!resolved) {
@@ -89,10 +102,11 @@ class OLTSession {
                 if (!resolved) {
                     resolved = true;
                     cleanup();
+                    console.log(`[OLT ${this.oltId}] Timeout response (${response.length} bytes): ${response.slice(-200)}`);
                     if (response.length > 0) {
                         resolve(response);
                     } else {
-                        reject(new Error('Command timeout'));
+                        reject(new Error('Command timeout - no response'));
                     }
                 }
             }, timeout);
