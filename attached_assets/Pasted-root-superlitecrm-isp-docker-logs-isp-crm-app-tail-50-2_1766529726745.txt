@@ -1,0 +1,23 @@
+root@superlitecrm:~/isp# docker logs isp_crm_app --tail 50 2>&1 | grep -i -A3 "oms-notify\|error\|whatsapp"
+Error response from daemon: No such container: isp_crm_app
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 50 2>&1 | grep -i -A3 "oms-notify\|error\|whatsapp"
+NOTICE: PHP message: PHP Warning:  require_once(/var/www/html/public/api/../../src/Database.php): Failed to open stream: No such file or directory in /var/www/html/public/api/oms-notify.php on line 3
+NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Failed opening required '/var/www/html/public/api/../../src/Database.php' (include_path='.:/usr/local/lib/php') in /var/www/html/public/api/oms-notify.php:3
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/public/api/oms-notify.php on line 3
+172.18.0.8 -  24/Dec/2025:01:36:44 +0300 "GET /api/oms-notify.php" 500
+NOTICE: PHP message: PHP Warning:  require_once(/var/www/html/public/api/../../src/Database.php): Failed to open stream: No such file or directory in /var/www/html/public/api/oms-notify.php on line 3
+NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Failed opening required '/var/www/html/public/api/../../src/Database.php' (include_path='.:/usr/local/lib/php') in /var/www/html/public/api/oms-notify.php:3
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/public/api/oms-notify.php on line 3
+172.18.0.8 -  24/Dec/2025:01:39:00 +0300 "GET /api/oms-notify.php" 500
+172.18.0.8 -  24/Dec/2025:01:40:01 +0300 "GET /cron.php" 403
+172.18.0.8 -  24/Dec/2025:01:40:01 +0300 "GET /cron.php" 200
+NOTICE: PHP message: PHP Warning:  require_once(/var/www/html/public/api/../../src/Database.php): Failed to open stream: No such file or directory in /var/www/html/public/api/oms-notify.php on line 3
+NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Failed opening required '/var/www/html/public/api/../../src/Database.php' (include_path='.:/usr/local/lib/php') in /var/www/html/public/api/oms-notify.php:3
+Stack trace:
+#0 {main}
+  thrown in /var/www/html/public/api/oms-notify.php on line 3
+172.18.0.8 -  24/Dec/2025:01:41:00 +0300 "GET /api/oms-notify.php" 500
