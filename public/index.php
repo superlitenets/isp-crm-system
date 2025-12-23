@@ -5924,7 +5924,8 @@ $csrfToken = \App\Auth::generateToken();
         body {
             background-color: #f8f9fa;
         }
-        .sidebar {
+        /* Desktop sidebar - hidden on mobile */
+        .sidebar-desktop {
             position: fixed;
             top: 0;
             left: 0;
@@ -5933,19 +5934,23 @@ $csrfToken = \App\Auth::generateToken();
             background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);
             padding-top: 1rem;
             z-index: 1000;
+            overflow-y: auto;
         }
-        .sidebar .nav-link {
+        .sidebar-desktop .nav-link,
+        .offcanvas .nav-link {
             color: rgba(255,255,255,0.8);
             padding: 0.75rem 1.5rem;
             border-radius: 0;
             transition: all 0.3s;
         }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+        .sidebar-desktop .nav-link:hover, .sidebar-desktop .nav-link.active,
+        .offcanvas .nav-link:hover, .offcanvas .nav-link.active {
             background: rgba(255,255,255,0.1);
             color: #fff;
             border-left: 3px solid var(--primary-color);
         }
-        .sidebar .nav-link i {
+        .sidebar-desktop .nav-link i,
+        .offcanvas .nav-link i {
             margin-right: 0.75rem;
             width: 20px;
         }
@@ -6002,14 +6007,96 @@ $csrfToken = \App\Auth::generateToken();
             font-size: 0.875rem;
             border-top: 1px solid rgba(255,255,255,0.1);
         }
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
+        /* Mobile header with hamburger */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%);
+            z-index: 1050;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .mobile-header .brand-mobile {
+            color: #fff;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .mobile-header .hamburger-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+        }
+        /* Mobile offcanvas sidebar styling */
+        .offcanvas-mobile {
+            background: linear-gradient(135deg, #1a1c2c 0%, #2d3250 100%) !important;
+            width: 280px !important;
+        }
+        .offcanvas-mobile .offcanvas-header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .offcanvas-mobile .btn-close {
+            filter: invert(1);
+        }
+        /* Responsive adjustments */
+        @media (max-width: 991.98px) {
+            .sidebar-desktop {
+                display: none !important;
+            }
+            .mobile-header {
+                display: flex !important;
             }
             .main-content {
                 margin-left: 0;
+                padding: 1rem;
+                padding-top: 70px;
+            }
+            /* Smaller cards on mobile */
+            .stat-card .stat-icon {
+                width: 45px;
+                height: 45px;
+                font-size: 1.2rem;
+            }
+            /* Full-width buttons on mobile */
+            .btn-mobile-full {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+            /* Better table scrolling */
+            .table-responsive {
+                margin: 0 -1rem;
+                padding: 0 1rem;
+            }
+        }
+        @media (min-width: 992px) {
+            .mobile-header {
+                display: none !important;
+            }
+            .sidebar-desktop {
+                display: flex !important;
+            }
+        }
+        /* Touch-friendly form controls */
+        @media (max-width: 767.98px) {
+            .form-control, .form-select, .btn {
+                min-height: 44px;
+            }
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+            .modal-body {
+                padding: 1rem;
+            }
+            /* Stack form rows on mobile */
+            .row-mobile-stack > * {
+                margin-bottom: 0.75rem;
             }
         }
     </style>
@@ -6021,7 +6108,152 @@ $csrfToken = \App\Auth::generateToken();
     $sidebarLogo = $sidebarCompanyInfo['company_logo'] ?? '';
     $sidebarCompanyName = $sidebarCompanyInfo['company_name'] ?? 'ISP CRM';
     ?>
-    <nav class="sidebar d-flex flex-column">
+    
+    <!-- Mobile Header with Hamburger -->
+    <div class="mobile-header">
+        <div class="brand-mobile">
+            <?php if (!empty($sidebarLogo)): ?>
+                <img src="<?= htmlspecialchars($sidebarLogo) ?>" alt="<?= htmlspecialchars($sidebarCompanyName) ?>" style="max-height: 32px;">
+            <?php else: ?>
+                <i class="bi bi-router"></i> <?= htmlspecialchars($sidebarCompanyName) ?>
+            <?php endif; ?>
+        </div>
+        <button class="hamburger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+    
+    <!-- Mobile Offcanvas Sidebar -->
+    <div class="offcanvas offcanvas-start offcanvas-mobile" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title text-white" id="mobileSidebarLabel">
+                <?php if (!empty($sidebarLogo)): ?>
+                    <img src="<?= htmlspecialchars($sidebarLogo) ?>" alt="<?= htmlspecialchars($sidebarCompanyName) ?>" style="max-height: 36px;">
+                <?php else: ?>
+                    <i class="bi bi-router"></i> <?= htmlspecialchars($sidebarCompanyName) ?>
+                <?php endif; ?>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                </li>
+                <?php if (\App\Auth::can('customers.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'customers' ? 'active' : '' ?>" href="?page=customers">
+                        <i class="bi bi-people"></i> Customers
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('tickets.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'tickets' ? 'active' : '' ?>" href="?page=tickets">
+                        <i class="bi bi-ticket"></i> Tickets
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('hr.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'hr' ? 'active' : '' ?>" href="?page=hr">
+                        <i class="bi bi-people-fill"></i> HR
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('inventory.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
+                        <i class="bi bi-box-seam"></i> Inventory
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('orders.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'orders' ? 'active' : '' ?>" href="?page=orders">
+                        <i class="bi bi-cart3"></i> Orders
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('tickets.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'complaints' ? 'active' : '' ?>" href="?page=complaints">
+                        <i class="bi bi-exclamation-triangle"></i> Complaints
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('settings.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'devices' ? 'active' : '' ?>" href="?page=devices">
+                        <i class="bi bi-hdd-network"></i> Network Devices
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="?page=huawei-olt">
+                        <i class="bi bi-router text-primary"></i> OMS
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('reports.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'reports' ? 'active' : '' ?>" href="?page=reports">
+                        <i class="bi bi-graph-up"></i> Reports
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('settings.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
+                        <i class="bi bi-calculator"></i> Accounting
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="?page=finance">
+                        <i class="bi bi-bank text-success"></i> Finance
+                    </a>
+                </li>
+                <?php endif; ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'whatsapp-chat' ? 'active' : '' ?>" href="?page=whatsapp-chat">
+                        <i class="bi bi-chat-dots"></i> Quick Chat
+                    </a>
+                </li>
+                <?php if ($currentUser['role'] !== 'admin'): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'my-hr' ? 'active' : '' ?>" href="?page=my-hr">
+                        <i class="bi bi-person-badge"></i> My HR
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('settings.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'settings' ? 'active' : '' ?>" href="?page=settings">
+                        <i class="bi bi-gear"></i> Settings
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::isAdmin()): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'branches' ? 'active' : '' ?>" href="?page=branches">
+                        <i class="bi bi-building"></i> Branches
+                    </a>
+                </li>
+                <?php endif; ?>
+            </ul>
+            <div class="user-info mt-auto">
+                <i class="bi bi-person-circle"></i> <?= htmlspecialchars($currentUser['name']) ?>
+                <br>
+                <small class="text-muted"><?= ucfirst($currentUser['role']) ?></small>
+                <br>
+                <a href="?page=logout" class="text-danger small"><i class="bi bi-box-arrow-right"></i> Logout</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Desktop Sidebar -->
+    <nav class="sidebar-desktop d-none d-lg-flex flex-column">
         <div class="brand">
             <?php if (!empty($sidebarLogo)): ?>
                 <img src="<?= htmlspecialchars($sidebarLogo) ?>" alt="<?= htmlspecialchars($sidebarCompanyName) ?>" style="max-height: 40px; max-width: 180px;">

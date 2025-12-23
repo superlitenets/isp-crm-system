@@ -1839,6 +1839,109 @@ try {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.8); }
         }
+        
+        /* Mobile Responsive Styles */
+        .oms-mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(180deg, var(--oms-primary) 0%, var(--oms-primary-light) 100%);
+            z-index: 1050;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .oms-mobile-header .brand-mobile {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .oms-mobile-header .brand-mobile .brand-title {
+            font-size: 1.25rem;
+        }
+        .oms-mobile-header .hamburger-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+        }
+        .oms-offcanvas {
+            background: linear-gradient(180deg, var(--oms-primary) 0%, var(--oms-primary-light) 100%) !important;
+            width: 280px !important;
+        }
+        .oms-offcanvas .offcanvas-header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .oms-offcanvas .btn-close {
+            filter: invert(1);
+        }
+        
+        @media (max-width: 991.98px) {
+            .sidebar {
+                display: none !important;
+            }
+            .oms-mobile-header {
+                display: flex !important;
+            }
+            .main-content {
+                margin-left: 0 !important;
+                padding: 1rem !important;
+                padding-top: 70px !important;
+                width: 100% !important;
+            }
+            .stat-card {
+                margin-bottom: 0.75rem;
+            }
+            .stat-icon {
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 1.2rem !important;
+            }
+            .stat-value {
+                font-size: 1.5rem !important;
+            }
+            .page-title {
+                font-size: 1.25rem;
+            }
+            .btn-group-mobile {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .btn-group-mobile .btn {
+                flex: 1 1 auto;
+                min-width: 120px;
+            }
+        }
+        
+        @media (max-width: 767.98px) {
+            .form-control, .form-select, .btn {
+                min-height: 44px;
+            }
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+            .card-body {
+                padding: 1rem;
+            }
+            .table td, .table th {
+                padding: 0.5rem;
+                font-size: 0.875rem;
+            }
+        }
+        
+        @media (min-width: 992px) {
+            .oms-mobile-header {
+                display: none !important;
+            }
+            .sidebar {
+                display: flex !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1851,8 +1954,87 @@ try {
         </div>
     </div>
     
+    <!-- OMS Mobile Header -->
+    <div class="oms-mobile-header">
+        <div class="brand-mobile">
+            <div style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-light)); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-router text-white"></i>
+            </div>
+            <span class="brand-title text-white">OMS</span>
+        </div>
+        <button class="hamburger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#omsMobileSidebar">
+            <i class="bi bi-list"></i>
+        </button>
+    </div>
+    
+    <!-- OMS Mobile Offcanvas Sidebar -->
+    <div class="offcanvas offcanvas-start oms-offcanvas" tabindex="-1" id="omsMobileSidebar">
+        <div class="offcanvas-header">
+            <div class="d-flex align-items-center">
+                <div class="me-2" style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-light)); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-router text-white"></i>
+                </div>
+                <div>
+                    <span class="brand-title text-white">OMS</span>
+                    <div class="brand-subtitle">Network Manager</div>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body p-2">
+            <a href="?page=dashboard" class="nav-link text-white-50 small mb-2">
+                <i class="bi bi-arrow-left me-2"></i> Back to CRM
+            </a>
+            <nav class="nav flex-column">
+                <a class="nav-link <?= $view === 'dashboard' ? 'active' : '' ?>" href="?page=huawei-olt&view=dashboard">
+                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                </a>
+                <a class="nav-link <?= $view === 'olts' ? 'active' : '' ?>" href="?page=huawei-olt&view=olts">
+                    <i class="bi bi-hdd-rack me-2"></i> OLT Devices
+                </a>
+                <a class="nav-link <?= ($view === 'onus' && !isset($_GET['unconfigured'])) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus">
+                    <i class="bi bi-check-circle me-2"></i> Authorized ONUs
+                </a>
+                <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
+                    <i class="bi bi-hourglass-split me-2"></i> Non Auth
+                    <?php if ($stats['unconfigured_onus'] > 0): ?>
+                    <span class="badge bg-warning ms-auto"><?= $stats['unconfigured_onus'] ?></span>
+                    <?php endif; ?>
+                </a>
+                <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
+                    <i class="bi bi-sliders me-2"></i> Service Profiles
+                </a>
+                <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
+                    <i class="bi bi-geo-alt me-2"></i> Locations
+                </a>
+                <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
+                    <i class="bi bi-diagram-3 me-2"></i> Network Map
+                </a>
+                <a class="nav-link <?= $view === 'logs' ? 'active' : '' ?>" href="?page=huawei-olt&view=logs">
+                    <i class="bi bi-journal-text me-2"></i> Logs
+                </a>
+                <a class="nav-link <?= $view === 'alerts' ? 'active' : '' ?>" href="?page=huawei-olt&view=alerts">
+                    <i class="bi bi-bell me-2"></i> Alerts
+                </a>
+                <a class="nav-link <?= $view === 'terminal' ? 'active' : '' ?>" href="?page=huawei-olt&view=terminal">
+                    <i class="bi bi-terminal me-2"></i> CLI Terminal
+                </a>
+                <hr class="my-2 border-light opacity-25">
+                <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
+                    <i class="bi bi-gear-wide-connected me-2"></i> TR-069
+                </a>
+                <a class="nav-link <?= $view === 'vpn' ? 'active' : '' ?>" href="?page=huawei-olt&view=vpn">
+                    <i class="bi bi-shield-lock-fill me-2"></i> VPN
+                </a>
+                <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings">
+                    <i class="bi bi-gear me-2"></i> Settings
+                </a>
+            </nav>
+        </div>
+    </div>
+    
     <div class="d-flex">
-        <div class="sidebar d-flex flex-column p-3" style="width: 260px;">
+        <div class="sidebar d-none d-lg-flex flex-column p-3" style="width: 260px;">
             <a href="?page=dashboard" class="text-decoration-none small mb-3 px-2 d-flex align-items-center" style="color: rgba(255,255,255,0.5);">
                 <i class="bi bi-arrow-left me-1"></i> Back to CRM
             </a>
@@ -1915,7 +2097,7 @@ try {
             </nav>
         </div>
         
-        <div class="flex-grow-1 p-4">
+        <div class="main-content flex-grow-1 p-4">
             <?php if ($message): ?>
             <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($message) ?>
