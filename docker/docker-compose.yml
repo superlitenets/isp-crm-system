@@ -16,6 +16,7 @@ services:
       - SESSION_SECRET=isp-crm-secure-session-secret-2025
       - APP_TIMEZONE=Africa/Nairobi
       - APP_DEBUG=false
+      - OLT_SERVICE_URL=http://olt-service:3001
     volumes:
       - uploads_data:/var/www/html/uploads
       - logs_data:/var/www/html/logs
@@ -68,6 +69,27 @@ services:
     container_name: isp-crm-genieacs-mongo
     volumes:
       - genieacs_mongo_data:/data/db
+    restart: unless-stopped
+    networks:
+      - isp-crm-network
+
+  olt-service:
+    build:
+      context: ../olt-service
+      dockerfile: Dockerfile
+    container_name: isp_crm_olt_service
+    environment:
+      - DATABASE_URL=postgresql://crm:Mgathoni.2016@db:5432/ispcrm
+      - OLT_SERVICE_PORT=3001
+      - PHP_API_URL=http://app:80
+      - DISCOVERY_INTERVAL=*/30 * * * * *
+      - SNMP_POLL_INTERVAL=30
+      - SESSION_SECRET=isp-crm-secure-session-secret-2025
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - isp-crm-network

@@ -396,10 +396,10 @@ class HuaweiOLT {
                 $uptimeStr = $info['sysUpTime'];
                 if (preg_match('/\((\d+)\)/', $uptimeStr, $m)) {
                     $ticks = (int)$m[1];
-                    $seconds = $ticks / 100;
-                    $days = floor($seconds / 86400);
-                    $hours = floor(($seconds % 86400) / 3600);
-                    $mins = floor(($seconds % 3600) / 60);
+                    $seconds = (int)($ticks / 100);
+                    $days = (int)floor($seconds / 86400);
+                    $hours = (int)floor(($seconds % 86400) / 3600);
+                    $mins = (int)floor(($seconds % 3600) / 60);
                     $uptime = "{$days}d {$hours}h {$mins}m";
                 } else {
                     $uptime = $uptimeStr;
