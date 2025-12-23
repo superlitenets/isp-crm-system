@@ -17,18 +17,19 @@ class OLTSession {
         const params = {
             host: this.config.host,
             port: this.config.port || 23,
-            timeout: 15000,
-            shellPrompt: /[>#$%]\s*$/,
-            loginPrompt: /[Uu]sername:|[Ll]ogin:/,
+            timeout: 30000,
+            shellPrompt: /(?:<[^>]+>|\[[^\]]+\]|[>#$%])\s*$/,
+            loginPrompt: /[Uu]sername:|[Ll]ogin:|>>User name:/i,
             passwordPrompt: /[Pp]assword:/,
             username: this.config.username,
             password: this.config.password,
-            pageSeparator: '---- More ----',
+            pageSeparator: /---- More.*----|--More--|Press any key/i,
             ors: '\r\n',
-            sendTimeout: 10000,
-            execTimeout: 30000,
+            sendTimeout: 15000,
+            execTimeout: 60000,
             negotiationMandatory: false,
-            stripShellPrompt: false
+            stripShellPrompt: false,
+            debug: false
         };
 
         try {

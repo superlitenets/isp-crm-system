@@ -92,7 +92,7 @@ class DiscoveryWorker {
         }
 
         const command = 'display ont autofind all';
-        const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 30000 });
+        const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 60000 });
 
         const unconfiguredOnus = this.parseAutofindOutput(output);
         console.log(`[Discovery] Found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
