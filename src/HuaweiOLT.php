@@ -3362,6 +3362,103 @@ class HuaweiOLT {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
+    public function getTopologyData(?int $oltId = null): array {
+        $topology = ['nodes' => [], 'edges' => []];
+        
+        $oltQuery = "SELECT id, name, ip_address, is_active FROM huawei_olts WHERE is_active = TRUE";
+        if ($oltId) {
+            $oltQuery .= " AND id = :olt_id";
+        }
+        $oltQuery .= " ORDER BY name";
+        
+        $stmt = $this->db->prepare($oltQuery);
+        if ($oltId) {
+            $stmt->execute([':olt_id' => $oltId]);
+        } else {
+            $stmt->execute();
+        }
+        $olts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($olts as $olt) {
+            $oltNodeId = 'olt_' . $olt['id'];
+            $topology['nodes'][] = [
+                'id' => $oltNodeId,
+                'label' => $olt['name'],
+                'type' => 'olt',
+                'title' => "OLT: {$olt['name']}\nIP: {$olt['ip_address']}",
+                'ip' => $olt['ip_address']
+            ];
+            
+            $portStmt = $this->db->prepare("
+                SELECT DISTINCT frame_slot_port, 
+                       COUNT(id) as onu_count,
+                       COUNT(*) FILTER (WHERE status = 'online') as online,
+                       COUNT(*) FILTER (WHERE status = 'offline') as offline,
+                       COUNT(*) FILTER (WHERE status = 'los') as los
+                FROM huawei_onus 
+                WHERE olt_id = :olt_id 
+                GROUP BY frame_slot_port 
+                ORDER BY frame_slot_port
+            ");
+            $portStmt->execute([':olt_id' => $olt['id']]);
+            $ports = $portStmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            foreach ($ports as $port) {
+                $portNodeId = 'port_' . $olt['id'] . '_' . str_replace('/', '_', $port['frame_slot_port']);
+                $portStatus = $port['los'] > 0 ? 'warning' : ($port['offline'] > 0 ? 'partial' : 'online');
+                
+                $topology['nodes'][] = [
+                    'id' => $portNodeId,
+                    'label' => $port['frame_slot_port'],
+                    'type' => 'port',
+                    'title' => "Port: {$port['frame_slot_port']}\nONUs: {$port['onu_count']}\nOnline: {$port['online']}, Offline: {$port['offline']}, LOS: {$port['los']}",
+                    'status' => $portStatus,
+                    'onu_count' => $port['onu_count'],
+                    'online' => $port['online'],
+                    'offline' => $port['offline'],
+                    'los' => $port['los']
+                ];
+                
+                $topology['edges'][] = [
+                    'from' => $oltNodeId,
+                    'to' => $portNodeId
+                ];
+                
+                $onuStmt = $this->db->prepare("
+                    SELECT id, name, sn, status, onu_id, rx_power, tx_power,
+                           (SELECT c.name FROM customers c WHERE c.id = o.customer_id) as customer_name
+                    FROM huawei_onus o
+                    WHERE olt_id = :olt_id AND frame_slot_port = :port
+                    ORDER BY onu_id
+                ");
+                $onuStmt->execute([':olt_id' => $olt['id'], ':port' => $port['frame_slot_port']]);
+                $onus = $onuStmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                foreach ($onus as $onu) {
+                    $onuNodeId = 'onu_' . $onu['id'];
+                    $topology['nodes'][] = [
+                        'id' => $onuNodeId,
+                        'label' => $onu['name'] ?: "ONU #{$onu['onu_id']}",
+                        'type' => 'onu',
+                        'status' => $onu['status'],
+                        'title' => "ONU: " . ($onu['name'] ?: $onu['sn']) . "\nS/N: {$onu['sn']}\nStatus: {$onu['status']}\nRx: " . ($onu['rx_power'] ?? 'N/A') . " dBm" . ($onu['customer_name'] ? "\nCustomer: {$onu['customer_name']}" : ''),
+                        'serial' => $onu['sn'],
+                        'rx_power' => $onu['rx_power'],
+                        'customer' => $onu['customer_name'],
+                        'db_id' => $onu['id']
+                    ];
+                    
+                    $topology['edges'][] = [
+                        'from' => $portNodeId,
+                        'to' => $onuNodeId
+                    ];
+                }
+            }
+        }
+        
+        return $topology;
+    }
+    
     // ==================== Provisioning Logs ====================
     
     public function addLog(array $data): int {

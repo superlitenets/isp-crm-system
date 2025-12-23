@@ -1759,6 +1759,9 @@ try {
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
                     <i class="bi bi-geo-alt me-2"></i> Locations
                 </a>
+                <a class="nav-link <?= $view === 'topology' ? 'active' : '' ?>" href="?page=huawei-olt&view=topology">
+                    <i class="bi bi-diagram-3 me-2"></i> Network Map
+                </a>
                 <a class="nav-link <?= $view === 'logs' ? 'active' : '' ?>" href="?page=huawei-olt&view=logs">
                     <i class="bi bi-journal-text me-2"></i> Provisioning Logs
                 </a>
@@ -4522,6 +4525,275 @@ try {
                     <?php endif; ?>
                 </div>
             </div>
+            <?php elseif ($view === 'topology'): ?>
+            <?php
+            $topologyOltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+            $topologyData = $huaweiOLT->getTopologyData($topologyOltId);
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="page-title mb-1"><i class="bi bi-diagram-3"></i> PON Network Map</h4>
+                    <small class="text-muted">Interactive topology visualization</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <select id="topologyOltFilter" class="form-select form-select-sm" style="width: 200px;" onchange="filterTopology(this.value)">
+                        <option value="">All OLTs</option>
+                        <?php foreach ($olts as $olt): ?>
+                        <option value="<?= $olt['id'] ?>" <?= $topologyOltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="resetTopologyView()">
+                        <i class="bi bi-arrows-angle-contract me-1"></i> Fit View
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-3">
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
+                        <span class="topology-legend-dot" style="background: var(--oms-primary);"></span>
+                        <small>OLT</small>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
+                        <span class="topology-legend-dot" style="background: #8b5cf6;"></span>
+                        <small>PON Port</small>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
+                        <span class="topology-legend-dot" style="background: var(--oms-success);"></span>
+                        <small>Online ONU</small>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
+                        <span class="topology-legend-dot" style="background: var(--oms-danger);"></span>
+                        <small>LOS ONU</small>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2 bg-light rounded px-3 py-2">
+                        <span class="topology-legend-dot" style="background: #6b7280;"></span>
+                        <small>Offline ONU</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div id="topologyContainer" style="height: 600px; width: 100%; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 0.375rem;"></div>
+                </div>
+            </div>
+            
+            <div id="nodeInfoPanel" class="card shadow-sm mt-3" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Node Details</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('nodeInfoPanel').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="card-body" id="nodeInfoContent"></div>
+            </div>
+            
+            <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+            <style>
+                .topology-legend-dot {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    display: inline-block;
+                }
+                #topologyContainer .vis-tooltip {
+                    background: #1e293b !important;
+                    color: #f1f5f9 !important;
+                    border: 1px solid #475569 !important;
+                    border-radius: 8px !important;
+                    padding: 10px 14px !important;
+                    font-family: inherit !important;
+                    white-space: pre-line !important;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+                }
+            </style>
+            <script>
+            const topologyData = <?= json_encode($topologyData) ?>;
+            let network = null;
+            
+            function initTopology() {
+                const container = document.getElementById('topologyContainer');
+                
+                const nodes = new vis.DataSet(topologyData.nodes.map(node => {
+                    let color, shape, size, font;
+                    
+                    if (node.type === 'olt') {
+                        color = { background: '#3b82f6', border: '#1d4ed8', highlight: { background: '#60a5fa', border: '#2563eb' } };
+                        shape = 'box';
+                        size = 30;
+                        font = { color: '#ffffff', size: 14, bold: true };
+                    } else if (node.type === 'port') {
+                        color = { background: '#8b5cf6', border: '#6d28d9', highlight: { background: '#a78bfa', border: '#7c3aed' } };
+                        shape = 'diamond';
+                        size = 20;
+                        font = { color: '#ffffff', size: 11 };
+                    } else {
+                        if (node.status === 'online') {
+                            color = { background: '#10b981', border: '#059669', highlight: { background: '#34d399', border: '#10b981' } };
+                        } else if (node.status === 'los') {
+                            color = { background: '#ef4444', border: '#dc2626', highlight: { background: '#f87171', border: '#ef4444' } };
+                        } else {
+                            color = { background: '#6b7280', border: '#4b5563', highlight: { background: '#9ca3af', border: '#6b7280' } };
+                        }
+                        shape = 'dot';
+                        size = 12;
+                        font = { color: '#e2e8f0', size: 10 };
+                    }
+                    
+                    return {
+                        id: node.id,
+                        label: node.label,
+                        title: node.title,
+                        color: color,
+                        shape: shape,
+                        size: size,
+                        font: font,
+                        nodeData: node
+                    };
+                }));
+                
+                const edges = new vis.DataSet(topologyData.edges.map(edge => ({
+                    from: edge.from,
+                    to: edge.to,
+                    color: { color: '#475569', highlight: '#60a5fa', opacity: 0.6 },
+                    width: edge.from.startsWith('olt_') ? 3 : 1,
+                    smooth: { type: 'cubicBezier', roundness: 0.5 }
+                })));
+                
+                const options = {
+                    layout: {
+                        hierarchical: {
+                            enabled: true,
+                            direction: 'UD',
+                            sortMethod: 'directed',
+                            levelSeparation: 120,
+                            nodeSpacing: 80,
+                            treeSpacing: 100
+                        }
+                    },
+                    physics: {
+                        enabled: false
+                    },
+                    interaction: {
+                        hover: true,
+                        tooltipDelay: 100,
+                        zoomView: true,
+                        dragView: true
+                    },
+                    nodes: {
+                        borderWidth: 2,
+                        shadow: { enabled: true, size: 8, x: 2, y: 2 }
+                    },
+                    edges: {
+                        arrows: { to: { enabled: false } }
+                    }
+                };
+                
+                network = new vis.Network(container, { nodes, edges }, options);
+                
+                network.on('click', function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        const node = nodes.get(nodeId);
+                        showNodeInfo(node.nodeData);
+                    }
+                });
+                
+                network.on('doubleClick', function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        const node = nodes.get(nodeId);
+                        if (node.nodeData.type === 'onu' && node.nodeData.db_id) {
+                            window.location.href = '?page=huawei-olt&view=onus&onu_id=' + node.nodeData.db_id;
+                        }
+                    }
+                });
+            }
+            
+            function showNodeInfo(node) {
+                const panel = document.getElementById('nodeInfoPanel');
+                const content = document.getElementById('nodeInfoContent');
+                
+                let html = '';
+                if (node.type === 'olt') {
+                    html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Type:</strong> OLT Device</p>
+                                <p><strong>Name:</strong> ${node.label}</p>
+                                <p><strong>IP Address:</strong> ${node.ip || 'N/A'}</p>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <a href="?page=huawei-olt&view=olts&edit_olt=${node.id.replace('olt_', '')}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil me-1"></i> Edit OLT
+                                </a>
+                            </div>
+                        </div>`;
+                } else if (node.type === 'port') {
+                    html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Type:</strong> PON Port</p>
+                                <p><strong>Port:</strong> ${node.label}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Total ONUs:</strong> ${node.onu_count || 0}</p>
+                                <p><span class="text-success">${node.online || 0} Online</span> / <span class="text-danger">${node.los || 0} LOS</span> / <span class="text-secondary">${node.offline || 0} Offline</span></p>
+                            </div>
+                        </div>`;
+                } else {
+                    const statusClass = node.status === 'online' ? 'success' : (node.status === 'los' ? 'danger' : 'secondary');
+                    html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Type:</strong> ONU</p>
+                                <p><strong>Name:</strong> ${node.label}</p>
+                                <p><strong>Serial:</strong> <code>${node.serial || 'N/A'}</code></p>
+                                <p><strong>Status:</strong> <span class="badge bg-${statusClass}">${node.status}</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Rx Power:</strong> ${node.rx_power ? node.rx_power + ' dBm' : 'N/A'}</p>
+                                <p><strong>Customer:</strong> ${node.customer || 'Not assigned'}</p>
+                                ${node.db_id ? `<a href="?page=huawei-olt&view=onus&onu_id=${node.db_id}" class="btn btn-primary btn-sm"><i class="bi bi-eye me-1"></i> View Details</a>` : ''}
+                            </div>
+                        </div>`;
+                }
+                
+                content.innerHTML = html;
+                panel.style.display = 'block';
+            }
+            
+            function filterTopology(oltId) {
+                const url = new URL(window.location);
+                if (oltId) {
+                    url.searchParams.set('olt_id', oltId);
+                } else {
+                    url.searchParams.delete('olt_id');
+                }
+                window.location = url;
+            }
+            
+            function resetTopologyView() {
+                if (network) {
+                    network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+                }
+            }
+            
+            document.addEventListener('DOMContentLoaded', initTopology);
+            </script>
+            
             <?php elseif ($view === 'tr069'): ?>
             <?php
             require_once __DIR__ . '/../src/GenieACS.php';
