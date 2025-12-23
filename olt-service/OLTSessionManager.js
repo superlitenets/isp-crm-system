@@ -92,12 +92,32 @@ class OLTSession {
             }
         }
         
-        // Check if we're logged in (prompt detected)
-        if (this.promptPattern.test(this.buffer)) {
+        // Debug: Log buffer after password sent
+        if (this.sentPassword && !this.loggedBuffer) {
+            setTimeout(() => {
+                if (!this.connected) {
+                    console.log(`[OLT ${this.oltId}] Buffer after login (${this.buffer.length} bytes):`);
+                    console.log(`[OLT ${this.oltId}] Last 500 chars: ${this.buffer.slice(-500).replace(/\r?\n/g, '\\n')}`);
+                    this.loggedBuffer = true;
+                }
+            }, 5000);
+        }
+        
+        // Check if we're logged in (prompt detected) - multiple patterns for Huawei
+        const huaweiPrompts = [
+            /(?:<[^<>]+>)\s*$/,           // <hostname>
+            /(?:\[[^\[\]]+\])\s*$/,       // [hostname]
+            /MA\d+\S*[>#]\s*$/,           // MA5600T# or MA5683T>
+            /\S+[>#]\s*$/                 // Any hostname with > or #
+        ];
+        
+        const promptMatched = huaweiPrompts.some(p => p.test(this.buffer));
+        
+        if (promptMatched) {
             if (!this.connected) {
                 this.connected = true;
                 this.lastActivity = Date.now();
-                console.log(`[OLT ${this.oltId}] Login successful`);
+                console.log(`[OLT ${this.oltId}] Login successful - prompt detected`);
                 
                 // Disable paging
                 setTimeout(() => {
