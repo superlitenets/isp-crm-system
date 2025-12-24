@@ -56,9 +56,13 @@ if (isset($_GET['action']) && $view === 'vpn') {
             echo json_encode(['success' => true, 'peer' => $peer, 'subnets' => $subnets]);
             exit;
         case 'test_peer_connectivity':
-            $peerId = (int)($_GET['peer_id'] ?? 0);
-            $results = $wgService->testPeerConnectivity($peerId);
-            echo json_encode(['success' => true, 'results' => $results]);
+            try {
+                $peerId = (int)($_GET['peer_id'] ?? 0);
+                $results = $wgService->testPeerConnectivity($peerId);
+                echo json_encode(['success' => true, 'results' => $results]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
             exit;
         case 'test_ip':
             $ip = $_GET['ip'] ?? '';
