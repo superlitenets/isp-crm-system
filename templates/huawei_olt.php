@@ -131,6 +131,141 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
     exit;
 }
 
+// AJAX endpoint for realtime OMS stats (dashboard refresh)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_stats') {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    
+    try {
+        $stats = $huaweiOLT->getStats();
+        
+        // Get OLT status counts
+        $oltStats = $db->query("
+            SELECT 
+                COUNT(*) FILTER (WHERE is_active = TRUE) as active_olts,
+                COUNT(*) as total_olts
+            FROM huawei_olts
+        ")->fetch(\PDO::FETCH_ASSOC);
+        
+        // Get signal health issues
+        $signalIssues = $db->query("
+            SELECT COUNT(*) FROM huawei_onus 
+            WHERE is_authorized = TRUE 
+            AND (rx_power < -28 OR rx_power > -8 OR status = 'los')
+        ")->fetchColumn();
+        
+        // Get recent activity (last 5 minutes)
+        $recentActivity = $db->query("
+            SELECT COUNT(*) FROM huawei_onus 
+            WHERE updated_at > NOW() - INTERVAL '5 minutes'
+        ")->fetchColumn();
+        
+        echo json_encode([
+            'success' => true,
+            'stats' => $stats,
+            'olt_stats' => $oltStats,
+            'signal_issues' => (int)$signalIssues,
+            'recent_activity' => (int)$recentActivity,
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint for realtime ONU list (with pagination)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+    $unconfigured = isset($_GET['unconfigured']) && $_GET['unconfigured'] == '1';
+    $search = $_GET['search'] ?? '';
+    $status = $_GET['status'] ?? '';
+    
+    try {
+        $params = [];
+        $where = [];
+        
+        if ($oltId) {
+            $where[] = "o.olt_id = ?";
+            $params[] = $oltId;
+        }
+        
+        if ($unconfigured) {
+            $where[] = "o.is_authorized = FALSE";
+        } else {
+            $where[] = "o.is_authorized = TRUE";
+        }
+        
+        if ($search) {
+            $where[] = "(o.sn ILIKE ? OR o.name ILIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+        
+        if ($status) {
+            $where[] = "o.status = ?";
+            $params[] = $status;
+        }
+        
+        $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+        
+        $sql = "SELECT o.id, o.sn, o.name, o.status, o.rx_power, o.tx_power, 
+                       o.frame, o.slot, o.port, o.onu_id, o.olt_id, 
+                       ol.name as olt_name, o.updated_at,
+                       c.first_name || ' ' || c.last_name as customer_name
+                FROM huawei_onus o
+                LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
+                LEFT JOIN customers c ON o.customer_id = c.id
+                $whereClause
+                ORDER BY o.updated_at DESC
+                LIMIT 100";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Get discovered ONUs if viewing unconfigured
+        $discoveredOnus = [];
+        if ($unconfigured) {
+            $discSql = "SELECT dl.*, ol.name as olt_name 
+                        FROM onu_discovery_log dl
+                        LEFT JOIN huawei_olts ol ON dl.olt_id = ol.id
+                        WHERE dl.authorized = FALSE 
+                        AND dl.last_seen_at > NOW() - INTERVAL '2 hours'
+                        ORDER BY dl.last_seen_at DESC";
+            if ($oltId) {
+                $discSql = "SELECT dl.*, ol.name as olt_name 
+                            FROM onu_discovery_log dl
+                            LEFT JOIN huawei_olts ol ON dl.olt_id = ol.id
+                            WHERE dl.authorized = FALSE 
+                            AND dl.olt_id = ?
+                            AND dl.last_seen_at > NOW() - INTERVAL '2 hours'
+                            ORDER BY dl.last_seen_at DESC";
+                $stmt = $db->prepare($discSql);
+                $stmt->execute([$oltId]);
+            } else {
+                $stmt = $db->query($discSql);
+            }
+            $discoveredOnus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'onus' => $onus,
+            'discovered_onus' => $discoveredOnus,
+            'total_count' => count($onus),
+            'discovered_count' => count($discoveredOnus),
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
@@ -2932,6 +3067,92 @@ try {
                 </div>
             </div>
             
+            <!-- Realtime Dashboard Updates -->
+            <script>
+            (function() {
+                let realtimeInterval = null;
+                const REFRESH_INTERVAL = 10000; // 10 seconds
+                
+                function updateStats(data) {
+                    if (!data.success) return;
+                    
+                    const stats = data.stats;
+                    const totalOnus = stats.online_onus + stats.offline_onus + stats.los_onus;
+                    const uptimePercent = totalOnus > 0 ? ((stats.online_onus / totalOnus) * 100).toFixed(1) : 0;
+                    
+                    // Update stat values with animation
+                    updateElement('.stat-card.stat-success .stat-value', stats.online_onus.toLocaleString());
+                    updateElement('.stat-card.stat-danger .stat-value', (stats.offline_onus + stats.los_onus).toString());
+                    updateElement('.stat-card.stat-warning .stat-value', stats.unconfigured_onus.toString());
+                    
+                    // Update pending button
+                    const pendingBtn = document.querySelector('a[href*="unconfigured=1"].btn-warning');
+                    if (pendingBtn) {
+                        pendingBtn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i> Pending (${stats.unconfigured_onus})`;
+                    }
+                    
+                    // Update timestamp
+                    const timestampEl = document.querySelector('.text-muted.small');
+                    if (timestampEl && timestampEl.textContent.includes('Last updated')) {
+                        timestampEl.textContent = 'Last updated: ' + new Date().toLocaleString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', 
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        });
+                    }
+                    
+                    // Pulse the live indicator
+                    const liveIndicator = document.querySelector('.live-indicator');
+                    if (liveIndicator) {
+                        liveIndicator.classList.add('pulse-once');
+                        setTimeout(() => liveIndicator.classList.remove('pulse-once'), 500);
+                    }
+                }
+                
+                function updateElement(selector, value) {
+                    const el = document.querySelector(selector);
+                    if (el && el.textContent !== value) {
+                        el.classList.add('value-updated');
+                        el.textContent = value;
+                        setTimeout(() => el.classList.remove('value-updated'), 1000);
+                    }
+                }
+                
+                async function fetchRealtimeStats() {
+                    try {
+                        const resp = await fetch('?page=huawei-olt&ajax=realtime_stats');
+                        const data = await resp.json();
+                        updateStats(data);
+                    } catch (e) {
+                        console.error('Realtime stats error:', e);
+                    }
+                }
+                
+                // Start polling
+                realtimeInterval = setInterval(fetchRealtimeStats, REFRESH_INTERVAL);
+                
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    if (realtimeInterval) clearInterval(realtimeInterval);
+                });
+            })();
+            </script>
+            <style>
+            .value-updated {
+                animation: valueFlash 0.5s ease-out;
+            }
+            @keyframes valueFlash {
+                0% { background-color: rgba(25, 135, 84, 0.3); }
+                100% { background-color: transparent; }
+            }
+            .pulse-once {
+                animation: pulseLive 0.5s ease-out;
+            }
+            @keyframes pulseLive {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+            </style>
+            
             <?php elseif ($view === 'live_monitor'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0"><i class="bi bi-activity me-2"></i>Live ONU Monitor</h4>
@@ -3137,8 +3358,8 @@ try {
                     startBtn.classList.add('d-none');
                     stopBtn.classList.remove('d-none');
                     fetchLiveData();
-                    // Auto-refresh every 2 minutes
-                    monitorInterval = setInterval(fetchLiveData, 120000);
+                    // Auto-refresh every 30 seconds for real-time monitoring
+                    monitorInterval = setInterval(fetchLiveData, 30000);
                 }
                 
                 function stopMonitor() {
@@ -3234,10 +3455,16 @@ try {
             
             <?php elseif ($view === 'onus'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="mb-0">
-                    <i class="bi bi-<?= isset($_GET['unconfigured']) ? 'hourglass-split' : 'check-circle' ?> me-2"></i>
-                    <?= isset($_GET['unconfigured']) ? 'Pending Authorization' : 'Authorized ONUs' ?>
-                </h4>
+                <div>
+                    <h4 class="mb-0">
+                        <i class="bi bi-<?= isset($_GET['unconfigured']) ? 'hourglass-split' : 'check-circle' ?> me-2"></i>
+                        <?= isset($_GET['unconfigured']) ? 'Pending Authorization' : 'Authorized ONUs' ?>
+                    </h4>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <span class="live-indicator"><span class="live-dot"></span> Live</span>
+                        <small id="realtime-indicator" class="text-muted">Auto-refreshing...</small>
+                    </div>
+                </div>
                 <div class="d-flex gap-2">
                     <form class="d-flex gap-2" method="get">
                         <input type="hidden" name="page" value="huawei-olt">
@@ -3467,7 +3694,7 @@ try {
                             </thead>
                             <tbody>
                                 <?php foreach ($onus as $onu): ?>
-                                <tr>
+                                <tr data-onu-id="<?= $onu['id'] ?>">
                                     <td>
                                         <code><?= htmlspecialchars($onu['sn']) ?></code>
                                         <?php if (!empty($onu['discovered_eqid'])): ?>
@@ -3596,12 +3823,16 @@ try {
                 </div>
             </div>
             
-            <!-- Manual refresh/discovery functionality - no auto-refresh -->
+            <!-- Realtime ONU list updates -->
             <script>
             (function() {
                 const isUnconfigured = <?= isset($_GET['unconfigured']) ? 'true' : 'false' ?>;
                 const oltId = <?= $oltId ? $oltId : 'null' ?>;
+                const searchParam = '<?= htmlspecialchars($_GET['search'] ?? '') ?>';
+                const statusParam = '<?= htmlspecialchars($_GET['status'] ?? '') ?>';
                 let isDiscovering = false;
+                let realtimeInterval = null;
+                const REFRESH_INTERVAL = 15000; // 15 seconds for ONU list
                 
                 function showToast(message, type) {
                     const toast = document.createElement('div');
@@ -3616,6 +3847,85 @@ try {
                         </div>`;
                     document.body.appendChild(toast);
                     setTimeout(() => toast.remove(), 5000);
+                }
+                
+                // Realtime ONU status updates
+                async function fetchRealtimeONUs() {
+                    try {
+                        let url = '?page=huawei-olt&ajax=realtime_onus';
+                        if (oltId) url += '&olt_id=' + oltId;
+                        if (isUnconfigured) url += '&unconfigured=1';
+                        if (searchParam) url += '&search=' + encodeURIComponent(searchParam);
+                        if (statusParam) url += '&status=' + encodeURIComponent(statusParam);
+                        
+                        const resp = await fetch(url);
+                        const data = await resp.json();
+                        
+                        if (data.success) {
+                            updateONUStatuses(data.onus);
+                            updateRealtimeIndicator(data.timestamp);
+                        }
+                    } catch (e) {
+                        console.error('Realtime ONU error:', e);
+                    }
+                }
+                
+                function updateONUStatuses(onus) {
+                    const statusMap = {};
+                    onus.forEach(onu => {
+                        statusMap[onu.id] = onu;
+                    });
+                    
+                    // Update status badges in the table
+                    document.querySelectorAll('tr[data-onu-id]').forEach(row => {
+                        const onuId = row.getAttribute('data-onu-id');
+                        const onu = statusMap[onuId];
+                        if (!onu) return;
+                        
+                        const statusBadge = row.querySelector('.badge');
+                        if (statusBadge) {
+                            const newStatus = onu.status || 'offline';
+                            const statusCfg = {
+                                online: { class: 'bg-success', icon: 'check-circle-fill' },
+                                offline: { class: 'bg-secondary', icon: 'circle' },
+                                los: { class: 'bg-danger', icon: 'exclamation-triangle-fill' }
+                            };
+                            const cfg = statusCfg[newStatus] || statusCfg.offline;
+                            
+                            // Check if status changed
+                            if (!statusBadge.classList.contains(cfg.class)) {
+                                statusBadge.className = 'badge ' + cfg.class;
+                                statusBadge.innerHTML = `<i class="bi bi-${cfg.icon} me-1"></i>${newStatus}`;
+                                row.classList.add('row-updated');
+                                setTimeout(() => row.classList.remove('row-updated'), 1000);
+                            }
+                        }
+                        
+                        // Update power levels
+                        const rxCell = row.querySelector('[data-rx-power]');
+                        const txCell = row.querySelector('[data-tx-power]');
+                        if (rxCell && onu.rx_power !== null) {
+                            const newRx = parseFloat(onu.rx_power).toFixed(1) + ' dBm';
+                            if (rxCell.textContent !== newRx) {
+                                rxCell.textContent = newRx;
+                            }
+                        }
+                        if (txCell && onu.tx_power !== null) {
+                            const newTx = parseFloat(onu.tx_power).toFixed(1) + ' dBm';
+                            if (txCell.textContent !== newTx) {
+                                txCell.textContent = newTx;
+                            }
+                        }
+                    });
+                }
+                
+                function updateRealtimeIndicator(timestamp) {
+                    const indicator = document.getElementById('realtime-indicator');
+                    if (indicator) {
+                        indicator.textContent = 'Updated: ' + new Date(timestamp).toLocaleTimeString();
+                        indicator.classList.add('pulse-once');
+                        setTimeout(() => indicator.classList.remove('pulse-once'), 500);
+                    }
                 }
                 
                 // Manual discovery function (called by Discover button)
@@ -3656,8 +3966,25 @@ try {
                 window.refreshPage = function() {
                     window.location.reload();
                 };
+                
+                // Start realtime polling
+                realtimeInterval = setInterval(fetchRealtimeONUs, REFRESH_INTERVAL);
+                
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    if (realtimeInterval) clearInterval(realtimeInterval);
+                });
             })();
             </script>
+            <style>
+            .row-updated {
+                animation: rowFlash 0.5s ease-out;
+            }
+            @keyframes rowFlash {
+                0% { background-color: rgba(25, 135, 84, 0.2); }
+                100% { background-color: transparent; }
+            }
+            </style>
             
             <?php elseif ($view === 'onu_detail' && $currentOnu): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
