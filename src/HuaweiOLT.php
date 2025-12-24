@@ -6567,6 +6567,108 @@ class HuaweiOLT {
         ];
     }
     
+    public function bulkMoveONUs(array $migrations): array {
+        $results = [];
+        $successful = 0;
+        $failed = 0;
+        
+        foreach ($migrations as $migration) {
+            $onuDbId = (int)($migration['onu_id'] ?? 0);
+            $newSlot = (int)($migration['new_slot'] ?? 0);
+            $newPort = (int)($migration['new_port'] ?? 0);
+            $newOnuId = !empty($migration['new_onu_id']) ? (int)$migration['new_onu_id'] : null;
+            
+            if (!$onuDbId || !$newSlot || !$newPort) {
+                $results[] = ['onu_id' => $onuDbId, 'success' => false, 'error' => 'Missing required parameters'];
+                $failed++;
+                continue;
+            }
+            
+            $result = $this->moveONU($onuDbId, $newSlot, $newPort, $newOnuId);
+            $results[] = array_merge(['onu_id' => $onuDbId], $result);
+            
+            if ($result['success']) {
+                $successful++;
+            } else {
+                $failed++;
+            }
+            
+            // Small delay between migrations to prevent overwhelming the OLT
+            usleep(500000); // 500ms
+        }
+        
+        return [
+            'success' => $failed === 0,
+            'total' => count($migrations),
+            'successful' => $successful,
+            'failed' => $failed,
+            'results' => $results
+        ];
+    }
+    
+    public function getONUsForMigration(int $oltId, ?int $slot = null, ?int $port = null): array {
+        $sql = "SELECT o.id, o.sn, o.name, o.frame, o.slot, o.port, o.onu_id, o.status, o.rx_power,
+                       c.name as customer_name
+                FROM huawei_onus o
+                LEFT JOIN customers c ON o.customer_id = c.id
+                WHERE o.olt_id = ? AND o.is_authorized = true";
+        $params = [$oltId];
+        
+        if ($slot !== null) {
+            $sql .= " AND o.slot = ?";
+            $params[] = $slot;
+        }
+        if ($port !== null) {
+            $sql .= " AND o.port = ?";
+            $params[] = $port;
+        }
+        
+        $sql .= " ORDER BY o.slot, o.port, o.onu_id";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getAvailablePorts(int $oltId): array {
+        // Get board info for available GPON ports
+        $stmt = $this->db->prepare("
+            SELECT DISTINCT frame, slot, port, COUNT(*) as onu_count
+            FROM huawei_onus 
+            WHERE olt_id = ? AND is_authorized = true
+            GROUP BY frame, slot, port
+            ORDER BY frame, slot, port
+        ");
+        $stmt->execute([$oltId]);
+        $usedPorts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Get OLT board info for available slots
+        $stmt = $this->db->prepare("SELECT board_info FROM huawei_olts WHERE id = ?");
+        $stmt->execute([$oltId]);
+        $olt = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $boardInfo = json_decode($olt['board_info'] ?? '{}', true);
+        
+        $availablePorts = [];
+        foreach ($boardInfo as $slotNum => $board) {
+            if (isset($board['type']) && (stripos($board['type'], 'GP') !== false || stripos($board['type'], 'GPON') !== false)) {
+                // Typically 8 or 16 ports per GPON board
+                $portsPerBoard = 8; // Default
+                if (preg_match('/(\d+)$/', $board['type'] ?? '', $m)) {
+                    $portsPerBoard = min((int)$m[1], 16);
+                }
+                for ($p = 0; $p < $portsPerBoard; $p++) {
+                    $availablePorts[] = [
+                        'frame' => 0,
+                        'slot' => (int)$slotNum,
+                        'port' => $p
+                    ];
+                }
+            }
+        }
+        
+        return ['used_ports' => $usedPorts, 'available_ports' => $availablePorts];
+    }
+    
     public function getOnuTypeInfo(int $onuDbId): ?array {
         $onu = $this->getONU($onuDbId);
         if (!$onu) {
