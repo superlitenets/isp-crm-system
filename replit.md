@@ -35,6 +35,11 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Billing System Integration**: One-ISP API integration for customer data lookup and import.
 - **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump).
 - **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation, configuration export, MikroTik script generation, and real-time traffic statistics.
+- **Licensing System**: Standalone license server for redistributing the CRM to other ISPs. Features include:
+  - **License Server** (`license-server/`): Deployable standalone PHP app with admin dashboard, REST API, customer/license/activation management, usage analytics.
+  - **License Client** (`src/LicenseClient.php`, `src/LicenseMiddleware.php`): Integrated validation with 7-day grace period for offline operation.
+  - **Feature Gating**: Tier-based access control (Starter/Professional/Enterprise) with limits on users, customers, and ONUs.
+  - **Environment Variables**: `LICENSE_SERVER_URL`, `LICENSE_KEY` enable licensing; disabled by default for self-hosted use.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
