@@ -762,7 +762,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             }
                         }
                     }
-                    $message = 'VPN peer added successfully';
+                    // Auto-sync WireGuard config
+                    $syncResult = $wgService->syncConfig();
+                    $message = 'VPN peer added successfully' . ($syncResult['success'] ? ' - Config synced' : '');
                     $messageType = 'success';
                 } else {
                     $message = 'Failed to add VPN peer';
@@ -773,7 +775,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 require_once __DIR__ . '/../src/WireGuardService.php';
                 $wgService = new \App\WireGuardService($db);
                 $wgService->deletePeer((int)$_POST['peer_id']);
-                $message = 'VPN peer deleted successfully';
+                // Auto-sync WireGuard config
+                $syncResult = $wgService->syncConfig();
+                $message = 'VPN peer deleted' . ($syncResult['success'] ? ' - Config synced' : '');
                 $messageType = 'success';
                 break;
             case 'edit_vpn_peer':
@@ -808,15 +812,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         }
                     }
                     
-                    // Restart WireGuard container to apply new routes
-                    $wgService->restartContainer();
-                    $message = 'VPN peer updated and WireGuard restarted to apply routes';
+                    // Auto-sync WireGuard config (replaces restartContainer)
+                    $syncResult = $wgService->syncConfig();
+                    $message = 'VPN peer updated' . ($syncResult['success'] ? ' - Config synced and applied' : ' - Please sync manually');
                 } catch (Exception $e) {
                     $message = 'Peer updated but subnet changes may have failed: ' . $e->getMessage();
                 }
                 $messageType = 'success';
                 break;
             case 'add_vpn_subnet':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
                 $peerId = !empty($_POST['vpn_peer_id']) ? (int)$_POST['vpn_peer_id'] : null;
                 $stmt = $db->prepare("INSERT INTO wireguard_subnets (vpn_peer_id, network_cidr, description, subnet_type, is_olt_management, is_tr069_range) VALUES (?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
@@ -827,14 +833,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     isset($_POST['is_olt_management']) && $_POST['is_olt_management'] === '1',
                     isset($_POST['is_tr069_range']) && $_POST['is_tr069_range'] === '1'
                 ]);
-                $message = 'Network subnet added successfully';
+                // Auto-sync WireGuard config
+                $syncResult = $wgService->syncConfig();
+                $message = 'Network subnet added' . ($syncResult['success'] ? ' - Config synced' : '');
                 $messageType = 'success';
                 break;
             case 'delete_vpn_subnet':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
                 $stmt = $db->prepare("UPDATE wireguard_subnets SET is_active = FALSE WHERE id = ?");
                 $stmt->execute([(int)$_POST['id']]);
-                $message = 'Network subnet deleted successfully';
+                // Auto-sync WireGuard config
+                $syncResult = $wgService->syncConfig();
+                $message = 'Network subnet deleted' . ($syncResult['success'] ? ' - Config synced' : '');
                 $messageType = 'success';
+                break;
+            case 'sync_wireguard':
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $syncResult = $wgService->syncConfig();
+                $message = $syncResult['success'] 
+                    ? 'WireGuard config synced and applied successfully' 
+                    : 'Sync failed: ' . ($syncResult['error'] ?? 'Unknown error');
+                $messageType = $syncResult['success'] ? 'success' : 'danger';
                 break;
             case 'test_genieacs':
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -5388,6 +5409,16 @@ try {
                                 <button type="submit" class="btn btn-primary w-100">
                                     <i class="bi bi-save me-2"></i>Save VPN Settings
                                 </button>
+                            </form>
+                            
+                            <hr class="my-3">
+                            <form method="POST" action="?page=huawei-olt&view=vpn">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="sync_wireguard">
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="bi bi-arrow-repeat me-2"></i>Sync & Apply Config
+                                </button>
+                                <div class="form-text text-center mt-1">Writes config and applies via wg syncconf</div>
                             </form>
                         </div>
                     </div>

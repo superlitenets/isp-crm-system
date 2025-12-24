@@ -20,6 +20,7 @@ services:
     volumes:
       - uploads_data:/var/www/html/uploads
       - logs_data:/var/www/html/logs
+      - wireguard_config:/etc/wireguard
     depends_on:
       db:
         condition: service_healthy

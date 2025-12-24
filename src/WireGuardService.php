@@ -713,4 +713,157 @@ class WireGuardService {
         
         return $results;
     }
+    
+    /**
+     * Write WireGuard config to file and apply via wg syncconf
+     * @param int $serverId Server ID (or 0 for first/only server)
+     * @return array Result with success status and message
+     */
+    public function syncConfig(int $serverId = 0): array {
+        try {
+            // Get server (use first one if not specified)
+            if ($serverId === 0) {
+                $servers = $this->getServers();
+                if (empty($servers)) {
+                    return ['success' => false, 'error' => 'No WireGuard server configured'];
+                }
+                $serverId = $servers[0]['id'];
+            }
+            
+            $config = $this->getServerConfig($serverId);
+            if (empty($config)) {
+                return ['success' => false, 'error' => 'Failed to generate config'];
+            }
+            
+            // Config file paths (Docker volume or host path)
+            $configPaths = [
+                '/config/wg0.conf',           // Inside linuxserver/wireguard container
+                '/etc/wireguard/wg0.conf',    // Host WireGuard path
+            ];
+            
+            $configWritten = false;
+            $writtenPath = '';
+            
+            foreach ($configPaths as $path) {
+                $dir = dirname($path);
+                if (is_dir($dir) && is_writable($dir)) {
+                    if (file_put_contents($path, $config) !== false) {
+                        $configWritten = true;
+                        $writtenPath = $path;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$configWritten) {
+                // Try writing to a shared volume path that might be mapped
+                $fallbackPath = '/var/www/html/storage/wireguard/wg0.conf';
+                $fallbackDir = dirname($fallbackPath);
+                if (!is_dir($fallbackDir)) {
+                    @mkdir($fallbackDir, 0755, true);
+                }
+                if (file_put_contents($fallbackPath, $config) !== false) {
+                    $configWritten = true;
+                    $writtenPath = $fallbackPath;
+                }
+            }
+            
+            if (!$configWritten) {
+                return ['success' => false, 'error' => 'Could not write config file - check permissions'];
+            }
+            
+            // Try to apply config using wg syncconf (hot reload, no restart needed)
+            $syncResult = $this->applyConfig($writtenPath);
+            
+            // Log the sync
+            $this->logSync($serverId, $syncResult['success'], $syncResult['message'] ?? '');
+            
+            return [
+                'success' => $syncResult['success'],
+                'message' => $syncResult['success'] 
+                    ? 'Config synced and applied successfully' 
+                    : 'Config written but could not apply: ' . ($syncResult['error'] ?? 'Unknown error'),
+                'config_path' => $writtenPath,
+                'applied' => $syncResult['success']
+            ];
+            
+        } catch (\Exception $e) {
+            \error_log("WireGuard syncConfig error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Apply WireGuard config using wg syncconf or wg-quick
+     */
+    private function applyConfig(string $configPath): array {
+        // Try wg syncconf first (hot reload without dropping connections)
+        $output = [];
+        $returnVar = 0;
+        
+        // Check if wg command is available
+        exec('which wg 2>/dev/null', $output, $returnVar);
+        if ($returnVar !== 0) {
+            // wg not available in this container, try docker exec
+            exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg0.conf 2>&1', $output, $returnVar);
+            if ($returnVar === 0) {
+                return ['success' => true, 'message' => 'Applied via docker exec'];
+            }
+            
+            // Try restarting container as fallback
+            exec('docker restart isp_crm_wireguard 2>&1', $output, $returnVar);
+            if ($returnVar === 0) {
+                return ['success' => true, 'message' => 'Container restarted'];
+            }
+            
+            return ['success' => false, 'error' => 'Could not apply config - wg command not available'];
+        }
+        
+        // wg is available, use syncconf
+        exec("wg syncconf wg0 {$configPath} 2>&1", $output, $returnVar);
+        if ($returnVar === 0) {
+            return ['success' => true, 'message' => 'Applied via wg syncconf'];
+        }
+        
+        // Try wg-quick strip and reload
+        exec("wg-quick strip wg0 2>&1", $output, $returnVar);
+        
+        return [
+            'success' => $returnVar === 0,
+            'error' => implode("\n", $output)
+        ];
+    }
+    
+    /**
+     * Log sync operation
+     */
+    private function logSync(int $serverId, bool $success, string $message): void {
+        try {
+            $this->db->prepare("
+                INSERT INTO wireguard_sync_logs (server_id, success, message, synced_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ")->execute([$serverId, $success, $message]);
+        } catch (\Exception $e) {
+            \error_log("Failed to log WireGuard sync: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Get recent sync logs
+     */
+    public function getSyncLogs(int $limit = 10): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT l.*, s.name as server_name 
+                FROM wireguard_sync_logs l
+                LEFT JOIN wireguard_servers s ON l.server_id = s.id
+                ORDER BY l.synced_at DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
 }

@@ -66,6 +66,7 @@ services:
     volumes:
       - ./logs:/var/www/html/logs
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
+      - wireguard_config:/etc/wireguard
 
   nginx:
     image: nginx:stable-alpine
