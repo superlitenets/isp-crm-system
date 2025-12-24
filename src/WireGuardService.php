@@ -622,37 +622,38 @@ class WireGuardService {
     }
     
     /**
-     * Test connectivity using socket connection (fallback when exec is disabled)
+     * Test connectivity via OLT Session Manager (real ping when exec is disabled)
      */
-    private function testConnectivitySocket(string $ip, int $timeout = 2): array {
-        $result = [
-            'success' => false,
-            'ip' => $ip,
-            'method' => 'socket',
-            'latency_avg' => null
-        ];
+    private function testConnectivityViaOltService(string $ip, int $count = 3, int $timeout = 2): array {
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3001';
         
-        $startTime = \microtime(true);
-        $socket = @\fsockopen($ip, 22, $errno, $errstr, $timeout);
+        $ch = \curl_init("{$oltServiceUrl}/ping");
+        \curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => \json_encode(['ip' => $ip, 'count' => $count, 'timeout' => $timeout]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout + 5,
+            CURLOPT_CONNECTTIMEOUT => 3
+        ]);
         
-        if ($socket) {
-            $latency = (\microtime(true) - $startTime) * 1000;
-            \fclose($socket);
-            $result['success'] = true;
-            $result['latency_avg'] = $latency;
-            $result['port'] = 22;
-        } else {
-            $socket = @\fsockopen($ip, 80, $errno, $errstr, $timeout);
-            if ($socket) {
-                $latency = (\microtime(true) - $startTime) * 1000;
-                \fclose($socket);
-                $result['success'] = true;
-                $result['latency_avg'] = $latency;
-                $result['port'] = 80;
+        $response = \curl_exec($ch);
+        $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        \curl_close($ch);
+        
+        if ($httpCode === 200 && $response) {
+            $result = \json_decode($response, true);
+            if ($result) {
+                return $result;
             }
         }
         
-        return $result;
+        return [
+            'success' => false,
+            'ip' => $ip,
+            'error' => 'OLT Service unreachable',
+            'method' => 'olt_service'
+        ];
     }
     
     /**
@@ -668,7 +669,7 @@ class WireGuardService {
         }
         
         if (!$this->isExecAvailable()) {
-            return $this->testConnectivitySocket($ip, $timeout);
+            return $this->testConnectivityViaOltService($ip, $count, $timeout);
         }
         
         $output = [];
