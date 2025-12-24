@@ -576,6 +576,10 @@ class Employee {
         $bonuses = (float)($data['bonuses'] ?? 0);
         $deductions = (float)($data['deductions'] ?? 0);
         $tax = (float)($data['tax'] ?? 0);
+        
+        $advanceDeduction = $this->calculateAdvanceDeduction($data['employee_id']);
+        $deductions += $advanceDeduction;
+        
         $netPay = $baseSalary + $overtimePay + $bonuses - $deductions - $tax;
 
         $stmt = $this->db->prepare("
@@ -599,7 +603,81 @@ class Employee {
             $data['notes'] ?? null
         ]);
 
-        return (int) $this->db->lastInsertId();
+        $payrollId = (int) $this->db->lastInsertId();
+        
+        if ($advanceDeduction > 0) {
+            $this->applyAdvanceDeductions($data['employee_id'], $payrollId, $advanceDeduction);
+        }
+
+        return $payrollId;
+    }
+    
+    private function calculateAdvanceDeduction(int $employeeId): float {
+        $stmt = $this->db->prepare("
+            SELECT sa.id, sa.outstanding_balance, sa.installments,
+                   COALESCE(sa.approved_amount, sa.requested_amount) as total_amount
+            FROM salary_advances sa
+            WHERE sa.employee_id = ? 
+              AND sa.status IN ('disbursed', 'repaying')
+              AND sa.outstanding_balance > 0
+            ORDER BY sa.created_at ASC
+        ");
+        $stmt->execute([$employeeId]);
+        $advances = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $totalDeduction = 0;
+        foreach ($advances as $advance) {
+            $installmentAmount = $advance['installments'] > 0 
+                ? $advance['total_amount'] / $advance['installments'] 
+                : $advance['outstanding_balance'];
+            $deductAmount = min($installmentAmount, $advance['outstanding_balance']);
+            $totalDeduction += $deductAmount;
+        }
+        
+        return $totalDeduction;
+    }
+    
+    private function applyAdvanceDeductions(int $employeeId, int $payrollId, float $totalDeduction): void {
+        $stmt = $this->db->prepare("
+            SELECT sa.id, sa.outstanding_balance, sa.installments,
+                   COALESCE(sa.approved_amount, sa.requested_amount) as total_amount
+            FROM salary_advances sa
+            WHERE sa.employee_id = ? 
+              AND sa.status IN ('disbursed', 'repaying')
+              AND sa.outstanding_balance > 0
+            ORDER BY sa.created_at ASC
+        ");
+        $stmt->execute([$employeeId]);
+        $advances = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $remainingDeduction = $totalDeduction;
+        
+        foreach ($advances as $advance) {
+            if ($remainingDeduction <= 0) break;
+            
+            $installmentAmount = $advance['installments'] > 0 
+                ? $advance['total_amount'] / $advance['installments'] 
+                : $advance['outstanding_balance'];
+            $deductAmount = min($installmentAmount, $advance['outstanding_balance'], $remainingDeduction);
+            
+            $repaymentStmt = $this->db->prepare("
+                INSERT INTO salary_advance_repayments (advance_id, payroll_id, amount, repayment_date, notes)
+                VALUES (?, ?, ?, CURRENT_DATE, 'Automatic payroll deduction')
+            ");
+            $repaymentStmt->execute([$advance['id'], $payrollId, $deductAmount]);
+            
+            $newBalance = $advance['outstanding_balance'] - $deductAmount;
+            $newStatus = $newBalance <= 0 ? 'completed' : 'repaying';
+            
+            $updateStmt = $this->db->prepare("
+                UPDATE salary_advances 
+                SET outstanding_balance = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $updateStmt->execute([max(0, $newBalance), $newStatus, $advance['id']]);
+            
+            $remainingDeduction -= $deductAmount;
+        }
     }
 
     public function updatePayroll(int $id, array $data): bool {
