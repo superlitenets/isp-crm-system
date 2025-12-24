@@ -277,6 +277,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'ONU deleted from database';
                 $messageType = 'success';
                 break;
+            case 'cleanup_stale_pending':
+                $hoursOld = (int)($_POST['hours_old'] ?? 2);
+                $cleaned = $huaweiOLT->cleanupStalePendingONUs($hoursOld);
+                $total = $cleaned['discovery_log'] + $cleaned['unauthorized_onus'];
+                if ($total > 0) {
+                    $message = "Cleaned up {$total} stale entries ({$cleaned['discovery_log']} discovery, {$cleaned['unauthorized_onus']} ONUs)";
+                    $messageType = 'success';
+                } else {
+                    $message = 'No stale entries found to clean up';
+                    $messageType = 'info';
+                }
+                break;
+            case 'clear_discovery_entry':
+                $huaweiOLT->clearDiscoveryEntry((int)$_POST['id']);
+                $message = 'Discovery entry cleared';
+                $messageType = 'success';
+                break;
             case 'quick_authorize':
                 $onuId = (int)$_POST['id'];
                 $huaweiOLT->updateONU($onuId, ['is_authorized' => true]);
@@ -3260,6 +3277,14 @@ try {
                             </button>
                         </form>
                         <?php endif; ?>
+                        <form method="post" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="cleanup_stale_pending">
+                            <input type="hidden" name="hours_old" value="2">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Clear stale pending entries older than 2 hours?')" title="Remove stale entries that no longer exist on OLT">
+                                <i class="bi bi-trash me-1"></i> Clear Stale
+                            </button>
+                        </form>
                     <?php endif; ?>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
                         <i class="bi bi-plus-circle me-1"></i> Add ONU

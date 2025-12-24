@@ -2651,7 +2651,8 @@ class HuaweiOLT {
         }
         
         if ($pendingOnly) {
-            $sql .= " AND d.authorized = false";
+            // Only show pending entries from the last 2 hours
+            $sql .= " AND d.authorized = false AND d.last_seen_at > NOW() - INTERVAL '2 hours'";
         }
         
         $sql .= " ORDER BY d.last_seen_at DESC";
@@ -2675,6 +2676,52 @@ class HuaweiOLT {
                 SET authorized = true, authorized_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             ");
+            return $stmt->execute([$discoveryId]);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Cleanup stale discovery entries and unauthorized ONUs
+     */
+    public function cleanupStalePendingONUs(int $hoursOld = 2): array {
+        $cleaned = ['discovery_log' => 0, 'unauthorized_onus' => 0];
+        
+        try {
+            // Delete old unauthorized discovery entries
+            $stmt = $this->db->prepare("
+                DELETE FROM onu_discovery_log 
+                WHERE authorized = FALSE 
+                AND last_seen_at < NOW() - INTERVAL '1 hour' * ?
+            ");
+            $stmt->execute([$hoursOld]);
+            $cleaned['discovery_log'] = $stmt->rowCount();
+            
+            // Delete unauthorized ONUs that haven't been seen/updated in a while
+            // Only delete if they're offline and have no customer linked
+            $stmt = $this->db->prepare("
+                DELETE FROM huawei_onus 
+                WHERE is_authorized = FALSE 
+                AND customer_id IS NULL
+                AND updated_at < NOW() - INTERVAL '1 hour' * ?
+            ");
+            $stmt->execute([$hoursOld]);
+            $cleaned['unauthorized_onus'] = $stmt->rowCount();
+            
+        } catch (\Exception $e) {
+            // Tables may not exist
+        }
+        
+        return $cleaned;
+    }
+
+    /**
+     * Clear a specific discovery entry (mark as no longer pending)
+     */
+    public function clearDiscoveryEntry(int $discoveryId): bool {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM onu_discovery_log WHERE id = ?");
             return $stmt->execute([$discoveryId]);
         } catch (\Exception $e) {
             return false;
@@ -3514,7 +3561,12 @@ class HuaweiOLT {
         $stats['unconfigured_onus'] = (int)$row['unconfigured'];
         
         try {
-            $stats['discovered_onus'] = (int)$this->db->query("SELECT COUNT(*) FROM onu_discovery_log WHERE authorized = FALSE")->fetchColumn();
+            // Only count discovery entries from the last 2 hours as truly pending
+            $stats['discovered_onus'] = (int)$this->db->query("
+                SELECT COUNT(*) FROM onu_discovery_log 
+                WHERE authorized = FALSE 
+                AND last_seen_at > NOW() - INTERVAL '2 hours'
+            ")->fetchColumn();
         } catch (\Exception $e) {
             $stats['discovered_onus'] = 0;
         }
