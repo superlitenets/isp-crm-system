@@ -656,6 +656,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 break;
+            case 'bulk_tr069_config':
+                $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $acsUrl = trim($_POST['acs_url'] ?? '');
+                $tr069Vlan = !empty($_POST['tr069_vlan']) ? (int)$_POST['tr069_vlan'] : null;
+                $periodicInterval = !empty($_POST['periodic_interval']) ? (int)$_POST['periodic_interval'] : 300;
+                
+                if (!$oltId) {
+                    $message = 'Please select an OLT';
+                    $messageType = 'danger';
+                } elseif (empty($acsUrl)) {
+                    $message = 'Please enter the ACS URL';
+                    $messageType = 'danger';
+                } else {
+                    $result = $huaweiOLT->bulkConfigureTR069($oltId, $acsUrl, [
+                        'tr069_vlan' => $tr069Vlan,
+                        'periodic_interval' => $periodicInterval
+                    ]);
+                    
+                    if ($result['success'] && $result['configured'] > 0) {
+                        $message = "TR-069 configured on {$result['configured']} ONUs" . ($result['failed'] > 0 ? ", {$result['failed']} failed" : '');
+                        $messageType = $result['failed'] > 0 ? 'warning' : 'success';
+                    } else {
+                        $message = 'Failed to configure TR-069: ' . ($result['error'] ?? 'No ONUs found or all commands failed');
+                        $messageType = 'danger';
+                    }
+                }
+                break;
             case 'import_smartolt':
             case 'import_from_smartolt':
                 require_once __DIR__ . '/../src/SmartOLT.php';
@@ -6885,6 +6912,81 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 </button>
                             </form>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Bulk TR-069 Configuration -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-info text-white">
+                            <i class="bi bi-broadcast me-2"></i>Bulk TR-069 Configuration
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Push ACS URL to all authorized ONUs on an OLT. This configures ONUs to connect to your GenieACS server.
+                            </p>
+                            <form method="post" id="bulkTr069Form">
+                                <input type="hidden" name="action" value="bulk_tr069_config">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Select OLT</label>
+                                    <select name="olt_id" class="form-select" required id="tr069OltSelect">
+                                        <option value="">-- Select OLT --</option>
+                                        <?php foreach ($olts as $o): ?>
+                                        <option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['name']) ?> (<?= $o['onu_count'] ?? 0 ?> ONUs)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ACS URL</label>
+                                    <?php
+                                    $defaultAcsUrl = '';
+                                    $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_acs_url'");
+                                    $defaultAcsUrl = $stmt->fetchColumn() ?: '';
+                                    if (!$defaultAcsUrl) {
+                                        $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
+                                        $genieUrl = $stmt->fetchColumn();
+                                        if ($genieUrl) {
+                                            $parsed = parse_url($genieUrl);
+                                            $defaultAcsUrl = 'http://' . ($parsed['host'] ?? 'localhost') . ':7547';
+                                        }
+                                    }
+                                    ?>
+                                    <input type="url" name="acs_url" class="form-control" required
+                                           value="<?= htmlspecialchars($defaultAcsUrl) ?>"
+                                           placeholder="http://your-genieacs-server:7547">
+                                    <div class="form-text">URL that ONUs will use to connect to GenieACS</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">TR-069 VLAN (optional)</label>
+                                    <input type="number" name="tr069_vlan" class="form-control" placeholder="e.g., 100">
+                                    <div class="form-text">Leave empty to use existing ONU VLAN configuration</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Periodic Inform Interval</label>
+                                    <select name="periodic_interval" class="form-select">
+                                        <option value="60">1 minute</option>
+                                        <option value="300" selected>5 minutes</option>
+                                        <option value="600">10 minutes</option>
+                                        <option value="1800">30 minutes</option>
+                                        <option value="3600">1 hour</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="alert alert-warning small mb-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>Note:</strong> This will push commands to all authorized ONUs on the selected OLT. 
+                                    ONUs will start connecting to your ACS within the periodic interval.
+                                </div>
+                                
+                                <button type="submit" class="btn btn-info w-100" onclick="showLoading('Configuring TR-069 on all ONUs...')">
+                                    <i class="bi bi-broadcast me-1"></i> Configure TR-069 on All ONUs
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>

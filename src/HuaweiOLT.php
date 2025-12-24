@@ -6579,4 +6579,109 @@ class HuaweiOLT {
             'tr069_capable' => true
         ];
     }
+    
+    public function bulkConfigureTR069(int $oltId, string $acsUrl, array $options = []): array {
+        $onuFilter = $options['onu_ids'] ?? null;
+        $tr069Vlan = $options['tr069_vlan'] ?? null;
+        $periodicInterval = $options['periodic_interval'] ?? 300;
+        $batchSize = $options['batch_size'] ?? 20;
+        
+        $sql = "SELECT id, frame, slot, port, onu_id, sn, name FROM huawei_onus WHERE olt_id = ? AND is_authorized = true";
+        $params = [$oltId];
+        
+        if ($onuFilter && is_array($onuFilter) && !empty($onuFilter)) {
+            $placeholders = implode(',', array_fill(0, count($onuFilter), '?'));
+            $sql .= " AND id IN ({$placeholders})";
+            $params = array_merge($params, $onuFilter);
+        }
+        
+        $sql .= " ORDER BY slot, port, onu_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $onus = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        if (empty($onus)) {
+            return ['success' => false, 'error' => 'No authorized ONUs found', 'configured' => 0, 'failed' => 0];
+        }
+        
+        $configured = 0;
+        $failed = 0;
+        $errors = [];
+        $currentSlot = null;
+        $batchCommands = [];
+        
+        foreach ($onus as $onu) {
+            $frame = $onu['frame'] ?? 0;
+            $slot = $onu['slot'];
+            $port = $onu['port'];
+            $onuId = $onu['onu_id'];
+            
+            if ($currentSlot !== $slot) {
+                if (!empty($batchCommands)) {
+                    $batchCommands[] = "quit";
+                    $script = implode("\r\n", $batchCommands);
+                    $result = $this->executeCommand($oltId, $script);
+                    if (!$result['success']) {
+                        $failed += count(array_filter($batchCommands, fn($c) => strpos($c, 'acs-url') !== false));
+                    } else {
+                        $configured += count(array_filter($batchCommands, fn($c) => strpos($c, 'acs-url') !== false));
+                    }
+                    $batchCommands = [];
+                }
+                $batchCommands[] = "interface gpon {$frame}/{$slot}";
+                $currentSlot = $slot;
+            }
+            
+            if ($tr069Vlan) {
+                $batchCommands[] = "ont port native-vlan {$port} {$onuId} eth 1 vlan {$tr069Vlan} priority 0";
+                $batchCommands[] = "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan}";
+            }
+            $batchCommands[] = "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"";
+            $batchCommands[] = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
+            
+            if (count($batchCommands) >= $batchSize * 4) {
+                $batchCommands[] = "quit";
+                $script = implode("\r\n", $batchCommands);
+                $result = $this->executeCommand($oltId, $script);
+                $cmdCount = count(array_filter($batchCommands, fn($c) => strpos($c, 'acs-url') !== false));
+                if (!$result['success']) {
+                    $failed += $cmdCount;
+                    $errors[] = $result['error'] ?? 'Command failed';
+                } else {
+                    $configured += $cmdCount;
+                }
+                $batchCommands = [];
+                $currentSlot = null;
+            }
+        }
+        
+        if (!empty($batchCommands)) {
+            $batchCommands[] = "quit";
+            $script = implode("\r\n", $batchCommands);
+            $result = $this->executeCommand($oltId, $script);
+            $cmdCount = count(array_filter($batchCommands, fn($c) => strpos($c, 'acs-url') !== false));
+            if (!$result['success']) {
+                $failed += $cmdCount;
+                $errors[] = $result['error'] ?? 'Command failed';
+            } else {
+                $configured += $cmdCount;
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'bulk_tr069_config',
+            'status' => $failed === 0 ? 'success' : ($configured > 0 ? 'partial' : 'error'),
+            'message' => "Bulk TR-069 config: {$configured} configured, {$failed} failed. ACS: {$acsUrl}",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'configured' => $configured,
+            'failed' => $failed,
+            'total' => count($onus),
+            'errors' => $errors
+        ];
+    }
 }
