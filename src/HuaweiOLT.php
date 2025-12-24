@@ -4483,19 +4483,24 @@ class HuaweiOLT {
         $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? null;
         
         if ($tr069Vlan && $assignedOnuId !== null) {
+            // Get ACS URL from settings
+            $acsUrl = $this->getTR069AcsUrl();
+            
             // Enter interface context for TR-069 configuration
             $tr069Script = "interface gpon {$frame}/{$slot}\r\n";
             
             // Configure native VLAN for TR-069 on ONU
-            // ont port native-vlan <port> <onu_id> eth <eth_port> vlan <vlan> priority <priority>
             $tr069Script .= "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
             
-            // Configure IP mode for TR-069 (DHCP or static)
-            // ont ipconfig <port> <onu_id> ip-index 0 dhcp vlan <vlan>
+            // Configure IP mode for TR-069 (DHCP)
             $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} ip-index 0 dhcp vlan {$tr069Vlan}\r\n";
             
-            // Assign TR-069 server profile if specified
-            if ($tr069ProfileId) {
+            // Push ACS URL directly (like SmartOLT does)
+            if ($acsUrl) {
+                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url \"{$acsUrl}\"\r\n";
+                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
+            } elseif ($tr069ProfileId) {
+                // Fallback to profile-id if no URL configured
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
             }
             
@@ -4505,7 +4510,7 @@ class HuaweiOLT {
             $output .= "\n[TR-069 Config]\n" . ($tr069Result['output'] ?? '');
             
             // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
-            $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+            $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
             $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $output .= "\n" . ($tr069SpResult['output'] ?? '');
@@ -6158,6 +6163,28 @@ class HuaweiOLT {
         } catch (\Exception $e) {
             error_log("OMS Notification Error (Authorized): " . $e->getMessage());
             return false;
+        }
+    }
+    
+    private function getTR069AcsUrl(): ?string {
+        try {
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_acs_url'");
+            $url = $stmt->fetchColumn();
+            if ($url) {
+                return $url;
+            }
+            
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
+            $genieUrl = $stmt->fetchColumn();
+            if ($genieUrl) {
+                $parsed = parse_url($genieUrl);
+                $host = $parsed['host'] ?? 'localhost';
+                return "http://{$host}:7547";
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }
