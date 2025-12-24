@@ -291,6 +291,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $zone = $_POST['zone'] ?? '';
                 $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
                 $description = trim($_POST['description'] ?? '');
+                $sn = trim($_POST['sn'] ?? '');
+                $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
+                $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
                 
                 // Auto-generate description from zone if not provided
                 if (empty($description) && !empty($zone)) {
@@ -298,10 +302,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 // Ensure ONU exists in database
-                $onu = $huaweiOLT->getONU($onuId);
+                $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
+                
+                // If no ONU ID but we have SN, check discovery log or create new ONU
+                if (!$onu && !empty($sn)) {
+                    // Check if ONU exists by serial number first
+                    $existingStmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                    $existingStmt->execute([$sn]);
+                    $existingOnuId = $existingStmt->fetchColumn();
+                    
+                    if ($existingOnuId) {
+                        $onuId = (int)$existingOnuId;
+                        $onu = $huaweiOLT->getONU($onuId);
+                    } else {
+                        // Look up in discovery log
+                        $discStmt = $db->prepare("SELECT * FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
+                        $discStmt->execute([$sn]);
+                        $discoveredOnu = $discStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($discoveredOnu || (!empty($oltIdInput) && !empty($frameSlotPort))) {
+                            // Parse frame/slot/port
+                            $frame = 0; $slot = 0; $port = 0;
+                            $fsp = $discoveredOnu['frame_slot_port'] ?? $frameSlotPort;
+                            if (preg_match('/(\d+)\/(\d+)\/(\d+)/', $fsp, $fspMatch)) {
+                                $frame = (int)$fspMatch[1];
+                                $slot = (int)$fspMatch[2];
+                                $port = (int)$fspMatch[3];
+                            }
+                            
+                            // Create new ONU record from discovery
+                            $oltIdForOnu = $discoveredOnu['olt_id'] ?? $oltIdInput;
+                            $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
+                            
+                            $insertStmt = $db->prepare("
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                RETURNING id
+                            ");
+                            $insertStmt->execute([
+                                $oltIdForOnu,
+                                $sn,
+                                $description ?: $sn,
+                                $frame,
+                                $slot,
+                                $port,
+                                $onuTypeIdForOnu,
+                                $discoveredOnu['equipment_id'] ?? null
+                            ]);
+                            $onuId = (int)$insertStmt->fetchColumn();
+                            $onu = $huaweiOLT->getONU($onuId);
+                            
+                            // Mark as authorized in discovery log
+                            $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$sn]);
+                        }
+                    }
+                }
+                
                 if (!$onu) {
                     // ONU not found - redirect with error
-                    header('Location: ?page=huawei-olt&view=onus&unconfigured=1&msg=' . urlencode('ONU record not found. Please refresh discovery.') . '&msg_type=warning');
+                    header('Location: ?page=huawei-olt&view=onus&unconfigured=1&msg=' . urlencode('ONU record not found. Please provide SN and OLT info.') . '&msg_type=warning');
                     exit;
                 }
                 

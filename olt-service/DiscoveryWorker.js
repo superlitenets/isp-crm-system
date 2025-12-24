@@ -107,36 +107,32 @@ class DiscoveryWorker {
         try {
             const crypto = require('crypto');
             const key = process.env.SESSION_SECRET || 'default-secret-key-change-me';
-            const keyHash = crypto.createHash('sha256').update(key).digest();
-            const parts = encrypted.split(':');
-            if (parts.length !== 2) {
-                console.log(`[Discovery] Password not in iv:cipher format, using as-is`);
-                return encrypted;
-            }
-            const iv = Buffer.from(parts[0], 'hex');
             
-            // Try hex first, then base64 if hex fails
-            let encryptedText;
-            const hexPart = parts[1];
+            // PHP format: base64(16-byte-raw-iv + base64-ciphertext)
+            // First decode the outer base64
+            const combined = Buffer.from(encrypted, 'base64');
             
-            // Check if it's hex-encoded base64 (our PHP format)
-            const decoded = Buffer.from(hexPart, 'hex').toString();
-            if (decoded.match(/^[A-Za-z0-9+/=]+$/)) {
-                // It's hex-encoded base64, decode to get actual ciphertext
-                encryptedText = Buffer.from(decoded, 'base64');
-            } else {
-                // It's raw hex ciphertext
-                encryptedText = Buffer.from(hexPart, 'hex');
-            }
+            // Extract 16-byte IV and the rest is base64-encoded ciphertext
+            const iv = combined.slice(0, 16);
+            const ciphertextBase64 = combined.slice(16).toString('utf8');
             
-            const decipher = crypto.createDecipheriv('aes-256-cbc', keyHash, iv);
-            let decrypted = decipher.update(encryptedText);
+            // Decode the base64 ciphertext
+            const ciphertext = Buffer.from(ciphertextBase64, 'base64');
+            
+            // PHP openssl_encrypt uses the key directly (not hashed), padded/truncated to 32 bytes
+            // For AES-256-CBC, key must be exactly 32 bytes
+            const keyBuffer = Buffer.alloc(32);
+            Buffer.from(key).copy(keyBuffer);
+            
+            const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
+            let decrypted = decipher.update(ciphertext);
             decrypted = Buffer.concat([decrypted, decipher.final()]);
-            const password = decrypted.toString();
-            console.log(`[Discovery] Decrypted password: ${password.substring(0, 2)}***${password.substring(password.length-1)}`);
+            const password = decrypted.toString('utf8');
+            console.log(`[Discovery] Decrypted password: ${password.substring(0, 2)}***`);
             return password;
         } catch (e) {
             console.error(`[Discovery] Password decryption failed:`, e.message);
+            // Fallback: try as plain text
             return encrypted;
         }
     }
