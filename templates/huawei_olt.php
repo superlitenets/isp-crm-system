@@ -510,6 +510,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['message'];
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'apply_port_template':
+                $onuId = (int)$_POST['onu_id'];
+                $template = $_POST['template'] ?? '';
+                $result = $huaweiOLT->applyPortTemplate($onuId, $template);
+                if ($result['success']) {
+                    $message = "Applied '{$template}' template to {$result['eth_ports']} ports. Configuration pushed via OMCI.";
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to apply template: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
+            case 'configure_onu_ports':
+                $onuId = (int)$_POST['onu_id'];
+                $portData = $_POST['port'] ?? [];
+                $portConfigs = [];
+                foreach ($portData as $ethPort => $config) {
+                    $portConfigs[(int)$ethPort] = [
+                        'mode' => $config['mode'] ?? 'transparent',
+                        'vlan_id' => !empty($config['vlan_id']) ? (int)$config['vlan_id'] : null,
+                        'allowed_vlans' => $config['allowed_vlans'] ?? '',
+                        'priority' => (int)($config['priority'] ?? 0),
+                        'desc' => $config['desc'] ?? ''
+                    ];
+                }
+                $result = $huaweiOLT->configureOnuPorts($onuId, $portConfigs);
+                if ($result['success']) {
+                    $message = "Configured {$result['ports_configured']} ports successfully. OMCI commands sent to OLT.";
+                    $messageType = 'success';
+                } else {
+                    $message = 'Port configuration failed: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
+            case 'move_onu':
+                $onuId = (int)$_POST['onu_id'];
+                $newSlot = (int)$_POST['new_slot'];
+                $newPort = (int)$_POST['new_port'];
+                $newOnuId = !empty($_POST['new_onu_id']) ? (int)$_POST['new_onu_id'] : null;
+                $result = $huaweiOLT->moveONU($onuId, $newSlot, $newPort, $newOnuId);
+                $message = $result['message'];
+                $messageType = $result['success'] ? 'success' : 'danger';
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
+            case 'import_smartolt':
+            case 'import_from_smartolt':
+                require_once __DIR__ . '/../src/SmartOLT.php';
+                $smartolt = new \App\SmartOLT($db);
+                if (!$smartolt->isConfigured()) {
+                    $message = 'SmartOLT is not configured. Please set API URL and key in settings.';
+                    $messageType = 'danger';
+                } else {
+                    $result = $smartolt->getAllONUsDetails();
+                    if ($result['status']) {
+                        $onus = $result['response'] ?? [];
+                        $imported = 0;
+                        $updated = 0;
+                        foreach ($onus as $smartOnu) {
+                            $sn = strtoupper($smartOnu['sn'] ?? '');
+                            if (empty($sn)) continue;
+                            
+                            // Check if ONU exists
+                            $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                            $stmt->execute([$sn]);
+                            $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            
+                            // Get OLT by SmartOLT olt_id mapping
+                            $oltId = null;
+                            if (!empty($smartOnu['olt_id'])) {
+                                $stmt = $db->prepare("SELECT id FROM huawei_olts WHERE smartolt_id = ? OR name LIKE ?");
+                                $stmt->execute([$smartOnu['olt_id'], '%' . ($smartOnu['olt_name'] ?? '') . '%']);
+                                $olt = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                $oltId = $olt['id'] ?? null;
+                            }
+                            
+                            $onuData = [
+                                'sn' => $sn,
+                                'name' => $smartOnu['name'] ?? $smartOnu['description'] ?? '',
+                                'description' => $smartOnu['description'] ?? '',
+                                'frame' => (int)($smartOnu['board'] ?? 0),
+                                'slot' => (int)($smartOnu['slot'] ?? 0),
+                                'port' => (int)($smartOnu['port'] ?? 0),
+                                'onu_id' => (int)($smartOnu['onu_id'] ?? 0),
+                                'status' => strtolower($smartOnu['status'] ?? 'offline'),
+                                'is_authorized' => !empty($smartOnu['authorized']),
+                                'rx_power' => isset($smartOnu['rx_power']) ? (float)str_replace(' dBm', '', $smartOnu['rx_power']) : null,
+                                'tx_power' => isset($smartOnu['tx_power']) ? (float)str_replace(' dBm', '', $smartOnu['tx_power']) : null,
+                                'smartolt_external_id' => $smartOnu['external_id'] ?? null
+                            ];
+                            
+                            if ($oltId) $onuData['olt_id'] = $oltId;
+                            
+                            if ($existing) {
+                                $huaweiOLT->updateONU($existing['id'], $onuData);
+                                $updated++;
+                            } else {
+                                // Insert new
+                                $cols = array_keys($onuData);
+                                $placeholders = array_fill(0, count($cols), '?');
+                                $stmt = $db->prepare("INSERT INTO huawei_onus (" . implode(',', $cols) . ") VALUES (" . implode(',', $placeholders) . ")");
+                                $stmt->execute(array_values($onuData));
+                                $imported++;
+                            }
+                        }
+                        $message = "SmartOLT sync complete: {$imported} imported, {$updated} updated from " . count($onus) . " total ONUs.";
+                        $messageType = 'success';
+                    } else {
+                        $message = 'SmartOLT API error: ' . ($result['error'] ?? 'Unknown');
+                        $messageType = 'danger';
+                    }
+                }
+                break;
             case 'execute_command':
                 $result = $huaweiOLT->executeCommand((int)$_POST['olt_id'], $_POST['command']);
                 $message = $result['success'] ? 'Command executed' : $result['message'];
@@ -3616,6 +3733,34 @@ try {
                                     <button type="submit" class="btn btn-primary btn-sm w-100">Update</button>
                                 </div>
                             </form>
+                            
+                            <hr>
+                            
+                            <h6 class="mb-3"><i class="bi bi-arrows-move me-2"></i>Move ONU to Different Port</h6>
+                            <form method="post" onsubmit="return confirm('Move this ONU to a different port? The ONU will be deleted from the current location and re-added to the new location.')">
+                                <input type="hidden" name="action" value="move_onu">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-4">
+                                        <label class="form-label small">New Slot</label>
+                                        <input type="number" name="new_slot" class="form-control form-control-sm" 
+                                               value="<?= $currentOnu['slot'] ?>" min="0" max="21" required>
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label small">New Port</label>
+                                        <input type="number" name="new_port" class="form-control form-control-sm" 
+                                               value="<?= $currentOnu['port'] ?>" min="0" max="15" required>
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label small">ONU ID <small class="text-muted">(opt)</small></label>
+                                        <input type="number" name="new_onu_id" class="form-control form-control-sm" 
+                                               placeholder="Auto" min="0" max="127">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-warning btn-sm w-100">
+                                    <i class="bi bi-arrows-move me-1"></i> Move ONU
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -4384,7 +4529,159 @@ try {
                 </div>
             </div>
             
+            <!-- OMCI LAN Port Configuration -->
+            <?php 
+            $onuTypeInfo = $huaweiOLT->getOnuTypeInfo($currentOnu['id']);
+            $ethPorts = $onuTypeInfo['eth_ports'] ?? 4;
+            $currentPortConfig = json_decode($currentOnu['port_config'] ?? '{}', true);
+            ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-ethernet me-2"></i>OMCI LAN Port Configuration</span>
+                    <span class="badge bg-light text-dark">
+                        <?= htmlspecialchars($onuTypeInfo['model'] ?? 'Unknown') ?> - <?= $ethPorts ?> ETH Port<?= $ethPorts > 1 ? 's' : '' ?>
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>OMCI Port Configuration</strong> - These settings are pushed directly to the OLT via Telnet/CLI commands.
+                        Changes affect the ONU's LAN port behavior at the network level.
+                    </div>
+                    
+                    <!-- Quick Templates -->
+                    <div class="mb-4">
+                        <h6 class="mb-3"><i class="bi bi-lightning me-2"></i>Quick Templates</h6>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <form method="post" class="d-inline" onsubmit="return confirm('Apply Bridge Mode template? All ports will be set to transparent.')">
+                                <input type="hidden" name="action" value="apply_port_template">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="template" value="bridge">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-diagram-3 me-1"></i> Bridge Mode
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Apply Router Mode template? Port 1 = WAN, others = LAN.')">
+                                <input type="hidden" name="action" value="apply_port_template">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="template" value="router">
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-router me-1"></i> Router Mode
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Apply IPTV Mode template? Last port = IPTV VLAN.')">
+                                <input type="hidden" name="action" value="apply_port_template">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="template" value="iptv">
+                                <button type="submit" class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-tv me-1"></i> IPTV Mode
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Apply VoIP Mode template? Last port = VoIP (high priority).')">
+                                <input type="hidden" name="action" value="apply_port_template">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="template" value="voip">
+                                <button type="submit" class="btn btn-outline-warning btn-sm">
+                                    <i class="bi bi-telephone me-1"></i> VoIP Mode
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Apply Trunk All template? All ports = trunk mode.')">
+                                <input type="hidden" name="action" value="apply_port_template">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="template" value="trunk_all">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-arrows-expand me-1"></i> Trunk All
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Per-Port Configuration -->
+                    <h6 class="mb-3"><i class="bi bi-sliders me-2"></i>Per-Port Configuration</h6>
+                    <form method="post" id="portConfigForm">
+                        <input type="hidden" name="action" value="configure_onu_ports">
+                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:80px">Port</th>
+                                        <th style="width:140px">Mode</th>
+                                        <th style="width:100px">Native VLAN</th>
+                                        <th style="width:150px">Allowed VLANs</th>
+                                        <th style="width:90px">Priority</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php for ($i = 1; $i <= $ethPorts; $i++): 
+                                        $portCfg = $currentPortConfig[$i] ?? [];
+                                    ?>
+                                    <tr>
+                                        <td class="text-center">
+                                            <span class="badge bg-dark fs-6">ETH <?= $i ?></span>
+                                        </td>
+                                        <td>
+                                            <select name="port[<?= $i ?>][mode]" class="form-select form-select-sm" onchange="togglePortFields(<?= $i ?>, this.value)">
+                                                <option value="transparent" <?= ($portCfg['mode'] ?? '') === 'transparent' ? 'selected' : '' ?>>Transparent</option>
+                                                <option value="access" <?= ($portCfg['mode'] ?? '') === 'access' ? 'selected' : '' ?>>Access</option>
+                                                <option value="trunk" <?= ($portCfg['mode'] ?? '') === 'trunk' ? 'selected' : '' ?>>Trunk</option>
+                                                <option value="hybrid" <?= ($portCfg['mode'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="port[<?= $i ?>][vlan_id]" class="form-control form-control-sm port-vlan-<?= $i ?>" 
+                                                   value="<?= $portCfg['vlan_id'] ?? '' ?>" placeholder="VLAN" min="1" max="4094">
+                                        </td>
+                                        <td>
+                                            <input type="text" name="port[<?= $i ?>][allowed_vlans]" class="form-control form-control-sm port-allowed-<?= $i ?>" 
+                                                   value="<?= htmlspecialchars($portCfg['allowed_vlans'] ?? '') ?>" placeholder="e.g. 100-200" 
+                                                   style="display:<?= ($portCfg['mode'] ?? '') === 'trunk' ? 'block' : 'none' ?>">
+                                        </td>
+                                        <td>
+                                            <select name="port[<?= $i ?>][priority]" class="form-select form-select-sm">
+                                                <?php for ($p = 0; $p <= 7; $p++): ?>
+                                                <option value="<?= $p ?>" <?= ($portCfg['priority'] ?? 0) == $p ? 'selected' : '' ?>><?= $p ?></option>
+                                                <?php endfor; ?>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="port[<?= $i ?>][desc]" class="form-control form-control-sm" 
+                                                   value="<?= htmlspecialchars($portCfg['desc'] ?? '') ?>" placeholder="Optional description">
+                                        </td>
+                                    </tr>
+                                    <?php endfor; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">
+                                <strong>Modes:</strong> 
+                                Transparent = bridge mode, 
+                                Access = single VLAN untagged, 
+                                Trunk = multiple VLANs tagged,
+                                Hybrid = mixed tagged/untagged
+                            </small>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i> Apply Port Configuration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
             <script>
+            function togglePortFields(portNum, mode) {
+                const allowedInput = document.querySelector('.port-allowed-' + portNum);
+                if (allowedInput) {
+                    allowedInput.style.display = (mode === 'trunk' || mode === 'hybrid') ? 'block' : 'none';
+                }
+            }
+            
             function toggleWanFields() {
                 const wanType = document.getElementById('wanType').value;
                 document.getElementById('pppoeFields').style.display = wanType === 'pppoe' ? 'block' : 'none';

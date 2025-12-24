@@ -6196,4 +6196,387 @@ class HuaweiOLT {
             return null;
         }
     }
+    
+    public function setOntPortNativeVlan(int $onuDbId, int $ethPort, int $vlanId, int $priority = 0): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+        $cmd .= "quit";
+        
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        $success = !empty($result['output']) && strpos($result['output'], 'error') === false;
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'set_port_native_vlan',
+            'status' => $success ? 'success' : 'error',
+            'message' => "Set ETH{$ethPort} native VLAN to {$vlanId}",
+            'command_sent' => $cmd,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'output' => $result['output'] ?? '',
+            'error' => $success ? null : 'Command may have failed'
+        ];
+    }
+    
+    public function setOntPortMode(int $onuDbId, int $ethPort, string $mode, array $options = []): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $mode = strtolower($mode);
+        if (!in_array($mode, ['access', 'trunk', 'hybrid', 'transparent'])) {
+            return ['success' => false, 'error' => 'Invalid port mode'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        
+        if ($mode === 'transparent') {
+            $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} transparent\r\n";
+        } else {
+            $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} {$mode}\r\n";
+        }
+        
+        $cmd .= "quit";
+        
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        $success = !empty($result['output']) && strpos($result['output'], 'error') === false;
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'set_port_mode',
+            'status' => $success ? 'success' : 'error',
+            'message' => "Set ETH{$ethPort} mode to {$mode}",
+            'command_sent' => $cmd,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'output' => $result['output'] ?? '',
+            'error' => $success ? null : 'Command may have failed'
+        ];
+    }
+    
+    public function configureOnuPorts(int $onuDbId, array $portConfigs): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        
+        foreach ($portConfigs as $ethPort => $config) {
+            $mode = $config['mode'] ?? 'access';
+            $vlanId = $config['vlan_id'] ?? null;
+            $priority = $config['priority'] ?? 0;
+            $allowedVlans = $config['allowed_vlans'] ?? '';
+            
+            if ($mode === 'transparent') {
+                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} transparent\r\n";
+            } else {
+                $cmd .= "ont port route {$port} {$onuId} eth {$ethPort} {$mode}\r\n";
+            }
+            
+            if ($vlanId && $mode !== 'trunk') {
+                $cmd .= "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority {$priority}\r\n";
+            }
+            
+            if ($mode === 'trunk' && !empty($allowedVlans)) {
+                $cmd .= "ont port vlan {$port} {$onuId} eth {$ethPort} add vlan {$allowedVlans}\r\n";
+            }
+        }
+        
+        $cmd .= "quit";
+        
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        $success = !empty($result['output']) && strpos($result['output'], 'error') === false;
+        
+        // Store port configuration in database
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE huawei_onus SET port_config = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+            ");
+            $stmt->execute([json_encode($portConfigs), $onuDbId]);
+        } catch (\Exception $e) {
+            // Column might not exist yet
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'configure_ports',
+            'status' => $success ? 'success' : 'error',
+            'message' => "Configured " . count($portConfigs) . " ETH ports",
+            'command_sent' => $cmd,
+            'command_response' => $result['output'] ?? '',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'output' => $result['output'] ?? '',
+            'ports_configured' => count($portConfigs),
+            'error' => $success ? null : 'Some commands may have failed'
+        ];
+    }
+    
+    public function applyPortTemplate(int $onuDbId, string $template): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        // Get ONU type info for number of ports
+        $ethPorts = 4; // Default
+        if ($onu['onu_type_id']) {
+            $stmt = $this->db->prepare("SELECT eth_ports FROM huawei_onu_types WHERE id = ?");
+            $stmt->execute([$onu['onu_type_id']]);
+            $ethPorts = $stmt->fetchColumn() ?: 4;
+        }
+        
+        $portConfigs = [];
+        
+        switch ($template) {
+            case 'bridge':
+                // All ports access mode, same VLAN
+                for ($i = 1; $i <= $ethPorts; $i++) {
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                }
+                break;
+                
+            case 'router':
+                // Port 1: WAN (access, internet VLAN), Ports 2-4: LAN (transparent)
+                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                for ($i = 2; $i <= $ethPorts; $i++) {
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                }
+                break;
+                
+            case 'iptv':
+                // Port 4: IPTV (access, multicast VLAN), Others: Internet
+                for ($i = 1; $i <= $ethPorts - 1; $i++) {
+                    $portConfigs[$i] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                }
+                $portConfigs[$ethPorts] = ['mode' => 'access', 'vlan_id' => 500, 'priority' => 5];
+                break;
+                
+            case 'voip':
+                // Port 1: Internet, Port 4: VoIP (high priority)
+                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                for ($i = 2; $i <= $ethPorts - 1; $i++) {
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                }
+                $portConfigs[$ethPorts] = ['mode' => 'access', 'vlan_id' => 300, 'priority' => 6];
+                break;
+                
+            case 'trunk_all':
+                // All ports trunk mode
+                for ($i = 1; $i <= $ethPorts; $i++) {
+                    $portConfigs[$i] = ['mode' => 'trunk', 'vlan_id' => null, 'allowed_vlans' => '100-999', 'priority' => 0];
+                }
+                break;
+                
+            default:
+                return ['success' => false, 'error' => 'Unknown template: ' . $template];
+        }
+        
+        $result = $this->configureOnuPorts($onuDbId, $portConfigs);
+        $result['template'] = $template;
+        $result['eth_ports'] = $ethPorts;
+        
+        return $result;
+    }
+    
+    public function moveONU(int $onuDbId, int $newSlot, int $newPort, ?int $newOnuId = null): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $oldSlot = $onu['slot'];
+        $oldPort = $onu['port'];
+        $oldOnuId = $onu['onu_id'];
+        $sn = $onu['sn'];
+        $description = $onu['name'] ?? $onu['description'] ?? $sn;
+        
+        // Validate: not moving to same location
+        if ($oldSlot == $newSlot && $oldPort == $newPort && ($newOnuId === null || $newOnuId == $oldOnuId)) {
+            return ['success' => false, 'error' => 'ONU is already at this location'];
+        }
+        
+        // Store original config for rollback
+        $originalData = [
+            'slot' => $oldSlot,
+            'port' => $oldPort,
+            'onu_id' => $oldOnuId
+        ];
+        
+        // Get profile info
+        $profile = null;
+        if ($onu['service_profile_id']) {
+            $stmt = $this->db->prepare("SELECT * FROM huawei_service_profiles WHERE id = ?");
+            $stmt->execute([$onu['service_profile_id']]);
+            $profile = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        $lineProfile = $profile['line_profile'] ?? 10;
+        $srvProfile = $profile['srv_profile'] ?? 10;
+        
+        // Step 1: Add to new location FIRST (less risky)
+        $addCmd = "interface gpon {$frame}/{$newSlot}\r\n";
+        if ($newOnuId !== null) {
+            $addCmd .= "ont add {$newPort} {$newOnuId} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfile} ont-srvprofile-id {$srvProfile} desc \"{$description}\"\r\n";
+        } else {
+            $addCmd .= "ont add {$newPort} sn-auth \"{$sn}\" omci ont-lineprofile-id {$lineProfile} ont-srvprofile-id {$srvProfile} desc \"{$description}\"\r\n";
+        }
+        $addCmd .= "quit";
+        
+        $addResult = $this->executeCommand($oltId, $addCmd);
+        $output = "[Add to {$frame}/{$newSlot}/{$newPort}" . ($newOnuId !== null ? ":{$newOnuId}" : '') . "]\n" . ($addResult['output'] ?? '');
+        
+        // Check if add was successful (look for ONTID or no error)
+        $addOutput = strtolower($addResult['output'] ?? '');
+        $addSuccess = (strpos($addOutput, 'ontid') !== false || strpos($addOutput, 'success') !== false) && 
+                      strpos($addOutput, 'error') === false && strpos($addOutput, 'failed') === false;
+        
+        // Parse new ONU ID from response
+        $assignedOnuId = $newOnuId;
+        if (preg_match('/ontid\s*:\s*(\d+)/i', $addResult['output'] ?? '', $m)) {
+            $assignedOnuId = (int)$m[1];
+        } elseif (preg_match('/ont id\s*:\s*(\d+)/i', $addResult['output'] ?? '', $m)) {
+            $assignedOnuId = (int)$m[1];
+        }
+        
+        if (!$addSuccess) {
+            $this->addLog([
+                'olt_id' => $oltId,
+                'onu_id' => $onuDbId,
+                'action' => 'move_onu',
+                'status' => 'error',
+                'message' => "Failed to add ONU {$sn} to new location {$frame}/{$newSlot}/{$newPort}",
+                'command_sent' => $addCmd,
+                'command_response' => $output,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            return [
+                'success' => false,
+                'error' => 'Failed to add ONU to new location - original location unchanged',
+                'output' => $output
+            ];
+        }
+        
+        // Step 2: Delete from old location
+        $deleteCmd = "interface gpon {$frame}/{$oldSlot}\r\n";
+        $deleteCmd .= "ont delete {$oldPort} {$oldOnuId}\r\n";
+        $deleteCmd .= "quit";
+        
+        $deleteResult = $this->executeCommand($oltId, $deleteCmd);
+        $output .= "\n\n[Delete from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId}]\n" . ($deleteResult['output'] ?? '');
+        
+        $success = true;
+        
+        // Update database
+        $this->updateONU($onuDbId, [
+            'slot' => $newSlot,
+            'port' => $newPort,
+            'onu_id' => $assignedOnuId ?? $oldOnuId
+        ]);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'move_onu',
+            'status' => 'success',
+            'message' => "Moved ONU {$sn} from {$frame}/{$oldSlot}/{$oldPort}:{$oldOnuId} to {$frame}/{$newSlot}/{$newPort}" . ($assignedOnuId ? ":{$assignedOnuId}" : ''),
+            'command_sent' => $addCmd . "\n\n" . $deleteCmd,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => "ONU moved to {$frame}/{$newSlot}/{$newPort}" . ($assignedOnuId ? " (ID: {$assignedOnuId})" : ''),
+            'new_slot' => $newSlot,
+            'new_port' => $newPort,
+            'new_onu_id' => $assignedOnuId ?? $oldOnuId,
+            'output' => $output
+        ];
+    }
+    
+    public function getOnuTypeInfo(int $onuDbId): ?array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return null;
+        }
+        
+        if ($onu['onu_type_id']) {
+            $stmt = $this->db->prepare("SELECT * FROM huawei_onu_types WHERE id = ?");
+            $stmt->execute([$onu['onu_type_id']]);
+            return $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // Try to detect from ONU model/description
+        $model = $onu['model'] ?? $onu['onu_type'] ?? '';
+        if ($model) {
+            $stmt = $this->db->prepare("
+                SELECT * FROM huawei_onu_types 
+                WHERE model ILIKE ? OR model_aliases ILIKE ?
+                LIMIT 1
+            ");
+            $stmt->execute(["%{$model}%", "%{$model}%"]);
+            $type = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($type) {
+                // Update ONU with detected type
+                $this->updateONU($onuDbId, ['onu_type_id' => $type['id']]);
+                return $type;
+            }
+        }
+        
+        // Return default type info
+        return [
+            'id' => null,
+            'model' => 'Unknown',
+            'eth_ports' => 4,
+            'pots_ports' => 0,
+            'wifi_capable' => false,
+            'tr069_capable' => true
+        ];
+    }
 }
