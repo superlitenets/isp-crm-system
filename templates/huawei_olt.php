@@ -560,9 +560,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $newPort = (int)$_POST['new_port'];
                 $newOnuId = !empty($_POST['new_onu_id']) ? (int)$_POST['new_onu_id'] : null;
                 $result = $huaweiOLT->moveONU($onuId, $newSlot, $newPort, $newOnuId);
-                $message = $result['message'];
+                $message = $result['message'] ?? ($result['error'] ?? 'Unknown error');
                 $messageType = $result['success'] ? 'success' : 'danger';
-                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                $redirectView = isset($_POST['redirect_view']) ? $_POST['redirect_view'] : 'onu_detail&onu_id=' . $onuId;
+                header('Location: ?page=huawei-olt&view=' . $redirectView . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
+            case 'bulk_move_onus':
+                $oltId = (int)$_POST['olt_id'];
+                $migrations = [];
+                if (!empty($_POST['migrations']) && is_array($_POST['migrations'])) {
+                    foreach ($_POST['migrations'] as $m) {
+                        if (!empty($m['onu_id']) && !empty($m['new_slot']) && isset($m['new_port'])) {
+                            $migrations[] = [
+                                'onu_id' => (int)$m['onu_id'],
+                                'new_slot' => (int)$m['new_slot'],
+                                'new_port' => (int)$m['new_port'],
+                                'new_onu_id' => !empty($m['new_onu_id']) ? (int)$m['new_onu_id'] : null
+                            ];
+                        }
+                    }
+                }
+                if (empty($migrations)) {
+                    $message = 'No valid migrations specified';
+                    $messageType = 'warning';
+                } else {
+                    $result = $huaweiOLT->bulkMoveONUs($migrations);
+                    $message = "Bulk migration complete: {$result['successful']}/{$result['total']} successful";
+                    $messageType = $result['success'] ? 'success' : ($result['successful'] > 0 ? 'warning' : 'danger');
+                }
+                header('Location: ?page=huawei-olt&view=migrations&olt_id=' . $oltId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
             case 'bulk_import_smartolt':
@@ -2397,6 +2424,9 @@ try {
                 <a class="nav-link <?= $view === 'terminal' ? 'active' : '' ?>" href="?page=huawei-olt&view=terminal">
                     <i class="bi bi-terminal me-2"></i> CLI Terminal
                 </a>
+                <a class="nav-link <?= $view === 'migrations' ? 'active' : '' ?>" href="?page=huawei-olt&view=migrations">
+                    <i class="bi bi-arrow-left-right me-2"></i> ONU Migrations
+                </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
                     <i class="bi bi-gear-wide-connected me-2"></i> TR-069
@@ -2460,6 +2490,9 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'terminal' ? 'active' : '' ?>" href="?page=huawei-olt&view=terminal">
                     <i class="bi bi-terminal me-2"></i> CLI Terminal
+                </a>
+                <a class="nav-link <?= $view === 'migrations' ? 'active' : '' ?>" href="?page=huawei-olt&view=migrations">
+                    <i class="bi bi-arrow-left-right me-2"></i> ONU Migrations
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'tr069' ? 'active' : '' ?>" href="?page=huawei-olt&view=tr069">
@@ -6660,6 +6693,365 @@ try {
                 URL.revokeObjectURL(url);
             }
             </script>
+            
+            <?php elseif ($view === 'migrations'): ?>
+            <?php
+            $migOltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+            $migSlot = isset($_GET['slot']) ? (int)$_GET['slot'] : null;
+            $migPort = isset($_GET['port']) ? (int)$_GET['port'] : null;
+            
+            $migOnus = [];
+            $migPortInfo = ['used_ports' => [], 'available_ports' => []];
+            if ($migOltId) {
+                $migOnus = $huaweiOLT->getONUsForMigration($migOltId, $migSlot, $migPort);
+                $migPortInfo = $huaweiOLT->getAvailablePorts($migOltId);
+            }
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="page-title mb-1"><i class="bi bi-arrow-left-right"></i> ONU Migrations</h4>
+                    <small class="text-muted">Move ONUs between PON ports individually or in bulk</small>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Select Source</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <input type="hidden" name="page" value="huawei-olt">
+                        <input type="hidden" name="view" value="migrations">
+                        <div class="col-md-4">
+                            <label class="form-label">OLT Device</label>
+                            <select name="olt_id" id="migOltSelect" class="form-select" required onchange="this.form.submit()">
+                                <option value="">-- Select OLT --</option>
+                                <?php foreach ($olts as $olt): ?>
+                                <option value="<?= $olt['id'] ?>" <?= $migOltId == $olt['id'] ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?> (<?= $olt['ip_address'] ?>)</option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php if ($migOltId): ?>
+                        <div class="col-md-3">
+                            <label class="form-label">Filter by Slot</label>
+                            <select name="slot" class="form-select" onchange="this.form.submit()">
+                                <option value="">All Slots</option>
+                                <?php
+                                $usedSlots = array_unique(array_column($migPortInfo['used_ports'], 'slot'));
+                                sort($usedSlots);
+                                foreach ($usedSlots as $s):
+                                ?>
+                                <option value="<?= $s ?>" <?= $migSlot === $s ? 'selected' : '' ?>>Slot <?= $s ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Filter by Port</label>
+                            <select name="port" class="form-select" onchange="this.form.submit()">
+                                <option value="">All Ports</option>
+                                <?php for ($p = 0; $p < 16; $p++): ?>
+                                <option value="<?= $p ?>" <?= $migPort === $p ? 'selected' : '' ?>>Port <?= $p ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i> Filter</button>
+                        </div>
+                        <?php endif; ?>
+                    </form>
+                </div>
+            </div>
+            
+            <?php if ($migOltId && !empty($migOnus)): ?>
+            <ul class="nav nav-tabs mb-4" id="migrationTabs">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#singleMigration">
+                        <i class="bi bi-arrow-right-circle me-1"></i> Single Migration
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#bulkMigration">
+                        <i class="bi bi-arrow-left-right me-1"></i> Bulk Migration
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="singleMigration">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>ONUs Available for Migration (<?= count($migOnus) ?>)</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>SN</th>
+                                            <th>Name</th>
+                                            <th>Customer</th>
+                                            <th>Current Location</th>
+                                            <th>Status</th>
+                                            <th>RX Power</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($migOnus as $monu): ?>
+                                        <tr>
+                                            <td><code><?= htmlspecialchars($monu['sn']) ?></code></td>
+                                            <td><?= htmlspecialchars($monu['name'] ?: '-') ?></td>
+                                            <td><?= htmlspecialchars($monu['customer_name'] ?: '-') ?></td>
+                                            <td><span class="badge bg-secondary"><?= $monu['frame'] ?>/<?= $monu['slot'] ?>/<?= $monu['port'] ?>:<?= $monu['onu_id'] ?></span></td>
+                                            <td>
+                                                <?php if ($monu['status'] === 'online'): ?>
+                                                <span class="badge bg-success">Online</span>
+                                                <?php elseif ($monu['status'] === 'offline'): ?>
+                                                <span class="badge bg-danger">Offline</span>
+                                                <?php else: ?>
+                                                <span class="badge bg-warning"><?= ucfirst($monu['status']) ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= $monu['rx_power'] ? number_format((float)$monu['rx_power'], 2) . ' dBm' : '-' ?></td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" onclick="openMoveModal(<?= $monu['id'] ?>, '<?= htmlspecialchars($monu['sn']) ?>', <?= $monu['slot'] ?>, <?= $monu['port'] ?>, <?= $monu['onu_id'] ?>)">
+                                                    <i class="bi bi-arrow-right-circle"></i> Move
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tab-pane fade" id="bulkMigration">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Bulk Port Migration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Bulk Migration:</strong> Move all ONUs from one port to another. Uses add-first strategy for safety.
+                            </div>
+                            
+                            <form method="post" action="?page=huawei-olt&view=migrations" onsubmit="return confirmBulkMigration()">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="bulk_move_onus">
+                                <input type="hidden" name="olt_id" value="<?= $migOltId ?>">
+                                
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <div class="card border">
+                                            <div class="card-header bg-light">
+                                                <strong>Source Port</strong>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Slot</label>
+                                                        <select id="bulkSourceSlot" class="form-select" onchange="updateBulkSourcePort()">
+                                                            <?php foreach ($usedSlots as $s): ?>
+                                                            <option value="<?= $s ?>" <?= $migSlot === $s ? 'selected' : '' ?>>Slot <?= $s ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label">Port</label>
+                                                        <select id="bulkSourcePort" class="form-select" onchange="updateBulkPreview()">
+                                                            <?php for ($p = 0; $p < 16; $p++): ?>
+                                                            <option value="<?= $p ?>" <?= $migPort === $p ? 'selected' : '' ?>>Port <?= $p ?></option>
+                                                            <?php endfor; ?>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2">
+                                                    <small class="text-muted">ONUs on this port: <span id="bulkSourceCount"><?= count($migOnus) ?></span></small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="card border">
+                                            <div class="card-header bg-light">
+                                                <strong>Destination Port</strong>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Slot</label>
+                                                        <select id="bulkDestSlot" name="dest_slot" class="form-select" required>
+                                                            <?php foreach ($usedSlots as $s): ?>
+                                                            <option value="<?= $s ?>">Slot <?= $s ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label">Port</label>
+                                                        <select id="bulkDestPort" name="dest_port" class="form-select" required>
+                                                            <?php for ($p = 0; $p < 16; $p++): ?>
+                                                            <option value="<?= $p ?>">Port <?= $p ?></option>
+                                                            <?php endfor; ?>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="bulkMigrationPreview" class="mb-4" style="display: none;">
+                                    <h6>ONUs to Migrate:</h6>
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th><input type="checkbox" id="selectAllBulk" checked onchange="toggleAllBulk()"></th>
+                                                    <th>SN</th>
+                                                    <th>Name</th>
+                                                    <th>Current</th>
+                                                    <th>New</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="bulkMigrationTable">
+                                                <?php foreach ($migOnus as $idx => $monu): ?>
+                                                <tr>
+                                                    <td><input type="checkbox" name="migrations[<?= $idx ?>][selected]" class="bulk-select" checked></td>
+                                                    <td><code><?= htmlspecialchars($monu['sn']) ?></code></td>
+                                                    <td><?= htmlspecialchars($monu['name'] ?: '-') ?></td>
+                                                    <td><?= $monu['frame'] ?>/<?= $monu['slot'] ?>/<?= $monu['port'] ?>:<?= $monu['onu_id'] ?></td>
+                                                    <td class="bulk-dest">--</td>
+                                                    <input type="hidden" name="migrations[<?= $idx ?>][onu_id]" value="<?= $monu['id'] ?>">
+                                                    <input type="hidden" name="migrations[<?= $idx ?>][new_slot]" class="bulk-new-slot" value="">
+                                                    <input type="hidden" name="migrations[<?= $idx ?>][new_port]" class="bulk-new-port" value="">
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <button type="button" class="btn btn-secondary me-2" onclick="previewBulkMigration()">
+                                    <i class="bi bi-eye me-1"></i> Preview Migration
+                                </button>
+                                <button type="submit" class="btn btn-warning" id="bulkMigrateBtn" disabled>
+                                    <i class="bi bi-arrow-left-right me-1"></i> Execute Bulk Migration
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="moveOnuModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-arrow-right-circle me-2"></i>Move ONU</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="?page=huawei-olt&view=migrations">
+                            <div class="modal-body">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="move_onu">
+                                <input type="hidden" name="onu_id" id="moveOnuId">
+                                <input type="hidden" name="redirect_view" value="migrations&olt_id=<?= $migOltId ?>">
+                                
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Moving ONU: <strong id="moveOnuSn"></strong><br>
+                                    <small>Current: <span id="moveOnuCurrent"></span></small>
+                                </div>
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">New Slot</label>
+                                        <select name="new_slot" id="moveNewSlot" class="form-select" required>
+                                            <?php foreach ($usedSlots as $s): ?>
+                                            <option value="<?= $s ?>">Slot <?= $s ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">New Port</label>
+                                        <select name="new_port" id="moveNewPort" class="form-select" required>
+                                            <?php for ($p = 0; $p < 16; $p++): ?>
+                                            <option value="<?= $p ?>">Port <?= $p ?></option>
+                                            <?php endfor; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">ONU ID <small class="text-muted">(optional)</small></label>
+                                        <input type="number" name="new_onu_id" id="moveNewOnuId" class="form-control" min="0" max="127" placeholder="Auto">
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning mt-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>Warning:</strong> This will briefly disconnect the ONU during migration.
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-right-circle me-1"></i> Move ONU</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function openMoveModal(onuId, sn, slot, port, onuIdNum) {
+                document.getElementById('moveOnuId').value = onuId;
+                document.getElementById('moveOnuSn').textContent = sn;
+                document.getElementById('moveOnuCurrent').textContent = '0/' + slot + '/' + port + ':' + onuIdNum;
+                new bootstrap.Modal(document.getElementById('moveOnuModal')).show();
+            }
+            
+            function previewBulkMigration() {
+                const destSlot = document.getElementById('bulkDestSlot').value;
+                const destPort = document.getElementById('bulkDestPort').value;
+                
+                document.querySelectorAll('.bulk-dest').forEach(el => {
+                    el.textContent = '0/' + destSlot + '/' + destPort + ':auto';
+                });
+                document.querySelectorAll('.bulk-new-slot').forEach(el => {
+                    el.value = destSlot;
+                });
+                document.querySelectorAll('.bulk-new-port').forEach(el => {
+                    el.value = destPort;
+                });
+                
+                document.getElementById('bulkMigrationPreview').style.display = 'block';
+                document.getElementById('bulkMigrateBtn').disabled = false;
+            }
+            
+            function toggleAllBulk() {
+                const checked = document.getElementById('selectAllBulk').checked;
+                document.querySelectorAll('.bulk-select').forEach(cb => cb.checked = checked);
+            }
+            
+            function confirmBulkMigration() {
+                const count = document.querySelectorAll('.bulk-select:checked').length;
+                return confirm('Are you sure you want to migrate ' + count + ' ONU(s)? This will briefly disconnect each ONU.');
+            }
+            </script>
+            
+            <?php elseif ($migOltId && empty($migOnus)): ?>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                No authorized ONUs found for the selected filters. Try adjusting the slot/port filters or select a different OLT.
+            </div>
+            <?php elseif (!$migOltId): ?>
+            <div class="alert alert-secondary">
+                <i class="bi bi-arrow-up-circle me-2"></i>
+                Please select an OLT device above to view ONUs available for migration.
+            </div>
+            <?php endif; ?>
             
             <?php elseif ($view === 'settings'): ?>
             <?php
