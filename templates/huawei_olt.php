@@ -11197,7 +11197,7 @@ echo "# ================================================\n";
                 if (data.success) {
                     const count = (data.unconfigured_onus || 0) + (data.discovered_onus || 0);
                     const badgeClass = count > 0 ? 'badge bg-warning badge-pulse ms-auto' : 'badge bg-secondary ms-auto';
-                    const badgeText = count + ' pending';
+                    const badgeText = count.toString();
                     
                     const desktopBadge = document.getElementById('nonAuthBadgeDesktop');
                     const mobileBadge = document.getElementById('nonAuthBadgeMobile');
