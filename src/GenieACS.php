@@ -325,13 +325,22 @@ class GenieACS {
             if ($onu) {
                 $deviceId = $device['_id'] ?? '';
                 $lastInform = $device['_lastInform'] ?? null;
+                $manufacturer = $device['_deviceId']['_Manufacturer'] ?? '';
+                $model = $device['_deviceId']['_ProductClass'] ?? '';
                 
+                // Extract IP address from device data
+                $ipAddress = $this->extractValue($device, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress')
+                    ?? $this->extractValue($device, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress')
+                    ?? null;
+                
+                // Sync to tr069_devices table
                 $stmt = $this->db->prepare("
-                    INSERT INTO tr069_devices (onu_id, device_id, serial_number, last_inform, manufacturer, model)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO tr069_devices (onu_id, device_id, serial_number, last_inform, manufacturer, model, ip_address)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (serial_number) DO UPDATE SET 
                         device_id = EXCLUDED.device_id,
                         last_inform = EXCLUDED.last_inform,
+                        ip_address = COALESCE(EXCLUDED.ip_address, tr069_devices.ip_address),
                         updated_at = CURRENT_TIMESTAMP
                 ");
                 $stmt->execute([
@@ -339,9 +348,26 @@ class GenieACS {
                     $deviceId,
                     $serial,
                     $lastInform,
-                    $device['_deviceId']['_Manufacturer'] ?? '',
-                    $device['_deviceId']['_ProductClass'] ?? ''
+                    $manufacturer,
+                    $model,
+                    $ipAddress
                 ]);
+                
+                // Also update huawei_onus with TR-069 info
+                try {
+                    $updateStmt = $this->db->prepare("
+                        UPDATE huawei_onus SET 
+                            tr069_device_id = ?,
+                            tr069_ip = COALESCE(?, tr069_ip),
+                            tr069_status = 'connected',
+                            tr069_last_inform = ?
+                        WHERE id = ?
+                    ");
+                    $updateStmt->execute([$deviceId, $ipAddress, $lastInform, $onu['id']]);
+                } catch (\Exception $e) {
+                    // Ignore if columns don't exist
+                }
+                
                 $synced++;
             }
         }

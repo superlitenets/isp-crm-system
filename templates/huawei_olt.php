@@ -396,13 +396,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'vlan_id' => $vlanId
                 ];
                 
+                // Get TR-069 ACS URL for display
+                require_once __DIR__ . '/../src/WireGuardService.php';
+                $wgService = new \App\WireGuardService($db);
+                $acsUrl = $wgService->getTR069AcsUrl();
+                
                 // Try to execute actual OLT authorization
                 try {
                     $result = $huaweiOLT->authorizeONU($onuId, $profileId, 'sn', '', '', $options);
                     
                     if ($result['success']) {
-                        $message = 'ONU authorized on OLT. VLAN ' . ($vlanId ?: 'default') . ' configured. TR-069 will handle router settings.';
+                        $assignedOnuId = $result['onu_id'] ?? '';
+                        $message = "ONU authorized successfully! ";
+                        $message .= $assignedOnuId ? "Assigned ONU ID: {$assignedOnuId}. " : "";
+                        $message .= "VLAN: " . ($vlanId ?: 'default') . ". ";
+                        $message .= "TR-069 ACS URL pushed via OMCI. Device will connect to: " . $acsUrl;
                         $messageType = 'success';
+                        
+                        // Update ONU with TR-069 status
+                        $huaweiOLT->updateONU($onuId, [
+                            'tr069_status' => 'pending',
+                            'onu_id' => $assignedOnuId ?: $onu['onu_id']
+                        ]);
                     } else {
                         // CLI failed but we can still update database state (simulated success for demo)
                         $huaweiOLT->updateONU($onuId, [
@@ -410,9 +425,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             'service_profile_id' => $profileId,
                             'name' => $description ?: $onu['name'],
                             'status' => 'online',
-                            'olt_sync_pending' => true
+                            'olt_sync_pending' => true,
+                            'tr069_status' => 'pending'
                         ]);
-                        $message = 'ONU authorized (pending OLT sync). VLAN ' . ($vlanId ?: 'default') . ' configured.';
+                        $message = "ONU marked authorized (pending OLT sync). VLAN: " . ($vlanId ?: 'default') . ". TR-069 ACS: {$acsUrl}";
                         $messageType = 'success';
                     }
                 } catch (Exception $e) {
@@ -422,6 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'service_profile_id' => $profileId,
                         'name' => $description ?: $onu['name'],
                         'status' => 'online',
+                        'tr069_status' => 'pending',
                         'olt_sync_pending' => true
                     ]);
                     $message = 'ONU authorized (OLT offline - will sync when connected). VLAN ' . ($vlanId ?: 'default') . ' configured.';
@@ -3470,7 +3487,7 @@ try {
                                 </div>
                                 
                                 <div class="row text-center">
-                                    <div class="col-6">
+                                    <div class="col-4">
                                         <div class="h6 text-muted">Authorization</div>
                                         <?php if ($currentOnu['is_authorized']): ?>
                                         <span class="badge bg-success fs-6">Authorized</span>
@@ -3478,11 +3495,47 @@ try {
                                         <span class="badge bg-warning fs-6">Pending</span>
                                         <?php endif; ?>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-4">
                                         <div class="h6 text-muted">Distance</div>
                                         <span class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
                                     </div>
+                                    <div class="col-4">
+                                        <div class="h6 text-muted">TR-069 IP</div>
+                                        <?php if (!empty($currentOnu['tr069_ip'])): ?>
+                                        <code class="text-primary fw-bold"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></code>
+                                        <?php elseif (!empty($tr069Info['ip'])): ?>
+                                        <code class="text-primary fw-bold"><?= htmlspecialchars($tr069Info['ip']) ?></code>
+                                        <?php else: ?>
+                                        <span class="text-muted small">Waiting...</span>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
+                                
+                                <!-- TR-069 Device Info Row -->
+                                <?php if (!empty($tr069Device) || !empty($currentOnu['tr069_device_id'])): ?>
+                                <div class="row text-center mt-3 pt-3 border-top">
+                                    <div class="col-6">
+                                        <div class="small text-muted">TR-069 Status</div>
+                                        <?php 
+                                        $tr069Status = $currentOnu['tr069_status'] ?? ($tr069Device ? 'connected' : 'pending');
+                                        $tr069Badge = ['connected' => 'success', 'pending' => 'warning', 'offline' => 'secondary'];
+                                        ?>
+                                        <span class="badge bg-<?= $tr069Badge[$tr069Status] ?? 'secondary' ?>">
+                                            <i class="bi bi-cloud-<?= $tr069Status === 'connected' ? 'check' : 'arrow-up' ?> me-1"></i><?= ucfirst($tr069Status) ?>
+                                        </span>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="small text-muted">Last Inform</div>
+                                        <?php if (!empty($currentOnu['tr069_last_inform'])): ?>
+                                        <small class="fw-bold"><?= date('M j, H:i', strtotime($currentOnu['tr069_last_inform'])) ?></small>
+                                        <?php elseif (!empty($tr069Device['last_inform'])): ?>
+                                        <small class="fw-bold"><?= date('M j, H:i', strtotime($tr069Device['last_inform'])) ?></small>
+                                        <?php else: ?>
+                                        <small class="text-muted">-</small>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                             </div>
                             
                             <div id="liveDataTimestamp" class="text-center text-muted small mt-3 d-none">
