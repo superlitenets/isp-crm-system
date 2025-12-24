@@ -2008,7 +2008,7 @@ try {
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php $mobileTotalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
-                    <span class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
+                    <span id="nonAuthBadgeMobile" class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
                     <i class="bi bi-sliders me-2"></i> Service Profiles
@@ -2069,7 +2069,7 @@ try {
                 <a class="nav-link <?= isset($_GET['unconfigured']) ? 'active' : '' ?> <?= ($stats['unconfigured_onus'] > 0 || $stats['discovered_onus'] > 0) ? 'pending-auth-highlight' : '' ?>" href="?page=huawei-olt&view=onus&unconfigured=1">
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php $totalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
-                    <span class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
+                    <span id="nonAuthBadgeDesktop" class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
                 </a>
                 <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
                     <i class="bi bi-sliders me-2"></i> Service Profiles
@@ -9036,6 +9036,38 @@ echo "# ================================================\n";
         });
         aptSelect.value = '';
     }
+    
+    // Live update Non Auth badge from OLT Session Manager
+    function updateNonAuthBadge() {
+        fetch('api/olt-stats.php')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const count = (data.unconfigured_onus || 0) + (data.discovered_onus || 0);
+                    const badgeClass = count > 0 ? 'badge bg-warning badge-pulse ms-auto' : 'badge bg-secondary ms-auto';
+                    const badgeText = count + ' pending';
+                    
+                    const desktopBadge = document.getElementById('nonAuthBadgeDesktop');
+                    const mobileBadge = document.getElementById('nonAuthBadgeMobile');
+                    
+                    if (desktopBadge) {
+                        desktopBadge.className = badgeClass;
+                        desktopBadge.textContent = badgeText;
+                    }
+                    if (mobileBadge) {
+                        mobileBadge.className = count > 0 ? 'badge bg-warning ms-auto' : 'badge bg-secondary ms-auto';
+                        mobileBadge.textContent = badgeText;
+                    }
+                }
+            })
+            .catch(() => {});
+    }
+    
+    // Update badge on page load and every 30 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        updateNonAuthBadge();
+        setInterval(updateNonAuthBadge, 30000);
+    });
     </script>
 </body>
 </html>
