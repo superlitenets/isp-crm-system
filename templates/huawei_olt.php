@@ -637,6 +637,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         
                         $message = "Bulk import complete: {$imported} added, {$updated} updated" . ($skipped > 0 ? ", {$skipped} skipped (no OLT mapping)" : '');
                         $messageType = 'success';
+                        
+                        // Auto-sync optical levels if requested
+                        if (!empty($_POST['sync_optical'])) {
+                            $syncedCount = 0;
+                            $syncedOlts = array_unique(array_values($oltMappings));
+                            foreach ($syncedOlts as $syncOltId) {
+                                $syncResult = $huaweiOLT->syncOpticalPowerSNMP($syncOltId);
+                                if ($syncResult['success']) {
+                                    $syncedCount += $syncResult['updated'] ?? 0;
+                                }
+                            }
+                            $message .= ". Optical sync: {$syncedCount} ONUs updated";
+                        }
                     } else {
                         $message = 'Failed to fetch ONUs from SmartOLT: ' . ($result['error'] ?? 'Unknown error');
                         $messageType = 'danger';
@@ -6858,6 +6871,13 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 <div class="alert alert-info small">
                                     <i class="bi bi-info-circle me-1"></i>
                                     <strong>Total available:</strong> <?= $smartOnuCount ?> ONUs across <?= count($smartOlts) ?> OLT(s)
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="sync_optical" id="syncOptical" checked>
+                                    <label class="form-check-label" for="syncOptical">
+                                        Sync optical power levels from OLT after import (via SNMP)
+                                    </label>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary w-100" onclick="showLoading('Importing ONUs from SmartOLT... This may take a while.')">
