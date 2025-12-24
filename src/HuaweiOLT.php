@@ -4876,16 +4876,17 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        
         $cleanDesc = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $description);
         $cleanDesc = substr(trim($cleanDesc), 0, 64);
         
-        $command = "interface gpon {$onu['frame']}/{$onu['slot']}";
-        $this->executeCommand($onu['olt_id'], $command);
-        
-        $descCommand = "ont modify {$onu['port']} {$onu['onu_id']} desc \"{$cleanDesc}\"";
-        $result = $this->executeCommand($onu['olt_id'], $descCommand);
-        
-        $this->executeCommand($onu['olt_id'], "quit");
+        // Combined command with interface context
+        $command = "interface gpon {$frame}/{$slot}\r\nont modify {$port} {$onuIdNum} desc \"{$cleanDesc}\"\r\nquit";
+        $result = $this->executeCommand($onu['olt_id'], $command);
         
         if ($result['success']) {
             $this->updateONU($onuId, ['description' => $description]);
@@ -6004,7 +6005,8 @@ class HuaweiOLT {
         }
         
         $commands[] = "quit";
-        $fullCommand = implode("\n", $commands);
+        // Use \r\n for proper Telnet line endings
+        $fullCommand = implode("\r\n", $commands);
         
         $result = $this->executeCommand($oltId, $fullCommand);
         
