@@ -5392,6 +5392,41 @@ try {
                         </div>
                     </div>
                     
+                    <!-- Quick Ping Test Card -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-broadcast me-2"></i>Quick Ping Test</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Test connectivity to any IP through the VPN tunnel (OLT, TR-069 devices, etc.)</p>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="pingTestIp" placeholder="192.168.1.1" pattern="^(\d{1,3}\.){3}\d{1,3}$">
+                                <button class="btn btn-info" type="button" onclick="quickPingTest()" id="pingTestBtn">
+                                    <i class="bi bi-broadcast me-1"></i>Ping
+                                </button>
+                            </div>
+                            <div id="pingTestResult" style="display:none;"></div>
+                            <div class="small text-muted">
+                                <strong>Quick targets:</strong><br>
+                                <a href="#" onclick="pingQuickTarget('<?= htmlspecialchars($wgSettings['vpn_gateway_ip']) ?>'); return false;" class="me-2">VPN Gateway</a>
+                                <?php
+                                $quickTargets = [];
+                                try {
+                                    $stmt = $db->query("SELECT DISTINCT network_cidr FROM wireguard_subnets WHERE is_active = TRUE LIMIT 3");
+                                    $quickTargets = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+                                } catch (Exception $e) {}
+                                foreach ($quickTargets as $cidr):
+                                    $parts = explode('/', $cidr);
+                                    $octets = explode('.', $parts[0]);
+                                    $octets[3] = '1';
+                                    $gwIp = implode('.', $octets);
+                                ?>
+                                <a href="#" onclick="pingQuickTarget('<?= htmlspecialchars($gwIp) ?>'); return false;" class="me-2"><?= htmlspecialchars($cidr) ?></a>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="card shadow-sm">
                         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-server me-2"></i>VPN Servers</h5>
@@ -5896,6 +5931,61 @@ try {
                     .catch(err => {
                         document.getElementById('connectivityResults').innerHTML = `
                             <div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Error: ${err.message}</div>
+                        `;
+                    });
+            }
+            
+            function pingQuickTarget(ip) {
+                document.getElementById('pingTestIp').value = ip;
+                quickPingTest();
+            }
+            
+            function quickPingTest() {
+                const ip = document.getElementById('pingTestIp').value.trim();
+                if (!ip || !/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+                    document.getElementById('pingTestResult').style.display = 'block';
+                    document.getElementById('pingTestResult').innerHTML = `
+                        <div class="alert alert-warning py-2 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Please enter a valid IP address</div>
+                    `;
+                    return;
+                }
+                
+                const btn = document.getElementById('pingTestBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pinging...';
+                
+                document.getElementById('pingTestResult').style.display = 'block';
+                document.getElementById('pingTestResult').innerHTML = `
+                    <div class="text-center py-2"><div class="spinner-border spinner-border-sm text-info"></div> Pinging ${ip}...</div>
+                `;
+                
+                fetch(`?page=huawei-olt&view=vpn&action=test_ip&ip=${encodeURIComponent(ip)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Ping';
+                        
+                        if (data.success) {
+                            document.getElementById('pingTestResult').innerHTML = `
+                                <div class="alert alert-success py-2 mb-0">
+                                    <i class="bi bi-check-circle me-2"></i><strong>${ip}</strong> is reachable
+                                    <br><small class="text-muted">Latency: ${data.latency_avg ? data.latency_avg.toFixed(1) + ' ms' : 'N/A'} | Packets: ${data.packets_received}/${data.packets_sent}</small>
+                                </div>
+                            `;
+                        } else {
+                            document.getElementById('pingTestResult').innerHTML = `
+                                <div class="alert alert-danger py-2 mb-0">
+                                    <i class="bi bi-x-circle me-2"></i><strong>${ip}</strong> is unreachable
+                                    <br><small class="text-muted">Packets: ${data.packets_received || 0}/${data.packets_sent || 3} received</small>
+                                </div>
+                            `;
+                        }
+                    })
+                    .catch(err => {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Ping';
+                        document.getElementById('pingTestResult').innerHTML = `
+                            <div class="alert alert-danger py-2 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Error: ${err.message}</div>
                         `;
                     });
             }
