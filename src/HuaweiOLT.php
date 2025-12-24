@@ -4625,21 +4625,31 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        $command = "ont reboot {$onu['frame']}/{$onu['slot']}/{$onu['port']} {$onu['onu_id']}";
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        
+        // Huawei MA5683T requires interface context for ont reset
+        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\nquit";
         $result = $this->executeCommand($onu['olt_id'], $command);
+        
+        // Check for success indicators in output
+        $output = $result['output'] ?? '';
+        $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
         
         $this->addLog([
             'olt_id' => $onu['olt_id'],
             'onu_id' => $onuId,
             'action' => 'reboot',
-            'status' => $result['success'] ? 'success' : 'failed',
-            'message' => $result['success'] ? "ONU {$onu['sn']} rebooted" : $result['message'],
+            'status' => $success ? 'success' : 'failed',
+            'message' => $success ? "ONU {$onu['sn']} rebooted" : ($result['message'] ?? 'Reboot command failed'),
             'command_sent' => $command,
-            'command_response' => $result['output'] ?? '',
+            'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        return $result;
+        return ['success' => $success, 'message' => $success ? "ONU {$onu['sn']} rebooted successfully" : 'Reboot command failed', 'output' => $output];
     }
     
     public function deleteONUFromOLT(int $onuId): array {
@@ -4648,10 +4658,20 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        $command = "ont delete {$onu['frame']}/{$onu['slot']}/{$onu['port']} {$onu['onu_id']}";
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        
+        // Huawei MA5683T requires interface context for ont delete
+        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\nquit";
         $result = $this->executeCommand($onu['olt_id'], $command);
         
-        if ($result['success']) {
+        // Check for success indicators in output
+        $output = $result['output'] ?? '';
+        $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
+        
+        if ($success) {
             $this->deleteONU($onuId);
         }
         
@@ -4659,14 +4679,14 @@ class HuaweiOLT {
             'olt_id' => $onu['olt_id'],
             'onu_id' => $onuId,
             'action' => 'delete',
-            'status' => $result['success'] ? 'success' : 'failed',
-            'message' => $result['success'] ? "ONU {$onu['sn']} deleted" : $result['message'],
+            'status' => $success ? 'success' : 'failed',
+            'message' => $success ? "ONU {$onu['sn']} deleted from OLT" : ($result['message'] ?? 'Delete command failed'),
             'command_sent' => $command,
-            'command_response' => $result['output'] ?? '',
+            'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        return $result;
+        return ['success' => $success, 'message' => $success ? "ONU {$onu['sn']} deleted from OLT" : 'Delete command failed', 'output' => $output];
     }
     
     public function resetONUConfig(int $onuId): array {
@@ -4675,7 +4695,13 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        $command = "ont reset {$onu['frame']}/{$onu['slot']}/{$onu['port']} {$onu['onu_id']}";
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuIdNum = $onu['onu_id'];
+        
+        // Huawei MA5683T requires interface context
+        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\nquit";
         $result = $this->executeCommand($onu['olt_id'], $command);
         
         $this->addLog([
