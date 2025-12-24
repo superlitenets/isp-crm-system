@@ -266,6 +266,152 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
     exit;
 }
 
+// AJAX endpoint for signal history
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'signal_history') {
+    header('Content-Type: application/json');
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    $hours = (int)($_GET['hours'] ?? 24);
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    $history = $huaweiOLT->getSignalHistory($onuId, $hours);
+    echo json_encode(['success' => true, 'history' => $history]);
+    exit;
+}
+
+// AJAX endpoint for port capacity
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_GET['olt_id'] ?? 0);
+    
+    if (!$oltId) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID required']);
+        exit;
+    }
+    
+    $capacity = $huaweiOLT->getPortCapacity($oltId);
+    echo json_encode(['success' => true, 'capacity' => $capacity]);
+    exit;
+}
+
+// AJAX endpoint for uptime stats
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'uptime_stats') {
+    header('Content-Type: application/json');
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    $days = (int)($_GET['days'] ?? 7);
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    $stats = $huaweiOLT->getUptimeStats($onuId, $days);
+    echo json_encode(['success' => true, 'stats' => $stats]);
+    exit;
+}
+
+// AJAX endpoint for CSV export
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'export_csv') {
+    $oltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : null;
+    $data = $huaweiOLT->exportONUsToCSV($oltId);
+    
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="onus_export_' . date('Y-m-d_His') . '.csv"');
+    
+    $output = fopen('php://output', 'w');
+    if (!empty($data)) {
+        fputcsv($output, array_keys($data[0]));
+        foreach ($data as $row) {
+            fputcsv($output, $row);
+        }
+    }
+    fclose($output);
+    exit;
+}
+
+// AJAX endpoint for bulk reboot
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_reboot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $input = json_decode(file_get_contents('php://input'), true);
+    $onuIds = $input['onu_ids'] ?? [];
+    
+    if (empty($onuIds)) {
+        echo json_encode(['success' => false, 'error' => 'No ONUs selected']);
+        exit;
+    }
+    
+    $result = $huaweiOLT->bulkReboot($onuIds);
+    echo json_encode(['success' => true, 'result' => $result]);
+    exit;
+}
+
+// AJAX endpoint for bulk delete
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'bulk_delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $input = json_decode(file_get_contents('php://input'), true);
+    $onuIds = $input['onu_ids'] ?? [];
+    
+    if (empty($onuIds)) {
+        echo json_encode(['success' => false, 'error' => 'No ONUs selected']);
+        exit;
+    }
+    
+    $result = $huaweiOLT->bulkDelete($onuIds);
+    echo json_encode(['success' => true, 'result' => $result]);
+    exit;
+}
+
+// AJAX endpoint for customer search (for ONU linking)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_customers') {
+    header('Content-Type: application/json');
+    $phone = $_GET['phone'] ?? '';
+    
+    if (strlen($phone) < 3) {
+        echo json_encode(['success' => true, 'customers' => []]);
+        exit;
+    }
+    
+    $customers = $huaweiOLT->findCustomersByPhone($phone);
+    echo json_encode(['success' => true, 'customers' => $customers]);
+    exit;
+}
+
+// AJAX endpoint for linking ONU to customer
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'link_customer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $input = json_decode(file_get_contents('php://input'), true);
+    $onuId = (int)($input['onu_id'] ?? 0);
+    $customerId = (int)($input['customer_id'] ?? 0);
+    
+    if (!$onuId || !$customerId) {
+        echo json_encode(['success' => false, 'error' => 'ONU and customer ID required']);
+        exit;
+    }
+    
+    $result = $huaweiOLT->matchONUToCustomer($onuId, $customerId);
+    echo json_encode(['success' => $result]);
+    exit;
+}
+
+// AJAX endpoint for creating LOS ticket
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'create_los_ticket' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $input = json_decode(file_get_contents('php://input'), true);
+    $onuId = (int)($input['onu_id'] ?? 0);
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    $ticketId = $huaweiOLT->createLOSTicket($onuId);
+    echo json_encode(['success' => $ticketId !== null, 'ticket_id' => $ticketId]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
@@ -3513,6 +3659,9 @@ try {
                             </button>
                         </form>
                     <?php endif; ?>
+                    <a href="?page=huawei-olt&ajax=export_csv<?= $oltId ? '&olt_id=' . $oltId : '' ?>" class="btn btn-outline-success btn-sm" title="Export to CSV">
+                        <i class="bi bi-download me-1"></i> Export CSV
+                    </a>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#onuModal" onclick="resetOnuForm()">
                         <i class="bi bi-plus-circle me-1"></i> Add ONU
                     </button>
@@ -3677,10 +3826,33 @@ try {
                         All discovered ONUs shown above
                     </div>
                     <?php else: ?>
+                    <!-- Bulk Action Toolbar -->
+                    <div id="bulkActionBar" class="bg-primary text-white p-3 d-none">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span id="selectedCount">0</span> ONUs selected
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-light btn-sm" onclick="bulkReboot()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Reboot Selected
+                                </button>
+                                <button class="btn btn-warning btn-sm" onclick="bulkRefreshSignal()">
+                                    <i class="bi bi-reception-4 me-1"></i> Refresh Signal
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="bulkDelete()">
+                                    <i class="bi bi-trash me-1"></i> Delete Selected
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" onclick="clearSelection()">
+                                    <i class="bi bi-x-lg me-1"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover mb-0" id="onuTable">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 40px;"><input type="checkbox" id="selectAllOnus" class="form-check-input" title="Select All"></th>
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
                                     <th>Name / Description</th>
@@ -3695,6 +3867,7 @@ try {
                             <tbody>
                                 <?php foreach ($onus as $onu): ?>
                                 <tr data-onu-id="<?= $onu['id'] ?>">
+                                    <td><input type="checkbox" class="form-check-input onu-checkbox" value="<?= $onu['id'] ?>"></td>
                                     <td>
                                         <code><?= htmlspecialchars($onu['sn']) ?></code>
                                         <?php if (!empty($onu['discovered_eqid'])): ?>
@@ -3974,6 +4147,186 @@ try {
                 window.addEventListener('beforeunload', () => {
                     if (realtimeInterval) clearInterval(realtimeInterval);
                 });
+                
+                // ==================== Bulk Operations ====================
+                const selectAllCheckbox = document.getElementById('selectAllOnus');
+                const bulkActionBar = document.getElementById('bulkActionBar');
+                const selectedCountEl = document.getElementById('selectedCount');
+                
+                function getSelectedONUs() {
+                    return Array.from(document.querySelectorAll('.onu-checkbox:checked')).map(cb => parseInt(cb.value));
+                }
+                
+                function updateBulkActionBar() {
+                    const selected = getSelectedONUs();
+                    if (bulkActionBar && selectedCountEl) {
+                        selectedCountEl.textContent = selected.length;
+                        bulkActionBar.classList.toggle('d-none', selected.length === 0);
+                    }
+                }
+                
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.addEventListener('change', function() {
+                        document.querySelectorAll('.onu-checkbox').forEach(cb => cb.checked = this.checked);
+                        updateBulkActionBar();
+                    });
+                }
+                
+                document.querySelectorAll('.onu-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updateBulkActionBar);
+                });
+                
+                window.clearSelection = function() {
+                    document.querySelectorAll('.onu-checkbox').forEach(cb => cb.checked = false);
+                    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+                    updateBulkActionBar();
+                };
+                
+                window.bulkReboot = async function() {
+                    const onuIds = getSelectedONUs();
+                    if (!onuIds.length) return;
+                    if (!confirm(`Reboot ${onuIds.length} ONU(s)?`)) return;
+                    
+                    showToast(`Rebooting ${onuIds.length} ONU(s)...`, 'info');
+                    try {
+                        const resp = await fetch('?page=huawei-olt&ajax=bulk_reboot', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({onu_ids: onuIds})
+                        });
+                        const data = await resp.json();
+                        if (data.success) {
+                            showToast(`Rebooted: ${data.result.success} success, ${data.result.failed} failed`, 
+                                data.result.failed > 0 ? 'warning' : 'success');
+                        }
+                    } catch (e) {
+                        showToast('Bulk reboot failed: ' + e.message, 'danger');
+                    }
+                    clearSelection();
+                };
+                
+                window.bulkDelete = async function() {
+                    const onuIds = getSelectedONUs();
+                    if (!onuIds.length) return;
+                    if (!confirm(`DELETE ${onuIds.length} ONU(s)? This cannot be undone!`)) return;
+                    
+                    showToast(`Deleting ${onuIds.length} ONU(s)...`, 'warning');
+                    try {
+                        const resp = await fetch('?page=huawei-olt&ajax=bulk_delete', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({onu_ids: onuIds})
+                        });
+                        const data = await resp.json();
+                        if (data.success) {
+                            showToast(`Deleted: ${data.result.success} success, ${data.result.failed} failed`, 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        }
+                    } catch (e) {
+                        showToast('Bulk delete failed: ' + e.message, 'danger');
+                    }
+                };
+                
+                window.bulkRefreshSignal = function() {
+                    const onuIds = getSelectedONUs();
+                    if (!onuIds.length) return;
+                    showToast(`Use "Sync from OLT" to refresh signals for all ONUs`, 'info');
+                };
+                
+                // ==================== Browser Notifications ====================
+                let lastPendingCount = <?= $stats['unconfigured_onus'] ?? 0 ?>;
+                let notificationsEnabled = false;
+                
+                async function requestNotificationPermission() {
+                    if ('Notification' in window && Notification.permission === 'default') {
+                        const permission = await Notification.requestPermission();
+                        notificationsEnabled = permission === 'granted';
+                    } else {
+                        notificationsEnabled = Notification.permission === 'granted';
+                    }
+                }
+                
+                function sendBrowserNotification(title, body, icon = 'bi-bell') {
+                    if (!notificationsEnabled) return;
+                    try {
+                        new Notification(title, { body, icon: '/favicon.ico' });
+                    } catch (e) { console.warn('Notification failed:', e); }
+                }
+                
+                // Check for new pending ONUs
+                async function checkForNewPending() {
+                    try {
+                        const resp = await fetch('?page=huawei-olt&ajax=realtime_stats');
+                        const data = await resp.json();
+                        if (data.success) {
+                            const newPending = data.stats.unconfigured_onus;
+                            if (newPending > lastPendingCount) {
+                                const diff = newPending - lastPendingCount;
+                                sendBrowserNotification('New ONU Discovered!', 
+                                    `${diff} new ONU(s) waiting for authorization`);
+                                showToast(`${diff} new ONU(s) discovered!`, 'warning');
+                            }
+                            lastPendingCount = newPending;
+                        }
+                    } catch (e) {}
+                }
+                
+                requestNotificationPermission();
+                setInterval(checkForNewPending, 30000);
+                
+                // ==================== Keyboard Shortcuts ====================
+                document.addEventListener('keydown', function(e) {
+                    // Ctrl+/ or ? for help
+                    if ((e.ctrlKey && e.key === '/') || (e.shiftKey && e.key === '?')) {
+                        e.preventDefault();
+                        showKeyboardShortcuts();
+                    }
+                    // Escape to clear selection
+                    if (e.key === 'Escape') {
+                        clearSelection();
+                    }
+                    // Ctrl+A to select all (when not in input)
+                    if (e.ctrlKey && e.key === 'a' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                        e.preventDefault();
+                        if (selectAllCheckbox) {
+                            selectAllCheckbox.checked = true;
+                            selectAllCheckbox.dispatchEvent(new Event('change'));
+                        }
+                    }
+                    // R to refresh (when not in input)
+                    if (e.key === 'r' && !e.ctrlKey && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                        e.preventDefault();
+                        location.reload();
+                    }
+                });
+                
+                function showKeyboardShortcuts() {
+                    const modal = document.createElement('div');
+                    modal.className = 'modal fade show';
+                    modal.style.display = 'block';
+                    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                    modal.innerHTML = `
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title"><i class="bi bi-keyboard me-2"></i>Keyboard Shortcuts</h5>
+                                    <button type="button" class="btn-close" onclick="this.closest('.modal').remove()"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <table class="table table-sm mb-0">
+                                        <tr><td><kbd>Ctrl</kbd> + <kbd>A</kbd></td><td>Select all ONUs</td></tr>
+                                        <tr><td><kbd>Esc</kbd></td><td>Clear selection</td></tr>
+                                        <tr><td><kbd>R</kbd></td><td>Refresh page</td></tr>
+                                        <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(modal);
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) modal.remove();
+                    });
+                }
             })();
             </script>
             <style>
@@ -3983,6 +4336,12 @@ try {
             @keyframes rowFlash {
                 0% { background-color: rgba(25, 135, 84, 0.2); }
                 100% { background-color: transparent; }
+            }
+            #bulkActionBar {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                border-radius: 0.5rem 0.5rem 0 0;
             }
             </style>
             
@@ -4225,7 +4584,146 @@ try {
                 </div>
             </div>
             
-            <div class="row mt-4">
+            <!-- Signal History Chart -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-graph-up me-2"></i>Signal History (Last 7 Days)</span>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-light active" data-days="7">7D</button>
+                                <button class="btn btn-outline-light" data-days="30">30D</button>
+                                <button class="btn btn-outline-light" data-days="90">90D</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="signalHistoryChart" height="120"></canvas>
+                            <div id="signalHistoryLoading" class="text-center py-4 d-none">
+                                <div class="spinner-border text-primary"></div>
+                            </div>
+                            <div id="signalHistoryNoData" class="text-center py-4 text-muted d-none">
+                                <i class="bi bi-bar-chart fs-1 d-block mb-2"></i>
+                                No signal history data available yet
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+            (function() {
+                const onuId = <?= $currentOnu['id'] ?>;
+                let signalChart = null;
+                
+                async function loadSignalHistory(days = 7) {
+                    const loading = document.getElementById('signalHistoryLoading');
+                    const noData = document.getElementById('signalHistoryNoData');
+                    const canvas = document.getElementById('signalHistoryChart');
+                    
+                    loading.classList.remove('d-none');
+                    canvas.style.display = 'none';
+                    noData.classList.add('d-none');
+                    
+                    try {
+                        const resp = await fetch(`?page=huawei-olt&ajax=signal_history&onu_id=${onuId}&days=${days}`);
+                        const data = await resp.json();
+                        
+                        loading.classList.add('d-none');
+                        
+                        if (!data.success || !data.history || data.history.length === 0) {
+                            noData.classList.remove('d-none');
+                            return;
+                        }
+                        
+                        canvas.style.display = 'block';
+                        
+                        const labels = data.history.map(h => {
+                            const d = new Date(h.recorded_at);
+                            return d.toLocaleDateString('en-US', {month:'short', day:'numeric', hour:'2-digit'});
+                        });
+                        const rxData = data.history.map(h => h.rx_power);
+                        const txData = data.history.map(h => h.tx_power);
+                        
+                        if (signalChart) signalChart.destroy();
+                        
+                        signalChart = new Chart(canvas, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'RX Power (dBm)',
+                                    data: rxData,
+                                    borderColor: 'rgb(75, 192, 192)',
+                                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                    tension: 0.3,
+                                    fill: true
+                                }, {
+                                    label: 'TX Power (dBm)',
+                                    data: txData,
+                                    borderColor: 'rgb(255, 99, 132)',
+                                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                                    tension: 0.3,
+                                    fill: true
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: { position: 'top' },
+                                    annotation: {
+                                        annotations: {
+                                            warningLine: {
+                                                type: 'line',
+                                                yMin: -25,
+                                                yMax: -25,
+                                                borderColor: 'orange',
+                                                borderWidth: 1,
+                                                borderDash: [5, 5],
+                                                label: { content: 'Warning', display: true }
+                                            },
+                                            criticalLine: {
+                                                type: 'line',
+                                                yMin: -28,
+                                                yMax: -28,
+                                                borderColor: 'red',
+                                                borderWidth: 1,
+                                                borderDash: [5, 5],
+                                                label: { content: 'Critical', display: true }
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        title: { display: true, text: 'Power (dBm)' },
+                                        min: -35,
+                                        max: 5
+                                    }
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Signal history error:', e);
+                        loading.classList.add('d-none');
+                        noData.classList.remove('d-none');
+                    }
+                }
+                
+                // Period selector buttons
+                document.querySelectorAll('[data-days]').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('[data-days]').forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        loadSignalHistory(parseInt(this.dataset.days));
+                    });
+                });
+                
+                // Initial load
+                loadSignalHistory(7);
+            })();
+            </script>
+            
+            <div class="row">
                 <div class="col-md-6">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-warning text-dark">

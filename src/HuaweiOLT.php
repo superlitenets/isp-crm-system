@@ -6866,4 +6866,218 @@ class HuaweiOLT {
             'errors' => $errors
         ];
     }
+    
+    // ==================== Signal History & Uptime Tracking ====================
+    
+    public function recordSignalHistory(int $onuId, ?float $rxPower, ?float $txPower, string $status): void {
+        $stmt = $this->db->prepare("
+            INSERT INTO onu_signal_history (onu_id, rx_power, tx_power, status)
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([$onuId, $rxPower, $txPower, $status]);
+    }
+    
+    public function getSignalHistory(int $onuId, int $hours = 24): array {
+        $stmt = $this->db->prepare("
+            SELECT rx_power, tx_power, status, recorded_at
+            FROM onu_signal_history
+            WHERE onu_id = ? AND recorded_at > NOW() - INTERVAL '{$hours} hours'
+            ORDER BY recorded_at ASC
+        ");
+        $stmt->execute([$onuId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function trackStatusChange(int $onuId, string $newStatus): void {
+        $stmt = $this->db->prepare("
+            SELECT id, status, started_at FROM onu_uptime_log 
+            WHERE onu_id = ? AND ended_at IS NULL 
+            ORDER BY started_at DESC LIMIT 1
+        ");
+        $stmt->execute([$onuId]);
+        $current = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($current && $current['status'] !== $newStatus) {
+            $stmt = $this->db->prepare("
+                UPDATE onu_uptime_log 
+                SET ended_at = NOW(), 
+                    duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INTEGER
+                WHERE id = ?
+            ");
+            $stmt->execute([$current['id']]);
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO onu_uptime_log (onu_id, status) VALUES (?, ?)
+            ");
+            $stmt->execute([$onuId, $newStatus]);
+        } elseif (!$current) {
+            $stmt = $this->db->prepare("
+                INSERT INTO onu_uptime_log (onu_id, status) VALUES (?, ?)
+            ");
+            $stmt->execute([$onuId, $newStatus]);
+        }
+    }
+    
+    public function getUptimeStats(int $onuId, int $days = 7): array {
+        $stmt = $this->db->prepare("
+            SELECT status, SUM(COALESCE(duration_seconds, EXTRACT(EPOCH FROM (NOW() - started_at))::INTEGER)) as total_seconds
+            FROM onu_uptime_log
+            WHERE onu_id = ? AND started_at > NOW() - INTERVAL '{$days} days'
+            GROUP BY status
+        ");
+        $stmt->execute([$onuId]);
+        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $stats = ['online' => 0, 'offline' => 0, 'los' => 0];
+        foreach ($results as $row) {
+            $stats[$row['status']] = (int)$row['total_seconds'];
+        }
+        $total = array_sum($stats);
+        $stats['uptime_percent'] = $total > 0 ? round(($stats['online'] / $total) * 100, 2) : 0;
+        
+        return $stats;
+    }
+    
+    public function getPortCapacity(int $oltId): array {
+        $stmt = $this->db->prepare("
+            SELECT slot, port, COUNT(*) as onu_count,
+                   SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online_count,
+                   SUM(CASE WHEN status = 'los' THEN 1 ELSE 0 END) as los_count
+            FROM huawei_onus
+            WHERE olt_id = ? AND is_authorized = TRUE
+            GROUP BY slot, port
+            ORDER BY slot, port
+        ");
+        $stmt->execute([$oltId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSignalAlerts(float $rxThreshold = -28): array {
+        $stmt = $this->db->prepare("
+            SELECT o.*, ol.name as olt_name, c.first_name, c.last_name, c.phone
+            FROM huawei_onus o
+            JOIN huawei_olts ol ON o.olt_id = ol.id
+            LEFT JOIN customers c ON o.customer_id = c.id
+            WHERE o.is_authorized = TRUE 
+            AND (o.rx_power < ? OR o.rx_power > -8 OR o.status = 'los')
+            ORDER BY o.rx_power ASC NULLS LAST
+        ");
+        $stmt->execute([$rxThreshold]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function exportONUsToCSV(int $oltId = null): array {
+        $sql = "SELECT o.sn, o.name, o.description, ol.name as olt_name, 
+                       o.frame, o.slot, o.port, o.onu_id, o.status, o.rx_power, o.tx_power,
+                       o.distance, t.model as onu_type, c.first_name, c.last_name, c.phone,
+                       z.name as zone_name, o.created_at, o.updated_at
+                FROM huawei_onus o
+                JOIN huawei_olts ol ON o.olt_id = ol.id
+                LEFT JOIN huawei_onu_types t ON o.onu_type_id = t.id
+                LEFT JOIN customers c ON o.customer_id = c.id
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
+                WHERE o.is_authorized = TRUE";
+        $params = [];
+        if ($oltId) {
+            $sql .= " AND o.olt_id = ?";
+            $params[] = $oltId;
+        }
+        $sql .= " ORDER BY ol.name, o.slot, o.port, o.onu_id";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function bulkReboot(array $onuIds): array {
+        $success = 0;
+        $failed = 0;
+        $errors = [];
+        
+        foreach ($onuIds as $onuId) {
+            $onu = $this->getONU($onuId);
+            if (!$onu) {
+                $failed++;
+                $errors[] = "ONU {$onuId} not found";
+                continue;
+            }
+            
+            $result = $this->rebootONU($onuId);
+            if ($result['success'] ?? false) {
+                $success++;
+            } else {
+                $failed++;
+                $errors[] = "ONU {$onu['sn']}: " . ($result['error'] ?? 'Failed');
+            }
+            usleep(200000);
+        }
+        
+        return ['success' => $success, 'failed' => $failed, 'errors' => $errors];
+    }
+    
+    public function bulkDelete(array $onuIds): array {
+        $success = 0;
+        $failed = 0;
+        
+        foreach ($onuIds as $onuId) {
+            try {
+                $this->deleteONU($onuId);
+                $success++;
+            } catch (\Exception $e) {
+                $failed++;
+            }
+        }
+        
+        return ['success' => $success, 'failed' => $failed];
+    }
+    
+    public function matchONUToCustomer(int $onuId, int $customerId): bool {
+        $stmt = $this->db->prepare("UPDATE huawei_onus SET customer_id = ? WHERE id = ?");
+        return $stmt->execute([$customerId, $onuId]);
+    }
+    
+    public function findCustomersByPhone(string $phone): array {
+        $stmt = $this->db->prepare("
+            SELECT id, first_name, last_name, phone, email 
+            FROM customers 
+            WHERE phone LIKE ? OR secondary_phone LIKE ?
+            LIMIT 20
+        ");
+        $search = "%{$phone}%";
+        $stmt->execute([$search, $search]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function findUnlinkedONUs(): array {
+        $stmt = $this->db->query("
+            SELECT o.*, ol.name as olt_name
+            FROM huawei_onus o
+            JOIN huawei_olts ol ON o.olt_id = ol.id
+            WHERE o.is_authorized = TRUE AND o.customer_id IS NULL
+            ORDER BY o.created_at DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function createLOSTicket(int $onuId): ?int {
+        $onu = $this->getONU($onuId);
+        if (!$onu) return null;
+        
+        $customerId = $onu['customer_id'] ?? null;
+        $title = "LOS Alert: ONU " . ($onu['name'] ?: $onu['sn']);
+        $description = "Automatic ticket created due to Loss of Signal (LOS) on ONU.\n\n";
+        $description .= "Serial Number: {$onu['sn']}\n";
+        $description .= "Location: {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}\n";
+        $description .= "Last RX Power: " . ($onu['rx_power'] ? $onu['rx_power'] . ' dBm' : 'N/A') . "\n";
+        $description .= "OLT: " . ($onu['olt_name'] ?? 'Unknown');
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO tickets (title, description, customer_id, category, priority, status, created_at)
+            VALUES (?, ?, ?, 'Network', 'High', 'Open', NOW())
+            RETURNING id
+        ");
+        $stmt->execute([$title, $description, $customerId]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $result['id'] ?? null;
+    }
 }
