@@ -414,7 +414,22 @@ class WireGuardService {
                 $config .= "PresharedKey = {$psk}\n";
             }
             
-            $config .= "AllowedIPs = {$peer['allowed_ips']}\n";
+            // Include routed networks from wireguard_subnets table
+            $allowedIps = [$peer['allowed_ips']];
+            try {
+                $stmt = $this->db->prepare("SELECT network_cidr FROM wireguard_subnets WHERE vpn_peer_id = ? AND is_active = TRUE");
+                $stmt->execute([$peer['id']]);
+                $subnets = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+                foreach ($subnets as $subnet) {
+                    if (!empty($subnet)) {
+                        $allowedIps[] = trim($subnet);
+                    }
+                }
+            } catch (\Exception $e) {
+                \error_log("Error fetching subnets for peer {$peer['id']}: " . $e->getMessage());
+            }
+            
+            $config .= "AllowedIPs = " . implode(', ', array_unique($allowedIps)) . "\n";
             
             if ($peer['persistent_keepalive']) {
                 $config .= "PersistentKeepalive = {$peer['persistent_keepalive']}\n";
