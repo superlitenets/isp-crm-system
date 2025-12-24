@@ -613,6 +613,49 @@ class WireGuardService {
     }
     
     /**
+     * Check if exec() function is available
+     */
+    private function isExecAvailable(): bool {
+        $disabled = \explode(',', \ini_get('disable_functions'));
+        $disabled = \array_map('trim', $disabled);
+        return \function_exists('exec') && !\in_array('exec', $disabled);
+    }
+    
+    /**
+     * Test connectivity using socket connection (fallback when exec is disabled)
+     */
+    private function testConnectivitySocket(string $ip, int $timeout = 2): array {
+        $result = [
+            'success' => false,
+            'ip' => $ip,
+            'method' => 'socket',
+            'latency_avg' => null
+        ];
+        
+        $startTime = \microtime(true);
+        $socket = @\fsockopen($ip, 22, $errno, $errstr, $timeout);
+        
+        if ($socket) {
+            $latency = (\microtime(true) - $startTime) * 1000;
+            \fclose($socket);
+            $result['success'] = true;
+            $result['latency_avg'] = $latency;
+            $result['port'] = 22;
+        } else {
+            $socket = @\fsockopen($ip, 80, $errno, $errstr, $timeout);
+            if ($socket) {
+                $latency = (\microtime(true) - $startTime) * 1000;
+                \fclose($socket);
+                $result['success'] = true;
+                $result['latency_avg'] = $latency;
+                $result['port'] = 80;
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
      * Test connectivity to a remote IP address via ping
      * @param string $ip IP address to ping
      * @param int $count Number of ping attempts
@@ -624,6 +667,10 @@ class WireGuardService {
             return ['success' => false, 'error' => 'Invalid IP address', 'ip' => $ip];
         }
         
+        if (!$this->isExecAvailable()) {
+            return $this->testConnectivitySocket($ip, $timeout);
+        }
+        
         $output = [];
         $returnVar = 0;
         
@@ -632,6 +679,7 @@ class WireGuardService {
         $result = [
             'success' => $returnVar === 0,
             'ip' => $ip,
+            'method' => 'ping',
             'output' => \implode("\n", $output),
             'packets_sent' => $count,
             'packets_received' => 0,
