@@ -6954,7 +6954,7 @@ class HuaweiOLT {
     
     public function getSignalAlerts(float $rxThreshold = -28): array {
         $stmt = $this->db->prepare("
-            SELECT o.*, ol.name as olt_name, c.first_name, c.last_name, c.phone
+            SELECT o.*, ol.name as olt_name, c.name as customer_name, c.phone
             FROM huawei_onus o
             JOIN huawei_olts ol ON o.olt_id = ol.id
             LEFT JOIN customers c ON o.customer_id = c.id
@@ -6969,7 +6969,7 @@ class HuaweiOLT {
     public function exportONUsToCSV(int $oltId = null): array {
         $sql = "SELECT o.sn, o.name, o.description, ol.name as olt_name, 
                        o.frame, o.slot, o.port, o.onu_id, o.status, o.rx_power, o.tx_power,
-                       o.distance, t.model as onu_type, c.first_name, c.last_name, c.phone,
+                       o.distance, t.model as onu_type, c.name as customer_name, c.phone,
                        z.name as zone_name, o.created_at, o.updated_at
                 FROM huawei_onus o
                 JOIN huawei_olts ol ON o.olt_id = ol.id
@@ -7038,7 +7038,7 @@ class HuaweiOLT {
     
     public function findCustomersByPhone(string $phone): array {
         $stmt = $this->db->prepare("
-            SELECT id, first_name, last_name, phone, email 
+            SELECT id, name, phone, email 
             FROM customers 
             WHERE phone LIKE ? OR secondary_phone LIKE ?
             LIMIT 20

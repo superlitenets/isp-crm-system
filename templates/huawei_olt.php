@@ -219,7 +219,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         $sql = "SELECT o.id, o.sn, o.name, o.status, o.rx_power, o.tx_power, 
                        o.frame, o.slot, o.port, o.onu_id, o.olt_id, 
                        ol.name as olt_name, o.updated_at,
-                       c.first_name || ' ' || c.last_name as customer_name
+                       c.name as customer_name
                 FROM huawei_onus o
                 LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
                 LEFT JOIN customers c ON o.customer_id = c.id
