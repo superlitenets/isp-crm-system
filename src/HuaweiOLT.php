@@ -6168,12 +6168,21 @@ class HuaweiOLT {
     
     private function getTR069AcsUrl(): ?string {
         try {
+            // First check for explicit TR-069 ACS URL setting
             $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_acs_url'");
             $url = $stmt->fetchColumn();
             if ($url) {
                 return $url;
             }
             
+            // Fallback: Use WireGuard gateway IP (for remote OLT access via VPN)
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'vpn_gateway_ip'");
+            $vpnGateway = $stmt->fetchColumn();
+            if ($vpnGateway) {
+                return "http://{$vpnGateway}:7547";
+            }
+            
+            // Last fallback: Try GenieACS URL
             $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
             $genieUrl = $stmt->fetchColumn();
             if ($genieUrl) {

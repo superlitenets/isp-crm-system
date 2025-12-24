@@ -650,7 +650,16 @@ class WireGuardService {
             return ['success' => false, 'error' => 'Peer not found'];
         }
         
-        $routedNetworks = \array_filter(\array_map('trim', \explode("\n", $peer['routed_networks'] ?? '')));
+        // Fetch routed networks from wireguard_subnets table
+        $routedNetworks = [];
+        try {
+            $stmt = $this->db->prepare("SELECT network_cidr FROM wireguard_subnets WHERE vpn_peer_id = ? AND is_active = TRUE");
+            $stmt->execute([$peerId]);
+            $routedNetworks = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Exception $e) {
+            \error_log("Error fetching subnets: " . $e->getMessage());
+        }
+        
         $results = [
             'peer_name' => $peer['name'],
             'peer_ip' => $peer['allowed_ips'],
@@ -658,11 +667,13 @@ class WireGuardService {
             'networks' => []
         ];
         
+        // First test the VPN tunnel IP
         $vpnIp = \explode('/', $peer['allowed_ips'])[0];
         $vpnTest = $this->testConnectivity($vpnIp, 2, 2);
         $results['vpn_reachable'] = $vpnTest['success'];
         $results['vpn_latency'] = $vpnTest['latency_avg'];
         
+        // Then test each routed network (ping the .1 gateway)
         foreach ($routedNetworks as $network) {
             $network = \trim($network);
             if (empty($network)) continue;
@@ -670,6 +681,7 @@ class WireGuardService {
             $networkIp = \explode('/', $network)[0];
             $parts = \explode('.', $networkIp);
             if (\count($parts) === 4) {
+                // Ping the .1 address (usually the gateway)
                 $parts[3] = '1';
                 $testIp = \implode('.', $parts);
                 
