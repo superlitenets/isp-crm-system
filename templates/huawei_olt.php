@@ -559,6 +559,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
+            case 'bulk_import_smartolt':
+                require_once __DIR__ . '/../src/SmartOLT.php';
+                $smartolt = new \App\SmartOLT($db);
+                if (!$smartolt->isConfigured()) {
+                    $message = 'SmartOLT is not configured. Please set API URL and key in OMS Settings.';
+                    $messageType = 'danger';
+                } else {
+                    // Get OLT mappings from POST
+                    $oltMappings = [];
+                    foreach ($_POST as $key => $value) {
+                        if (strpos($key, 'olt_map_') === 0 && !empty($value)) {
+                            $smartoltOltId = str_replace('olt_map_', '', $key);
+                            $oltMappings[$smartoltOltId] = (int)$value;
+                            // Store mapping for future imports
+                            $db->prepare("UPDATE huawei_olts SET smartolt_id = ? WHERE id = ?")->execute([$smartoltOltId, (int)$value]);
+                        }
+                    }
+                    
+                    $result = $smartolt->getAllONUsDetails();
+                    if ($result['status']) {
+                        $onus = $result['response'] ?? [];
+                        $imported = 0;
+                        $updated = 0;
+                        $skipped = 0;
+                        
+                        foreach ($onus as $smartOnu) {
+                            $sn = strtoupper($smartOnu['sn'] ?? '');
+                            if (empty($sn)) continue;
+                            
+                            // Get OLT from mapping or existing smartolt_id
+                            $oltId = null;
+                            $smartOltId = $smartOnu['olt_id'] ?? null;
+                            if ($smartOltId && isset($oltMappings[$smartOltId])) {
+                                $oltId = $oltMappings[$smartOltId];
+                            } else if ($smartOltId) {
+                                $stmt = $db->prepare("SELECT id FROM huawei_olts WHERE smartolt_id = ?");
+                                $stmt->execute([$smartOltId]);
+                                $olt = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                $oltId = $olt['id'] ?? null;
+                            }
+                            
+                            if (!$oltId) {
+                                $skipped++;
+                                continue;
+                            }
+                            
+                            // Check if ONU exists
+                            $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                            $stmt->execute([$sn]);
+                            $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            
+                            $onuData = [
+                                'sn' => $sn,
+                                'olt_id' => $oltId,
+                                'name' => $smartOnu['name'] ?? $smartOnu['description'] ?? '',
+                                'description' => $smartOnu['description'] ?? '',
+                                'frame' => (int)($smartOnu['board'] ?? 0),
+                                'slot' => (int)($smartOnu['slot'] ?? 0),
+                                'port' => (int)($smartOnu['port'] ?? 0),
+                                'onu_id' => (int)($smartOnu['onu_number'] ?? $smartOnu['onu_id'] ?? 0),
+                                'status' => strtolower($smartOnu['status'] ?? 'offline'),
+                                'is_authorized' => true,
+                                'rx_power' => isset($smartOnu['rx_power']) ? (float)str_replace(' dBm', '', $smartOnu['rx_power']) : null,
+                                'tx_power' => isset($smartOnu['tx_power']) ? (float)str_replace(' dBm', '', $smartOnu['tx_power']) : null,
+                                'smartolt_external_id' => $smartOnu['external_id'] ?? $smartOnu['id'] ?? null
+                            ];
+                            
+                            if ($existing) {
+                                $huaweiOLT->updateONU($existing['id'], $onuData);
+                                $updated++;
+                            } else {
+                                $huaweiOLT->addONU($onuData);
+                                $imported++;
+                            }
+                        }
+                        
+                        $message = "Bulk import complete: {$imported} added, {$updated} updated" . ($skipped > 0 ? ", {$skipped} skipped (no OLT mapping)" : '');
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to fetch ONUs from SmartOLT: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                }
+                break;
             case 'import_smartolt':
             case 'import_from_smartolt':
                 require_once __DIR__ . '/../src/SmartOLT.php';
@@ -567,6 +651,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $message = 'SmartOLT is not configured. Please set API URL and key in settings.';
                     $messageType = 'danger';
                 } else {
+                    $targetOltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                     $result = $smartolt->getAllONUsDetails();
                     if ($result['status']) {
                         $onus = $result['response'] ?? [];
@@ -581,31 +666,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             $stmt->execute([$sn]);
                             $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
                             
-                            // Get OLT by SmartOLT olt_id mapping
-                            $oltId = null;
-                            if (!empty($smartOnu['olt_id'])) {
+                            // Get OLT by SmartOLT olt_id mapping or use target OLT
+                            $oltId = $targetOltId;
+                            if (!$oltId && !empty($smartOnu['olt_id'])) {
                                 $stmt = $db->prepare("SELECT id FROM huawei_olts WHERE smartolt_id = ? OR name LIKE ?");
                                 $stmt->execute([$smartOnu['olt_id'], '%' . ($smartOnu['olt_name'] ?? '') . '%']);
                                 $olt = $stmt->fetch(\PDO::FETCH_ASSOC);
                                 $oltId = $olt['id'] ?? null;
                             }
                             
+                            if (!$oltId) continue;
+                            
                             $onuData = [
                                 'sn' => $sn,
+                                'olt_id' => $oltId,
                                 'name' => $smartOnu['name'] ?? $smartOnu['description'] ?? '',
                                 'description' => $smartOnu['description'] ?? '',
                                 'frame' => (int)($smartOnu['board'] ?? 0),
                                 'slot' => (int)($smartOnu['slot'] ?? 0),
                                 'port' => (int)($smartOnu['port'] ?? 0),
-                                'onu_id' => (int)($smartOnu['onu_id'] ?? 0),
+                                'onu_id' => (int)($smartOnu['onu_number'] ?? $smartOnu['onu_id'] ?? 0),
                                 'status' => strtolower($smartOnu['status'] ?? 'offline'),
-                                'is_authorized' => !empty($smartOnu['authorized']),
+                                'is_authorized' => true,
                                 'rx_power' => isset($smartOnu['rx_power']) ? (float)str_replace(' dBm', '', $smartOnu['rx_power']) : null,
                                 'tx_power' => isset($smartOnu['tx_power']) ? (float)str_replace(' dBm', '', $smartOnu['tx_power']) : null,
-                                'smartolt_external_id' => $smartOnu['external_id'] ?? null
+                                'smartolt_external_id' => $smartOnu['external_id'] ?? $smartOnu['id'] ?? null
                             ];
-                            
-                            if ($oltId) $onuData['olt_id'] = $oltId;
                             
                             if ($existing) {
                                 $huaweiOLT->updateONU($existing['id'], $onuData);
@@ -824,6 +910,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 $message = 'GenieACS settings saved successfully';
                 $messageType = 'success';
+                break;
+            case 'save_smartolt_settings':
+                require_once __DIR__ . '/../src/SmartOLT.php';
+                \App\SmartOLT::saveSettings($db, [
+                    'api_url' => $_POST['api_url'] ?? '',
+                    'api_key' => $_POST['api_key'] ?? ''
+                ]);
+                $message = 'SmartOLT settings saved successfully';
+                $messageType = 'success';
+                header('Location: ?page=huawei-olt&view=settings&tab=smartolt&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
+            case 'test_smartolt':
+                require_once __DIR__ . '/../src/SmartOLT.php';
+                $smartolt = new \App\SmartOLT($db);
+                $result = $smartolt->testConnection();
+                $message = $result['message'];
+                $messageType = $result['success'] ? 'success' : 'danger';
+                header('Location: ?page=huawei-olt&view=settings&tab=smartolt&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
                 break;
             case 'save_onu_type':
                 $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
@@ -6531,6 +6637,11 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'smartolt' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=smartolt">
+                        <i class="bi bi-cloud-download me-1"></i> SmartOLT Import
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=onu_types">
                         <i class="bi bi-router me-1"></i> ONU Types
                     </a>
@@ -6616,6 +6727,144 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             
                             <h6 class="mt-3">4. Enter NBI URL Above</h6>
                             <p class="small mb-0">Use <code>http://YOUR_SERVER:7557</code> for the NBI URL in settings.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php elseif ($settingsTab === 'smartolt'): ?>
+            <?php
+            require_once __DIR__ . '/../src/SmartOLT.php';
+            $smartolt = new \App\SmartOLT($db);
+            $smartoltConfigured = $smartolt->isConfigured();
+            $smartoltSettings = $smartolt->getSettings();
+            
+            $smartOlts = [];
+            $smartOnuCount = 0;
+            if ($smartoltConfigured) {
+                $oltsResult = $smartolt->getOLTs();
+                if ($oltsResult['status'] && isset($oltsResult['response'])) {
+                    $smartOlts = $oltsResult['response'];
+                }
+                $onusResult = $smartolt->getAllONUsDetails();
+                if ($onusResult['status'] && isset($onusResult['response'])) {
+                    $smartOnuCount = count($onusResult['response']);
+                }
+            }
+            
+            $localOlts = $huaweiOLT->getOLTs();
+            ?>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-cloud me-2"></i>SmartOLT API Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_smartolt_settings">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">SmartOLT API URL</label>
+                                    <input type="url" name="api_url" class="form-control" value="<?= htmlspecialchars($smartoltSettings['api_url'] ?? '') ?>" placeholder="https://your-smartolt.com">
+                                    <div class="form-text">Your SmartOLT server URL (without /api)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">API Key</label>
+                                    <input type="text" name="api_key" class="form-control" value="<?= htmlspecialchars($smartoltSettings['api_key'] ?? '') ?>" placeholder="Your SmartOLT API key">
+                                    <div class="form-text">Find this in SmartOLT > Settings > API</div>
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
+                                    <button type="submit" name="action" value="test_smartolt" class="btn btn-outline-secondary"><i class="bi bi-plug me-1"></i> Test Connection</button>
+                                </div>
+                            </form>
+                            
+                            <?php if ($smartoltConfigured): ?>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-success"><i class="bi bi-check-circle me-1"></i> Connected to SmartOLT</span>
+                                <span class="badge bg-primary"><?= $smartOnuCount ?> ONUs available</span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-cloud-download me-2"></i>Bulk Import from SmartOLT</h5>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!$smartoltConfigured): ?>
+                            <div class="alert alert-warning mb-0">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Configure SmartOLT API settings first to enable bulk import.
+                            </div>
+                            <?php elseif (empty($smartOlts)): ?>
+                            <div class="alert alert-warning mb-0">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                No OLTs found in SmartOLT. Check your API connection.
+                            </div>
+                            <?php else: ?>
+                            <form method="post" onsubmit="return confirm('Import all ONUs from SmartOLT? This will add new ONUs and update existing ones.')">
+                                <input type="hidden" name="action" value="bulk_import_smartolt">
+                                
+                                <p class="text-muted small">Map each SmartOLT OLT to a local OLT device. Unmapped OLTs will be skipped.</p>
+                                
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>SmartOLT Device</th>
+                                                <th>ONUs</th>
+                                                <th>Map to Local OLT</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($smartOlts as $solt): 
+                                                $existingMapping = null;
+                                                foreach ($localOlts as $lo) {
+                                                    if ($lo['smartolt_id'] == $solt['id']) {
+                                                        $existingMapping = $lo['id'];
+                                                        break;
+                                                    }
+                                                }
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <strong><?= htmlspecialchars($solt['name'] ?? 'OLT ' . $solt['id']) ?></strong>
+                                                    <br><small class="text-muted"><?= htmlspecialchars($solt['ip'] ?? '') ?></small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary"><?= $solt['onu_count'] ?? '?' ?></span>
+                                                </td>
+                                                <td>
+                                                    <select name="olt_map_<?= $solt['id'] ?>" class="form-select form-select-sm">
+                                                        <option value="">-- Skip --</option>
+                                                        <?php foreach ($localOlts as $lo): ?>
+                                                        <option value="<?= $lo['id'] ?>" <?= $existingMapping == $lo['id'] ? 'selected' : '' ?>><?= htmlspecialchars($lo['name']) ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    <strong>Total available:</strong> <?= $smartOnuCount ?> ONUs across <?= count($smartOlts) ?> OLT(s)
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary w-100" onclick="showLoading('Importing ONUs from SmartOLT... This may take a while.')">
+                                    <i class="bi bi-cloud-download me-1"></i> Import All ONUs
+                                </button>
+                            </form>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
