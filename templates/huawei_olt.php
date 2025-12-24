@@ -445,6 +445,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'success';
                 }
                 
+                // Mark discovery log entry as authorized (remove from pending list)
+                $onuSn = $onu['sn'] ?? $sn;
+                if (!empty($onuSn)) {
+                    $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$onuSn]);
+                }
+                
                 // Queue TR-069 configuration if WAN/WiFi settings provided
                 $tr069Queued = false;
                 if (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24'])) {
@@ -1732,6 +1738,9 @@ if ($view === 'onus' || $view === 'dashboard') {
         $onuFilters['is_authorized'] = false;
         // Also fetch discovered ONUs from onu_discovery_log (auto-populated by OLT Session Manager)
         $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
+    } else {
+        // Default view shows only authorized ONUs
+        $onuFilters['is_authorized'] = true;
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
 }
