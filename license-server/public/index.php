@@ -28,13 +28,11 @@ try {
 $license = new LicenseServer\License($db, $config);
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = str_replace('/api', '', $uri);
 $method = $_SERVER['REQUEST_METHOD'];
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
-function getClientInfo(): array {
-    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+function getClientInfo(array $input): array {
     return [
         'domain' => $input['domain'] ?? $_SERVER['HTTP_HOST'] ?? null,
         'server_ip' => $input['server_ip'] ?? $_SERVER['REMOTE_ADDR'] ?? null,
@@ -57,7 +55,7 @@ switch ($uri) {
             echo json_encode(['error' => 'Method not allowed']);
             break;
         }
-        $result = $license->validateLicense($input['license_key'] ?? '', getClientInfo());
+        $result = $license->validateLicense($input['license_key'] ?? '', getClientInfo($input));
         echo json_encode($result);
         break;
         
@@ -67,7 +65,7 @@ switch ($uri) {
             echo json_encode(['error' => 'Method not allowed']);
             break;
         }
-        $result = $license->activate($input['license_key'] ?? '', getClientInfo());
+        $result = $license->activate($input['license_key'] ?? '', getClientInfo($input));
         echo json_encode($result);
         break;
         
@@ -93,5 +91,5 @@ switch ($uri) {
         
     default:
         http_response_code(404);
-        echo json_encode(['error' => 'Endpoint not found']);
+        echo json_encode(['error' => 'Endpoint not found', 'path' => $uri]);
 }

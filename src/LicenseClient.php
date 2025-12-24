@@ -29,19 +29,27 @@ class LicenseClient {
         }
         
         try {
-            $result = $this->callServer('heartbeat', [
-                'activation_token' => $this->getActivationToken()
-            ]);
+            $token = $this->getActivationToken();
             
-            if (!$result['valid'] && $this->getActivationToken()) {
+            if ($token) {
+                $result = $this->callServer('heartbeat', [
+                    'activation_token' => $token
+                ]);
+                
+                if ($result['valid']) {
+                    $this->cacheLicense($result);
+                    return $result;
+                }
+            }
+            
+            if (!empty($this->config['license_key'])) {
                 $result = $this->activate();
+                if ($result['valid']) {
+                    return $result;
+                }
             }
             
-            if ($result['valid']) {
-                $this->cacheLicense($result);
-            }
-            
-            return $result;
+            return ['valid' => false, 'error' => 'not_activated', 'message' => 'License not activated'];
         } catch (Exception $e) {
             if ($cached && $this->isInGracePeriod($cached)) {
                 $cached['grace_mode'] = true;

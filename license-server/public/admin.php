@@ -17,7 +17,9 @@ try {
 $license = new LicenseServer\License($db, $config);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
-    if ($_POST['password'] === $config['admin_password']) {
+    if ($config['admin_password'] === 'change-this-in-production') {
+        $loginError = 'Admin password not configured. Set LICENSE_ADMIN_PASSWORD environment variable.';
+    } elseif ($_POST['password'] === $config['admin_password']) {
         $_SESSION['admin_logged_in'] = true;
     } else {
         $loginError = 'Invalid password';
