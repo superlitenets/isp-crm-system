@@ -792,9 +792,9 @@ class WireGuardService {
             
             // Use temp file + docker cp approach (safest for special characters)
             $tempFile = '/tmp/wg0_' . uniqid() . '.conf';
-            if (file_put_contents($tempFile, $config) !== false) {
-                exec("docker cp {$tempFile} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
-                @unlink($tempFile);
+            if (\file_put_contents($tempFile, $config) !== false) {
+                \exec("docker cp {$tempFile} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
+                @\unlink($tempFile);
                 if ($returnVar === 0) {
                     $configWritten = true;
                 }
@@ -808,9 +808,9 @@ class WireGuardService {
                 ];
                 
                 foreach ($configPaths as $path) {
-                    $dir = dirname($path);
-                    if (is_dir($dir) && is_writable($dir)) {
-                        if (file_put_contents($path, $config) !== false) {
+                    $dir = \dirname($path);
+                    if (\is_dir($dir) && \is_writable($dir)) {
+                        if (\file_put_contents($path, $config) !== false) {
                             $configWritten = true;
                             $writtenPath = $path;
                             break;
@@ -822,15 +822,15 @@ class WireGuardService {
             // Last resort: write to shared storage path
             if (!$configWritten) {
                 $fallbackPath = '/var/www/html/storage/wireguard/wg0.conf';
-                $fallbackDir = dirname($fallbackPath);
-                if (!is_dir($fallbackDir)) {
-                    @mkdir($fallbackDir, 0755, true);
+                $fallbackDir = \dirname($fallbackPath);
+                if (!\is_dir($fallbackDir)) {
+                    @\mkdir($fallbackDir, 0755, true);
                 }
-                if (file_put_contents($fallbackPath, $config) !== false) {
+                if (\file_put_contents($fallbackPath, $config) !== false) {
                     $configWritten = true;
                     $writtenPath = $fallbackPath;
                     // Copy to container using docker cp
-                    exec("docker cp {$fallbackPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
+                    \exec("docker cp {$fallbackPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
                 }
             }
             
