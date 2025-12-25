@@ -528,6 +528,87 @@ class GenieACS {
         return $this->setParameterValues($deviceId, $params);
     }
     
+    public function setAdvancedWiFiConfig(string $deviceId, array $config): array {
+        $params = [];
+        $base24 = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
+        $base5 = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5';
+        
+        // 2.4GHz WiFi settings
+        $wifi24 = $config['wifi_24'] ?? [];
+        if (!empty($wifi24)) {
+            $params[] = ["{$base24}.Enable", (bool)($wifi24['enabled'] ?? true), 'xsd:boolean'];
+            
+            if (!empty($wifi24['ssid'])) {
+                $params[] = ["{$base24}.SSID", $wifi24['ssid'], 'xsd:string'];
+            }
+            if (!empty($wifi24['password'])) {
+                $params[] = ["{$base24}.PreSharedKey.1.KeyPassphrase", $wifi24['password'], 'xsd:string'];
+                $params[] = ["{$base24}.PreSharedKey.1.PreSharedKey", $wifi24['password'], 'xsd:string'];
+            }
+            if (isset($wifi24['channel']) && $wifi24['channel'] > 0) {
+                $params[] = ["{$base24}.Channel", (int)$wifi24['channel'], 'xsd:unsignedInt'];
+            } else {
+                $params[] = ["{$base24}.AutoChannelEnable", true, 'xsd:boolean'];
+            }
+            
+            // VLAN settings for 2.4GHz (Huawei specific parameters)
+            $mode24 = $wifi24['mode'] ?? 'access';
+            if ($mode24 === 'access' && !empty($wifi24['access_vlan'])) {
+                $vlan = (int)$wifi24['access_vlan'];
+                if ($vlan > 1) {
+                    // Set VLAN tag for access mode
+                    $params[] = ["{$base24}.X_HW_WlanAccessType", 1, 'xsd:unsignedInt']; // 1 = Access
+                    $params[] = ["{$base24}.X_HW_VLANID", $vlan, 'xsd:unsignedInt'];
+                }
+            } elseif ($mode24 === 'trunk') {
+                $params[] = ["{$base24}.X_HW_WlanAccessType", 2, 'xsd:unsignedInt']; // 2 = Trunk
+                if (!empty($wifi24['native_vlan'])) {
+                    $params[] = ["{$base24}.X_HW_PVID", (int)$wifi24['native_vlan'], 'xsd:unsignedInt'];
+                }
+            }
+        }
+        
+        // 5GHz WiFi settings
+        $wifi5 = $config['wifi_5'] ?? [];
+        if (!empty($wifi5)) {
+            $params[] = ["{$base5}.Enable", (bool)($wifi5['enabled'] ?? true), 'xsd:boolean'];
+            
+            if (!empty($wifi5['ssid'])) {
+                $params[] = ["{$base5}.SSID", $wifi5['ssid'], 'xsd:string'];
+            }
+            if (!empty($wifi5['password'])) {
+                $params[] = ["{$base5}.PreSharedKey.1.KeyPassphrase", $wifi5['password'], 'xsd:string'];
+                $params[] = ["{$base5}.PreSharedKey.1.PreSharedKey", $wifi5['password'], 'xsd:string'];
+            }
+            if (isset($wifi5['channel']) && $wifi5['channel'] > 0) {
+                $params[] = ["{$base5}.Channel", (int)$wifi5['channel'], 'xsd:unsignedInt'];
+            } else {
+                $params[] = ["{$base5}.AutoChannelEnable", true, 'xsd:boolean'];
+            }
+            
+            // VLAN settings for 5GHz (Huawei specific parameters)
+            $mode5 = $wifi5['mode'] ?? 'access';
+            if ($mode5 === 'access' && !empty($wifi5['access_vlan'])) {
+                $vlan = (int)$wifi5['access_vlan'];
+                if ($vlan > 1) {
+                    $params[] = ["{$base5}.X_HW_WlanAccessType", 1, 'xsd:unsignedInt'];
+                    $params[] = ["{$base5}.X_HW_VLANID", $vlan, 'xsd:unsignedInt'];
+                }
+            } elseif ($mode5 === 'trunk') {
+                $params[] = ["{$base5}.X_HW_WlanAccessType", 2, 'xsd:unsignedInt'];
+                if (!empty($wifi5['native_vlan'])) {
+                    $params[] = ["{$base5}.X_HW_PVID", (int)$wifi5['native_vlan'], 'xsd:unsignedInt'];
+                }
+            }
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No WiFi parameters to configure'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
     public function setLANConfig(string $deviceId, array $config): array {
         $params = [];
         $lanBase = 'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement';

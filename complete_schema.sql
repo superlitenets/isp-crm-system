@@ -11810,3 +11810,26 @@ ALTER TABLE ONLY public.wireguard_sync_logs
 
 \unrestrict EmPVagPOkj6895I0U0Hk5OQ6MHE6wukLHSlnFGz2QprFg1aULDjYtOsOXdGCcSG
 
+
+-- ONU Service VLANs table
+CREATE TABLE IF NOT EXISTS huawei_onu_service_vlans (
+    id SERIAL PRIMARY KEY,
+    onu_id INTEGER NOT NULL REFERENCES huawei_onus(id) ON DELETE CASCADE,
+    vlan_id INTEGER NOT NULL,
+    vlan_name VARCHAR(100),
+    interface_type VARCHAR(20) DEFAULT 'wifi' CHECK (interface_type IN ('wifi', 'eth', 'all')),
+    port_mode VARCHAR(20) DEFAULT 'access' CHECK (port_mode IN ('access', 'trunk')),
+    is_native BOOLEAN DEFAULT FALSE,
+    priority INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(onu_id, vlan_id, interface_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_onu_service_vlans_onu ON huawei_onu_service_vlans(onu_id);
+CREATE INDEX IF NOT EXISTS idx_onu_service_vlans_vlan ON huawei_onu_service_vlans(vlan_id);
+
+COMMENT ON TABLE huawei_onu_service_vlans IS 'Service VLANs attached to individual ONUs for WiFi/TR-069 configuration';
+COMMENT ON COLUMN huawei_onu_service_vlans.interface_type IS 'Interface type: wifi (wireless), eth (ethernet), all (both)';
+COMMENT ON COLUMN huawei_onu_service_vlans.port_mode IS 'Port mode: access (untagged) or trunk (tagged)';
+COMMENT ON COLUMN huawei_onu_service_vlans.is_native IS 'For trunk mode: true if this is the native/untagged VLAN';
+

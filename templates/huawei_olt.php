@@ -356,6 +356,103 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
     exit;
 }
 
+// AJAX endpoint for ONU service VLANs
+if (isset($_GET['action']) && $_GET['action'] === 'get_onu_service_vlans') {
+    header('Content-Type: application/json');
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT * FROM huawei_onu_service_vlans WHERE onu_id = ? ORDER BY priority, vlan_id");
+        $stmt->execute([$onuId]);
+        $vlans = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'vlans' => $vlans]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint for getting OLT VLANs (for dropdown)
+if (isset($_GET['action']) && $_GET['action'] === 'get_olt_vlans') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_GET['olt_id'] ?? 0);
+    
+    if (!$oltId) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT vlan_id, description, vlan_type, is_tr069 FROM huawei_vlans WHERE olt_id = ? AND is_active = TRUE ORDER BY vlan_id");
+        $stmt->execute([$oltId]);
+        $vlans = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'vlans' => $vlans]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint to add service VLAN to ONU
+if (isset($_GET['action']) && $_GET['action'] === 'add_onu_service_vlan') {
+    header('Content-Type: application/json');
+    
+    $onuId = (int)($_POST['onu_id'] ?? 0);
+    $vlanId = (int)($_POST['vlan_id'] ?? 0);
+    $vlanName = trim($_POST['vlan_name'] ?? '');
+    $interfaceType = $_POST['interface_type'] ?? 'wifi';
+    $portMode = $_POST['port_mode'] ?? 'access';
+    $isNative = (int)($_POST['is_native'] ?? 0);
+    
+    if (!$onuId || !$vlanId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID and VLAN ID required']);
+        exit;
+    }
+    
+    try {
+        // If setting as native, unset other natives for same interface type
+        if ($isNative) {
+            $db->prepare("UPDATE huawei_onu_service_vlans SET is_native = FALSE WHERE onu_id = ? AND interface_type = ?")->execute([$onuId, $interfaceType]);
+        }
+        
+        $stmt = $db->prepare("INSERT INTO huawei_onu_service_vlans (onu_id, vlan_id, vlan_name, interface_type, port_mode, is_native) 
+                              VALUES (?, ?, ?, ?, ?, ?) 
+                              ON CONFLICT (onu_id, vlan_id, interface_type) DO UPDATE 
+                              SET vlan_name = EXCLUDED.vlan_name, port_mode = EXCLUDED.port_mode, is_native = EXCLUDED.is_native");
+        $stmt->execute([$onuId, $vlanId, $vlanName ?: null, $interfaceType, $portMode, $isNative]);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint to remove service VLAN from ONU
+if (isset($_GET['action']) && $_GET['action'] === 'remove_onu_service_vlan') {
+    header('Content-Type: application/json');
+    
+    $id = (int)($_POST['id'] ?? 0);
+    
+    if (!$id) {
+        echo json_encode(['success' => false, 'error' => 'Record ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("DELETE FROM huawei_onu_service_vlans WHERE id = ?");
+        $stmt->execute([$id]);
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint for port capacity
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
     header('Content-Type: application/json');
@@ -1768,6 +1865,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $message = 'Failed to change admin password: ' . ($result['error'] ?? 'Unknown error');
                         $messageType = 'danger';
                     }
+                }
+                break;
+            
+            case 'tr069_wifi_advanced':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceId = $_POST['device_id'] ?? '';
+                
+                // Build WiFi configuration for both bands
+                $wifiConfig = [
+                    'wifi_24' => [
+                        'enabled' => isset($_POST['wifi24_enabled']),
+                        'ssid' => $_POST['wifi24_ssid'] ?? '',
+                        'password' => $_POST['wifi24_password'] ?? '',
+                        'channel' => (int)($_POST['wifi24_channel'] ?? 0),
+                        'mode' => $_POST['wifi24_mode'] ?? 'access',
+                        'access_vlan' => (int)($_POST['wifi24_access_vlan'] ?? 1),
+                        'native_vlan' => (int)($_POST['wifi24_native_vlan'] ?? 1),
+                        'allowed_vlans' => $_POST['wifi24_allowed_vlans'] ?? ''
+                    ],
+                    'wifi_5' => [
+                        'enabled' => isset($_POST['wifi5_enabled']),
+                        'ssid' => $_POST['wifi5_ssid'] ?? '',
+                        'password' => $_POST['wifi5_password'] ?? '',
+                        'channel' => (int)($_POST['wifi5_channel'] ?? 0),
+                        'mode' => $_POST['wifi5_mode'] ?? 'access',
+                        'access_vlan' => (int)($_POST['wifi5_access_vlan'] ?? 1),
+                        'native_vlan' => (int)($_POST['wifi5_native_vlan'] ?? 1),
+                        'allowed_vlans' => $_POST['wifi5_allowed_vlans'] ?? ''
+                    ],
+                    'sync_both' => isset($_POST['sync_both'])
+                ];
+                
+                // Sync SSIDs/passwords if requested
+                if ($wifiConfig['sync_both'] && !empty($wifiConfig['wifi_24']['ssid'])) {
+                    $wifiConfig['wifi_5']['ssid'] = $wifiConfig['wifi_24']['ssid'];
+                    $wifiConfig['wifi_5']['password'] = $wifiConfig['wifi_24']['password'];
+                }
+                
+                $result = $genieacs->setAdvancedWiFiConfig($deviceId, $wifiConfig);
+                
+                if ($result['success']) {
+                    $message = 'WiFi configuration sent successfully. Changes may take a few moments to apply.';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to configure WiFi: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
                 }
                 break;
             
@@ -5853,6 +5997,9 @@ try {
                             return;
                         }
                         
+                        const onuId = '<?= $currentOnu['id'] ?>';
+                        const oltId = '<?= $currentOnu['olt_id'] ?>';
+                        
                         let html = '';
                         
                         // 2.4GHz Interface
@@ -5863,7 +6010,7 @@ try {
                             <td>${wifi24.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
                             <td>${wifi24.channel || 'Auto'}</td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfig('${deviceId}', '${serialNumber}')" title="Configure">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
                                     <i class="bi bi-gear"></i>
                                 </button>
                             </td>
@@ -5877,7 +6024,7 @@ try {
                             <td>${wifi5.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
                             <td>${wifi5.channel || 'Auto'}</td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfig('${deviceId}', '${serialNumber}')" title="Configure">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
                                     <i class="bi bi-gear"></i>
                                 </button>
                             </td>
@@ -5896,6 +6043,65 @@ try {
                 // Auto-load on page load
                 refreshWifiStatus();
             })();
+            
+            function openWifiConfigModal(deviceId, serialNumber, onuId, oltId) {
+                document.getElementById('wifiDeviceId').value = deviceId;
+                document.getElementById('wifiDeviceSn').textContent = serialNumber;
+                
+                // Store for VLAN loading
+                if (typeof loadOnuServiceVlans === 'function') {
+                    loadOnuServiceVlans(onuId, oltId);
+                }
+                
+                // Also load service VLANs into dropdowns
+                loadVlanDropdowns(onuId);
+                
+                new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+            }
+            
+            async function loadVlanDropdowns(onuId) {
+                try {
+                    const resp = await fetch(`?action=get_onu_service_vlans&onu_id=${onuId}`);
+                    const data = await resp.json();
+                    
+                    if (data.success && data.vlans) {
+                        // Filter WiFi VLANs
+                        const wifiVlans = data.vlans.filter(v => v.interface_type === 'wifi' || v.interface_type === 'all');
+                        
+                        // Update all VLAN dropdowns
+                        const dropdowns = ['wifi24_access_vlan', 'wifi5_access_vlan', 'wifi24_native_vlan', 'wifi5_native_vlan'];
+                        dropdowns.forEach(id => {
+                            const input = document.querySelector(`input[name="${id}"]`);
+                            if (input && wifiVlans.length > 0) {
+                                // Replace number input with select
+                                const select = document.createElement('select');
+                                select.name = id;
+                                select.className = 'form-select';
+                                
+                                wifiVlans.forEach(v => {
+                                    const opt = document.createElement('option');
+                                    opt.value = v.vlan_id;
+                                    opt.textContent = `VLAN ${v.vlan_id}${v.vlan_name ? ' - ' + v.vlan_name : ''}`;
+                                    if (v.is_native) opt.selected = true;
+                                    select.appendChild(opt);
+                                });
+                                
+                                input.parentNode.replaceChild(select, input);
+                            }
+                        });
+                        
+                        // Also populate allowed VLANs text fields with trunk VLANs
+                        const trunkVlans = wifiVlans.filter(v => v.port_mode === 'trunk');
+                        if (trunkVlans.length > 0) {
+                            const vlanList = trunkVlans.map(v => v.vlan_id).join(',');
+                            document.querySelector('input[name="wifi24_allowed_vlans"]').value = vlanList;
+                            document.querySelector('input[name="wifi5_allowed_vlans"]').value = vlanList;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load service VLANs for dropdowns:', e);
+                }
+            }
             </script>
             <?php endif; ?>
             
@@ -10927,14 +11133,14 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     </script>
     
     <div class="modal fade" id="wifiConfigModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="post">
-                    <input type="hidden" name="action" value="tr069_wifi">
+                    <input type="hidden" name="action" value="tr069_wifi_advanced">
                     <input type="hidden" name="device_id" id="wifiDeviceId">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-wifi me-2"></i>Configure WiFi</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="bi bi-wifi me-2"></i>Configure Wireless Interfaces</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-info small">
@@ -10942,31 +11148,173 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             Configuring device: <strong id="wifiDeviceSn"></strong>
                         </div>
                         
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" name="enabled" id="wifiEnabled" checked>
-                            <label class="form-check-label" for="wifiEnabled">Enable WiFi</label>
+                        <ul class="nav nav-tabs mb-3" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#wifi24Tab" type="button">
+                                    <i class="bi bi-broadcast me-1"></i> 2.4 GHz
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#wifi5Tab" type="button">
+                                    <i class="bi bi-broadcast me-1"></i> 5 GHz
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content">
+                            <!-- 2.4 GHz Tab -->
+                            <div class="tab-pane fade show active" id="wifi24Tab">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="wifi24_enabled" id="wifi24Enabled" checked>
+                                            <label class="form-check-label" for="wifi24Enabled"><strong>Enable 2.4 GHz WiFi</strong></label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="wifi24_ssid" class="form-control" placeholder="MyNetwork_2.4G">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Password</label>
+                                            <input type="text" name="wifi24_password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Channel</label>
+                                            <select name="wifi24_channel" class="form-select">
+                                                <option value="0">Auto</option>
+                                                <option value="1">1</option>
+                                                <option value="6">6</option>
+                                                <option value="11">11</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> VLAN Configuration</h6>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Port Mode</label>
+                                            <select name="wifi24_mode" class="form-select" onchange="toggleWifi24VlanFields(this.value)">
+                                                <option value="access">Access (Single VLAN)</option>
+                                                <option value="trunk">Trunk (Tagged VLANs)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div id="wifi24AccessVlan" class="mb-3">
+                                            <label class="form-label">Access VLAN ID</label>
+                                            <input type="number" name="wifi24_access_vlan" class="form-control" value="1" min="1" max="4094">
+                                            <div class="form-text">Untagged VLAN for this interface</div>
+                                        </div>
+                                        
+                                        <div id="wifi24TrunkVlans" class="mb-3 d-none">
+                                            <label class="form-label">Native VLAN</label>
+                                            <input type="number" name="wifi24_native_vlan" class="form-control" value="1" min="1" max="4094">
+                                            <div class="form-text">Untagged VLAN (PVID)</div>
+                                        </div>
+                                        
+                                        <div id="wifi24AllowedVlans" class="mb-3 d-none">
+                                            <label class="form-label">Allowed VLANs</label>
+                                            <input type="text" name="wifi24_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
+                                            <div class="form-text">Comma-separated or ranges</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 5 GHz Tab -->
+                            <div class="tab-pane fade" id="wifi5Tab">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" name="wifi5_enabled" id="wifi5Enabled" checked>
+                                            <label class="form-check-label" for="wifi5Enabled"><strong>Enable 5 GHz WiFi</strong></label>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">SSID (Network Name)</label>
+                                            <input type="text" name="wifi5_ssid" class="form-control" placeholder="MyNetwork_5G">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Password</label>
+                                            <input type="text" name="wifi5_password" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Channel</label>
+                                            <select name="wifi5_channel" class="form-select">
+                                                <option value="0">Auto</option>
+                                                <option value="36">36</option>
+                                                <option value="40">40</option>
+                                                <option value="44">44</option>
+                                                <option value="48">48</option>
+                                                <option value="149">149</option>
+                                                <option value="153">153</option>
+                                                <option value="157">157</option>
+                                                <option value="161">161</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> VLAN Configuration</h6>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Port Mode</label>
+                                            <select name="wifi5_mode" class="form-select" onchange="toggleWifi5VlanFields(this.value)">
+                                                <option value="access">Access (Single VLAN)</option>
+                                                <option value="trunk">Trunk (Tagged VLANs)</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div id="wifi5AccessVlan" class="mb-3">
+                                            <label class="form-label">Access VLAN ID</label>
+                                            <input type="number" name="wifi5_access_vlan" class="form-control" value="1" min="1" max="4094">
+                                            <div class="form-text">Untagged VLAN for this interface</div>
+                                        </div>
+                                        
+                                        <div id="wifi5TrunkVlans" class="mb-3 d-none">
+                                            <label class="form-label">Native VLAN</label>
+                                            <input type="number" name="wifi5_native_vlan" class="form-control" value="1" min="1" max="4094">
+                                            <div class="form-text">Untagged VLAN (PVID)</div>
+                                        </div>
+                                        
+                                        <div id="wifi5AllowedVlans" class="mb-3 d-none">
+                                            <label class="form-label">Allowed VLANs</label>
+                                            <input type="text" name="wifi5_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
+                                            <div class="form-text">Comma-separated or ranges</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
-                        <h6>2.4 GHz WiFi</h6>
-                        <div class="row mb-3">
-                            <div class="col-8">
-                                <label class="form-label">SSID</label>
-                                <input type="text" name="ssid" class="form-control" placeholder="Network Name" required>
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label">Channel</label>
-                                <select name="channel" class="form-select">
-                                    <option value="0">Auto</option>
-                                    <option value="1">1</option>
-                                    <option value="6">6</option>
-                                    <option value="11">11</option>
-                                </select>
-                            </div>
+                        <hr>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="sync_both" id="syncBothWifi">
+                            <label class="form-check-label" for="syncBothWifi">Use same SSID/password for both bands</label>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Password</label>
-                            <input type="text" name="password" class="form-control" placeholder="WiFi Password" required minlength="8">
-                            <div class="form-text">Minimum 8 characters</div>
+                        
+                        <!-- Service VLANs Section -->
+                        <div class="card border-secondary">
+                            <div class="card-header bg-secondary text-white py-2 d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-diagram-3 me-2"></i>Attached Service VLANs</span>
+                                <button type="button" class="btn btn-sm btn-light" onclick="showAddVlanModal()">
+                                    <i class="bi bi-plus-lg me-1"></i>Add VLAN
+                                </button>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="wifiServiceVlansContainer">
+                                    <div class="text-center text-muted py-3">
+                                        <i class="bi bi-hourglass-split me-1"></i> Loading VLANs...
+                                    </div>
+                                </div>
+                                <div class="form-text mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    These VLANs will be available for WiFi interface VLAN configuration
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -10977,6 +11325,192 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             </div>
         </div>
     </div>
+    
+    <!-- Add VLAN to ONU Modal -->
+    <div class="modal fade" id="addVlanModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white py-2">
+                    <h6 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Service VLAN</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="addVlanOnuId">
+                    <div class="mb-3">
+                        <label class="form-label">Select VLAN</label>
+                        <select id="addVlanSelect" class="form-select">
+                            <option value="">-- Select VLAN --</option>
+                        </select>
+                        <div class="form-text">VLANs from OLT configuration</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">VLAN Name (Optional)</label>
+                        <input type="text" id="addVlanName" class="form-control" placeholder="e.g., Internet, IPTV">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Interface Type</label>
+                        <select id="addVlanInterfaceType" class="form-select">
+                            <option value="wifi">WiFi Only</option>
+                            <option value="eth">Ethernet Only</option>
+                            <option value="all">All Interfaces</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Port Mode</label>
+                        <select id="addVlanPortMode" class="form-select">
+                            <option value="access">Access (Untagged)</option>
+                            <option value="trunk">Trunk (Tagged)</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="addVlanIsNative">
+                        <label class="form-check-label" for="addVlanIsNative">Native VLAN (for trunk mode)</label>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success btn-sm" onclick="addServiceVlan()">
+                        <i class="bi bi-plus-lg me-1"></i>Add VLAN
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    let currentWifiOnuId = null;
+    let currentOltId = null;
+    
+    function toggleWifi24VlanFields(mode) {
+        document.getElementById('wifi24AccessVlan').classList.toggle('d-none', mode === 'trunk');
+        document.getElementById('wifi24TrunkVlans').classList.toggle('d-none', mode === 'access');
+        document.getElementById('wifi24AllowedVlans').classList.toggle('d-none', mode === 'access');
+    }
+    function toggleWifi5VlanFields(mode) {
+        document.getElementById('wifi5AccessVlan').classList.toggle('d-none', mode === 'trunk');
+        document.getElementById('wifi5TrunkVlans').classList.toggle('d-none', mode === 'access');
+        document.getElementById('wifi5AllowedVlans').classList.toggle('d-none', mode === 'access');
+    }
+    
+    function loadOnuServiceVlans(onuId, oltId) {
+        currentWifiOnuId = onuId;
+        currentOltId = oltId;
+        const container = document.getElementById('wifiServiceVlansContainer');
+        container.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span> Loading...</div>';
+        
+        fetch(`?action=get_onu_service_vlans&onu_id=${onuId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.vlans && data.vlans.length > 0) {
+                    let html = '<table class="table table-sm table-bordered mb-0">';
+                    html += '<thead class="table-light"><tr><th>VLAN</th><th>Name</th><th>Type</th><th>Mode</th><th></th></tr></thead><tbody>';
+                    data.vlans.forEach(v => {
+                        const nativeBadge = v.is_native ? '<span class="badge bg-warning text-dark ms-1">Native</span>' : '';
+                        html += `<tr>
+                            <td><span class="badge bg-primary">${v.vlan_id}</span>${nativeBadge}</td>
+                            <td>${v.vlan_name || '-'}</td>
+                            <td><span class="badge bg-secondary">${v.interface_type}</span></td>
+                            <td>${v.port_mode}</td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeServiceVlan(${v.id})" title="Remove">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="text-center text-muted py-2"><i class="bi bi-info-circle me-1"></i>No service VLANs attached</div>';
+                }
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="text-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i>Failed to load VLANs</div>';
+            });
+    }
+    
+    function showAddVlanModal() {
+        if (!currentWifiOnuId || !currentOltId) return;
+        document.getElementById('addVlanOnuId').value = currentWifiOnuId;
+        
+        // Load available VLANs from OLT
+        fetch(`?action=get_olt_vlans&olt_id=${currentOltId}`)
+            .then(r => r.json())
+            .then(data => {
+                const select = document.getElementById('addVlanSelect');
+                select.innerHTML = '<option value="">-- Select VLAN --</option>';
+                if (data.vlans) {
+                    data.vlans.forEach(v => {
+                        const desc = v.description ? ` - ${v.description}` : '';
+                        select.innerHTML += `<option value="${v.vlan_id}">${v.vlan_id}${desc}</option>`;
+                    });
+                }
+            });
+        
+        new bootstrap.Modal(document.getElementById('addVlanModal')).show();
+    }
+    
+    function addServiceVlan() {
+        const onuId = document.getElementById('addVlanOnuId').value;
+        const vlanId = document.getElementById('addVlanSelect').value;
+        const vlanName = document.getElementById('addVlanName').value;
+        const interfaceType = document.getElementById('addVlanInterfaceType').value;
+        const portMode = document.getElementById('addVlanPortMode').value;
+        const isNative = document.getElementById('addVlanIsNative').checked;
+        
+        if (!vlanId) {
+            alert('Please select a VLAN');
+            return;
+        }
+        
+        fetch('?action=add_onu_service_vlan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `onu_id=${onuId}&vlan_id=${vlanId}&vlan_name=${encodeURIComponent(vlanName)}&interface_type=${interfaceType}&port_mode=${portMode}&is_native=${isNative ? 1 : 0}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('addVlanModal')).hide();
+                loadOnuServiceVlans(currentWifiOnuId, currentOltId);
+            } else {
+                alert(data.error || 'Failed to add VLAN');
+            }
+        })
+        .catch(err => alert('Error adding VLAN'));
+    }
+    
+    function removeServiceVlan(vlanRecordId) {
+        if (!confirm('Remove this service VLAN?')) return;
+        
+        fetch('?action=remove_onu_service_vlan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `id=${vlanRecordId}`
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                loadOnuServiceVlans(currentWifiOnuId, currentOltId);
+            } else {
+                alert(data.error || 'Failed to remove VLAN');
+            }
+        })
+        .catch(err => alert('Error removing VLAN'));
+    }
+    
+    // Hook into WiFi modal opening
+    document.getElementById('wifiConfigModal').addEventListener('show.bs.modal', function(e) {
+        const button = e.relatedTarget;
+        if (button) {
+            const onuId = button.dataset.onuId;
+            const oltId = button.dataset.oltId;
+            if (onuId && oltId) {
+                loadOnuServiceVlans(onuId, oltId);
+            }
+        }
+    });
+    </script>
 
     <!-- Admin Password Change Modal -->
     <div class="modal fade" id="adminPasswordModal" tabindex="-1">
