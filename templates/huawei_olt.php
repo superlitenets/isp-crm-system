@@ -286,6 +286,76 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'signal_history') {
     exit;
 }
 
+// AJAX endpoint for WiFi status via TR-069
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
+    header('Content-Type: application/json');
+    $deviceId = $_GET['device_id'] ?? '';
+    
+    if (empty($deviceId)) {
+        echo json_encode(['success' => false, 'error' => 'Device ID required']);
+        exit;
+    }
+    
+    try {
+        require_once __DIR__ . '/../src/GenieACS.php';
+        $genieacs = new \App\GenieACS($db);
+        
+        if (!$genieacs->isConfigured()) {
+            echo json_encode(['success' => false, 'error' => 'GenieACS not configured']);
+            exit;
+        }
+        
+        $result = $genieacs->getWiFiSettings($deviceId);
+        
+        if (!$result['success']) {
+            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to fetch WiFi settings']);
+            exit;
+        }
+        
+        // Parse the response data
+        $data = $result['data'] ?? [];
+        $wifi24 = [
+            'ssid' => null,
+            'enabled' => false,
+            'channel' => null
+        ];
+        $wifi5 = [
+            'ssid' => null,
+            'enabled' => false,
+            'channel' => null
+        ];
+        
+        // Extract values from GenieACS response
+        if (is_array($data)) {
+            foreach ($data as $param) {
+                $name = $param[0] ?? '';
+                $value = $param[1] ?? null;
+                
+                if (strpos($name, 'WLANConfiguration.1.SSID') !== false) {
+                    $wifi24['ssid'] = $value;
+                } elseif (strpos($name, 'WLANConfiguration.1.Enable') !== false) {
+                    $wifi24['enabled'] = ($value === true || $value === 'true' || $value === '1' || $value === 1);
+                } elseif (strpos($name, 'WLANConfiguration.1.Channel') !== false) {
+                    $wifi24['channel'] = $value;
+                } elseif (strpos($name, 'WLANConfiguration.5.SSID') !== false) {
+                    $wifi5['ssid'] = $value;
+                } elseif (strpos($name, 'WLANConfiguration.5.Enable') !== false) {
+                    $wifi5['enabled'] = ($value === true || $value === 'true' || $value === '1' || $value === 1);
+                }
+            }
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'wifi_24' => $wifi24,
+            'wifi_5' => $wifi5
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint for port capacity
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
     header('Content-Type: application/json');
@@ -1675,6 +1745,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            
+            case 'tr069_admin_password':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceId = $_POST['device_id'] ?? '';
+                $newPassword = $_POST['new_password'] ?? '';
+                $username = $_POST['admin_username'] ?? 'admin';
+                
+                if (empty($newPassword)) {
+                    $message = 'Password is required';
+                    $messageType = 'warning';
+                } elseif (strlen($newPassword) < 6) {
+                    $message = 'Password must be at least 6 characters';
+                    $messageType = 'warning';
+                } else {
+                    $result = $genieacs->setAdminPassword($deviceId, $newPassword, $username);
+                    if ($result['success']) {
+                        $message = 'Admin password change command sent successfully. The device may need to reboot.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to change admin password: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+            
             case 'apply_pending_tr069':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -5518,6 +5614,24 @@ try {
                                             </button>
                                         </form>
                                     </div>
+                                    
+                                    <h6 class="text-muted mb-3 mt-4">TR-069 Remote Configuration</h6>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <?php if (!empty($currentOnu['tr069_device_id'])): ?>
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                onclick="openWifiConfig('<?= htmlspecialchars($currentOnu['tr069_device_id']) ?>', '<?= htmlspecialchars($currentOnu['sn']) ?>')">
+                                            <i class="bi bi-wifi me-1"></i> WiFi Settings
+                                        </button>
+                                        <button type="button" class="btn btn-outline-warning" 
+                                                onclick="openAdminPasswordConfig('<?= htmlspecialchars($currentOnu['tr069_device_id']) ?>', '<?= htmlspecialchars($currentOnu['sn']) ?>')">
+                                            <i class="bi bi-key me-1"></i> Admin Password
+                                        </button>
+                                        <?php else: ?>
+                                        <div class="alert alert-info small w-100 mb-0">
+                                            <i class="bi bi-info-circle me-2"></i>
+                                            TR-069 WiFi/password config requires ACS connection. Use ETH Port Config tab for OMCI-based Ethernet settings.
+                                        </div>
+                                        <?php endif; ?>
                                 </div>
                                 
                                 <div class="col-md-6">
@@ -5557,6 +5671,7 @@ try {
                                     </form>
                                 </div>
                             </div>
+                            
                         </div>
                         
                         <!-- VoIP Configuration -->
@@ -5666,6 +5781,123 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- TR-069 Wireless Interfaces - Only show if TR-069 connected -->
+            <?php if (!empty($currentOnu['tr069_device_id'])): ?>
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-wifi me-2"></i>Wireless Interfaces (TR-069)</span>
+                    <button type="button" class="btn btn-sm btn-light" onclick="refreshWifiStatus()">
+                        <i class="bi bi-arrow-repeat me-1"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-secondary small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>TR-069 WiFi Configuration</strong> - These settings are fetched and configured remotely via GenieACS/TR-069.
+                    </div>
+                    <div id="wifiInterfacesLoading" class="text-center py-3 d-none">
+                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                        <span class="text-muted">Fetching wireless settings from device...</span>
+                    </div>
+                    <div id="wifiInterfacesError" class="alert alert-warning small d-none">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="wifiErrorMessage">Unable to fetch wireless settings</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0" id="wifiInterfacesTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:100px">Interface</th>
+                                    <th>SSID</th>
+                                    <th style="width:100px">Status</th>
+                                    <th style="width:80px">Channel</th>
+                                    <th style="width:80px">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wifiInterfacesBody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">
+                                        <i class="bi bi-wifi-off me-2"></i>Loading wireless settings...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <script>
+            (function() {
+                const deviceId = '<?= htmlspecialchars($currentOnu['tr069_device_id']) ?>';
+                const serialNumber = '<?= htmlspecialchars($currentOnu['sn']) ?>';
+                
+                window.refreshWifiStatus = async function() {
+                    const loading = document.getElementById('wifiInterfacesLoading');
+                    const errorDiv = document.getElementById('wifiInterfacesError');
+                    const tbody = document.getElementById('wifiInterfacesBody');
+                    
+                    loading.classList.remove('d-none');
+                    errorDiv.classList.add('d-none');
+                    tbody.innerHTML = '';
+                    
+                    try {
+                        const resp = await fetch(`?page=huawei-olt&ajax=wifi_status&device_id=${encodeURIComponent(deviceId)}`);
+                        const data = await resp.json();
+                        
+                        loading.classList.add('d-none');
+                        
+                        if (!data.success) {
+                            errorDiv.classList.remove('d-none');
+                            document.getElementById('wifiErrorMessage').textContent = data.error || 'Failed to fetch WiFi settings';
+                            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="bi bi-wifi-off me-2"></i>WiFi data unavailable</td></tr>';
+                            return;
+                        }
+                        
+                        let html = '';
+                        
+                        // 2.4GHz Interface
+                        const wifi24 = data.wifi_24 || {};
+                        html += `<tr>
+                            <td><i class="bi bi-broadcast text-primary me-1"></i> 2.4 GHz</td>
+                            <td><code>${wifi24.ssid || 'N/A'}</code></td>
+                            <td>${wifi24.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
+                            <td>${wifi24.channel || 'Auto'}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfig('${deviceId}', '${serialNumber}')" title="Configure">
+                                    <i class="bi bi-gear"></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                        
+                        // 5GHz Interface
+                        const wifi5 = data.wifi_5 || {};
+                        html += `<tr>
+                            <td><i class="bi bi-broadcast text-info me-1"></i> 5 GHz</td>
+                            <td><code>${wifi5.ssid || 'N/A'}</code></td>
+                            <td>${wifi5.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
+                            <td>${wifi5.channel || 'Auto'}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfig('${deviceId}', '${serialNumber}')" title="Configure">
+                                    <i class="bi bi-gear"></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                        
+                        tbody.innerHTML = html;
+                        
+                    } catch (e) {
+                        loading.classList.add('d-none');
+                        errorDiv.classList.remove('d-none');
+                        document.getElementById('wifiErrorMessage').textContent = 'Network error: ' + e.message;
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="bi bi-wifi-off me-2"></i>WiFi data unavailable</td></tr>';
+                    }
+                };
+                
+                // Auto-load on page load
+                refreshWifiStatus();
+            })();
+            </script>
+            <?php endif; ?>
             
             <!-- OMCI LAN Port Configuration -->
             <?php 
@@ -6853,6 +7085,9 @@ try {
                                         <div class="btn-group btn-group-sm">
                                             <button type="button" class="btn btn-outline-primary" onclick="openWifiConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Configure WiFi">
                                                 <i class="bi bi-wifi"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-warning" onclick="openAdminPasswordConfig('<?= htmlspecialchars($device['device_id']) ?>', '<?= htmlspecialchars($device['serial_number']) ?>')" title="Change Admin Password">
+                                                <i class="bi bi-key"></i>
                                             </button>
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="tr069_refresh">
@@ -10743,6 +10978,60 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
 
+    <!-- Admin Password Change Modal -->
+    <div class="modal fade" id="adminPasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <input type="hidden" name="action" value="tr069_admin_password">
+                    <input type="hidden" name="device_id" id="adminPassDeviceId">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-key me-2"></i>Change Admin Password</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Changing password for device: <strong id="adminPassDeviceSn"></strong>
+                        </div>
+                        <div class="alert alert-warning small">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            This will change the ONU web interface login password via TR-069.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Admin Username</label>
+                            <input type="text" name="admin_username" class="form-control" value="admin" placeholder="admin">
+                            <div class="form-text">Usually "admin" for most devices</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">New Password</label>
+                            <div class="input-group">
+                                <input type="password" name="new_password" id="newAdminPass" class="form-control" placeholder="Enter new password" required minlength="6">
+                                <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('newAdminPass')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Minimum 6 characters</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Confirm Password</label>
+                            <input type="password" name="confirm_password" id="confirmAdminPass" class="form-control" placeholder="Confirm new password" required minlength="6">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning" onclick="return validatePasswordMatch()">
+                            <i class="bi bi-key me-1"></i> Change Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <div class="modal fade" id="configScriptModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -11434,6 +11723,33 @@ echo "# ================================================\n";
         document.getElementById('wifiDeviceId').value = deviceId;
         document.getElementById('wifiDeviceSn').textContent = serialNumber;
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+    }
+    
+    function openAdminPasswordConfig(deviceId, serialNumber) {
+        document.getElementById('adminPassDeviceId').value = deviceId;
+        document.getElementById('adminPassDeviceSn').textContent = serialNumber;
+        document.getElementById('newAdminPass').value = '';
+        document.getElementById('confirmAdminPass').value = '';
+        new bootstrap.Modal(document.getElementById('adminPasswordModal')).show();
+    }
+    
+    function validatePasswordMatch() {
+        const pass = document.getElementById('newAdminPass').value;
+        const confirm = document.getElementById('confirmAdminPass').value;
+        if (pass !== confirm) {
+            alert('Passwords do not match!');
+            return false;
+        }
+        return true;
+    }
+    
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+        } else {
+            input.type = 'password';
+        }
     }
     
     // Location Management Functions

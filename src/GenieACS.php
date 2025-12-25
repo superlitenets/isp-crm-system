@@ -262,6 +262,90 @@ class GenieACS {
         return $this->setParameterValues($deviceId, $params);
     }
     
+    /**
+     * Change ONU administrator password via TR-069
+     */
+    public function setAdminPassword(string $deviceId, string $newPassword, string $username = 'admin'): array {
+        // Try multiple common TR-069 paths for admin password
+        $params = [
+            ['InternetGatewayDevice.UserInterface.CurrentPassword', $newPassword, 'xsd:string']
+        ];
+        
+        $result = $this->setParameterValues($deviceId, $params);
+        
+        // If first method fails, try alternative paths
+        if (!$result['success']) {
+            $altParams = [
+                ['InternetGatewayDevice.DeviceInfo.X_HW_WebUserInfo.1.UserName', $username, 'xsd:string'],
+                ['InternetGatewayDevice.DeviceInfo.X_HW_WebUserInfo.1.Password', $newPassword, 'xsd:string']
+            ];
+            $result = $this->setParameterValues($deviceId, $altParams);
+        }
+        
+        // Try another common path for Huawei devices
+        if (!$result['success']) {
+            $hwParams = [
+                ['InternetGatewayDevice.X_HW_WebUserInfo.WebUserInfoInstance.1.UserName', $username, 'xsd:string'],
+                ['InternetGatewayDevice.X_HW_WebUserInfo.WebUserInfoInstance.1.Password', $newPassword, 'xsd:string']
+            ];
+            $result = $this->setParameterValues($deviceId, $hwParams);
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get Ethernet port settings via TR-069
+     */
+    public function getEthernetSettings(string $deviceId, int $portNumber = 1): array {
+        $params = [
+            "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.Enable",
+            "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.MaxBitRate",
+            "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.DuplexMode",
+            "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.Status"
+        ];
+        
+        return $this->getParameterValues($deviceId, $params);
+    }
+    
+    /**
+     * Configure Ethernet port settings via TR-069
+     */
+    public function setEthernetSettings(string $deviceId, int $portNumber, array $settings): array {
+        $params = [];
+        
+        if (isset($settings['enabled'])) {
+            $params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.Enable", $settings['enabled'], 'xsd:boolean'];
+        }
+        
+        if (!empty($settings['max_bit_rate'])) {
+            // Values: Auto, 10, 100, 1000
+            $params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.MaxBitRate", $settings['max_bit_rate'], 'xsd:string'];
+        }
+        
+        if (!empty($settings['duplex_mode'])) {
+            // Values: Auto, Half, Full
+            $params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNumber}.DuplexMode", $settings['duplex_mode'], 'xsd:string'];
+        }
+        
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No settings provided'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
+    /**
+     * Get LAN host information (connected devices)
+     */
+    public function getLANHosts(string $deviceId): array {
+        $params = [
+            'InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries'
+        ];
+        
+        return $this->getParameterValues($deviceId, $params);
+    }
+    
     public function getDeviceInfo(string $deviceId): array {
         $result = $this->getDevice($deviceId);
         if (!$result['success']) {
