@@ -234,22 +234,24 @@ app.post('/wireguard/apply', async (req, res) => {
         }
         
         // Sync routes if subnets provided
+        // NOTE: wg0 is on the HOST, not in a container. OLT service runs with network_mode: host
+        // so we can add routes directly without docker exec
         if (subnets && Array.isArray(subnets)) {
             try {
-                // Get current routes
-                const { stdout } = await execPromise(`docker exec ${containerName} ip route show dev wg0 2>/dev/null`).catch(() => ({ stdout: '' }));
+                // Get current routes on HOST (wg0 is a host interface)
+                const { stdout } = await execPromise(`ip route show dev wg0 2>/dev/null`).catch(() => ({ stdout: '' }));
                 const currentRoutes = [];
                 stdout.split('\n').forEach(line => {
                     const match = line.match(/^([\d.]+\/\d+)/);
                     if (match) currentRoutes.push(match[1]);
                 });
                 
-                // Validate and add missing routes
+                // Validate and add missing routes on HOST
                 for (const subnet of subnets) {
                     if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/.test(subnet)) continue;
                     if (!currentRoutes.includes(subnet)) {
                         try {
-                            await execPromise(`docker exec ${containerName} ip route add ${subnet} dev wg0 2>&1`);
+                            await execPromise(`ip route add ${subnet} dev wg0 2>&1`);
                             results.routesAdded.push(subnet);
                         } catch (e) {
                             if (!e.message.includes('File exists')) {
@@ -264,7 +266,7 @@ app.post('/wireguard/apply', async (req, res) => {
                     if (route.startsWith('10.200.0.')) continue; // Skip tunnel network
                     if (!subnets.includes(route)) {
                         try {
-                            await execPromise(`docker exec ${containerName} ip route del ${route} 2>&1`);
+                            await execPromise(`ip route del ${route} 2>&1`);
                             results.routesRemoved.push(route);
                         } catch (e) {
                             if (!e.message.includes('No such process')) {
