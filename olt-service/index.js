@@ -197,7 +197,7 @@ app.post('/ping-batch', async (req, res) => {
 // WireGuard config apply endpoint
 app.post('/wireguard/apply', async (req, res) => {
     try {
-        const { config } = req.body;
+        const { config, subnets } = req.body;
         
         if (!config) {
             return res.status(400).json({ success: false, error: 'Missing config' });
@@ -205,29 +205,86 @@ app.post('/wireguard/apply', async (req, res) => {
         
         const fs = require('fs');
         const configPath = '/tmp/wg0_apply.conf';
+        const containerName = 'isp_crm_wireguard';
+        const results = { configApplied: false, routesAdded: [], routesRemoved: [], errors: [] };
         
         // Write config to temp file
         fs.writeFileSync(configPath, config);
         
         // Try docker cp to WireGuard container
         try {
-            await execPromise(`docker cp ${configPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1`);
+            await execPromise(`docker cp ${configPath} ${containerName}:/config/wg_confs/wg0.conf 2>&1`);
             
             // Try to apply via wg syncconf
             try {
-                await execPromise('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1');
-                res.json({ success: true, message: 'Config applied via wg syncconf' });
+                await execPromise(`docker exec ${containerName} wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1`);
+                results.configApplied = true;
+                results.configMessage = 'Config applied via wg syncconf';
             } catch (syncErr) {
                 // Fallback to container restart
-                await execPromise('docker restart isp_crm_wireguard 2>&1');
-                res.json({ success: true, message: 'Config applied via container restart' });
+                await execPromise(`docker restart ${containerName} 2>&1`);
+                await new Promise(r => setTimeout(r, 3000)); // Wait for container
+                results.configApplied = true;
+                results.configMessage = 'Config applied via container restart';
             }
         } catch (cpErr) {
-            res.status(500).json({ success: false, error: 'Failed to copy config: ' + cpErr.message });
+            results.errors.push('Failed to copy config: ' + cpErr.message);
         } finally {
-            // Cleanup temp file
             try { fs.unlinkSync(configPath); } catch (e) {}
         }
+        
+        // Sync routes if subnets provided
+        if (subnets && Array.isArray(subnets)) {
+            try {
+                // Get current routes
+                const { stdout } = await execPromise(`docker exec ${containerName} ip route show dev wg0 2>/dev/null`).catch(() => ({ stdout: '' }));
+                const currentRoutes = [];
+                stdout.split('\n').forEach(line => {
+                    const match = line.match(/^([\d.]+\/\d+)/);
+                    if (match) currentRoutes.push(match[1]);
+                });
+                
+                // Validate and add missing routes
+                for (const subnet of subnets) {
+                    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/.test(subnet)) continue;
+                    if (!currentRoutes.includes(subnet)) {
+                        try {
+                            await execPromise(`docker exec ${containerName} ip route add ${subnet} dev wg0 2>&1`);
+                            results.routesAdded.push(subnet);
+                        } catch (e) {
+                            if (!e.message.includes('File exists')) {
+                                results.errors.push(`Route ${subnet}: ${e.message}`);
+                            }
+                        }
+                    }
+                }
+                
+                // Remove stale routes (skip tunnel IPs)
+                for (const route of currentRoutes) {
+                    if (route.startsWith('10.200.0.')) continue; // Skip tunnel network
+                    if (!subnets.includes(route)) {
+                        try {
+                            await execPromise(`docker exec ${containerName} ip route del ${route} 2>&1`);
+                            results.routesRemoved.push(route);
+                        } catch (e) {
+                            if (!e.message.includes('No such process')) {
+                                results.errors.push(`Remove ${route}: ${e.message}`);
+                            }
+                        }
+                    }
+                }
+            } catch (routeErr) {
+                results.errors.push('Route sync error: ' + routeErr.message);
+            }
+        }
+        
+        res.json({ 
+            success: results.configApplied && results.errors.length === 0,
+            message: results.configMessage,
+            routesAdded: results.routesAdded,
+            routesRemoved: results.routesRemoved,
+            errors: results.errors
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }

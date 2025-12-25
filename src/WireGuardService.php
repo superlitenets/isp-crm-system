@@ -903,31 +903,74 @@ class WireGuardService {
         try {
             $config = \file_get_contents($configPath);
             
+            // Get all active subnets for route sync
+            $subnets = $this->getActiveSubnetCidrs();
+            
             $ch = \curl_init("{$oltServiceUrl}/wireguard/apply");
             \curl_setopt_array($ch, [
                 CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => \json_encode(['config' => $config]),
+                CURLOPT_POSTFIELDS => \json_encode([
+                    'config' => $config,
+                    'subnets' => $subnets
+                ]),
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 5
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_CONNECTTIMEOUT => 10
             ]);
             
             $response = \curl_exec($ch);
             $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = \curl_error($ch);
             \curl_close($ch);
             
             if ($httpCode === 200) {
                 $data = \json_decode($response, true);
                 if ($data && isset($data['success']) && $data['success']) {
-                    return ['success' => true, 'message' => 'Applied via OLT service'];
+                    $msg = 'Applied via OLT service';
+                    if (!empty($data['routesAdded'])) {
+                        $msg .= ' | Routes added: ' . \implode(', ', $data['routesAdded']);
+                    }
+                    if (!empty($data['routesRemoved'])) {
+                        $msg .= ' | Routes removed: ' . \implode(', ', $data['routesRemoved']);
+                    }
+                    return ['success' => true, 'message' => $msg];
                 }
+                $error = $data['error'] ?? ($data['errors'] ? \implode(', ', $data['errors']) : 'Unknown error');
+                return ['success' => false, 'error' => $error];
             }
             
-            return ['success' => false, 'error' => 'OLT service endpoint not available'];
+            return ['success' => false, 'error' => $curlError ?: "HTTP {$httpCode}"];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+    
+    /**
+     * Get all active subnet CIDRs from peers for routing
+     */
+    private function getActiveSubnetCidrs(): array {
+        $subnets = [];
+        try {
+            $stmt = $this->db->query("
+                SELECT DISTINCT unnest(string_to_array(allowed_ips, ',')) as subnet
+                FROM wireguard_peers 
+                WHERE is_active = true
+            ");
+            while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                $subnet = \trim($row['subnet']);
+                // Only include subnet CIDR ranges, not /32 single IPs unless it's the peer tunnel IP
+                if (!empty($subnet) && \preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $subnet)) {
+                    // Skip tunnel IPs (/32) that aren't part of a larger network
+                    if (!\preg_match('/\/32$/', $subnet) || \strpos($subnet, '10.200.0.') === 0) {
+                        $subnets[] = $subnet;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            \error_log("getActiveSubnetCidrs error: " . $e->getMessage());
+        }
+        return \array_unique($subnets);
     }
     
     /**
