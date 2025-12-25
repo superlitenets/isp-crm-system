@@ -824,16 +824,20 @@ class WireGuardService {
             // Try to apply config using wg syncconf (hot reload, no restart needed)
             $syncResult = $this->applyConfig($writtenPath);
             
+            // Manage host routes for all active subnets
+            $routeResult = $this->syncHostRoutes();
+            
             // Log the sync
             $this->logSync($serverId, $syncResult['success'], $syncResult['message'] ?? '');
             
             return [
                 'success' => $syncResult['success'],
                 'message' => $syncResult['success'] 
-                    ? 'Config synced and applied successfully' 
+                    ? 'Config synced and applied successfully' . ($routeResult['message'] ?? '')
                     : 'Config written but could not apply: ' . ($syncResult['error'] ?? 'Unknown error'),
                 'config_path' => $writtenPath,
-                'applied' => $syncResult['success']
+                'applied' => $syncResult['success'],
+                'routes' => $routeResult
             ];
             
         } catch (\Exception $e) {
@@ -910,6 +914,221 @@ class WireGuardService {
                 LIMIT ?
             ");
             $stmt->execute([$limit]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+    
+    /**
+     * Sync WireGuard container routes for all active subnets
+     * Adds routes for new subnets and removes routes for deleted ones
+     * Routes are added inside the WireGuard container using: docker exec isp_crm_wireguard ip route add X.X.X.X/XX dev wg0
+     * @return array Result with success status and details
+     */
+    public function syncHostRoutes(): array {
+        $result = [
+            'success' => true,
+            'added' => [],
+            'removed' => [],
+            'errors' => [],
+            'message' => ''
+        ];
+        
+        try {
+            $settings = $this->getSettings();
+            $containerName = $settings['container_name'] ?? 'isp_crm_wireguard';
+            $wgInterface = 'wg0';
+            
+            // Get all active subnets from database
+            $stmt = $this->db->query("SELECT DISTINCT network_cidr FROM wireguard_subnets WHERE is_active = TRUE");
+            $activeSubnets = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            
+            // Get current routes inside the WireGuard container
+            $currentRoutes = $this->getContainerRoutes($containerName, $wgInterface);
+            
+            // Add routes for new subnets
+            foreach ($activeSubnets as $subnet) {
+                $subnet = trim($subnet);
+                if (empty($subnet)) continue;
+                
+                if (!in_array($subnet, $currentRoutes)) {
+                    $addResult = $this->addContainerRoute($containerName, $subnet, $wgInterface);
+                    if ($addResult['success']) {
+                        $result['added'][] = $subnet;
+                    } else {
+                        $result['errors'][] = "Failed to add route for {$subnet}: " . ($addResult['error'] ?? 'Unknown error');
+                    }
+                }
+            }
+            
+            // Remove routes for deleted subnets (only those going through wg0)
+            foreach ($currentRoutes as $existingRoute) {
+                if (!in_array($existingRoute, $activeSubnets)) {
+                    $removeResult = $this->removeContainerRoute($containerName, $existingRoute);
+                    if ($removeResult['success']) {
+                        $result['removed'][] = $existingRoute;
+                    } else {
+                        $result['errors'][] = "Failed to remove route for {$existingRoute}: " . ($removeResult['error'] ?? 'Unknown error');
+                    }
+                }
+            }
+            
+            // Update persistent routes file for container restart
+            $this->updatePersistentRoutes($activeSubnets, $containerName, $wgInterface);
+            
+            // Build message
+            $messages = [];
+            if (!empty($result['added'])) {
+                $messages[] = 'Added routes: ' . implode(', ', $result['added']);
+            }
+            if (!empty($result['removed'])) {
+                $messages[] = 'Removed routes: ' . implode(', ', $result['removed']);
+            }
+            $result['message'] = !empty($messages) ? ' | Routes: ' . implode('; ', $messages) : '';
+            
+            if (!empty($result['errors'])) {
+                $result['success'] = false;
+            }
+            
+        } catch (\Exception $e) {
+            \error_log("syncHostRoutes error: " . $e->getMessage());
+            $result['success'] = false;
+            $result['errors'][] = $e->getMessage();
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get current routes inside the WireGuard container that use wg0 interface
+     */
+    private function getContainerRoutes(string $containerName, string $interface): array {
+        $routes = [];
+        $output = [];
+        $returnVar = 0;
+        
+        exec("docker exec {$containerName} ip route show dev {$interface} 2>/dev/null", $output, $returnVar);
+        
+        foreach ($output as $line) {
+            // Match subnet patterns like 10.78.0.0/24, 10.60.0.0/16
+            if (preg_match('/^([\d.]+\/\d+)/', trim($line), $matches)) {
+                $routes[] = $matches[1];
+            }
+        }
+        
+        return $routes;
+    }
+    
+    /**
+     * Add a route inside the WireGuard container
+     */
+    private function addContainerRoute(string $containerName, string $subnet, string $interface): array {
+        $output = [];
+        $returnVar = 0;
+        
+        // Validate subnet format
+        if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $subnet)) {
+            return ['success' => false, 'error' => 'Invalid subnet format'];
+        }
+        
+        $cmd = "docker exec {$containerName} ip route add {$subnet} dev {$interface} 2>&1";
+        exec($cmd, $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            \error_log("Added route {$subnet} via {$interface} in container {$containerName}");
+            return ['success' => true, 'message' => 'Route added'];
+        }
+        
+        // Check if route already exists (not an error)
+        $outputStr = implode("\n", $output);
+        if (strpos($outputStr, 'File exists') !== false) {
+            return ['success' => true, 'message' => 'Route already exists'];
+        }
+        
+        return ['success' => false, 'error' => $outputStr];
+    }
+    
+    /**
+     * Remove a route from the WireGuard container
+     */
+    private function removeContainerRoute(string $containerName, string $subnet): array {
+        $output = [];
+        $returnVar = 0;
+        
+        $cmd = "docker exec {$containerName} ip route del {$subnet} 2>&1";
+        exec($cmd, $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            \error_log("Removed route {$subnet} from container {$containerName}");
+            return ['success' => true, 'message' => 'Route removed'];
+        }
+        
+        // Check if route doesn't exist (not an error)
+        $outputStr = implode("\n", $output);
+        if (strpos($outputStr, 'No such process') !== false) {
+            return ['success' => true, 'message' => 'Route did not exist'];
+        }
+        
+        return ['success' => false, 'error' => $outputStr];
+    }
+    
+    /**
+     * Update persistent routes file for container restart persistence
+     * This creates a script that can be run after container restart
+     */
+    private function updatePersistentRoutes(array $subnets, string $containerName, string $interface): void {
+        $routesScript = "#!/bin/bash\n";
+        $routesScript .= "# Auto-generated by ISP CRM WireGuard Service\n";
+        $routesScript .= "# Generated: " . date('Y-m-d H:i:s') . "\n";
+        $routesScript .= "# Run this script after WireGuard container restart to restore routes\n\n";
+        $routesScript .= "CONTAINER=\"{$containerName}\"\n";
+        $routesScript .= "INTERFACE=\"{$interface}\"\n\n";
+        $routesScript .= "# Wait for container to be ready\n";
+        $routesScript .= "sleep 2\n\n";
+        
+        foreach ($subnets as $subnet) {
+            $subnet = trim($subnet);
+            if (!empty($subnet) && preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $subnet)) {
+                $routesScript .= "docker exec \$CONTAINER ip route add {$subnet} dev \$INTERFACE 2>/dev/null || true\n";
+            }
+        }
+        
+        $routesScript .= "\necho \"Routes applied: " . count($subnets) . " subnets\"\n";
+        
+        // Write to a persistent location (shared volume)
+        $routesPaths = [
+            '/var/www/html/storage/wireguard/apply_routes.sh',
+            '/config/wireguard/apply_routes.sh'
+        ];
+        
+        foreach ($routesPaths as $path) {
+            $dir = dirname($path);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            if (is_dir($dir)) {
+                if (@file_put_contents($path, $routesScript) !== false) {
+                    @chmod($path, 0755);
+                    \error_log("Persistent routes script written to: {$path}");
+                    break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get all active subnets
+     */
+    public function getActiveSubnets(): array {
+        try {
+            $stmt = $this->db->query("
+                SELECT s.*, p.name as peer_name 
+                FROM wireguard_subnets s
+                LEFT JOIN wireguard_peers p ON s.vpn_peer_id = p.id
+                WHERE s.is_active = TRUE
+                ORDER BY s.network_cidr
+            ");
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             return [];
