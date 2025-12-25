@@ -4530,7 +4530,7 @@ try {
                                     </div>
                                     <div class="col-4">
                                         <div class="h6 text-muted">Distance</div>
-                                        <span class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
+                                        <span id="liveDistance" class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
                                     </div>
                                     <div class="col-4">
                                         <div class="h6 text-muted">TR-069 IP</div>
@@ -5835,6 +5835,12 @@ try {
                     txEl.textContent = onu.tx_power.toFixed(1) + ' dBm';
                 } else {
                     txEl.textContent = 'N/A';
+                }
+                
+                // Update distance
+                const distEl = document.getElementById('liveDistance');
+                if (distEl) {
+                    distEl.textContent = onu.distance !== null ? onu.distance + ' m' : 'N/A';
                 }
                 
                 qualityEl.className = `badge bg-${rxClass}`;

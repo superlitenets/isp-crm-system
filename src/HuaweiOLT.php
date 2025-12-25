@@ -1607,6 +1607,13 @@ class HuaweiOLT {
             }
         }
         
+        // Parse distance from info output
+        // Formats: "Distance(m) : 1234", "ONU Distance : 1234", "Ont distance(m) : 1234"
+        $distance = null;
+        if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $infoOutput, $m)) {
+            $distance = (int)$m[1];
+        }
+        
         // Get name/description
         $name = '';
         if (preg_match('/Name\s*:\s*(.+)/i', $infoOutput, $m)) {
@@ -1625,6 +1632,7 @@ class HuaweiOLT {
                 'status' => $status,
                 'rx_power' => $rxPower,
                 'tx_power' => $txPower,
+                'distance' => $distance,
             ]
         ];
     }
