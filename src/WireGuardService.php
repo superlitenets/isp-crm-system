@@ -43,7 +43,9 @@ class WireGuardService {
             'tr069_use_vpn_gateway' => 'false',
             'tr069_acs_url' => 'http://localhost:7547',
             'vpn_gateway_ip' => '10.200.0.1',
-            'vpn_network' => '10.200.0.0/24'
+            'vpn_network' => '10.200.0.0/24',
+            'server_public_ip' => '',
+            'container_name' => 'isp_crm_wireguard'
         ], $settings);
     }
     
@@ -552,7 +554,13 @@ class WireGuardService {
             $interfaceName = substr($interfaceName, 0, 15);
         }
         
-        $endpoint = $peer['endpoint'] ?: ($settings['vpn_gateway_ip'] . ':' . $server['listen_port']);
+        // Use server_public_ip setting for MikroTik endpoint (public IP, not tunnel IP)
+        $serverPublicIp = $settings['server_public_ip'] ?? '';
+        if (empty($serverPublicIp)) {
+            // Fallback: try to detect public IP
+            $serverPublicIp = $this->detectPublicIp();
+        }
+        $endpoint = $peer['endpoint'] ?: ($serverPublicIp . ':' . $server['listen_port']);
         $keepalive = $peer['persistent_keepalive'] ?: 25;
         $vpnNetwork = $settings['vpn_network'] ?: '10.200.0.0/24';
         
@@ -623,6 +631,52 @@ class WireGuardService {
     private function extractPort(string $endpoint, int $default = 51820): int {
         $parts = explode(':', $endpoint);
         return isset($parts[1]) ? (int)$parts[1] : $default;
+    }
+    
+    /**
+     * Detect the public IP of this server for WireGuard endpoint
+     */
+    private function detectPublicIp(): string {
+        // Try multiple services to get public IP
+        $services = [
+            'https://api.ipify.org',
+            'https://ifconfig.me/ip',
+            'https://icanhazip.com',
+            'https://ipecho.net/plain'
+        ];
+        
+        foreach ($services as $url) {
+            $ch = \curl_init($url);
+            \curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_FOLLOWLOCATION => true
+            ]);
+            $ip = \trim(\curl_exec($ch) ?: '');
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            \curl_close($ch);
+            
+            if ($httpCode === 200 && \filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return $ip;
+            }
+        }
+        
+        // Fallback to APP_URL if set
+        $appUrl = \getenv('APP_URL');
+        if ($appUrl) {
+            $host = \parse_url($appUrl, PHP_URL_HOST);
+            if ($host && \filter_var($host, FILTER_VALIDATE_IP)) {
+                return $host;
+            }
+            // Try to resolve hostname to IP
+            $resolvedIp = \gethostbyname($host);
+            if ($resolvedIp !== $host) {
+                return $resolvedIp;
+            }
+        }
+        
+        return '0.0.0.0'; // Fallback - user must configure manually
     }
     
     public function getTR069AcsUrl(): string {

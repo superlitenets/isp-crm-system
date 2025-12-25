@@ -122,19 +122,16 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    network_mode: host
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5433/${POSTGRES_DB}
       - OLT_SERVICE_PORT=3002
-      - PHP_API_URL=http://nginx:80
+      - PHP_API_URL=http://127.0.0.1:80
       - DISCOVERY_INTERVAL=*/30 * * * * *
       - SNMP_POLL_INTERVAL=30
       - SESSION_SECRET=${SESSION_SECRET}
-    ports:
-      - "3002:3002"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - crm_network
 
   wireguard:
     image: lscr.io/linuxserver/wireguard

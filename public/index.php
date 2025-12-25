@@ -3940,6 +3940,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $wgService = new \App\WireGuardService($db);
                     $wgService->updateSettings([
                         'vpn_enabled' => isset($_POST['vpn_enabled']) ? 'true' : 'false',
+                        'server_public_ip' => $_POST['server_public_ip'] ?? '',
                         'vpn_gateway_ip' => $_POST['vpn_gateway_ip'] ?? '10.200.0.1',
                         'vpn_network' => $_POST['vpn_network'] ?? '10.200.0.0/24',
                         'tr069_use_vpn_gateway' => isset($_POST['tr069_use_vpn_gateway']) ? 'true' : 'false',

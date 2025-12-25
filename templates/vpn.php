@@ -279,9 +279,15 @@ try {
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Gateway IP</label>
+                            <label class="form-label">Server Public IP</label>
+                            <input type="text" class="form-control" name="server_public_ip" value="<?= htmlspecialchars($wgSettings['server_public_ip'] ?? '') ?>" placeholder="Auto-detect if empty">
+                            <div class="form-text">Public IP for MikroTik endpoints (auto-detected if blank)</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Gateway IP (Tunnel)</label>
                             <input type="text" class="form-control" name="vpn_gateway_ip" value="<?= htmlspecialchars($wgSettings['vpn_gateway_ip']) ?>">
-                            <div class="form-text">VPN server IP in the tunnel</div>
+                            <div class="form-text">VPN server IP inside the tunnel (e.g., 10.200.0.1)</div>
                         </div>
                         
                         <div class="mb-3">

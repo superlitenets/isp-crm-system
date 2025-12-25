@@ -36,7 +36,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Accounting Module**: Dashboard, Chart of Accounts, Products/Services, Customer Invoices, Vendors/Suppliers, Expense tracking, Quotes, Bills/Purchase Orders, and financial reports.
 - **Billing System Integration**: One-ISP API integration for customer data lookup and import.
 - **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump).
-- **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation, configuration export, MikroTik script generation, and real-time traffic statistics.
+- **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation (via `wg genkey`), configuration export, MikroTik script generation with auto-detected public IP, and real-time traffic statistics. OLT service uses host network mode to access VPN routes for ping functionality.
 - **Licensing System**: Standalone license server for redistributing the CRM to other ISPs. Features include:
   - **License Server** (`license-server/`): Deployable standalone PHP app with admin dashboard, REST API, customer/license/activation management, usage analytics.
   - **License Client** (`src/LicenseClient.php`, `src/LicenseMiddleware.php`): Integrated validation with 7-day grace period for offline operation.
