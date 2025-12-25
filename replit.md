@@ -26,6 +26,8 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Huawei OLT Module**: Standalone direct management module for Huawei OLT devices (Telnet/SSH/SNMP). Features include device management, ONU inventory and status monitoring, service profile management, auto-provisioning, ONU operations, and a CLI terminal.
   - **Persistent Session Manager**: Node.js service for persistent Telnet sessions, command queuing, auto-reconnection, and HTTP API integration.
   - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP protocol with GenieACS ACS server integration for WiFi configuration, device reboots, and factory resets.
+  - **TR-069 Auto-Provisioning via OMCI**: Automatic TR-069 configuration during ONU authorization. Auto-detects TR-069 VLAN, configures native VLAN on ETH port, sets DHCP mode, pushes ACS URL via OMCI, and enables periodic inform. Provides detailed success/failure notifications with manual fallback option.
+  - **OLT Profile Sync**: Sync line profiles and service profiles directly from OLT with caching in database for quick access.
   - **SmartOLT Migration**: Toolkit for migrating from SmartOLT to direct OLT management.
 - **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging.
 - **Ticket Management**: Includes timeline/activity history, quick status changes, customer satisfaction ratings, escalation features, statistics dashboard, and secure status update links for technicians and customers via WhatsApp/SMS.

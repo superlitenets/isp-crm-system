@@ -4841,19 +4841,54 @@ class HuaweiOLT {
             $tr069Script .= "quit";
             
             $tr069Result = $this->executeCommand($oltId, $tr069Script);
-            $output .= "\n[TR-069 Config]\n" . ($tr069Result['output'] ?? '');
+            $tr069Output = $tr069Result['output'] ?? '';
+            $output .= "\n[TR-069 Config]\n" . $tr069Output;
+            
+            // Check if TR-069 configuration had errors
+            $tr069HasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $tr069Output);
+            $tr069Success = $tr069Result['success'] && !$tr069HasError;
             
             // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
             $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
             $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $output .= "\n" . ($tr069SpResult['output'] ?? '');
+            
+            $tr069Status = [
+                'attempted' => true,
+                'success' => $tr069Success,
+                'vlan' => $tr069Vlan,
+                'acs_url' => $acsUrl,
+                'gem_port' => $tr069GemPort,
+                'error' => $tr069HasError ? $tr069Output : null
+            ];
+        } else {
+            // TR-069 not configured - provide reason
+            $tr069Status = [
+                'attempted' => false,
+                'success' => false,
+                'reason' => !$tr069Vlan ? 'No TR-069 VLAN found (mark a VLAN as TR-069 in OLT VLANs)' : 'ONU ID not assigned',
+                'vlan' => null,
+                'acs_url' => null
+            ];
+        }
+        
+        // Build detailed message
+        $statusMessage = "ONU authorized successfully as ONU ID {$assignedOnuId}";
+        if (isset($tr069Status['attempted']) && $tr069Status['attempted']) {
+            if ($tr069Status['success']) {
+                $statusMessage .= ". TR-069 configured (VLAN {$tr069Vlan})";
+            } else {
+                $statusMessage .= ". TR-069 FAILED - use manual config";
+            }
+        } else {
+            $statusMessage .= ". TR-069 skipped: " . ($tr069Status['reason'] ?? 'not configured');
         }
         
         $this->addLog([
             'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
             'status' => 'success',
-            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : '') . ($tr069Vlan ? " with TR-069" : ''),
+            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : '') . (isset($tr069Status['success']) && $tr069Status['success'] ? " with TR-069" : ''),
             'command_sent' => $cliScript,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
@@ -4861,11 +4896,124 @@ class HuaweiOLT {
         
         return [
             'success' => true,
-            'message' => "ONU authorized successfully" . ($assignedOnuId ? " as ONU ID {$assignedOnuId}" : '') . ($tr069Vlan ? " with TR-069 configured" : ''),
+            'message' => $statusMessage,
             'onu_id' => $assignedOnuId,
             'description' => $description,
             'output' => $output,
-            'tr069_configured' => !empty($tr069Vlan)
+            'tr069_configured' => isset($tr069Status['success']) && $tr069Status['success'],
+            'tr069_status' => $tr069Status ?? ['attempted' => false]
+        ];
+    }
+    
+    /**
+     * Manually configure TR-069 for an already-authorized ONU (fallback method)
+     */
+    public function configureTR069Manual(int $onuDbId, ?int $tr069Vlan = null, ?string $acsUrl = null, int $gemPort = 2): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        // Auto-detect TR-069 VLAN if not provided
+        if (!$tr069Vlan) {
+            $tr069Vlan = $this->getTR069VlanForOlt($oltId);
+        }
+        if (!$tr069Vlan) {
+            return ['success' => false, 'message' => 'No TR-069 VLAN found. Mark a VLAN as TR-069 in OLT VLANs or specify manually.'];
+        }
+        
+        // Get ACS URL from settings if not provided
+        if (!$acsUrl) {
+            $acsUrl = $this->getTR069AcsUrl();
+        }
+        if (!$acsUrl) {
+            return ['success' => false, 'message' => 'No ACS URL configured. Set it in Settings → TR-069 OMCI Settings.'];
+        }
+        
+        // Get periodic interval from settings
+        $periodicInterval = 300;
+        try {
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_periodic_interval'");
+            $interval = $stmt->fetchColumn();
+            if ($interval) {
+                $periodicInterval = (int)$interval;
+            }
+        } catch (\Exception $e) {}
+        
+        $output = '';
+        $errors = [];
+        
+        // Step 1: Configure native VLAN
+        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd1 .= "ont port native-vlan {$port} {$onuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
+        $cmd1 .= "quit";
+        $result1 = $this->executeCommand($oltId, $cmd1);
+        $output .= "[Step 1: Native VLAN]\n" . ($result1['output'] ?? '') . "\n";
+        if (!$result1['success'] || preg_match('/(?:Failure|Error)/i', $result1['output'] ?? '')) {
+            $errors[] = "Native VLAN config failed";
+        }
+        
+        // Step 2: Configure DHCP IP
+        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd2 .= "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan}\r\n";
+        $cmd2 .= "quit";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= "[Step 2: DHCP Config]\n" . ($result2['output'] ?? '') . "\n";
+        if (!$result2['success'] || preg_match('/(?:Failure|Error)/i', $result2['output'] ?? '')) {
+            $errors[] = "DHCP config failed";
+        }
+        
+        // Step 3: Push ACS URL
+        $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd3 .= "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"\r\n";
+        $cmd3 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
+        $cmd3 .= "quit";
+        $result3 = $this->executeCommand($oltId, $cmd3);
+        $output .= "[Step 3: ACS URL]\n" . ($result3['output'] ?? '') . "\n";
+        if (!$result3['success'] || preg_match('/(?:Failure|Error)/i', $result3['output'] ?? '')) {
+            $errors[] = "ACS URL config failed";
+        }
+        
+        // Step 4: Create service-port for TR-069
+        $cmd4 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+        $result4 = $this->executeCommand($oltId, $cmd4);
+        $output .= "[Step 4: Service Port]\n" . ($result4['output'] ?? '') . "\n";
+        if (!$result4['success'] || preg_match('/(?:Failure|Error)/i', $result4['output'] ?? '')) {
+            $errors[] = "Service port creation failed";
+        }
+        
+        $success = empty($errors);
+        $message = $success 
+            ? "TR-069 configured successfully (VLAN: {$tr069Vlan}, ACS: {$acsUrl})"
+            : "TR-069 configuration partially failed: " . implode(', ', $errors);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'configure_tr069_manual',
+            'status' => $success ? 'success' : 'partial',
+            'message' => $message,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'message' => $message,
+            'tr069_vlan' => $tr069Vlan,
+            'acs_url' => $acsUrl,
+            'errors' => $errors,
+            'output' => $output
         ];
     }
     
@@ -5719,7 +5867,7 @@ class HuaweiOLT {
         // Fetch Line Profiles
         $lpResult = $this->executeCommand($oltId, "display ont-lineprofile gpon all");
         if ($lpResult['success'] && !empty($lpResult['output'])) {
-            $lineProfiles = $this->parseLineProfiles($lpResult['output']);
+            $lineProfiles = $this->parseLineProfilesFromDisplay($lpResult['output']);
             foreach ($lineProfiles as $lp) {
                 try {
                     $stmt = $this->db->prepare("
@@ -5752,7 +5900,7 @@ class HuaweiOLT {
         // Fetch Service Profiles
         $spResult = $this->executeCommand($oltId, "display ont-srvprofile gpon all");
         if ($spResult['success'] && !empty($spResult['output'])) {
-            $srvProfiles = $this->parseServiceProfiles($spResult['output']);
+            $srvProfiles = $this->parseServiceProfilesFromDisplay($spResult['output']);
             foreach ($srvProfiles as $sp) {
                 try {
                     $stmt = $this->db->prepare("
@@ -5798,7 +5946,7 @@ class HuaweiOLT {
         ];
     }
     
-    private function parseLineProfiles(string $output): array {
+    private function parseLineProfilesFromDisplay(string $output): array {
         $profiles = [];
         $lines = explode("\n", $output);
         $currentProfile = null;
@@ -5842,7 +5990,7 @@ class HuaweiOLT {
         return $profiles;
     }
     
-    private function parseServiceProfiles(string $output): array {
+    private function parseServiceProfilesFromDisplay(string $output): array {
         $profiles = [];
         $lines = explode("\n", $output);
         $currentProfile = null;

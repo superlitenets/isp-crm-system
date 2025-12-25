@@ -582,6 +582,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'info';
                 }
                 break;
+            
+            case 'configure_tr069':
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                $tr069Vlan = !empty($_POST['tr069_vlan']) ? (int)$_POST['tr069_vlan'] : null;
+                $acsUrl = !empty($_POST['acs_url']) ? trim($_POST['acs_url']) : null;
+                $gemPort = !empty($_POST['gem_port']) ? (int)$_POST['gem_port'] : 2;
+                
+                if (!$onuId) {
+                    $message = 'ONU ID is required';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                try {
+                    $result = $huaweiOLT->configureTR069Manual($onuId, $tr069Vlan, $acsUrl, $gemPort);
+                    
+                    if ($result['success']) {
+                        $message = "TR-069 configured successfully! VLAN: {$result['tr069_vlan']}, ACS: {$result['acs_url']}";
+                        $messageType = 'success';
+                        
+                        // Update ONU TR-069 status
+                        $huaweiOLT->updateONU($onuId, ['tr069_status' => 'configured']);
+                    } else {
+                        $message = $result['message'];
+                        $messageType = 'warning';
+                        
+                        // Partial success - update status
+                        if (!empty($result['errors'])) {
+                            $huaweiOLT->updateONU($onuId, ['tr069_status' => 'partial']);
+                        }
+                    }
+                } catch (Exception $e) {
+                    $message = 'TR-069 configuration failed: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
             case 'clear_discovery_entry':
                 $huaweiOLT->clearDiscoveryEntry((int)$_POST['id']);
                 $message = 'Discovery entry cleared';
@@ -717,17 +753,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     
                     if ($result['success']) {
                         $assignedOnuId = $result['onu_id'] ?? '';
+                        $tr069Status = $result['tr069_status'] ?? ['attempted' => false];
+                        
                         $message = "ONU authorized successfully! ";
                         $message .= $assignedOnuId ? "Assigned ONU ID: {$assignedOnuId}. " : "";
                         $message .= "VLAN: " . ($vlanId ?: 'default') . ". ";
-                        $message .= "TR-069 ACS URL pushed via OMCI. Device will connect to: " . $acsUrl;
-                        $messageType = 'success';
                         
-                        // Update ONU with TR-069 status
-                        $huaweiOLT->updateONU($onuId, [
-                            'tr069_status' => 'pending',
-                            'onu_id' => $assignedOnuId ?: $onu['onu_id']
-                        ]);
+                        // Detailed TR-069 status notification
+                        if (isset($tr069Status['attempted']) && $tr069Status['attempted']) {
+                            if ($tr069Status['success']) {
+                                $message .= "TR-069 configured: VLAN {$tr069Status['vlan']}, ACS: {$tr069Status['acs_url']}";
+                                $messageType = 'success';
+                                $huaweiOLT->updateONU($onuId, [
+                                    'tr069_status' => 'configured',
+                                    'onu_id' => $assignedOnuId ?: $onu['onu_id']
+                                ]);
+                            } else {
+                                $message .= "TR-069 FAILED - use manual configuration button below.";
+                                $messageType = 'warning';
+                                $huaweiOLT->updateONU($onuId, [
+                                    'tr069_status' => 'failed',
+                                    'onu_id' => $assignedOnuId ?: $onu['onu_id']
+                                ]);
+                            }
+                        } else {
+                            $reason = $tr069Status['reason'] ?? 'not configured';
+                            $message .= "TR-069 skipped: {$reason}";
+                            $messageType = 'success';
+                            $huaweiOLT->updateONU($onuId, [
+                                'tr069_status' => 'skipped',
+                                'onu_id' => $assignedOnuId ?: $onu['onu_id']
+                            ]);
+                        }
                     } else {
                         // CLI failed but we can still update database state (simulated success for demo)
                         $huaweiOLT->updateONU($onuId, [
