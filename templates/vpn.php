@@ -27,6 +27,13 @@ try {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-shield-lock me-2"></i>VPN Management</h2>
         <div class="d-flex gap-2">
+            <form method="post" class="d-inline" onsubmit="return confirm('Sync WireGuard config and routes?');">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="sync_vpn_config">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-arrow-repeat me-1"></i>Sync Config & Routes
+                </button>
+            </form>
             <button class="btn btn-outline-primary" onclick="refreshStatus()">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh Status
             </button>

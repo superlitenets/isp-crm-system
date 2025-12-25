@@ -4029,7 +4029,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     
                     if ($peerId) {
-                        $message = 'VPN peer created successfully!';
+                        // Sync config and routes after adding peer
+                        $syncResult = $wgService->syncConfig();
+                        $syncMsg = $syncResult['success'] ? ' Routes synced.' : '';
+                        $message = 'VPN peer created successfully!' . $syncMsg;
                         $messageType = 'success';
                     } else {
                         throw new Exception('Failed to create VPN peer.');
@@ -4037,6 +4040,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error creating VPN peer: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'sync_vpn_config':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can sync VPN configuration.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $result = $wgService->syncConfig();
+                    
+                    if ($result['success']) {
+                        $message = $result['message'];
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception($result['message']);
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error syncing VPN config: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;
