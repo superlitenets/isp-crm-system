@@ -131,6 +131,8 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
     ports:
       - "3002:3002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - crm_network
 
