@@ -481,6 +481,11 @@ class WireGuardService {
             
             $config .= "AllowedIPs = " . implode(', ', array_unique($allowedIps)) . "\n";
             
+            // Include endpoint if the peer has one (needed for server to initiate connections)
+            if (!empty($peer['endpoint'])) {
+                $config .= "Endpoint = {$peer['endpoint']}\n";
+            }
+            
             if ($peer['persistent_keepalive']) {
                 $config .= "PersistentKeepalive = {$peer['persistent_keepalive']}\n";
             }
@@ -942,6 +947,9 @@ class WireGuardService {
      * Apply WireGuard config using wg syncconf or wg-quick
      */
     private function applyConfig(string $configPath): array {
+        $containerName = 'isp_crm_wireguard';
+        $containerConfigPath = '/config/wg_confs/wg0.conf';
+        
         // Check if exec is available
         if (!$this->isExecAvailable()) {
             // exec is disabled - config was written, but can't auto-apply
@@ -958,42 +966,38 @@ class WireGuardService {
             ];
         }
         
-        // Try wg syncconf first (hot reload without dropping connections)
         $output = [];
         $returnVar = 0;
         
-        // Check if wg command is available
-        \exec('which wg 2>/dev/null', $output, $returnVar);
+        // Step 1: Copy the new config into the WireGuard container
+        \exec("docker cp {$configPath} {$containerName}:{$containerConfigPath} 2>&1", $output, $returnVar);
         if ($returnVar !== 0) {
-            // wg not available in this container, try docker exec with correct LinuxServer path
-            \exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1', $output, $returnVar);
-            if ($returnVar === 0) {
-                return ['success' => true, 'message' => 'Applied via docker exec'];
-            }
-            
-            // Try restarting container as fallback
-            \exec('docker restart isp_crm_wireguard 2>&1', $output, $returnVar);
-            if ($returnVar === 0) {
-                \sleep(3); // Wait for container to fully start
-                return ['success' => true, 'message' => 'Container restarted'];
-            }
-            
-            return ['success' => false, 'error' => 'Could not apply config - wg command not available'];
+            return ['success' => false, 'error' => 'Failed to copy config to container: ' . implode(' ', $output)];
         }
         
-        // wg is available, use syncconf
-        \exec("wg syncconf wg0 {$configPath} 2>&1", $output, $returnVar);
+        // Step 2: Strip the config and apply using wg syncconf (hot reload)
+        $output = [];
+        \exec("docker exec {$containerName} sh -c \"wg-quick strip wg0 | wg syncconf wg0 /dev/stdin\" 2>&1", $output, $returnVar);
         if ($returnVar === 0) {
-            return ['success' => true, 'message' => 'Applied via wg syncconf'];
+            return ['success' => true, 'message' => 'Config copied and applied via wg syncconf'];
         }
         
-        // Try wg-quick strip and reload
-        \exec("wg-quick strip wg0 2>&1", $output, $returnVar);
+        // Fallback: Try direct wg setconf
+        $output = [];
+        \exec("docker exec {$containerName} wg setconf wg0 {$containerConfigPath} 2>&1", $output, $returnVar);
+        if ($returnVar === 0) {
+            return ['success' => true, 'message' => 'Config copied and applied via wg setconf'];
+        }
         
-        return [
-            'success' => $returnVar === 0,
-            'error' => \implode("\n", $output)
-        ];
+        // Last resort: Restart container to apply new config
+        $output = [];
+        \exec("docker restart {$containerName} 2>&1", $output, $returnVar);
+        if ($returnVar === 0) {
+            \sleep(3); // Wait for container to fully start
+            return ['success' => true, 'message' => 'Config copied, container restarted'];
+        }
+        
+        return ['success' => false, 'error' => 'Could not apply config: ' . implode(' ', $output)];
     }
     
     /**
@@ -1128,9 +1132,30 @@ class WireGuardService {
             $containerName = $settings['container_name'] ?? 'isp_crm_wireguard';
             $wgInterface = 'wg0';
             
-            // Get all active subnets from database
-            $stmt = $this->db->query("SELECT DISTINCT network_cidr FROM wireguard_subnets WHERE is_active = TRUE");
-            $activeSubnets = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            // Get all active subnets from wireguard_subnets table
+            $activeSubnets = [];
+            try {
+                $stmt = $this->db->query("SELECT DISTINCT network_cidr FROM wireguard_subnets WHERE is_active = TRUE");
+                $activeSubnets = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Exception $e) {
+                // Table might not exist
+            }
+            
+            // Also get subnets from peer allowed_ips (excluding /32 individual IPs)
+            $stmt = $this->db->query("SELECT allowed_ips FROM wireguard_peers WHERE is_active = TRUE");
+            $peers = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($peers as $allowedIps) {
+                $ips = explode(',', $allowedIps);
+                foreach ($ips as $ip) {
+                    $ip = trim($ip);
+                    // Add routes for subnets (not /32 individual IPs)
+                    if (!empty($ip) && !preg_match('/\/32$/', $ip)) {
+                        $activeSubnets[] = $ip;
+                    }
+                }
+            }
+            
+            $activeSubnets = array_unique(array_filter($activeSubnets));
             
             // Get current routes inside the WireGuard container
             $currentRoutes = $this->getContainerRoutes($containerName, $wgInterface);
