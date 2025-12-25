@@ -1471,6 +1471,45 @@ class HuaweiOLT {
     }
     
     /**
+     * Read from socket until one of the expected strings is found
+     */
+    private function readUntilOLT($socket, array $expect, int $timeout = 10): string {
+        $buffer = '';
+        $startTime = time();
+        stream_set_timeout($socket, 1);
+        
+        while ((time() - $startTime) < $timeout) {
+            $char = @fread($socket, 1024);
+            if ($char !== false && $char !== '') {
+                $buffer .= $char;
+                foreach ($expect as $str) {
+                    if (stripos($buffer, $str) !== false) {
+                        return $buffer;
+                    }
+                }
+            }
+            usleep(50000);
+        }
+        return $buffer;
+    }
+    
+    /**
+     * Drain remaining data from socket
+     */
+    private function drainSocketOLT($socket): string {
+        $buffer = '';
+        stream_set_timeout($socket, 1);
+        while (true) {
+            $data = @fread($socket, 4096);
+            if ($data === false || $data === '') {
+                break;
+            }
+            $buffer .= $data;
+        }
+        return $buffer;
+    }
+    
+    /**
      * Get live data for a single ONU from OLT
      */
     public function getSingleONULiveData(int $oltId, int $frame, ?int $slot, ?int $port, ?int $onuId, string $sn = ''): array {
