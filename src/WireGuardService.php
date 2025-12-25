@@ -98,6 +98,10 @@ class WireGuardService {
         try {
             $keys = $this->generateKeyPair();
             
+            // Default PostUp/PostDown for NAT and forwarding (safe - doesn't touch default gateway)
+            $defaultPostUp = 'iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE';
+            $defaultPostDown = 'iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE';
+            
             $stmt = $this->db->prepare("
                 INSERT INTO wireguard_servers 
                 (name, interface_name, interface_addr, listen_port, public_key, private_key_encrypted, mtu, dns_servers, post_up_cmd, post_down_cmd, enabled)
@@ -114,8 +118,8 @@ class WireGuardService {
                 $this->encrypt($keys['private_key']),
                 $data['mtu'] ?? 1420,
                 $data['dns_servers'] ?? null,
-                $data['post_up_cmd'] ?? null,
-                $data['post_down_cmd'] ?? null,
+                $data['post_up_cmd'] ?? $defaultPostUp,
+                $data['post_down_cmd'] ?? $defaultPostDown,
                 $data['enabled'] ?? true
             ]);
             
@@ -363,18 +367,62 @@ class WireGuardService {
     }
     
     public function generateKeyPair(): array {
-        $privateKey = sodium_crypto_box_keypair();
-        $publicKey = sodium_crypto_box_publickey($privateKey);
-        $secretKey = sodium_crypto_box_secretkey($privateKey);
+        // Try using wg command for proper WireGuard key generation
+        if ($this->isExecAvailable()) {
+            $privateKey = \trim(\shell_exec('wg genkey 2>/dev/null') ?? '');
+            if (!empty($privateKey) && \strlen($privateKey) === 44) {
+                $publicKey = \trim(\shell_exec("echo '{$privateKey}' | wg pubkey 2>/dev/null") ?? '');
+                if (!empty($publicKey) && \strlen($publicKey) === 44) {
+                    return [
+                        'private_key' => $privateKey,
+                        'public_key' => $publicKey
+                    ];
+                }
+            }
+            
+            // Try via docker exec if wg not available locally
+            $containerName = $this->getSettings()['container_name'] ?? 'isp_crm_wireguard';
+            $privateKey = \trim(\shell_exec("docker exec {$containerName} wg genkey 2>/dev/null") ?? '');
+            if (!empty($privateKey) && \strlen($privateKey) === 44) {
+                $publicKey = \trim(\shell_exec("docker exec {$containerName} sh -c \"echo '{$privateKey}' | wg pubkey\" 2>/dev/null") ?? '');
+                if (!empty($publicKey) && \strlen($publicKey) === 44) {
+                    return [
+                        'private_key' => $privateKey,
+                        'public_key' => $publicKey
+                    ];
+                }
+            }
+        }
+        
+        // Fallback to sodium (Curve25519) - compatible with WireGuard
+        $keyPair = \sodium_crypto_box_keypair();
+        $secretKey = \sodium_crypto_box_secretkey($keyPair);
+        $publicKey = \sodium_crypto_box_publickey($keyPair);
         
         return [
-            'private_key' => base64_encode($secretKey),
-            'public_key' => base64_encode($publicKey)
+            'private_key' => \base64_encode($secretKey),
+            'public_key' => \base64_encode($publicKey)
         ];
     }
     
     public function generatePresharedKey(): string {
-        return base64_encode(random_bytes(32));
+        // Try using wg command for proper preshared key generation
+        if ($this->isExecAvailable()) {
+            $psk = \trim(\shell_exec('wg genpsk 2>/dev/null') ?? '');
+            if (!empty($psk) && \strlen($psk) === 44) {
+                return $psk;
+            }
+            
+            // Try via docker exec
+            $containerName = $this->getSettings()['container_name'] ?? 'isp_crm_wireguard';
+            $psk = \trim(\shell_exec("docker exec {$containerName} wg genpsk 2>/dev/null") ?? '');
+            if (!empty($psk) && \strlen($psk) === 44) {
+                return $psk;
+            }
+        }
+        
+        // Fallback to random bytes
+        return \base64_encode(\random_bytes(32));
     }
     
     public function getServerConfig(int $serverId): string {
