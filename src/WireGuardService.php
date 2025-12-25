@@ -784,28 +784,43 @@ class WireGuardService {
                 return ['success' => false, 'error' => 'Failed to generate config'];
             }
             
-            // Config file paths (Docker volume or host path)
-            $configPaths = [
-                '/config/wg0.conf',           // Inside linuxserver/wireguard container
-                '/etc/wireguard/wg0.conf',    // Host WireGuard path
-            ];
-            
+            // First, try to write config via docker cp (most reliable for containerized setup)
             $configWritten = false;
-            $writtenPath = '';
+            $writtenPath = '/config/wg_confs/wg0.conf';
+            $output = [];
+            $returnVar = 0;
             
-            foreach ($configPaths as $path) {
-                $dir = dirname($path);
-                if (is_dir($dir) && is_writable($dir)) {
-                    if (file_put_contents($path, $config) !== false) {
-                        $configWritten = true;
-                        $writtenPath = $path;
-                        break;
+            // Use temp file + docker cp approach (safest for special characters)
+            $tempFile = '/tmp/wg0_' . uniqid() . '.conf';
+            if (file_put_contents($tempFile, $config) !== false) {
+                exec("docker cp {$tempFile} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
+                @unlink($tempFile);
+                if ($returnVar === 0) {
+                    $configWritten = true;
+                }
+            }
+            
+            // Fallback: try direct file paths if docker methods fail
+            if (!$configWritten) {
+                $configPaths = [
+                    '/config/wg_confs/wg0.conf',  // LinuxServer WireGuard container path
+                    '/etc/wireguard/wg0.conf',    // Host WireGuard path
+                ];
+                
+                foreach ($configPaths as $path) {
+                    $dir = dirname($path);
+                    if (is_dir($dir) && is_writable($dir)) {
+                        if (file_put_contents($path, $config) !== false) {
+                            $configWritten = true;
+                            $writtenPath = $path;
+                            break;
+                        }
                     }
                 }
             }
             
+            // Last resort: write to shared storage path
             if (!$configWritten) {
-                // Try writing to a shared volume path that might be mapped
                 $fallbackPath = '/var/www/html/storage/wireguard/wg0.conf';
                 $fallbackDir = dirname($fallbackPath);
                 if (!is_dir($fallbackDir)) {
@@ -814,11 +829,13 @@ class WireGuardService {
                 if (file_put_contents($fallbackPath, $config) !== false) {
                     $configWritten = true;
                     $writtenPath = $fallbackPath;
+                    // Copy to container using docker cp
+                    exec("docker cp {$fallbackPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
                 }
             }
             
             if (!$configWritten) {
-                return ['success' => false, 'error' => 'Could not write config file - check permissions'];
+                return ['success' => false, 'error' => 'Could not write config file - check Docker socket permissions'];
             }
             
             // Try to apply config using wg syncconf (hot reload, no restart needed)
@@ -857,8 +874,8 @@ class WireGuardService {
         // Check if wg command is available
         exec('which wg 2>/dev/null', $output, $returnVar);
         if ($returnVar !== 0) {
-            // wg not available in this container, try docker exec
-            exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg0.conf 2>&1', $output, $returnVar);
+            // wg not available in this container, try docker exec with correct LinuxServer path
+            exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1', $output, $returnVar);
             if ($returnVar === 0) {
                 return ['success' => true, 'message' => 'Applied via docker exec'];
             }
@@ -866,6 +883,7 @@ class WireGuardService {
             // Try restarting container as fallback
             exec('docker restart isp_crm_wireguard 2>&1', $output, $returnVar);
             if ($returnVar === 0) {
+                sleep(3); // Wait for container to fully start
                 return ['success' => true, 'message' => 'Container restarted'];
             }
             
