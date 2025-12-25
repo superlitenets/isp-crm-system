@@ -2221,9 +2221,15 @@ class HuaweiOLT {
         
         // Try CLI command to find ONU by SN
         $command = "display ont info by-sn {$sn}";
-        $output = $this->executeOLTCommand($oltId, $command);
+        $result = $this->executeCommand($oltId, $command);
         
-        if (!$output || strpos($output, 'Failure') !== false) {
+        if (!$result['success'] || empty($result['output'])) {
+            return null;
+        }
+        
+        $output = $result['output'];
+        
+        if (strpos($output, 'Failure') !== false) {
             return null;
         }
         
