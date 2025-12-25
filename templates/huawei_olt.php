@@ -558,9 +558,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 break;
             case 'delete_onu':
-                $huaweiOLT->deleteONU((int)$_POST['id']);
-                $message = 'ONU deleted from database';
-                $messageType = 'success';
+                $result = $huaweiOLT->deleteONU((int)$_POST['id']);
+                if ($result['success']) {
+                    $message = 'ONU deleted from database';
+                    if ($result['deauthorized']) {
+                        $message .= ' and deauthorized from OLT';
+                    }
+                    $messageType = 'success';
+                } else {
+                    $message = $result['error'] ?? 'Failed to delete ONU';
+                    $messageType = 'danger';
+                }
                 break;
             case 'cleanup_stale_pending':
                 $hoursOld = (int)($_POST['hours_old'] ?? 2);
@@ -2065,13 +2073,15 @@ if ($view === 'onus' || $view === 'dashboard') {
     if (!empty($_GET['search'])) $onuFilters['search'] = $_GET['search'];
     if (isset($_GET['unconfigured'])) {
         $onuFilters['is_authorized'] = false;
-        // Also fetch discovered ONUs from onu_discovery_log (auto-populated by OLT Session Manager)
-        $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
     } else {
         // Default view shows only authorized ONUs
         $onuFilters['is_authorized'] = true;
     }
     $onus = $huaweiOLT->getONUs($onuFilters);
+    
+    // Always fetch discovered ONUs (auto-populated by OLT Session Manager)
+    // These are pending ONUs waiting to be authorized
+    $discoveredOnus = $huaweiOLT->getDiscoveredONUs($oltId, true);
 }
 
 if ($view === 'logs') {
@@ -3753,11 +3763,14 @@ try {
                 </div>
             </div>
             
-            <?php if (isset($_GET['unconfigured']) && !empty($discoveredOnus)): ?>
+            <?php if (!empty($discoveredOnus)): ?>
             <div class="card shadow-sm mb-3 border-warning">
-                <div class="card-header bg-warning bg-opacity-25">
-                    <h6 class="mb-0"><i class="bi bi-broadcast me-2"></i>Auto-Discovered ONUs (<?= count($discoveredOnus) ?>)</h6>
-                    <small class="text-muted">Found by OLT Session Manager - refreshes every 30 seconds</small>
+                <div class="card-header bg-warning bg-opacity-25 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0"><i class="bi bi-broadcast me-2"></i>Pending Authorization (<?= count($discoveredOnus) ?>)</h6>
+                        <small class="text-muted">Auto-discovered by OLT Session Manager - refreshes every 30 seconds</small>
+                    </div>
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i> Requires Action</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">

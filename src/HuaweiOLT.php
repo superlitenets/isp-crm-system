@@ -3229,30 +3229,100 @@ class HuaweiOLT {
         return $stmt->execute($params);
     }
     
-    public function deleteONU(int $id): bool {
+    public function deleteONU(int $id, bool $deauthorizeOnOLT = true): array {
+        // Get ONU details first
+        $onu = $this->getONU($id);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $deauthResult = null;
+        
+        // Try to deauthorize on OLT if requested
+        if ($deauthorizeOnOLT && $onu['olt_id'] && $onu['frame'] !== null && $onu['slot'] !== null && $onu['port'] !== null && $onu['onu_id']) {
+            $deauthResult = $this->deleteONUFromOLT($id);
+        }
+        
+        // Reset discovery log entry so ONU reappears in discovery
+        if (!empty($onu['sn'])) {
+            try {
+                $stmt = $this->db->prepare("
+                    UPDATE onu_discovery_log 
+                    SET authorized = false, authorized_at = NULL, last_seen_at = NOW()
+                    WHERE serial_number = ?
+                ");
+                $stmt->execute([$onu['sn']]);
+            } catch (\Exception $e) {
+                // Table may not exist, ignore
+            }
+        }
+        
+        // Delete from database
         $stmt = $this->db->prepare("DELETE FROM huawei_onus WHERE id = ?");
-        return $stmt->execute([$id]);
+        $deleted = $stmt->execute([$id]);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'action' => 'delete_onu',
+            'status' => 'success',
+            'message' => "Deleted ONU {$onu['sn']} from database" . ($deauthResult ? ", OLT deauth: " . ($deauthResult['success'] ? 'OK' : 'Failed') : ''),
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $deleted,
+            'deauthorized' => $deauthResult['success'] ?? false,
+            'deauth_message' => $deauthResult['message'] ?? null
+        ];
     }
     
-    public function deleteAllONUs(?int $oltId = null): array {
+    public function deleteAllONUs(?int $oltId = null, bool $deauthorizeOnOLT = false): array {
         try {
+            // Get all ONUs to be deleted (for resetting discovery log)
+            $sql = "SELECT sn FROM huawei_onus WHERE sn IS NOT NULL";
+            if ($oltId) {
+                $sql .= " AND olt_id = ?";
+                $snStmt = $this->db->prepare($sql);
+                $snStmt->execute([$oltId]);
+            } else {
+                $snStmt = $this->db->query($sql);
+            }
+            $serials = $snStmt->fetchAll(\PDO::FETCH_COLUMN);
+            
+            // Reset discovery log for all these serials
+            if (!empty($serials)) {
+                try {
+                    $placeholders = implode(',', array_fill(0, count($serials), '?'));
+                    $stmt = $this->db->prepare("
+                        UPDATE onu_discovery_log 
+                        SET authorized = false, authorized_at = NULL 
+                        WHERE serial_number IN ({$placeholders})
+                    ");
+                    $stmt->execute($serials);
+                } catch (\Exception $e) {
+                    // Table may not exist
+                }
+            }
+            
+            // Delete from database
             if ($oltId) {
                 $stmt = $this->db->prepare("DELETE FROM huawei_onus WHERE olt_id = ?");
                 $stmt->execute([$oltId]);
+                $count = $stmt->rowCount();
             } else {
-                $this->db->exec("DELETE FROM huawei_onus");
+                $stmt = $this->db->query("DELETE FROM huawei_onus");
+                $count = $stmt->rowCount();
             }
-            $count = $stmt->rowCount() ?? 0;
             
             $this->addLog([
                 'olt_id' => $oltId,
                 'action' => 'delete_all_onus',
                 'status' => 'success',
-                'message' => "Deleted all ONUs" . ($oltId ? " for OLT #{$oltId}" : ""),
+                'message' => "Deleted {$count} ONUs" . ($oltId ? " for OLT #{$oltId}" : "") . ", reset " . count($serials) . " discovery entries",
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
             
-            return ['success' => true, 'count' => $count];
+            return ['success' => true, 'count' => $count, 'discovery_reset' => count($serials)];
         } catch (\Exception $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
