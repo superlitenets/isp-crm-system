@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache net-snmp net-snmp-tools
+RUN apk add --no-cache net-snmp net-snmp-tools docker-cli
 
 COPY package*.json ./
 RUN npm install --production
