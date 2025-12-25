@@ -1214,7 +1214,8 @@ class WireGuardService {
     }
     
     /**
-     * Get current routes inside the WireGuard container that use wg0 interface
+     * Get current routes on host that use wg0 interface
+     * Routes are on the host, not inside a container (wg0 is a host interface)
      */
     private function getContainerRoutes(string $containerName, string $interface): array {
         $routes = [];
@@ -1226,7 +1227,8 @@ class WireGuardService {
         $output = [];
         $returnVar = 0;
         
-        \exec("docker exec {$containerName} ip route show dev {$interface} 2>/dev/null", $output, $returnVar);
+        // Routes are on HOST, not in container - wg0 is a host interface
+        \exec("ip route show dev {$interface} 2>/dev/null", $output, $returnVar);
         
         foreach ($output as $line) {
             // Match subnet patterns like 10.78.0.0/24, 10.60.0.0/16
@@ -1239,7 +1241,8 @@ class WireGuardService {
     }
     
     /**
-     * Add a route inside the WireGuard container
+     * Add a route on the host for the WireGuard interface
+     * wg0 is a host interface, routes must be added on host, not in container
      */
     private function addContainerRoute(string $containerName, string $subnet, string $interface): array {
         if (!$this->isExecAvailable()) {
@@ -1254,7 +1257,8 @@ class WireGuardService {
             return ['success' => false, 'error' => 'Invalid subnet format'];
         }
         
-        $cmd = "docker exec {$containerName} ip route add {$subnet} dev {$interface} 2>&1";
+        // Add route on HOST (wg0 is a host interface, not in a container)
+        $cmd = "ip route add {$subnet} dev {$interface} 2>&1";
         \exec($cmd, $output, $returnVar);
         
         if ($returnVar === 0) {
@@ -1282,7 +1286,8 @@ class WireGuardService {
         $output = [];
         $returnVar = 0;
         
-        $cmd = "docker exec {$containerName} ip route del {$subnet} 2>&1";
+        // Remove route from HOST (wg0 is a host interface, not in a container)
+        $cmd = "ip route del {$subnet} 2>&1";
         \exec($cmd, $output, $returnVar);
         
         if ($returnVar === 0) {
