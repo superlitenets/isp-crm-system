@@ -763,7 +763,8 @@ class HuaweiOLT {
         }
         
         // Huawei requires entering GPON interface context first for optical-info
-        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}";
+        // Also fetch ont info for distance in the same session
+        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\ndisplay ont info {$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
