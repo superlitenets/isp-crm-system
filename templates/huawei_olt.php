@@ -2118,16 +2118,16 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
-    // Auto-refresh optical data via SNMP (with throttling - skips if updated within 60s)
-    try {
-        $onuRefreshResult = $huaweiOLT->refreshONUOptical($onuId);
-        if ($onuRefreshResult['success'] && !isset($onuRefreshResult['throttled'])) {
-            // Reload ONU data after refresh
-            $currentOnu = $huaweiOLT->getONU($onuId);
-        }
-    } catch (Exception $e) {
-        $onuRefreshResult = ['success' => false, 'error' => $e->getMessage()];
-    }
+    // Show cached optical data - refresh is now manual via AJAX button
+    // This makes the config page load instantly instead of waiting for OLT query
+    $onuRefreshResult = [
+        'success' => true,
+        'cached' => true,
+        'rx_power' => $currentOnu['rx_power'],
+        'tx_power' => $currentOnu['tx_power'],
+        'distance' => $currentOnu['distance'] ?? null,
+        'status' => $currentOnu['status']
+    ];
     
     // Fetch TR-069 device info
     $tr069Device = null;
