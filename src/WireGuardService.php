@@ -1048,14 +1048,19 @@ class WireGuardService {
      */
     private function getContainerRoutes(string $containerName, string $interface): array {
         $routes = [];
+        
+        if (!$this->isExecAvailable()) {
+            return $routes;
+        }
+        
         $output = [];
         $returnVar = 0;
         
-        exec("docker exec {$containerName} ip route show dev {$interface} 2>/dev/null", $output, $returnVar);
+        \exec("docker exec {$containerName} ip route show dev {$interface} 2>/dev/null", $output, $returnVar);
         
         foreach ($output as $line) {
             // Match subnet patterns like 10.78.0.0/24, 10.60.0.0/16
-            if (preg_match('/^([\d.]+\/\d+)/', trim($line), $matches)) {
+            if (\preg_match('/^([\d.]+\/\d+)/', \trim($line), $matches)) {
                 $routes[] = $matches[1];
             }
         }
@@ -1067,16 +1072,20 @@ class WireGuardService {
      * Add a route inside the WireGuard container
      */
     private function addContainerRoute(string $containerName, string $subnet, string $interface): array {
+        if (!$this->isExecAvailable()) {
+            return ['success' => false, 'error' => 'exec() not available'];
+        }
+        
         $output = [];
         $returnVar = 0;
         
         // Validate subnet format
-        if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $subnet)) {
+        if (!\preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/', $subnet)) {
             return ['success' => false, 'error' => 'Invalid subnet format'];
         }
         
         $cmd = "docker exec {$containerName} ip route add {$subnet} dev {$interface} 2>&1";
-        exec($cmd, $output, $returnVar);
+        \exec($cmd, $output, $returnVar);
         
         if ($returnVar === 0) {
             \error_log("Added route {$subnet} via {$interface} in container {$containerName}");
@@ -1084,8 +1093,8 @@ class WireGuardService {
         }
         
         // Check if route already exists (not an error)
-        $outputStr = implode("\n", $output);
-        if (strpos($outputStr, 'File exists') !== false) {
+        $outputStr = \implode("\n", $output);
+        if (\strpos($outputStr, 'File exists') !== false) {
             return ['success' => true, 'message' => 'Route already exists'];
         }
         
@@ -1096,11 +1105,15 @@ class WireGuardService {
      * Remove a route from the WireGuard container
      */
     private function removeContainerRoute(string $containerName, string $subnet): array {
+        if (!$this->isExecAvailable()) {
+            return ['success' => false, 'error' => 'exec() not available'];
+        }
+        
         $output = [];
         $returnVar = 0;
         
         $cmd = "docker exec {$containerName} ip route del {$subnet} 2>&1";
-        exec($cmd, $output, $returnVar);
+        \exec($cmd, $output, $returnVar);
         
         if ($returnVar === 0) {
             \error_log("Removed route {$subnet} from container {$containerName}");
@@ -1108,8 +1121,8 @@ class WireGuardService {
         }
         
         // Check if route doesn't exist (not an error)
-        $outputStr = implode("\n", $output);
-        if (strpos($outputStr, 'No such process') !== false) {
+        $outputStr = \implode("\n", $output);
+        if (\strpos($outputStr, 'No such process') !== false) {
             return ['success' => true, 'message' => 'Route did not exist'];
         }
         
