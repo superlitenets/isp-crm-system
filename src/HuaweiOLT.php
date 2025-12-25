@@ -4612,6 +4612,49 @@ class HuaweiOLT {
         return 'Connection failed. Check IP, credentials, and network access.';
     }
     
+    /**
+     * Find the next available ONU ID for a given port
+     * Queries the OLT to see which IDs are in use and returns the next available one
+     */
+    public function findNextAvailableOnuId(int $oltId, int $frame, int $slot, int $port): int {
+        // First check database for existing ONUs on this port
+        $stmt = $this->db->prepare("
+            SELECT onu_id FROM huawei_onus 
+            WHERE olt_id = ? AND frame = ? AND slot = ? AND port = ? AND onu_id IS NOT NULL
+            ORDER BY onu_id
+        ");
+        $stmt->execute([$oltId, $frame, $slot, $port]);
+        $usedIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        // Also try to get used IDs from OLT via CLI
+        $result = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} all\r\nquit");
+        if ($result['success'] && !empty($result['output'])) {
+            // Parse ONU IDs from output: "0/1/0  1  HWTC..." format
+            preg_match_all('/^\s*\d+\/\d+\/\d+\s+(\d+)\s+/m', $result['output'], $matches);
+            if (!empty($matches[1])) {
+                foreach ($matches[1] as $id) {
+                    if (!in_array((int)$id, $usedIds)) {
+                        $usedIds[] = (int)$id;
+                    }
+                }
+            }
+        }
+        
+        // Find the next available ID (starting from 1)
+        $nextId = 1;
+        sort($usedIds);
+        foreach ($usedIds as $id) {
+            if ($id == $nextId) {
+                $nextId++;
+            } else {
+                break;
+            }
+        }
+        
+        // ONU IDs typically range from 0-127 or 0-255 depending on OLT
+        return min($nextId, 127);
+    }
+    
     public function authorizeONU(int $onuId, int $profileId, string $authMethod = 'sn', string $loid = '', string $loidPassword = '', array $options = []): array {
         $onu = $this->getONU($onuId);
         $profile = $this->getServiceProfile($profileId);
@@ -4660,16 +4703,22 @@ class HuaweiOLT {
             $description = $this->generateNextSNSCode($oltId);
         }
         
+        // Find the next available ONU ID for this port
+        $assignedOnuId = $onu['onu_id'];
+        if (empty($assignedOnuId)) {
+            $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
+        }
+        
         // Build CLI script with newlines for multi-command execution
         // Huawei MA5680T/MA5683T requires interface context for ont add
-        $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$authPart} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']} desc \"{$description}\"\r\nquit";
+        // Format: ont add PORT ONU_ID sn-auth SERIAL omci ont-lineprofile-id X ont-srvprofile-id Y desc "DESC"
+        $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$profile['line_profile']} ont-srvprofile-id {$profile['srv_profile']} desc \"{$description}\"\r\nquit";
         
         // Execute the authorization command
         $result = $this->executeCommand($oltId, $cliScript);
         $output = $result['output'] ?? '';
         
-        // Parse assigned ONU ID from response: "ONTID :1", "ONT-ID=1", "Number:1"
-        $assignedOnuId = null;
+        // Check if OLT returned a different ONU ID (rare, but possible)
         if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
             $assignedOnuId = (int)$m[1];
         }
