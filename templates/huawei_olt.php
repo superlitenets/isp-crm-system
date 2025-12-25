@@ -312,43 +312,95 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
             exit;
         }
         
-        // Parse the response data
+        // Parse the response data - detect available interfaces dynamically
         $data = $result['data'] ?? [];
-        $wifi24 = [
-            'ssid' => null,
-            'enabled' => false,
-            'channel' => null
-        ];
-        $wifi5 = [
-            'ssid' => null,
-            'enabled' => false,
-            'channel' => null
-        ];
+        $interfaces = [];
+        $detectedConfigs = [];
         
-        // Extract values from GenieACS response
+        // Scan for all WLANConfiguration instances
         if (is_array($data)) {
             foreach ($data as $param) {
                 $name = $param[0] ?? '';
                 $value = $param[1] ?? null;
                 
-                if (strpos($name, 'WLANConfiguration.1.SSID') !== false) {
-                    $wifi24['ssid'] = $value;
-                } elseif (strpos($name, 'WLANConfiguration.1.Enable') !== false) {
-                    $wifi24['enabled'] = ($value === true || $value === 'true' || $value === '1' || $value === 1);
-                } elseif (strpos($name, 'WLANConfiguration.1.Channel') !== false) {
-                    $wifi24['channel'] = $value;
-                } elseif (strpos($name, 'WLANConfiguration.5.SSID') !== false) {
-                    $wifi5['ssid'] = $value;
-                } elseif (strpos($name, 'WLANConfiguration.5.Enable') !== false) {
-                    $wifi5['enabled'] = ($value === true || $value === 'true' || $value === '1' || $value === 1);
+                // Match WLANConfiguration.X patterns
+                if (preg_match('/WLANConfiguration\.(\d+)\.(\w+)/', $name, $matches)) {
+                    $configIndex = $matches[1];
+                    $property = $matches[2];
+                    
+                    if (!isset($detectedConfigs[$configIndex])) {
+                        $detectedConfigs[$configIndex] = [
+                            'index' => $configIndex,
+                            'ssid' => null,
+                            'enabled' => false,
+                            'channel' => null,
+                            'band' => null,
+                            'available' => true
+                        ];
+                    }
+                    
+                    switch ($property) {
+                        case 'SSID':
+                            $detectedConfigs[$configIndex]['ssid'] = $value;
+                            break;
+                        case 'Enable':
+                            $detectedConfigs[$configIndex]['enabled'] = ($value === true || $value === 'true' || $value === '1' || $value === 1);
+                            break;
+                        case 'Channel':
+                            $detectedConfigs[$configIndex]['channel'] = $value;
+                            // Detect band from channel
+                            if ($value !== null && $value > 0) {
+                                $detectedConfigs[$configIndex]['band'] = ($value <= 14) ? '2.4GHz' : '5GHz';
+                            }
+                            break;
+                        case 'OperatingFrequencyBand':
+                        case 'X_HW_FrequencyBand':
+                            // Explicit frequency band indicator
+                            if (stripos($value, '5') !== false) {
+                                $detectedConfigs[$configIndex]['band'] = '5GHz';
+                            } else {
+                                $detectedConfigs[$configIndex]['band'] = '2.4GHz';
+                            }
+                            break;
+                    }
                 }
+            }
+        }
+        
+        // Infer bands from index if not detected (common convention: 1=2.4GHz, 5=5GHz)
+        foreach ($detectedConfigs as $idx => &$config) {
+            if ($config['band'] === null) {
+                if ($idx == 1) $config['band'] = '2.4GHz';
+                elseif ($idx == 5 || $idx == 2) $config['band'] = '5GHz';
+                else $config['band'] = "Radio {$idx}";
+            }
+        }
+        
+        // Build interface list
+        foreach ($detectedConfigs as $config) {
+            $interfaces[] = $config;
+        }
+        
+        // Sort by index
+        usort($interfaces, fn($a, $b) => $a['index'] <=> $b['index']);
+        
+        // Legacy format for backward compatibility
+        $wifi24 = null;
+        $wifi5 = null;
+        foreach ($interfaces as $iface) {
+            if ($iface['band'] === '2.4GHz' && !$wifi24) {
+                $wifi24 = $iface;
+            } elseif ($iface['band'] === '5GHz' && !$wifi5) {
+                $wifi5 = $iface;
             }
         }
         
         echo json_encode([
             'success' => true,
+            'interfaces' => $interfaces,
             'wifi_24' => $wifi24,
-            'wifi_5' => $wifi5
+            'wifi_5' => $wifi5,
+            'is_dual_band' => ($wifi24 !== null && $wifi5 !== null)
         ]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -6000,35 +6052,67 @@ try {
                         const onuId = '<?= $currentOnu['id'] ?>';
                         const oltId = '<?= $currentOnu['olt_id'] ?>';
                         
+                        // Store detected interfaces for config modal
+                        window.detectedWifiInterfaces = data.interfaces || [];
+                        window.isDualBand = data.is_dual_band || false;
+                        
                         let html = '';
                         
-                        // 2.4GHz Interface
-                        const wifi24 = data.wifi_24 || {};
-                        html += `<tr>
-                            <td><i class="bi bi-broadcast text-primary me-1"></i> 2.4 GHz</td>
-                            <td><code>${wifi24.ssid || 'N/A'}</code></td>
-                            <td>${wifi24.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
-                            <td>${wifi24.channel || 'Auto'}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
-                                    <i class="bi bi-gear"></i>
-                                </button>
-                            </td>
-                        </tr>`;
+                        // Dynamically render detected interfaces
+                        const interfaces = data.interfaces || [];
                         
-                        // 5GHz Interface
-                        const wifi5 = data.wifi_5 || {};
-                        html += `<tr>
-                            <td><i class="bi bi-broadcast text-info me-1"></i> 5 GHz</td>
-                            <td><code>${wifi5.ssid || 'N/A'}</code></td>
-                            <td>${wifi5.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
-                            <td>${wifi5.channel || 'Auto'}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
-                                    <i class="bi bi-gear"></i>
-                                </button>
-                            </td>
-                        </tr>`;
+                        if (interfaces.length === 0) {
+                            // Fallback to legacy format
+                            const wifi24 = data.wifi_24;
+                            const wifi5 = data.wifi_5;
+                            
+                            if (wifi24) {
+                                html += `<tr>
+                                    <td><i class="bi bi-broadcast text-primary me-1"></i> 2.4 GHz</td>
+                                    <td><code>${wifi24.ssid || 'N/A'}</code></td>
+                                    <td>${wifi24.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
+                                    <td>${wifi24.channel || 'Auto'}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
+                                    </td>
+                                </tr>`;
+                            }
+                            if (wifi5) {
+                                html += `<tr>
+                                    <td><i class="bi bi-broadcast text-info me-1"></i> 5 GHz</td>
+                                    <td><code>${wifi5.ssid || 'N/A'}</code></td>
+                                    <td>${wifi5.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
+                                    <td>${wifi5.channel || 'Auto'}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId})" title="Configure">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
+                                    </td>
+                                </tr>`;
+                            }
+                        } else {
+                            // Render dynamically detected interfaces
+                            interfaces.forEach(iface => {
+                                const bandColor = iface.band === '5GHz' ? 'text-info' : 'text-primary';
+                                html += `<tr>
+                                    <td><i class="bi bi-broadcast ${bandColor} me-1"></i> ${iface.band}</td>
+                                    <td><code>${iface.ssid || 'N/A'}</code></td>
+                                    <td>${iface.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td>
+                                    <td>${iface.channel || 'Auto'}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="openWifiConfigModal('${deviceId}', '${serialNumber}', ${onuId}, ${oltId}, ${iface.index})" title="Configure">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
+                                    </td>
+                                </tr>`;
+                            });
+                        }
+                        
+                        if (!html) {
+                            html = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="bi bi-wifi-off me-2"></i>No wireless interfaces detected</td></tr>';
+                        }
                         
                         tbody.innerHTML = html;
                         
@@ -6044,9 +6128,49 @@ try {
                 refreshWifiStatus();
             })();
             
-            function openWifiConfigModal(deviceId, serialNumber, onuId, oltId) {
+            function openWifiConfigModal(deviceId, serialNumber, onuId, oltId, interfaceIndex = null) {
                 document.getElementById('wifiDeviceId').value = deviceId;
                 document.getElementById('wifiDeviceSn').textContent = serialNumber;
+                
+                // Dynamically show/hide tabs based on detected interfaces
+                const interfaces = window.detectedWifiInterfaces || [];
+                const has24 = interfaces.some(i => i.band === '2.4GHz');
+                const has5 = interfaces.some(i => i.band === '5GHz');
+                
+                // Show/hide tabs dynamically
+                const tab24 = document.querySelector('[data-bs-target="#wifi24Tab"]');
+                const tab5 = document.querySelector('[data-bs-target="#wifi5Tab"]');
+                const pane24 = document.getElementById('wifi24Tab');
+                const pane5 = document.getElementById('wifi5Tab');
+                
+                if (tab24 && tab5) {
+                    if (interfaces.length > 0) {
+                        // Hide tabs for unavailable bands
+                        tab24.parentElement.style.display = has24 ? '' : 'none';
+                        tab5.parentElement.style.display = has5 ? '' : 'none';
+                        
+                        // Ensure at least one tab is active
+                        if (has24 && !has5) {
+                            tab24.classList.add('active');
+                            pane24.classList.add('show', 'active');
+                            tab5.classList.remove('active');
+                            pane5.classList.remove('show', 'active');
+                        } else if (has5 && !has24) {
+                            tab5.classList.add('active');
+                            pane5.classList.add('show', 'active');
+                            tab24.classList.remove('active');
+                            pane24.classList.remove('show', 'active');
+                        }
+                        
+                        // Update badge to show single/dual band
+                        const badge = interfaces.length === 1 ? 'Single Band' : 'Dual Band';
+                        document.getElementById('wifiDeviceSn').textContent = serialNumber + ' (' + badge + ')';
+                    } else {
+                        // Show both tabs by default if no interface info
+                        tab24.parentElement.style.display = '';
+                        tab5.parentElement.style.display = '';
+                    }
+                }
                 
                 // Store for VLAN loading
                 if (typeof loadOnuServiceVlans === 'function') {
@@ -11192,32 +11316,43 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> VLAN Configuration</h6>
+                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
-                                            <label class="form-label">Port Mode</label>
-                                            <select name="wifi24_mode" class="form-select" onchange="toggleWifi24VlanFields(this.value)">
-                                                <option value="access">Access (Single VLAN)</option>
-                                                <option value="trunk">Trunk (Tagged VLANs)</option>
+                                            <label class="form-label">Connection Mode</label>
+                                            <select name="wifi24_conn_mode" class="form-select" onchange="toggleWifi24ConnMode(this.value)">
+                                                <option value="route">Route (NAT/Routed)</option>
+                                                <option value="bridge">Bridge (Transparent)</option>
                                             </select>
+                                            <div class="form-text" id="wifi24ConnModeHelp">Traffic is NAT'd through the ONU's WAN connection</div>
                                         </div>
                                         
-                                        <div id="wifi24AccessVlan" class="mb-3">
-                                            <label class="form-label">Access VLAN ID</label>
-                                            <input type="number" name="wifi24_access_vlan" class="form-control" value="1" min="1" max="4094">
-                                            <div class="form-text">Untagged VLAN for this interface</div>
-                                        </div>
-                                        
-                                        <div id="wifi24TrunkVlans" class="mb-3 d-none">
-                                            <label class="form-label">Native VLAN</label>
-                                            <input type="number" name="wifi24_native_vlan" class="form-control" value="1" min="1" max="4094">
-                                            <div class="form-text">Untagged VLAN (PVID)</div>
-                                        </div>
-                                        
-                                        <div id="wifi24AllowedVlans" class="mb-3 d-none">
-                                            <label class="form-label">Allowed VLANs</label>
-                                            <input type="text" name="wifi24_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
-                                            <div class="form-text">Comma-separated or ranges</div>
+                                        <div id="wifi24BridgeOptions">
+                                            <div class="mb-3">
+                                                <label class="form-label">VLAN Mode</label>
+                                                <select name="wifi24_vlan_mode" class="form-select" onchange="toggleWifi24VlanFields(this.value)">
+                                                    <option value="access">Access (Single VLAN)</option>
+                                                    <option value="trunk">Trunk (Tagged VLANs)</option>
+                                                </select>
+                                            </div>
+                                            
+                                            <div id="wifi24AccessVlan" class="mb-3">
+                                                <label class="form-label">Access VLAN ID</label>
+                                                <input type="number" name="wifi24_access_vlan" class="form-control" value="1" min="1" max="4094">
+                                                <div class="form-text">Untagged VLAN for this interface</div>
+                                            </div>
+                                            
+                                            <div id="wifi24TrunkVlans" class="mb-3 d-none">
+                                                <label class="form-label">Native VLAN</label>
+                                                <input type="number" name="wifi24_native_vlan" class="form-control" value="1" min="1" max="4094">
+                                                <div class="form-text">Untagged VLAN (PVID)</div>
+                                            </div>
+                                            
+                                            <div id="wifi24AllowedVlans" class="mb-3 d-none">
+                                                <label class="form-label">Allowed VLANs</label>
+                                                <input type="text" name="wifi24_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
+                                                <div class="form-text">Comma-separated or ranges</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -11258,32 +11393,43 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> VLAN Configuration</h6>
+                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
-                                            <label class="form-label">Port Mode</label>
-                                            <select name="wifi5_mode" class="form-select" onchange="toggleWifi5VlanFields(this.value)">
-                                                <option value="access">Access (Single VLAN)</option>
-                                                <option value="trunk">Trunk (Tagged VLANs)</option>
+                                            <label class="form-label">Connection Mode</label>
+                                            <select name="wifi5_conn_mode" class="form-select" onchange="toggleWifi5ConnMode(this.value)">
+                                                <option value="route">Route (NAT/Routed)</option>
+                                                <option value="bridge">Bridge (Transparent)</option>
                                             </select>
+                                            <div class="form-text" id="wifi5ConnModeHelp">Traffic is NAT'd through the ONU's WAN connection</div>
                                         </div>
                                         
-                                        <div id="wifi5AccessVlan" class="mb-3">
-                                            <label class="form-label">Access VLAN ID</label>
-                                            <input type="number" name="wifi5_access_vlan" class="form-control" value="1" min="1" max="4094">
-                                            <div class="form-text">Untagged VLAN for this interface</div>
-                                        </div>
-                                        
-                                        <div id="wifi5TrunkVlans" class="mb-3 d-none">
-                                            <label class="form-label">Native VLAN</label>
-                                            <input type="number" name="wifi5_native_vlan" class="form-control" value="1" min="1" max="4094">
-                                            <div class="form-text">Untagged VLAN (PVID)</div>
-                                        </div>
-                                        
-                                        <div id="wifi5AllowedVlans" class="mb-3 d-none">
-                                            <label class="form-label">Allowed VLANs</label>
-                                            <input type="text" name="wifi5_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
-                                            <div class="form-text">Comma-separated or ranges</div>
+                                        <div id="wifi5BridgeOptions">
+                                            <div class="mb-3">
+                                                <label class="form-label">VLAN Mode</label>
+                                                <select name="wifi5_vlan_mode" class="form-select" onchange="toggleWifi5VlanFields(this.value)">
+                                                    <option value="access">Access (Single VLAN)</option>
+                                                    <option value="trunk">Trunk (Tagged VLANs)</option>
+                                                </select>
+                                            </div>
+                                            
+                                            <div id="wifi5AccessVlan" class="mb-3">
+                                                <label class="form-label">Access VLAN ID</label>
+                                                <input type="number" name="wifi5_access_vlan" class="form-control" value="1" min="1" max="4094">
+                                                <div class="form-text">Untagged VLAN for this interface</div>
+                                            </div>
+                                            
+                                            <div id="wifi5TrunkVlans" class="mb-3 d-none">
+                                                <label class="form-label">Native VLAN</label>
+                                                <input type="number" name="wifi5_native_vlan" class="form-control" value="1" min="1" max="4094">
+                                                <div class="form-text">Untagged VLAN (PVID)</div>
+                                            </div>
+                                            
+                                            <div id="wifi5AllowedVlans" class="mb-3 d-none">
+                                                <label class="form-label">Allowed VLANs</label>
+                                                <input type="text" name="wifi5_allowed_vlans" class="form-control" placeholder="e.g., 100,200,300-350">
+                                                <div class="form-text">Comma-separated or ranges</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -11390,6 +11536,28 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('wifi5AccessVlan').classList.toggle('d-none', mode === 'trunk');
         document.getElementById('wifi5TrunkVlans').classList.toggle('d-none', mode === 'access');
         document.getElementById('wifi5AllowedVlans').classList.toggle('d-none', mode === 'access');
+    }
+    function toggleWifi24ConnMode(mode) {
+        const help = document.getElementById('wifi24ConnModeHelp');
+        const bridgeOpts = document.getElementById('wifi24BridgeOptions');
+        if (mode === 'bridge') {
+            help.textContent = 'Traffic passes through transparently with VLAN tagging';
+            bridgeOpts.classList.remove('d-none');
+        } else {
+            help.textContent = "Traffic is NAT'd through the ONU's WAN connection";
+            bridgeOpts.classList.add('d-none');
+        }
+    }
+    function toggleWifi5ConnMode(mode) {
+        const help = document.getElementById('wifi5ConnModeHelp');
+        const bridgeOpts = document.getElementById('wifi5BridgeOptions');
+        if (mode === 'bridge') {
+            help.textContent = 'Traffic passes through transparently with VLAN tagging';
+            bridgeOpts.classList.remove('d-none');
+        } else {
+            help.textContent = "Traffic is NAT'd through the ONU's WAN connection";
+            bridgeOpts.classList.add('d-none');
+        }
     }
     
     function loadOnuServiceVlans(onuId, oltId) {
