@@ -67,6 +67,8 @@ services:
       - ./logs:/var/www/html/logs
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
       - wireguard_config:/etc/wireguard
+      - ./storage/wireguard:/var/www/html/storage/wireguard
+      - /var/run/docker.sock:/var/run/docker.sock
 
   nginx:
     image: nginx:stable-alpine
@@ -151,6 +153,7 @@ services:
     volumes:
       - wireguard_config:/config
       - /lib/modules:/lib/modules:ro
+      - ./storage/wireguard:/scripts
     restart: unless-stopped
 
 networks:
