@@ -5705,6 +5705,224 @@ class HuaweiOLT {
         return ['success' => true, 'synced' => $synced, 'vlans' => $result['vlans']];
     }
     
+    /**
+     * Sync Line Profiles and Service Profiles from OLT
+     */
+    public function syncOLTProfiles(int $oltId): array {
+        $lineCount = 0;
+        $srvCount = 0;
+        $errors = [];
+        
+        // Ensure tables exist
+        $this->ensureProfileTablesExist();
+        
+        // Fetch Line Profiles
+        $lpResult = $this->executeCommand($oltId, "display ont-lineprofile gpon all");
+        if ($lpResult['success'] && !empty($lpResult['output'])) {
+            $lineProfiles = $this->parseLineProfiles($lpResult['output']);
+            foreach ($lineProfiles as $lp) {
+                try {
+                    $stmt = $this->db->prepare("
+                        INSERT INTO huawei_olt_line_profiles (olt_id, profile_id, profile_name, tcont_count, gem_count, tr069_enabled, raw_config, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT (olt_id, profile_id) DO UPDATE SET
+                            profile_name = EXCLUDED.profile_name,
+                            tcont_count = EXCLUDED.tcont_count,
+                            gem_count = EXCLUDED.gem_count,
+                            tr069_enabled = EXCLUDED.tr069_enabled,
+                            raw_config = EXCLUDED.raw_config,
+                            updated_at = CURRENT_TIMESTAMP
+                    ");
+                    $stmt->execute([
+                        $oltId,
+                        $lp['profile_id'],
+                        $lp['profile_name'],
+                        $lp['tcont_count'] ?? 0,
+                        $lp['gem_count'] ?? 0,
+                        $lp['tr069_enabled'] ?? false,
+                        $lp['raw_config'] ?? ''
+                    ]);
+                    $lineCount++;
+                } catch (\Exception $e) {
+                    $errors[] = "Line profile {$lp['profile_id']}: " . $e->getMessage();
+                }
+            }
+        }
+        
+        // Fetch Service Profiles
+        $spResult = $this->executeCommand($oltId, "display ont-srvprofile gpon all");
+        if ($spResult['success'] && !empty($spResult['output'])) {
+            $srvProfiles = $this->parseServiceProfiles($spResult['output']);
+            foreach ($srvProfiles as $sp) {
+                try {
+                    $stmt = $this->db->prepare("
+                        INSERT INTO huawei_olt_srv_profiles (olt_id, profile_id, profile_name, eth_ports, pots_ports, wifi_enabled, raw_config, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT (olt_id, profile_id) DO UPDATE SET
+                            profile_name = EXCLUDED.profile_name,
+                            eth_ports = EXCLUDED.eth_ports,
+                            pots_ports = EXCLUDED.pots_ports,
+                            wifi_enabled = EXCLUDED.wifi_enabled,
+                            raw_config = EXCLUDED.raw_config,
+                            updated_at = CURRENT_TIMESTAMP
+                    ");
+                    $stmt->execute([
+                        $oltId,
+                        $sp['profile_id'],
+                        $sp['profile_name'],
+                        $sp['eth_ports'] ?? 0,
+                        $sp['pots_ports'] ?? 0,
+                        $sp['wifi_enabled'] ?? false,
+                        $sp['raw_config'] ?? ''
+                    ]);
+                    $srvCount++;
+                } catch (\Exception $e) {
+                    $errors[] = "Service profile {$sp['profile_id']}: " . $e->getMessage();
+                }
+            }
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'sync_profiles',
+            'status' => 'success',
+            'message' => "Synced {$lineCount} line profiles, {$srvCount} service profiles",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => empty($errors),
+            'line_count' => $lineCount,
+            'srv_count' => $srvCount,
+            'errors' => $errors
+        ];
+    }
+    
+    private function parseLineProfiles(string $output): array {
+        $profiles = [];
+        $lines = explode("\n", $output);
+        $currentProfile = null;
+        
+        foreach ($lines as $line) {
+            // Match: Profile-ID: 10, Profile-name: "DEFAULT"
+            if (preg_match('/Profile-ID\s*:\s*(\d+)/i', $line, $m)) {
+                if ($currentProfile) {
+                    $profiles[] = $currentProfile;
+                }
+                $currentProfile = [
+                    'profile_id' => (int)$m[1],
+                    'profile_name' => '',
+                    'tcont_count' => 0,
+                    'gem_count' => 0,
+                    'tr069_enabled' => false,
+                    'raw_config' => ''
+                ];
+            }
+            if ($currentProfile) {
+                $currentProfile['raw_config'] .= $line . "\n";
+                
+                if (preg_match('/Profile-name\s*:\s*"?([^"]+)"?/i', $line, $m)) {
+                    $currentProfile['profile_name'] = trim($m[1]);
+                }
+                if (preg_match('/tcont\s+(\d+)/i', $line)) {
+                    $currentProfile['tcont_count']++;
+                }
+                if (preg_match('/gem\s+add\s+(\d+)/i', $line)) {
+                    $currentProfile['gem_count']++;
+                }
+                if (preg_match('/tr069-management\s+enable/i', $line)) {
+                    $currentProfile['tr069_enabled'] = true;
+                }
+            }
+        }
+        if ($currentProfile) {
+            $profiles[] = $currentProfile;
+        }
+        
+        return $profiles;
+    }
+    
+    private function parseServiceProfiles(string $output): array {
+        $profiles = [];
+        $lines = explode("\n", $output);
+        $currentProfile = null;
+        
+        foreach ($lines as $line) {
+            if (preg_match('/Profile-ID\s*:\s*(\d+)/i', $line, $m)) {
+                if ($currentProfile) {
+                    $profiles[] = $currentProfile;
+                }
+                $currentProfile = [
+                    'profile_id' => (int)$m[1],
+                    'profile_name' => '',
+                    'eth_ports' => 0,
+                    'pots_ports' => 0,
+                    'wifi_enabled' => false,
+                    'raw_config' => ''
+                ];
+            }
+            if ($currentProfile) {
+                $currentProfile['raw_config'] .= $line . "\n";
+                
+                if (preg_match('/Profile-name\s*:\s*"?([^"]+)"?/i', $line, $m)) {
+                    $currentProfile['profile_name'] = trim($m[1]);
+                }
+                if (preg_match('/ont-port\s+eth\s+(\d+)/i', $line, $m)) {
+                    $currentProfile['eth_ports'] = (int)$m[1];
+                }
+                if (preg_match('/pots\s+(\d+)/i', $line, $m)) {
+                    $currentProfile['pots_ports'] = (int)$m[1];
+                }
+                if (preg_match('/wifi|wlan/i', $line)) {
+                    $currentProfile['wifi_enabled'] = true;
+                }
+            }
+        }
+        if ($currentProfile) {
+            $profiles[] = $currentProfile;
+        }
+        
+        return $profiles;
+    }
+    
+    private function ensureProfileTablesExist(): void {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS huawei_olt_line_profiles (
+                    id SERIAL PRIMARY KEY,
+                    olt_id INTEGER REFERENCES huawei_olts(id) ON DELETE CASCADE,
+                    profile_id INTEGER NOT NULL,
+                    profile_name VARCHAR(100),
+                    tcont_count INTEGER DEFAULT 0,
+                    gem_count INTEGER DEFAULT 0,
+                    tr069_enabled BOOLEAN DEFAULT FALSE,
+                    raw_config TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(olt_id, profile_id)
+                )
+            ");
+            
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS huawei_olt_srv_profiles (
+                    id SERIAL PRIMARY KEY,
+                    olt_id INTEGER REFERENCES huawei_olts(id) ON DELETE CASCADE,
+                    profile_id INTEGER NOT NULL,
+                    profile_name VARCHAR(100),
+                    eth_ports INTEGER DEFAULT 0,
+                    pots_ports INTEGER DEFAULT 0,
+                    wifi_enabled BOOLEAN DEFAULT FALSE,
+                    raw_config TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(olt_id, profile_id)
+                )
+            ");
+        } catch (\Exception $e) {
+            error_log("Error creating profile tables: " . $e->getMessage());
+        }
+    }
+    
     public function getCachedVLANs(int $oltId): array {
         $stmt = $this->db->prepare("
             SELECT * FROM huawei_vlans 

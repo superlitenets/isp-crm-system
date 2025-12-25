@@ -1273,6 +1273,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'save_tr069_omci_settings':
+                $tr069Settings = [
+                    'tr069_acs_url' => $_POST['tr069_acs_url'] ?? '',
+                    'tr069_periodic_interval' => $_POST['tr069_periodic_interval'] ?? '300',
+                    'tr069_default_gem_port' => $_POST['tr069_default_gem_port'] ?? '2',
+                    'tr069_acs_username' => $_POST['tr069_acs_username'] ?? '',
+                    'tr069_cpe_username' => $_POST['tr069_cpe_username'] ?? ''
+                ];
+                if (!empty($_POST['tr069_acs_password'])) {
+                    $tr069Settings['tr069_acs_password'] = $_POST['tr069_acs_password'];
+                }
+                if (!empty($_POST['tr069_cpe_password'])) {
+                    $tr069Settings['tr069_cpe_password'] = $_POST['tr069_cpe_password'];
+                }
+                foreach ($tr069Settings as $key => $value) {
+                    $stmt = $db->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+                    $stmt->execute([$value, $key]);
+                    if ($stmt->rowCount() === 0) {
+                        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, setting_group) VALUES (?, ?, 'TR-069')");
+                        $stmt->execute([$key, $value]);
+                    }
+                }
+                $message = 'TR-069 OMCI settings saved successfully';
+                $messageType = 'success';
+                break;
+                
             case 'save_genieacs_settings':
                 $settings = [
                     'genieacs_url' => $_POST['genieacs_url'] ?? '',
@@ -7951,6 +7977,16 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'tr069_omci' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=tr069_omci">
+                        <i class="bi bi-broadcast me-1"></i> TR-069 OMCI Settings
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'olt_profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=olt_profiles">
+                        <i class="bi bi-sliders me-1"></i> OLT Profiles
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'smartolt' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=smartolt">
                         <i class="bi bi-cloud-download me-1"></i> SmartOLT Import
                     </a>
@@ -8045,6 +8081,288 @@ ont tr069-server-config 1 all profile-id 1</pre>
                     </div>
                 </div>
             </div>
+            
+            <?php elseif ($settingsTab === 'tr069_omci'): ?>
+            <?php
+            $tr069Settings = [];
+            try {
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'tr069_%'");
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $tr069Settings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch (Exception $e) {}
+            ?>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-broadcast me-2"></i>TR-069 OMCI Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle me-2"></i>
+                                These settings are pushed to ONUs via OMCI during authorization. The ONU will use these settings to connect to your ACS (GenieACS).
+                            </div>
+                            
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_tr069_omci_settings">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">TR-069 ACS URL</label>
+                                    <input type="url" name="tr069_acs_url" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_acs_url'] ?? '') ?>" placeholder="http://your-server:7547">
+                                    <div class="form-text">The CWMP URL that ONUs will connect to (usually port 7547)</div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Periodic Inform Interval (seconds)</label>
+                                        <input type="number" name="tr069_periodic_interval" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_periodic_interval'] ?? '300') ?>" min="60" max="86400">
+                                        <div class="form-text">How often ONUs report to ACS (300 = 5 min)</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Default GEM Port for TR-069</label>
+                                        <input type="number" name="tr069_default_gem_port" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_default_gem_port'] ?? '2') ?>" min="1" max="8">
+                                        <div class="form-text">GEM port used for TR-069 traffic</div>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <h6 class="text-muted"><i class="bi bi-shield-lock me-2"></i>ACS Authentication (Optional)</h6>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ACS Username</label>
+                                        <input type="text" name="tr069_acs_username" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_acs_username'] ?? '') ?>" placeholder="Optional">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ACS Password</label>
+                                        <input type="password" name="tr069_acs_password" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_acs_password'] ?? '') ?>" placeholder="Optional">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">CPE Username (for ACS to authenticate CPE)</label>
+                                        <input type="text" name="tr069_cpe_username" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_cpe_username'] ?? '') ?>" placeholder="Optional">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">CPE Password</label>
+                                        <input type="password" name="tr069_cpe_password" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_cpe_password'] ?? '') ?>" placeholder="Optional">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save TR-069 Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>How TR-069 OMCI Works</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="small">When you authorize an ONU, the system will automatically:</p>
+                            <ol class="small">
+                                <li><strong>Find TR-069 VLAN:</strong> Looks for a VLAN marked as "TR-069" in OLT VLANs</li>
+                                <li><strong>Configure Native VLAN:</strong> Sets the TR-069 VLAN on ONU's ETH port 1</li>
+                                <li><strong>Set DHCP Mode:</strong> Configures the ONU to get IP via DHCP on TR-069 VLAN</li>
+                                <li><strong>Push ACS URL:</strong> Sends your ACS URL to the ONU via OMCI</li>
+                                <li><strong>Enable Periodic Inform:</strong> ONU will report to ACS at configured interval</li>
+                            </ol>
+                            
+                            <h6 class="mt-3">Commands Sent to OLT:</h6>
+                            <pre class="bg-dark text-light p-2 rounded small" style="font-size: 11px;">
+interface gpon 0/X
+ont port native-vlan {port} {onu_id} eth 1 vlan {tr069_vlan} priority 0
+ont ipconfig {port} {onu_id} ip-index 0 dhcp vlan {tr069_vlan}
+ont tr069-server-config {port} {onu_id} acs-url "{acs_url}"
+ont tr069-server-config {port} {onu_id} periodic-inform enable interval 300
+quit
+service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
+                            
+                            <div class="alert alert-warning small mt-3 mb-0">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>Requirement:</strong> You must mark a VLAN as "TR-069" in OLT → VLANs for auto-configuration to work.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($settingsTab === 'olt_profiles'): ?>
+            <?php
+            $selectedOltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : ($olts[0]['id'] ?? 0);
+            $oltLineProfiles = [];
+            $oltSrvProfiles = [];
+            
+            if ($selectedOltId && isset($_GET['sync_profiles'])) {
+                $syncResult = $huaweiOLT->syncOLTProfiles($selectedOltId);
+                if ($syncResult['success']) {
+                    $message = "Synced profiles from OLT: {$syncResult['line_count']} line profiles, {$syncResult['srv_count']} service profiles";
+                    $messageType = 'success';
+                } else {
+                    $message = "Failed to sync profiles: " . ($syncResult['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+            }
+            
+            if ($selectedOltId) {
+                try {
+                    $stmt = $db->prepare("SELECT * FROM huawei_olt_line_profiles WHERE olt_id = ? ORDER BY profile_id");
+                    $stmt->execute([$selectedOltId]);
+                    $oltLineProfiles = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                } catch (Exception $e) {}
+                
+                try {
+                    $stmt = $db->prepare("SELECT * FROM huawei_olt_srv_profiles WHERE olt_id = ? ORDER BY profile_id");
+                    $stmt->execute([$selectedOltId]);
+                    $oltSrvProfiles = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                } catch (Exception $e) {}
+            }
+            ?>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <form method="get" class="row g-2 align-items-end">
+                                <input type="hidden" name="page" value="huawei-olt">
+                                <input type="hidden" name="view" value="settings">
+                                <input type="hidden" name="tab" value="olt_profiles">
+                                <div class="col-md-8">
+                                    <label class="form-label">Select OLT</label>
+                                    <select name="olt_id" class="form-select" onchange="this.form.submit()">
+                                        <?php foreach ($olts as $olt): ?>
+                                        <option value="<?= $olt['id'] ?>" <?= $olt['id'] == $selectedOltId ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="?page=huawei-olt&view=settings&tab=olt_profiles&olt_id=<?= $selectedOltId ?>&sync_profiles=1" class="btn btn-primary w-100">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Sync from OLT
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Line Profiles (ont-lineprofile)</h5>
+                            <span class="badge bg-primary"><?= count($oltLineProfiles) ?></span>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($oltLineProfiles)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-diagram-3 fs-1 mb-2 d-block"></i>
+                                No line profiles synced. Click "Sync from OLT" to fetch profiles.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>TCONT</th>
+                                            <th>GEM Ports</th>
+                                            <th>TR-069</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($oltLineProfiles as $lp): ?>
+                                        <tr>
+                                            <td><code><?= $lp['profile_id'] ?></code></td>
+                                            <td><?= htmlspecialchars($lp['profile_name']) ?></td>
+                                            <td><?= $lp['tcont_count'] ?? '-' ?></td>
+                                            <td><?= $lp['gem_count'] ?? '-' ?></td>
+                                            <td><?= $lp['tr069_enabled'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Service Profiles (ont-srvprofile)</h5>
+                            <span class="badge bg-primary"><?= count($oltSrvProfiles) ?></span>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (empty($oltSrvProfiles)): ?>
+                            <div class="p-4 text-center text-muted">
+                                <i class="bi bi-hdd-network fs-1 mb-2 d-block"></i>
+                                No service profiles synced. Click "Sync from OLT" to fetch profiles.
+                            </div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>ETH Ports</th>
+                                            <th>POTS</th>
+                                            <th>WiFi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($oltSrvProfiles as $sp): ?>
+                                        <tr>
+                                            <td><code><?= $sp['profile_id'] ?></code></td>
+                                            <td><?= htmlspecialchars($sp['profile_name']) ?></td>
+                                            <td><?= $sp['eth_ports'] ?? '-' ?></td>
+                                            <td><?= $sp['pots_ports'] ?? '-' ?></td>
+                                            <td><?= $sp['wifi_enabled'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>About OLT Profiles</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Line Profiles (ont-lineprofile)</h6>
+                            <p class="small text-muted">Define the upstream traffic handling:</p>
+                            <ul class="small">
+                                <li><strong>TCONT:</strong> Traffic container for upstream bandwidth</li>
+                                <li><strong>GEM Ports:</strong> Virtual connections for different services</li>
+                                <li><strong>DBA Profile:</strong> Dynamic bandwidth allocation</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Service Profiles (ont-srvprofile)</h6>
+                            <p class="small text-muted">Define the ONU's physical port capabilities:</p>
+                            <ul class="small">
+                                <li><strong>ETH Ports:</strong> Number of Ethernet ports</li>
+                                <li><strong>POTS Ports:</strong> VoIP phone ports</li>
+                                <li><strong>WiFi:</strong> Wireless capability</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <?php elseif ($settingsTab === 'smartolt'): ?>
             <?php
             require_once __DIR__ . '/../src/SmartOLT.php';
