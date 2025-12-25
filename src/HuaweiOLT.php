@@ -2213,6 +2213,46 @@ class HuaweiOLT {
         ];
     }
     
+    private function findONULocationBySN(int $oltId, string $sn): ?array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return null;
+        }
+        
+        // Try CLI command to find ONU by SN
+        $command = "display ont info by-sn {$sn}";
+        $output = $this->executeOLTCommand($oltId, $command);
+        
+        if (!$output || strpos($output, 'Failure') !== false) {
+            return null;
+        }
+        
+        // Parse output: F/S/P:ONU-ID format
+        // Example output:
+        // F/S/P       ONU      SN                   ...
+        // 0/1/0       1        HWTC12345678         ...
+        if (preg_match('/(\d+)\/(\d+)\/(\d+)\s+(\d+)\s+' . preg_quote($sn, '/') . '/i', $output, $matches)) {
+            return [
+                'frame' => (int)$matches[1],
+                'slot' => (int)$matches[2],
+                'port' => (int)$matches[3],
+                'onu_id' => (int)$matches[4]
+            ];
+        }
+        
+        // Try alternative format
+        if (preg_match('/Frame\/Slot\/Port\s*:\s*(\d+)\/(\d+)\/(\d+).*?ONT-ID\s*:\s*(\d+)/s', $output, $matches)) {
+            return [
+                'frame' => (int)$matches[1],
+                'slot' => (int)$matches[2],
+                'port' => (int)$matches[3],
+                'onu_id' => (int)$matches[4]
+            ];
+        }
+        
+        return null;
+    }
+    
     private function parseOpticalPowerDiv10($value): ?float {
         $cleaned = $this->cleanSnmpValue((string)$value);
         if (is_numeric($cleaned)) {
@@ -2258,8 +2298,31 @@ class HuaweiOLT {
             }
         }
         
-        if ($onu['onu_id'] === null) {
-            return ['success' => false, 'error' => 'ONU ID not set'];
+        // If ONU ID is not set, try to find it from the OLT using the serial number
+        if ($onu['onu_id'] === null || $onu['slot'] === null || $onu['port'] === null) {
+            if (!empty($onu['sn']) && !empty($onu['olt_id'])) {
+                $location = $this->findONULocationBySN($onu['olt_id'], $onu['sn']);
+                if ($location) {
+                    // Update the database with the found location
+                    $updateStmt = $this->db->prepare("
+                        UPDATE huawei_onus 
+                        SET frame = ?, slot = ?, port = ?, onu_id = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $updateStmt->execute([
+                        $location['frame'], 
+                        $location['slot'], 
+                        $location['port'], 
+                        $location['onu_id'], 
+                        $onuId
+                    ]);
+                    $onu = array_merge($onu, $location);
+                } else {
+                    return ['success' => false, 'error' => 'ONU ID not set. Please sync ONUs from OLT first.'];
+                }
+            } else {
+                return ['success' => false, 'error' => 'ONU ID not set and cannot lookup (missing SN or OLT ID)'];
+            }
         }
         
         // Detect SmartOLT format: if onu_id is large (port_index) and slot/port are 0/null
