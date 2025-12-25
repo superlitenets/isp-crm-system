@@ -1729,20 +1729,62 @@ class HuaweiOLT {
             }
         }
         
-        // Warn if no ONUs were parsed from config
+        // If no ONUs parsed from config, fall back to summary data
+        if (empty($parsed) && !empty($summaryOnus)) {
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'sync_cli',
+                'status' => 'info',
+                'message' => 'Using summary data - config parsing returned no ONUs',
+                'details' => 'Config lines: ' . count($lines) . ', Summary ONUs: ' . count($summaryOnus),
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            // Use summary data instead
+            foreach ($summaryOnus as $onu) {
+                try {
+                    $existing = $this->getONUBySN($onu['sn']);
+                    
+                    $onuName = "ONU {$onu['frame']}/{$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
+                    
+                    $this->addONU([
+                        'olt_id' => $oltId,
+                        'sn' => $onu['sn'],
+                        'name' => $onuName,
+                        'frame' => $onu['frame'],
+                        'slot' => $onu['slot'],
+                        'port' => $onu['port'],
+                        'onu_id' => $onu['onu_id'],
+                        'is_authorized' => true,
+                        'status' => $onu['status'] ?? 'online',
+                    ]);
+                    
+                    if ($existing) {
+                        $updated++;
+                    } else {
+                        $added++;
+                    }
+                    $parsed[] = $onu;
+                } catch (\Exception $e) {
+                    $errors[] = "Failed for {$onu['sn']}: " . $e->getMessage();
+                }
+            }
+        }
+        
+        // Still no ONUs found
         if (empty($parsed)) {
             $this->addLog([
                 'olt_id' => $oltId,
                 'action' => 'sync_cli',
                 'status' => 'warning',
-                'message' => 'No ONUs found in configuration output',
+                'message' => 'No ONUs found in configuration or summary',
                 'details' => 'Config lines: ' . count($lines) . ', Output size: ' . strlen($output),
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
             
             return [
                 'success' => false,
-                'error' => 'No ONUs found in OLT configuration. The OLT may have returned incomplete data.',
+                'error' => 'No ONUs found. Make sure ONUs are authorized on the OLT.',
                 'total' => 0,
                 'config_lines' => count($lines),
                 'output_size' => strlen($output)
