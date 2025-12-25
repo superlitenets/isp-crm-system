@@ -478,6 +478,62 @@ try {
     </div>
 </div>
 
+<div class="modal fade" id="editPeerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="update_vpn_peer">
+                <input type="hidden" name="peer_id" id="edit_peer_id">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit VPN Peer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Peer Name</label>
+                        <input type="text" class="form-control" name="name" id="edit_peer_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" id="edit_peer_description">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Allowed IPs / Subnets</label>
+                        <input type="text" class="form-control" name="allowed_ips" id="edit_peer_allowed_ips" required>
+                        <div class="form-text">Comma-separated. Example: 10.200.0.2/32, 10.78.0.0/24, 192.168.233.0/24</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Endpoint</label>
+                        <input type="text" class="form-control" name="endpoint" id="edit_peer_endpoint" placeholder="IP:PORT">
+                        <div class="form-text">Remote peer address (e.g., 102.205.239.250:51821)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Persistent Keepalive</label>
+                        <input type="number" class="form-control" name="persistent_keepalive" id="edit_peer_keepalive" value="25">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit_peer_is_olt_site" name="is_olt_site">
+                            <label class="form-check-label" for="edit_peer_is_olt_site">This is an OLT site</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit_peer_sync" name="sync_after_save" checked>
+                            <label class="form-check-label" for="edit_peer_sync">Sync config & routes after saving</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="configModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -606,7 +662,26 @@ function viewMikroTikScript(peerId) {
 }
 
 function editPeer(peerId) {
-    alert('Edit peer functionality - implement as needed');
+    fetch(`?page=api&action=get_vpn_peer&id=${peerId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.peer) {
+                const peer = data.peer;
+                document.getElementById('edit_peer_id').value = peer.id;
+                document.getElementById('edit_peer_name').value = peer.name || '';
+                document.getElementById('edit_peer_description').value = peer.description || '';
+                document.getElementById('edit_peer_allowed_ips').value = peer.allowed_ips || '';
+                document.getElementById('edit_peer_endpoint').value = peer.endpoint || '';
+                document.getElementById('edit_peer_keepalive').value = peer.persistent_keepalive || 25;
+                document.getElementById('edit_peer_is_olt_site').checked = peer.is_olt_site;
+                new bootstrap.Modal(document.getElementById('editPeerModal')).show();
+            } else {
+                alert('Error loading peer: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+        });
 }
 
 function deletePeer(peerId) {

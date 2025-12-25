@@ -1001,6 +1001,35 @@ if ($page === 'api' && $action === 'get_vpn_server_config') {
     exit;
 }
 
+if ($page === 'api' && $action === 'get_vpn_peer') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn() || !\App\Auth::isAdmin()) {
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+    
+    $peerId = (int)($_GET['id'] ?? 0);
+    if ($peerId <= 0) {
+        echo json_encode(['success' => false, 'error' => 'Invalid peer ID']);
+        exit;
+    }
+    
+    try {
+        $wgService = new \App\WireGuardService($db);
+        $peer = $wgService->getPeer($peerId);
+        if ($peer) {
+            echo json_encode(['success' => true, 'peer' => $peer]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Peer not found']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($page === 'api' && $action === 'get_vpn_peer_config') {
     ob_clean();
     header('Content-Type: application/json');
@@ -4062,6 +4091,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {
                     $message = 'Error syncing VPN config: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+            
+            case 'update_vpn_peer':
+                try {
+                    if (!\App\Auth::isAdmin()) {
+                        throw new Exception('Only administrators can update VPN peers.');
+                    }
+                    
+                    $peerId = (int)($_POST['peer_id'] ?? 0);
+                    if ($peerId <= 0) {
+                        throw new Exception('Invalid peer ID.');
+                    }
+                    
+                    $wgService = new \App\WireGuardService($db);
+                    $updated = $wgService->updatePeer($peerId, [
+                        'name' => $_POST['name'] ?? '',
+                        'description' => $_POST['description'] ?? null,
+                        'allowed_ips' => $_POST['allowed_ips'] ?? '',
+                        'endpoint' => $_POST['endpoint'] ?? null,
+                        'persistent_keepalive' => (int)($_POST['persistent_keepalive'] ?? 25),
+                        'is_active' => true,
+                        'is_olt_site' => isset($_POST['is_olt_site']),
+                        'olt_id' => null
+                    ]);
+                    
+                    if ($updated) {
+                        $syncMsg = '';
+                        if (isset($_POST['sync_after_save'])) {
+                            $syncResult = $wgService->syncConfig();
+                            $syncMsg = $syncResult['success'] ? ' Config synced.' : ' Sync failed: ' . ($syncResult['error'] ?? 'Unknown');
+                        }
+                        $message = 'VPN peer updated successfully!' . $syncMsg;
+                        $messageType = 'success';
+                    } else {
+                        throw new Exception('Failed to update VPN peer.');
+                    }
+                    \App\Auth::regenerateToken();
+                } catch (Exception $e) {
+                    $message = 'Error updating VPN peer: ' . $e->getMessage();
                     $messageType = 'danger';
                 }
                 break;
