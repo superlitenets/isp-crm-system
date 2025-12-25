@@ -1,0 +1,90 @@
+Connecting to @102.205.236.243 port 22, please wait...
+login as: superlite@102.205.236.243's password: 
+Welcome to Ubuntu 24.04.3 LTS (GNU/Linux 6.8.0-90-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu Dec 25 08:55:07 PM UTC 2025
+
+  System load:  0.49               Processes:              412
+  Usage of /:   79.9% of 23.45GB   Users logged in:        1
+  Memory usage: 17%                IPv4 address for ens18: 102.205.236.243
+  Swap usage:   0%
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+5 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+Last login: Thu Dec 25 20:51:49 2025 from 196.96.179.246
+
+superlite@superlitecrm:~$ sudo su
+[sudo] password for superlite: 
+root@superlitecrm:/home/superlite# cd /root/isp
+root@superlitecrm:~/isp# # Check current WireGuard state
+root@superlitecrm:~/isp# docker exec isp_crm_wireguard wg show
+interface: wg0
+  public key: D6dYcRLqKrWBChuHjh1ve8HPiV3zQY4hx9bzcz3LtC8=
+  private key: (hidden)
+  listening port: 51820
+
+peer: vrWmgT5qXtSvqvlMlYkRRPQIy0X6LpnxFM6UkS+ojCM=
+  preshared key: (hidden)
+  endpoint: 102.205.239.250:51821
+  allowed ips: 10.200.0.2/32, 10.78.0.0/24, 192.168.233.0/24, 10.66.0.0/16
+  latest handshake: 1 minute, 4 seconds ago
+  transfer: 8.75 KiB received, 8.00 KiB sent
+  persistent keepalive: every 25 seconds
+root@superlitecrm:~/isp# 
+root@superlitecrm:~/isp# # If it shows no peers or broken config, restart to reload from saved config
+root@superlitecrm:~/isp# docker restart isp_crm_wireguard
+isp_crm_wireguard
+root@superlitecrm:~/isp# 
+root@superlitecrm:~/isp# # Wait and verify
+root@superlitecrm:~/isp# sleep 5
+root@superlitecrm:~/isp# docker exec isp_crm_wireguard wg show
+interface: wg0
+  public key: D6dYcRLqKrWBChuHjh1ve8HPiV3zQY4hx9bzcz3LtC8=
+  private key: (hidden)
+  listening port: 51820
+
+peer: vrWmgT5qXtSvqvlMlYkRRPQIy0X6LpnxFM6UkS+ojCM=
+  preshared key: (hidden)
+  allowed ips: 10.200.0.2/32, 10.78.0.0/24, 192.168.233.0/24, 10.66.0.0/16
+  persistent keepalive: every 25 seconds
+root@superlitecrm:~/isp# 
+root@superlitecrm:~/isp# # Check routes are back
+root@superlitecrm:~/isp# docker exec isp_crm_wireguard ip route
+default via 102.205.236.241 dev ens18 
+10.66.0.0/16 dev wg0 scope link 
+10.78.0.0/24 dev wg0 scope link 
+10.200.0.0/24 dev wg0 proto kernel scope link src 10.200.0.1 
+102.205.236.240/29 dev ens18 proto kernel scope link src 102.205.236.243 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-c78a310cc9e1 proto kernel scope link src 172.18.0.1 
+172.19.0.0/16 dev br-d01725a33b97 proto kernel scope link src 172.19.0.1 linkdown 
+192.168.233.0/24 dev wg0 scope link 
+root@superlitecrm:~/isp# 
+root@superlitecrm:~/isp# # Test ping
+root@superlitecrm:~/isp# ping -c 2 10.78.0.1
+PING 10.78.0.1 (10.78.0.1) 56(84) bytes of data.
+From 10.200.0.1 icmp_seq=1 Destination Host Unreachable
+ping: sendmsg: Destination address required
+From 10.200.0.1 icmp_seq=2 Destination Host Unreachable
+ping: sendmsg: Destination address required
+
+--- 10.78.0.1 ping statistics ---
+2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 1000ms
+
+root@superlitecrm:~/isp# 
