@@ -194,6 +194,45 @@ app.post('/ping-batch', async (req, res) => {
     }
 });
 
+// WireGuard config apply endpoint
+app.post('/wireguard/apply', async (req, res) => {
+    try {
+        const { config } = req.body;
+        
+        if (!config) {
+            return res.status(400).json({ success: false, error: 'Missing config' });
+        }
+        
+        const fs = require('fs');
+        const configPath = '/tmp/wg0_apply.conf';
+        
+        // Write config to temp file
+        fs.writeFileSync(configPath, config);
+        
+        // Try docker cp to WireGuard container
+        try {
+            await execPromise(`docker cp ${configPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1`);
+            
+            // Try to apply via wg syncconf
+            try {
+                await execPromise('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1');
+                res.json({ success: true, message: 'Config applied via wg syncconf' });
+            } catch (syncErr) {
+                // Fallback to container restart
+                await execPromise('docker restart isp_crm_wireguard 2>&1');
+                res.json({ success: true, message: 'Config applied via container restart' });
+            }
+        } catch (cpErr) {
+            res.status(500).json({ success: false, error: 'Failed to copy config: ' + cpErr.message });
+        } finally {
+            // Cleanup temp file
+            try { fs.unlinkSync(configPath); } catch (e) {}
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '*/30 * * * * *';
 const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;

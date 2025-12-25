@@ -784,58 +784,27 @@ class WireGuardService {
                 return ['success' => false, 'error' => 'Failed to generate config'];
             }
             
-            // First, try to write config via docker cp (most reliable for containerized setup)
+            // Write config to shared storage path (mounted in both PHP and WireGuard containers)
             $configWritten = false;
-            $writtenPath = '/config/wg_confs/wg0.conf';
-            $output = [];
-            $returnVar = 0;
+            $writtenPath = '/var/www/html/storage/wireguard/wg0.conf';
             
-            // Use temp file + docker cp approach (safest for special characters)
-            $tempFile = '/tmp/wg0_' . uniqid() . '.conf';
-            if (\file_put_contents($tempFile, $config) !== false) {
-                \exec("docker cp {$tempFile} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
-                @\unlink($tempFile);
-                if ($returnVar === 0) {
-                    $configWritten = true;
-                }
+            $storageDir = \dirname($writtenPath);
+            if (!\is_dir($storageDir)) {
+                @\mkdir($storageDir, 0755, true);
             }
             
-            // Fallback: try direct file paths if docker methods fail
-            if (!$configWritten) {
-                $configPaths = [
-                    '/config/wg_confs/wg0.conf',  // LinuxServer WireGuard container path
-                    '/etc/wireguard/wg0.conf',    // Host WireGuard path
-                ];
-                
-                foreach ($configPaths as $path) {
-                    $dir = \dirname($path);
-                    if (\is_dir($dir) && \is_writable($dir)) {
-                        if (\file_put_contents($path, $config) !== false) {
-                            $configWritten = true;
-                            $writtenPath = $path;
-                            break;
-                        }
-                    }
-                }
+            if (\file_put_contents($writtenPath, $config) !== false) {
+                $configWritten = true;
             }
             
-            // Last resort: write to shared storage path
-            if (!$configWritten) {
-                $fallbackPath = '/var/www/html/storage/wireguard/wg0.conf';
-                $fallbackDir = \dirname($fallbackPath);
-                if (!\is_dir($fallbackDir)) {
-                    @\mkdir($fallbackDir, 0755, true);
-                }
-                if (\file_put_contents($fallbackPath, $config) !== false) {
-                    $configWritten = true;
-                    $writtenPath = $fallbackPath;
-                    // Copy to container using docker cp
-                    \exec("docker cp {$fallbackPath} isp_crm_wireguard:/config/wg_confs/wg0.conf 2>&1", $output, $returnVar);
-                }
+            // Also try writing to /etc/wireguard if accessible (host network mode)
+            if (\is_dir('/etc/wireguard') && \is_writable('/etc/wireguard')) {
+                \file_put_contents('/etc/wireguard/wg0.conf', $config);
+                $writtenPath = '/etc/wireguard/wg0.conf';
             }
             
             if (!$configWritten) {
-                return ['success' => false, 'error' => 'Could not write config file - check Docker socket permissions'];
+                return ['success' => false, 'error' => 'Could not write config file to storage'];
             }
             
             // Try to apply config using wg syncconf (hot reload, no restart needed)
@@ -867,23 +836,39 @@ class WireGuardService {
      * Apply WireGuard config using wg syncconf or wg-quick
      */
     private function applyConfig(string $configPath): array {
+        // Check if exec is available
+        if (!$this->isExecAvailable()) {
+            // exec is disabled - config was written, but can't auto-apply
+            // Try using OLT service API to apply
+            $applied = $this->applyConfigViaOltService($configPath);
+            if ($applied['success']) {
+                return $applied;
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Config saved. Run manually on VPS: docker restart isp_crm_wireguard',
+                'manual_required' => true
+            ];
+        }
+        
         // Try wg syncconf first (hot reload without dropping connections)
         $output = [];
         $returnVar = 0;
         
         // Check if wg command is available
-        exec('which wg 2>/dev/null', $output, $returnVar);
+        \exec('which wg 2>/dev/null', $output, $returnVar);
         if ($returnVar !== 0) {
             // wg not available in this container, try docker exec with correct LinuxServer path
-            exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1', $output, $returnVar);
+            \exec('docker exec isp_crm_wireguard wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1', $output, $returnVar);
             if ($returnVar === 0) {
                 return ['success' => true, 'message' => 'Applied via docker exec'];
             }
             
             // Try restarting container as fallback
-            exec('docker restart isp_crm_wireguard 2>&1', $output, $returnVar);
+            \exec('docker restart isp_crm_wireguard 2>&1', $output, $returnVar);
             if ($returnVar === 0) {
-                sleep(3); // Wait for container to fully start
+                \sleep(3); // Wait for container to fully start
                 return ['success' => true, 'message' => 'Container restarted'];
             }
             
@@ -891,18 +876,54 @@ class WireGuardService {
         }
         
         // wg is available, use syncconf
-        exec("wg syncconf wg0 {$configPath} 2>&1", $output, $returnVar);
+        \exec("wg syncconf wg0 {$configPath} 2>&1", $output, $returnVar);
         if ($returnVar === 0) {
             return ['success' => true, 'message' => 'Applied via wg syncconf'];
         }
         
         // Try wg-quick strip and reload
-        exec("wg-quick strip wg0 2>&1", $output, $returnVar);
+        \exec("wg-quick strip wg0 2>&1", $output, $returnVar);
         
         return [
             'success' => $returnVar === 0,
-            'error' => implode("\n", $output)
+            'error' => \implode("\n", $output)
         ];
+    }
+    
+    /**
+     * Apply WireGuard config via OLT service API (when exec is disabled)
+     */
+    private function applyConfigViaOltService(string $configPath): array {
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
+        
+        try {
+            $config = \file_get_contents($configPath);
+            
+            $ch = \curl_init("{$oltServiceUrl}/wireguard/apply");
+            \curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => \json_encode(['config' => $config]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 5
+            ]);
+            
+            $response = \curl_exec($ch);
+            $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            \curl_close($ch);
+            
+            if ($httpCode === 200) {
+                $data = \json_decode($response, true);
+                if ($data && isset($data['success']) && $data['success']) {
+                    return ['success' => true, 'message' => 'Applied via OLT service'];
+                }
+            }
+            
+            return ['success' => false, 'error' => 'OLT service endpoint not available'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
     
     /**
