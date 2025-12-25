@@ -4809,7 +4809,11 @@ class HuaweiOLT {
         }
         
         // Configure TR-069 via OMCI if enabled in profile or options
+        // Auto-detect TR-069 VLAN from OLT VLANs if not explicitly set
         $tr069Vlan = $options['tr069_vlan'] ?? $profile['tr069_vlan'] ?? null;
+        if (!$tr069Vlan) {
+            $tr069Vlan = $this->getTR069VlanForOlt($oltId);
+        }
         $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? null;
         
         if ($tr069Vlan && $assignedOnuId !== null) {
@@ -6551,6 +6555,27 @@ class HuaweiOLT {
             
             return null;
         } catch (\Exception $e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Get the TR-069 VLAN configured for an OLT
+     * Looks for a VLAN with is_tr069 = true in huawei_vlans table
+     */
+    private function getTR069VlanForOlt(int $oltId): ?int {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT vlan_id FROM huawei_vlans 
+                WHERE olt_id = ? AND is_tr069 = TRUE AND is_active = TRUE
+                ORDER BY vlan_id ASC
+                LIMIT 1
+            ");
+            $stmt->execute([$oltId]);
+            $vlanId = $stmt->fetchColumn();
+            return $vlanId ? (int)$vlanId : null;
+        } catch (\Exception $e) {
+            error_log("Error fetching TR-069 VLAN for OLT {$oltId}: " . $e->getMessage());
             return null;
         }
     }
