@@ -518,16 +518,10 @@ try {
                             <label class="form-check-label" for="edit_peer_is_olt_site">This is an OLT site</label>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="edit_peer_sync" name="sync_after_save" checked>
-                            <label class="form-check-label" for="edit_peer_sync">Sync config & routes after saving</label>
-                        </div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Save & Sync</button>
                 </div>
             </form>
         </div>

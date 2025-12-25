@@ -4119,11 +4119,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     
                     if ($updated) {
-                        $syncMsg = '';
-                        if (isset($_POST['sync_after_save'])) {
-                            $syncResult = $wgService->syncConfig();
-                            $syncMsg = $syncResult['success'] ? ' Config synced.' : ' Sync failed: ' . ($syncResult['error'] ?? 'Unknown');
-                        }
+                        // Always sync config and routes after saving peer
+                        $syncResult = $wgService->syncConfig();
+                        $syncMsg = $syncResult['success'] ? ' Config & routes synced.' : ' Sync failed: ' . ($syncResult['error'] ?? 'Unknown');
                         $message = 'VPN peer updated successfully!' . $syncMsg;
                         $messageType = 'success';
                     } else {
