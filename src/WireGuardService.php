@@ -625,7 +625,7 @@ class WireGuardService {
      * Test connectivity via OLT Session Manager (real ping when exec is disabled)
      */
     private function testConnectivityViaOltService(string $ip, int $count = 3, int $timeout = 2): array {
-        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3001';
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
         
         $ch = \curl_init("{$oltServiceUrl}/ping");
         \curl_setopt_array($ch, [
@@ -898,7 +898,7 @@ class WireGuardService {
      * Apply WireGuard config via OLT service API (when exec is disabled)
      */
     private function applyConfigViaOltService(string $configPath): array {
-        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://olt-service:3001';
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
         
         try {
             $config = \file_get_contents($configPath);
