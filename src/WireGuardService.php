@@ -784,27 +784,31 @@ class WireGuardService {
                 return ['success' => false, 'error' => 'Failed to generate config'];
             }
             
-            // Write config to shared storage path (mounted in both PHP and WireGuard containers)
+            // Try multiple paths to write config
             $configWritten = false;
-            $writtenPath = '/var/www/html/storage/wireguard/wg0.conf';
+            $writtenPath = '';
             
-            $storageDir = \dirname($writtenPath);
-            if (!\is_dir($storageDir)) {
-                @\mkdir($storageDir, 0755, true);
-            }
+            $storagePaths = [
+                '/var/www/html/storage/wireguard/wg0.conf',
+                '/tmp/wg0.conf',
+                '/etc/wireguard/wg0.conf'
+            ];
             
-            if (\file_put_contents($writtenPath, $config) !== false) {
-                $configWritten = true;
-            }
-            
-            // Also try writing to /etc/wireguard if accessible (host network mode)
-            if (\is_dir('/etc/wireguard') && \is_writable('/etc/wireguard')) {
-                \file_put_contents('/etc/wireguard/wg0.conf', $config);
-                $writtenPath = '/etc/wireguard/wg0.conf';
+            foreach ($storagePaths as $path) {
+                $dir = \dirname($path);
+                if (!\is_dir($dir)) {
+                    @\mkdir($dir, 0777, true);
+                }
+                
+                if (@\file_put_contents($path, $config) !== false) {
+                    $configWritten = true;
+                    $writtenPath = $path;
+                    break;
+                }
             }
             
             if (!$configWritten) {
-                return ['success' => false, 'error' => 'Could not write config file to storage'];
+                return ['success' => false, 'error' => 'Could not write config file - check directory permissions'];
             }
             
             // Try to apply config using wg syncconf (hot reload, no restart needed)
