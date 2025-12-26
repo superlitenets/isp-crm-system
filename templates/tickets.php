@@ -825,7 +825,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                     </tr>
                     <?php if ($ticketData['resolved_at']): ?>
                     <tr>
-                        <th>Resolved</th>
+                        <th>Completed</th>
                         <td><?= date('M j, Y g:i A', strtotime($ticketData['resolved_at'])) ?></td>
                     </tr>
                     <?php endif; ?>
@@ -903,7 +903,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                         </span>
                     </div>
                     <?php if (in_array($ticketData['status'], ['resolved', 'closed']) && $ticketData['resolved_at']): ?>
-                    <small class="text-muted">Resolved: <?= date('M j, g:i A', strtotime($ticketData['resolved_at'])) ?></small>
+                    <small class="text-muted">Completed: <?= date('M j, g:i A', strtotime($ticketData['resolved_at'])) ?></small>
                     <?php elseif ($ticketData['sla_resolution_due'] && $resStatus !== 'breached'): ?>
                     <small class="text-muted">Due: <?= date('M j, g:i A', strtotime($ticketData['sla_resolution_due'])) ?></small>
                     <?php if (isset($slaStatus['resolution']['time_left'])): ?>
@@ -1110,7 +1110,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                         <i class="bi bi-question-circle"></i> Need Info
                     </button>
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="sendTicketWA('resolved', <?= htmlspecialchars(json_encode($templates['resolved'])) ?>)">
-                        <i class="bi bi-check-circle"></i> Resolved
+                        <i class="bi bi-check-circle"></i> Completed
                     </button>
                     <button type="button" class="btn btn-outline-info btn-sm" onclick="sendTicketWA('technician_coming', <?= htmlspecialchars(json_encode($templates['technician_coming'])) ?>)">
                         <i class="bi bi-truck"></i> Tech Coming
@@ -1496,7 +1496,7 @@ $escalatedFilter = $_GET['escalated'] ?? '';
         <div class="card bg-success text-white h-100">
             <div class="card-body text-center">
                 <h3 class="mb-0"><?= $dashboardStats['resolved_tickets'] ?? 0 ?></h3>
-                <small>Resolved</small>
+                <small>Completed</small>
             </div>
         </div>
     </div>

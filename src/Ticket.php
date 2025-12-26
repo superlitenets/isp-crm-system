@@ -939,7 +939,7 @@ class Ticket {
             'open' => 'Open',
             'in_progress' => 'In Progress',
             'pending' => 'Pending',
-            'resolved' => 'Resolved',
+            'resolved' => 'Completed',
             'closed' => 'Closed'
         ];
     }
