@@ -6212,6 +6212,58 @@ class HuaweiOLT {
         return $result;
     }
     
+    public function updateVLANFeatures(int $oltId, int $vlanId, string $description, array $options): array {
+        if ($vlanId < 1 || $vlanId > 4094) {
+            return ['success' => false, 'message' => 'Invalid VLAN ID'];
+        }
+        
+        $cleanDesc = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $description);
+        $cleanDesc = substr(trim($cleanDesc), 0, 32);
+        
+        if (!empty($cleanDesc)) {
+            $command = "vlan desc {$vlanId} description \"{$cleanDesc}\"";
+            $this->executeCommand($oltId, $command);
+        }
+        
+        $isMulticast = !empty($options['is_multicast']);
+        $isVoip = !empty($options['is_voip']);
+        $isTr069 = !empty($options['is_tr069']);
+        $dhcpSnooping = !empty($options['dhcp_snooping']);
+        $lanToLan = !empty($options['lan_to_lan']);
+        
+        $stmt = $this->db->prepare("
+            UPDATE huawei_vlans 
+            SET description = ?, 
+                is_multicast = ?, 
+                is_voip = ?, 
+                is_tr069 = ?, 
+                dhcp_snooping = ?, 
+                lan_to_lan = ?,
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE olt_id = ? AND vlan_id = ?
+        ");
+        $stmt->execute([
+            $description,
+            $isMulticast,
+            $isVoip,
+            $isTr069,
+            $dhcpSnooping,
+            $lanToLan,
+            $oltId,
+            $vlanId
+        ]);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'update_vlan_features',
+            'status' => 'success',
+            'message' => "VLAN {$vlanId} features updated",
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return ['success' => true, 'message' => "VLAN {$vlanId} features updated successfully"];
+    }
+    
     public function addVLANToUplink(int $oltId, string $portName, int $vlanId, string $mode = 'tag'): array {
         if ($vlanId < 1 || $vlanId > 4094) {
             return ['success' => false, 'message' => 'Invalid VLAN ID'];

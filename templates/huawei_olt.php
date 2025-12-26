@@ -2158,6 +2158,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'VLAN description updated' : ($result['message'] ?? 'Failed to update description');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'update_vlan_features':
+                $options = [
+                    'is_multicast' => !empty($_POST['is_multicast']),
+                    'is_voip' => !empty($_POST['is_voip']),
+                    'is_tr069' => !empty($_POST['is_tr069']),
+                    'dhcp_snooping' => !empty($_POST['dhcp_snooping']),
+                    'lan_to_lan' => !empty($_POST['lan_to_lan'])
+                ];
+                $result = $huaweiOLT->updateVLANFeatures((int)$_POST['olt_id'], (int)$_POST['vlan_id'], $_POST['description'] ?? '', $options);
+                $message = $result['success'] ? 'VLAN features updated' : ($result['message'] ?? 'Failed to update features');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'add_vlan_uplink':
                 $result = $huaweiOLT->addVLANToUplink((int)$_POST['olt_id'], $_POST['port_name'], (int)$_POST['vlan_id']);
                 $message = $result['success'] ? "VLAN {$_POST['vlan_id']} added to uplink {$_POST['port_name']}" : ($result['message'] ?? 'Failed to add VLAN');
@@ -10178,7 +10190,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         </tr>
                                         
                                         <div class="modal fade" id="editVlanModal<?= $vlan['vlan_id'] ?>" tabindex="-1">
-                                            <div class="modal-dialog modal-sm">
+                                            <div class="modal-dialog">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
                                                         <h6 class="modal-title">Edit VLAN <?= $vlan['vlan_id'] ?></h6>
@@ -10186,7 +10198,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                     </div>
                                                     <form method="post">
                                                         <div class="modal-body">
-                                                            <input type="hidden" name="action" value="update_vlan_desc">
+                                                            <input type="hidden" name="action" value="update_vlan_features">
                                                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                                                             <input type="hidden" name="vlan_id" value="<?= $vlan['vlan_id'] ?>">
                                                             <div class="mb-3">
@@ -10195,6 +10207,39 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                                        value="<?= htmlspecialchars($vlan['description'] ?? '') ?>" 
                                                                        placeholder="Enter description" maxlength="32">
                                                                 <small class="text-muted">Max 32 characters, alphanumeric only</small>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label d-block">VLAN Features</label>
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="is_multicast" id="editMulticast<?= $vlan['vlan_id'] ?>" value="1" <?= !empty($vlan['is_multicast']) ? 'checked' : '' ?>>
+                                                                    <label class="form-check-label" for="editMulticast<?= $vlan['vlan_id'] ?>">
+                                                                        <i class="bi bi-broadcast me-1 text-info"></i>Multicast VLAN (IPTV)
+                                                                    </label>
+                                                                </div>
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="is_voip" id="editVoip<?= $vlan['vlan_id'] ?>" value="1" <?= !empty($vlan['is_voip']) ? 'checked' : '' ?>>
+                                                                    <label class="form-check-label" for="editVoip<?= $vlan['vlan_id'] ?>">
+                                                                        <i class="bi bi-telephone me-1 text-success"></i>Management / VoIP VLAN
+                                                                    </label>
+                                                                </div>
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="is_tr069" id="editTr069<?= $vlan['vlan_id'] ?>" value="1" <?= !empty($vlan['is_tr069']) ? 'checked' : '' ?>>
+                                                                    <label class="form-check-label" for="editTr069<?= $vlan['vlan_id'] ?>">
+                                                                        <i class="bi bi-gear me-1 text-warning"></i>TR-069 Management VLAN
+                                                                    </label>
+                                                                </div>
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="dhcp_snooping" id="editDhcp<?= $vlan['vlan_id'] ?>" value="1" <?= !empty($vlan['dhcp_snooping']) ? 'checked' : '' ?>>
+                                                                    <label class="form-check-label" for="editDhcp<?= $vlan['vlan_id'] ?>">
+                                                                        <i class="bi bi-shield-check me-1 text-primary"></i>DHCP Snooping
+                                                                    </label>
+                                                                </div>
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="lan_to_lan" id="editL2L<?= $vlan['vlan_id'] ?>" value="1" <?= !empty($vlan['lan_to_lan']) ? 'checked' : '' ?>>
+                                                                    <label class="form-check-label" for="editL2L<?= $vlan['vlan_id'] ?>">
+                                                                        <i class="bi bi-arrow-left-right me-1 text-secondary"></i>LAN-to-LAN (ONU direct communication)
+                                                                    </label>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
