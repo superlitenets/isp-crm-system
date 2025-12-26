@@ -8603,11 +8603,6 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?= $settingsTab === 'olt_profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=olt_profiles">
-                        <i class="bi bi-sliders me-1"></i> OLT Profiles
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link <?= $settingsTab === 'smartolt' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=smartolt">
                         <i class="bi bi-cloud-download me-1"></i> SmartOLT Import
                     </a>
@@ -8753,6 +8748,23 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                 </div>
                                 
                                 <hr class="my-3">
+                                <h6 class="text-muted"><i class="bi bi-sliders me-2"></i>OLT Profile IDs (for ONU Authorization)</h6>
+                                <p class="form-text mb-2">Enter the profile IDs configured on your OLT. Find them with: <code>display ont-lineprofile gpon all</code> and <code>display ont-srvprofile gpon all</code></p>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Line Profile ID</label>
+                                        <input type="number" name="tr069_line_profile_id" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_line_profile_id'] ?? '1') ?>" min="1" max="1024">
+                                        <div class="form-text">ont-lineprofile ID (typically 1-1024)</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Service Profile ID</label>
+                                        <input type="number" name="tr069_srv_profile_id" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_srv_profile_id'] ?? '1') ?>" min="1" max="1024">
+                                        <div class="form-text">ont-srvprofile ID (typically 1-1024)</div>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
                                 <h6 class="text-muted"><i class="bi bi-shield-lock me-2"></i>ACS Authentication (Optional)</h6>
                                 
                                 <div class="row">
@@ -8812,178 +8824,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <i class="bi bi-exclamation-triangle me-2"></i>
                                 <strong>Requirement:</strong> Go to OLT → VLANs, edit a VLAN, and tick "TR-069 Management VLAN" feature for auto-configuration to work.
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <?php elseif ($settingsTab === 'olt_profiles'): ?>
-            <?php
-            $selectedOltId = isset($_GET['olt_id']) ? (int)$_GET['olt_id'] : ($olts[0]['id'] ?? 0);
-            $oltLineProfiles = [];
-            $oltSrvProfiles = [];
-            
-            if ($selectedOltId && isset($_GET['sync_profiles'])) {
-                $syncResult = $huaweiOLT->syncOLTProfiles($selectedOltId);
-                if ($syncResult['success']) {
-                    $message = "Synced profiles from OLT: {$syncResult['line_count']} line profiles, {$syncResult['srv_count']} service profiles";
-                    $messageType = 'success';
-                } else {
-                    $message = "Failed to sync profiles: " . ($syncResult['error'] ?? 'Unknown error');
-                    $messageType = 'danger';
-                }
-            }
-            
-            if ($selectedOltId) {
-                try {
-                    $stmt = $db->prepare("SELECT * FROM huawei_olt_line_profiles WHERE olt_id = ? ORDER BY profile_id");
-                    $stmt->execute([$selectedOltId]);
-                    $oltLineProfiles = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                } catch (Exception $e) {}
-                
-                try {
-                    $stmt = $db->prepare("SELECT * FROM huawei_olt_srv_profiles WHERE olt_id = ? ORDER BY profile_id");
-                    $stmt->execute([$selectedOltId]);
-                    $oltSrvProfiles = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-                } catch (Exception $e) {}
-            }
-            ?>
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <form method="get" class="row g-2 align-items-end">
-                                <input type="hidden" name="page" value="huawei-olt">
-                                <input type="hidden" name="view" value="settings">
-                                <input type="hidden" name="tab" value="olt_profiles">
-                                <div class="col-md-8">
-                                    <label class="form-label">Select OLT</label>
-                                    <select name="olt_id" class="form-select" onchange="this.form.submit()">
-                                        <?php foreach ($olts as $olt): ?>
-                                        <option value="<?= $olt['id'] ?>" <?= $olt['id'] == $selectedOltId ? 'selected' : '' ?>><?= htmlspecialchars($olt['name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <a href="?page=huawei-olt&view=settings&tab=olt_profiles&olt_id=<?= $selectedOltId ?>&sync_profiles=1" class="btn btn-primary w-100">
-                                        <i class="bi bi-arrow-repeat me-1"></i> Sync from OLT
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Line Profiles (ont-lineprofile)</h5>
-                            <span class="badge bg-primary"><?= count($oltLineProfiles) ?></span>
-                        </div>
-                        <div class="card-body p-0">
-                            <?php if (empty($oltLineProfiles)): ?>
-                            <div class="p-4 text-center text-muted">
-                                <i class="bi bi-diagram-3 fs-1 mb-2 d-block"></i>
-                                No line profiles synced. Click "Sync from OLT" to fetch profiles.
-                            </div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Name</th>
-                                            <th>TCONT</th>
-                                            <th>GEM Ports</th>
-                                            <th>TR-069</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($oltLineProfiles as $lp): ?>
-                                        <tr>
-                                            <td><code><?= $lp['profile_id'] ?></code></td>
-                                            <td><?= htmlspecialchars($lp['profile_name']) ?></td>
-                                            <td><?= $lp['tcont_count'] ?? '-' ?></td>
-                                            <td><?= $lp['gem_count'] ?? '-' ?></td>
-                                            <td><?= $lp['tr069_enabled'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-lg-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Service Profiles (ont-srvprofile)</h5>
-                            <span class="badge bg-primary"><?= count($oltSrvProfiles) ?></span>
-                        </div>
-                        <div class="card-body p-0">
-                            <?php if (empty($oltSrvProfiles)): ?>
-                            <div class="p-4 text-center text-muted">
-                                <i class="bi bi-hdd-network fs-1 mb-2 d-block"></i>
-                                No service profiles synced. Click "Sync from OLT" to fetch profiles.
-                            </div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Name</th>
-                                            <th>ETH Ports</th>
-                                            <th>POTS</th>
-                                            <th>WiFi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($oltSrvProfiles as $sp): ?>
-                                        <tr>
-                                            <td><code><?= $sp['profile_id'] ?></code></td>
-                                            <td><?= htmlspecialchars($sp['profile_name']) ?></td>
-                                            <td><?= $sp['eth_ports'] ?? '-' ?></td>
-                                            <td><?= $sp['pots_ports'] ?? '-' ?></td>
-                                            <td><?= $sp['wifi_enabled'] ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>' ?></td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>About OLT Profiles</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Line Profiles (ont-lineprofile)</h6>
-                            <p class="small text-muted">Define the upstream traffic handling:</p>
-                            <ul class="small">
-                                <li><strong>TCONT:</strong> Traffic container for upstream bandwidth</li>
-                                <li><strong>GEM Ports:</strong> Virtual connections for different services</li>
-                                <li><strong>DBA Profile:</strong> Dynamic bandwidth allocation</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Service Profiles (ont-srvprofile)</h6>
-                            <p class="small text-muted">Define the ONU's physical port capabilities:</p>
-                            <ul class="small">
-                                <li><strong>ETH Ports:</strong> Number of Ethernet ports</li>
-                                <li><strong>POTS Ports:</strong> VoIP phone ports</li>
-                                <li><strong>WiFi:</strong> Wireless capability</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
