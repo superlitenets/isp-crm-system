@@ -5864,8 +5864,8 @@ class HuaweiOLT {
         // Ensure tables exist
         $this->ensureProfileTablesExist();
         
-        // Fetch Line Profiles
-        $lpResult = $this->executeCommand($oltId, "display ont-lineprofile gpon all");
+        // Fetch Line Profiles (use longer timeout for profile data)
+        $lpResult = $this->executeViaService($oltId, "display ont-lineprofile gpon all", 90000);
         if ($lpResult['success'] && !empty($lpResult['output'])) {
             $lineProfiles = $this->parseLineProfilesFromDisplay($lpResult['output']);
             foreach ($lineProfiles as $lp) {
@@ -5897,8 +5897,8 @@ class HuaweiOLT {
             }
         }
         
-        // Fetch Service Profiles
-        $spResult = $this->executeCommand($oltId, "display ont-srvprofile gpon all");
+        // Fetch Service Profiles (use longer timeout for profile data)
+        $spResult = $this->executeViaService($oltId, "display ont-srvprofile gpon all", 90000);
         if ($spResult['success'] && !empty($spResult['output'])) {
             $srvProfiles = $this->parseServiceProfilesFromDisplay($spResult['output']);
             foreach ($srvProfiles as $sp) {
