@@ -1551,7 +1551,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'save_tr069_omci_settings':
                 $tr069Settings = [
-                    'tr069_acs_url' => $_POST['tr069_acs_url'] ?? '',
                     'tr069_periodic_interval' => $_POST['tr069_periodic_interval'] ?? '300',
                     'tr069_default_gem_port' => $_POST['tr069_default_gem_port'] ?? '2',
                     'tr069_acs_username' => $_POST['tr069_acs_username'] ?? '',
@@ -1654,9 +1653,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $vpnSettings = [
                     'vpn_enabled' => isset($_POST['vpn_enabled']) ? 'true' : 'false',
                     'vpn_gateway_ip' => $_POST['vpn_gateway_ip'] ?? '10.200.0.1',
-                    'vpn_network' => $_POST['vpn_network'] ?? '10.200.0.0/24',
-                    'tr069_use_vpn_gateway' => isset($_POST['tr069_use_vpn_gateway']) ? 'true' : 'false',
-                    'tr069_acs_url' => $_POST['tr069_acs_url'] ?? ''
+                    'vpn_network' => $_POST['vpn_network'] ?? '10.200.0.0/24'
                 ];
                 $wgService->updateSettings($vpnSettings);
                 $message = 'VPN settings saved successfully';
@@ -7519,21 +7516,11 @@ try {
                                 
                                 <h6 class="text-muted mb-3"><i class="bi bi-gear-wide-connected me-2"></i>TR-069 Integration</h6>
                                 
-                                <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" id="tr069UseVpn" name="tr069_use_vpn_gateway" <?= $wgSettings['tr069_use_vpn_gateway'] === 'true' ? 'checked' : '' ?>>
-                                    <label class="form-check-label" for="tr069UseVpn">Use VPN Gateway for TR-069 ACS URL</label>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">TR-069 ACS URL</label>
-                                    <input type="text" class="form-control" name="tr069_acs_url" value="<?= htmlspecialchars($wgSettings['tr069_acs_url']) ?>" placeholder="http://localhost:7547">
-                                    <div class="form-text">GenieACS server URL (fallback if VPN disabled)</div>
-                                </div>
-                                
                                 <div class="alert alert-info small mb-3">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    <strong>Current ACS URL:</strong><br>
+                                    <strong>TR-069 ACS URL (auto-generated):</strong><br>
                                     <code><?= htmlspecialchars($wgService->getTR069AcsUrl()) ?></code>
+                                    <div class="form-text mt-1">Uses VPN Gateway IP on port 7547</div>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary w-100">
@@ -8741,10 +8728,15 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <form method="post">
                                 <input type="hidden" name="action" value="save_tr069_omci_settings">
                                 
-                                <div class="mb-3">
-                                    <label class="form-label">TR-069 ACS URL</label>
-                                    <input type="url" name="tr069_acs_url" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_acs_url'] ?? '') ?>" placeholder="http://your-server:7547">
-                                    <div class="form-text">The CWMP URL that ONUs will connect to (usually port 7547)</div>
+                                <?php
+                                require_once __DIR__ . '/../src/WireGuardService.php';
+                                $wgServiceTR069 = new \App\WireGuardService($db);
+                                ?>
+                                <div class="alert alert-success small mb-3">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <strong>TR-069 ACS URL (from VPN Gateway):</strong><br>
+                                    <code><?= htmlspecialchars($wgServiceTR069->getTR069AcsUrl()) ?></code>
+                                    <div class="form-text mt-1">Automatically uses VPN Gateway IP on port 7547. Configure in VPN Settings.</div>
                                 </div>
                                 
                                 <div class="row">
@@ -9166,24 +9158,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label">ACS URL</label>
+                                    <label class="form-label">ACS URL (from VPN Gateway)</label>
                                     <?php
-                                    $defaultAcsUrl = '';
-                                    $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_acs_url'");
-                                    $defaultAcsUrl = $stmt->fetchColumn() ?: '';
-                                    if (!$defaultAcsUrl) {
-                                        $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
-                                        $genieUrl = $stmt->fetchColumn();
-                                        if ($genieUrl) {
-                                            $parsed = parse_url($genieUrl);
-                                            $defaultAcsUrl = 'http://' . ($parsed['host'] ?? 'localhost') . ':7547';
-                                        }
-                                    }
+                                    require_once __DIR__ . '/../src/WireGuardService.php';
+                                    $wgServiceBulk = new \App\WireGuardService($db);
+                                    $defaultAcsUrl = $wgServiceBulk->getTR069AcsUrl();
                                     ?>
-                                    <input type="url" name="acs_url" class="form-control" required
-                                           value="<?= htmlspecialchars($defaultAcsUrl) ?>"
-                                           placeholder="http://your-genieacs-server:7547">
-                                    <div class="form-text">URL that ONUs will use to connect to GenieACS</div>
+                                    <input type="url" name="acs_url" class="form-control" required readonly
+                                           value="<?= htmlspecialchars($defaultAcsUrl) ?>">
+                                    <div class="form-text">Uses VPN Gateway IP on port 7547. Configure in VPN Settings.</div>
                                 </div>
                                 
                                 <div class="mb-3">

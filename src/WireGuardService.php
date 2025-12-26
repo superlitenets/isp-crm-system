@@ -40,8 +40,6 @@ class WireGuardService {
         
         return array_merge([
             'vpn_enabled' => 'false',
-            'tr069_use_vpn_gateway' => 'false',
-            'tr069_acs_url' => 'http://localhost:7547',
             'vpn_gateway_ip' => '10.200.0.1',
             'vpn_network' => '10.200.0.0/24',
             'server_public_ip' => '',
@@ -686,12 +684,8 @@ class WireGuardService {
     
     public function getTR069AcsUrl(): string {
         $settings = $this->getSettings();
-        
-        if ($settings['tr069_use_vpn_gateway'] === 'true' && $settings['vpn_enabled'] === 'true') {
-            return 'http://' . $settings['vpn_gateway_ip'] . ':7547';
-        }
-        
-        return $settings['tr069_acs_url'];
+        // Always use VPN gateway IP for TR-069 ACS URL
+        return 'http://' . $settings['vpn_gateway_ip'] . ':7547';
     }
     
     public function getOLTSitePeers(): array {
