@@ -1,0 +1,6 @@
+mschap {
+    use_mppe = yes
+    require_encryption = no
+    require_strong = no
+    with_ntdomain_hack = yes
+}

@@ -1,0 +1,3 @@
+# User authorization file
+# Users are authenticated against the SQL database
+# This file is kept for compatibility but not used

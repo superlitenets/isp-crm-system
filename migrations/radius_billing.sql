@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS radius_subscriptions (
     customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
     package_id INTEGER REFERENCES radius_packages(id),
     username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL, -- Cleartext password for RADIUS CHAP/MS-CHAP
     password_encrypted TEXT NOT NULL,
     access_type VARCHAR(20) DEFAULT 'pppoe', -- pppoe, hotspot, static, dhcp
     static_ip VARCHAR(45),
@@ -162,7 +163,21 @@ CREATE TABLE IF NOT EXISTS radius_redirect_rules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Post-Auth Log (for FreeRADIUS)
+CREATE TABLE IF NOT EXISTS radpostauth (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    pass VARCHAR(255),
+    reply VARCHAR(32),
+    authdate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    nasipaddress VARCHAR(45),
+    calledstationid VARCHAR(50),
+    callingstationid VARCHAR(50)
+);
+
 -- Create indexes
+CREATE INDEX IF NOT EXISTS idx_radpostauth_username ON radpostauth(username);
+CREATE INDEX IF NOT EXISTS idx_radpostauth_authdate ON radpostauth(authdate);
 CREATE INDEX IF NOT EXISTS idx_radius_sessions_subscription ON radius_sessions(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_radius_sessions_status ON radius_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_radius_sessions_start ON radius_sessions(session_start);

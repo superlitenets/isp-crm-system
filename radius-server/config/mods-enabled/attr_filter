@@ -1,0 +1,24 @@
+attr_filter attr_filter.post-proxy {
+    key = "%{Realm}"
+    filename = ${modconfdir}/attr_filter/post-proxy
+}
+
+attr_filter attr_filter.pre-proxy {
+    key = "%{Realm}"
+    filename = ${modconfdir}/attr_filter/pre-proxy
+}
+
+attr_filter attr_filter.access_reject {
+    key = "%{User-Name}"
+    filename = ${modconfdir}/attr_filter/access_reject
+}
+
+attr_filter attr_filter.access_challenge {
+    key = "%{User-Name}"
+    filename = ${modconfdir}/attr_filter/access_challenge
+}
+
+attr_filter attr_filter.accounting_response {
+    key = "%{User-Name}"
+    filename = ${modconfdir}/attr_filter/accounting_response
+}

@@ -1,0 +1,41 @@
+filter_username {
+    if (&User-Name =~ / /) {
+        update request {
+            &Module-Failure-Message += 'Rejected: Username contains whitespace'
+        }
+        reject
+    }
+    if (&User-Name =~ /@.*@/ ) {
+        update request {
+            &Module-Failure-Message += 'Rejected: Username contains multiple @ characters'
+        }
+        reject
+    }
+    if (&User-Name =~ /\.\./ ) {
+        update request {
+            &Module-Failure-Message += 'Rejected: Username contains consecutive dots'
+        }
+        reject
+    }
+    if ((&User-Name =~ /@/) && (&User-Name !~ /@(.+)\.(.+)$/))  {
+        update request {
+            &Module-Failure-Message += 'Rejected: Domain name in username is invalid'
+        }
+        reject
+    }
+    if (&User-Name =~ /\.$/)  {
+        update request {
+            &Module-Failure-Message += 'Rejected: Username ends with a dot'
+        }
+        reject
+    }
+    if (&User-Name =~ /@\./)  {
+        update request {
+            &Module-Failure-Message += 'Rejected: Username starts with a dot after @'
+        }
+        reject
+    }
+}
+
+filter_password {
+}

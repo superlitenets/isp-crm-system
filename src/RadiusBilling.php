@@ -304,14 +304,15 @@ class RadiusBilling {
             $expiryDate = date('Y-m-d', strtotime("+{$package['validity_days']} days"));
             
             $stmt = $this->db->prepare("
-                INSERT INTO radius_subscriptions (customer_id, package_id, username, password_encrypted,
+                INSERT INTO radius_subscriptions (customer_id, package_id, username, password, password_encrypted,
                     access_type, static_ip, mac_address, status, start_date, expiry_date, nas_id, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['customer_id'],
                 $data['package_id'],
                 $data['username'],
+                $data['password'], // Cleartext for RADIUS CHAP/MS-CHAP
                 $this->encrypt($data['password']),
                 $data['access_type'] ?? $package['package_type'],
                 $data['static_ip'] ?? null,

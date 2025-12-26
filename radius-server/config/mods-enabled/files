@@ -1,0 +1,5 @@
+files {
+    filename = ${confdir}/mods-config/files/authorize
+    usersfile = ${confdir}/users
+    acctusersfile = ${confdir}/acct_users
+}

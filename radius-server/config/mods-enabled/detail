@@ -1,0 +1,8 @@
+detail {
+    filename = ${radacctdir}/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+    header = "%t"
+    permissions = 0600
+    locking = yes
+    escape_filenames = no
+    log_packet_header = no
+}
