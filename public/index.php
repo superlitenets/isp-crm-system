@@ -6658,6 +6658,7 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/isp.php';
+                    exit;
                 }
                 break;
             case 'finance':
