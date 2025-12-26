@@ -1490,6 +1490,17 @@ if ($page === 'finance') {
     exit;
 }
 
+// ISP RADIUS Billing - standalone page with its own layout
+if ($page === 'isp') {
+    \App\Auth::requireLogin();
+    if (!\App\Auth::can('settings.view')) {
+        echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
+        exit;
+    }
+    include __DIR__ . '/../templates/isp.php';
+    exit;
+}
+
 \App\Auth::requireLogin();
 
 $customer = new \App\Customer();
