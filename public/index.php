@@ -6289,11 +6289,6 @@ $csrfToken = \App\Auth::generateToken();
                 <?php endif; ?>
                 <?php if (\App\Auth::can('settings.view')): ?>
                 <li class="nav-item">
-                    <a class="nav-link <?= $page === 'devices' ? 'active' : '' ?>" href="?page=devices">
-                        <i class="bi bi-hdd-network"></i> Network Devices
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link" href="?page=huawei-olt">
                         <i class="bi bi-router text-primary"></i> OMS
                     </a>
@@ -6436,11 +6431,6 @@ $csrfToken = \App\Auth::generateToken();
             </li>
             <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
-            <li class="nav-item">
-                <a class="nav-link <?= $page === 'devices' || $page === 'smartolt' ? 'active' : '' ?>" href="?page=devices">
-                    <i class="bi bi-hdd-network"></i> Network Devices
-                </a>
-            </li>
             <li class="nav-item">
                 <a class="nav-link" href="?page=huawei-olt">
                     <i class="bi bi-router text-primary"></i> OMS
@@ -6643,22 +6633,6 @@ $csrfToken = \App\Auth::generateToken();
                     $accessDenied = true;
                 } else {
                     include __DIR__ . '/../templates/complaints.php';
-                }
-                break;
-            case 'smartolt':
-            case 'devices':
-                if (!\App\Auth::can('settings.view')) {
-                    $accessDenied = true;
-                } else {
-                    $deviceMonitor = new \App\DeviceMonitor($db);
-                    $deviceMonitor->initializeTables();
-                    $devices = $deviceMonitor->getDevices();
-                    $stats = $deviceMonitor->getStatistics();
-                    $onus = [];
-                    if (!empty($_GET['device'])) {
-                        $onus = $deviceMonitor->getOnus((int)$_GET['device'], ['status' => $_GET['status'] ?? '']);
-                    }
-                    include __DIR__ . '/../templates/devices.php';
                 }
                 break;
             case 'huawei-olt':
