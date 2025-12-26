@@ -8799,7 +8799,7 @@ ont tr069-server-config 1 all profile-id 1</pre>
                         <div class="card-body">
                             <p class="small">When you authorize an ONU, the system will automatically:</p>
                             <ol class="small">
-                                <li><strong>Find TR-069 VLAN:</strong> Looks for a VLAN marked as "TR-069" in OLT VLANs</li>
+                                <li><strong>Find TR-069 VLAN:</strong> Looks for a VLAN with "TR-069 Management VLAN" feature enabled in OLT VLANs</li>
                                 <li><strong>Configure Native VLAN:</strong> Sets the TR-069 VLAN on ONU's ETH port 1</li>
                                 <li><strong>Set DHCP Mode:</strong> Configures the ONU to get IP via DHCP on TR-069 VLAN</li>
                                 <li><strong>Push ACS URL:</strong> Sends your ACS URL to the ONU via OMCI</li>
@@ -8818,7 +8818,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             
                             <div class="alert alert-warning small mt-3 mb-0">
                                 <i class="bi bi-exclamation-triangle me-2"></i>
-                                <strong>Requirement:</strong> You must mark a VLAN as "TR-069" in OLT → VLANs for auto-configuration to work.
+                                <strong>Requirement:</strong> Go to OLT → VLANs, edit a VLAN, and tick "TR-069 Management VLAN" feature for auto-configuration to work.
                             </div>
                         </div>
                     </div>
