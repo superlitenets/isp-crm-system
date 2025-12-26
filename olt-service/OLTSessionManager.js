@@ -27,7 +27,7 @@ class OLTSession {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
         this.buffer = '';
-        this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\])\s*$/;
+        this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]+(?:\([^)]+\))?[#>])\s*$/i;
         this.dataListeners = [];
     }
 
