@@ -155,6 +155,28 @@ services:
       - ./storage/wireguard:/scripts
     restart: unless-stopped
 
+  freeradius:
+    build:
+      context: ./radius-server
+      dockerfile: Dockerfile
+    container_name: isp_crm_freeradius
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    environment:
+      - POSTGRES_HOST=isp_crm_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./radius-server/config:/etc/freeradius/3.0/custom:ro
+    networks:
+      - crm_network
+
 networks:
   crm_network:
     driver: bridge

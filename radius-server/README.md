@@ -2,30 +2,18 @@
 
 This FreeRADIUS Docker container integrates with the ISP RADIUS Billing module to provide AAA (Authentication, Authorization, Accounting) services for MikroTik routers.
 
-## Quick Start
+## Deployment
 
-### 1. Configure Environment Variables
-
-Create a `.env` file in this directory:
-
-```bash
-POSTGRES_HOST=your-database-host
-POSTGRES_PORT=5432
-POSTGRES_DB=your-database-name
-POSTGRES_USER=your-database-user
-POSTGRES_PASSWORD=your-database-password
-```
-
-### 2. Build and Run
+FreeRADIUS is integrated into the main `docker-compose.yml` file. It starts automatically with other services:
 
 ```bash
 docker-compose up -d --build
 ```
 
-### 3. Test RADIUS Authentication
+### Test RADIUS Authentication
 
 ```bash
-radtest testuser testpassword localhost 0 testing123
+docker exec -it isp_crm_freeradius radtest testuser testpassword localhost 0 testing123
 ```
 
 ## Configuration
