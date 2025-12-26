@@ -1314,7 +1314,7 @@ class Ticket {
             
             if (in_array($newStatus, ['resolved', 'closed'])) {
                 $ticketCommission = new TicketCommission($this->db);
-                $ticketCommission->calculateForTicket($ticketId);
+                $ticketCommission->processTicketClosure($ticketId);
             }
         }
         
