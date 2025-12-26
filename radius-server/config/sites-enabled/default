@@ -40,16 +40,9 @@ server default {
     authorize {
         filter_username
         preprocess
-        chap
-        mschap
-        digest
         suffix
-        eap {
-            ok = return
-        }
         files
         sql
-        -ldap
         expiration
         logintime
         pap
@@ -59,15 +52,6 @@ server default {
         Auth-Type PAP {
             pap
         }
-        Auth-Type CHAP {
-            chap
-        }
-        Auth-Type MS-CHAP {
-            mschap
-        }
-        mschap
-        digest
-        eap
     }
 
     preacct {
