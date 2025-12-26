@@ -818,13 +818,23 @@ try {
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-5 mb-3">
                                         <label class="form-label">Username (PPPoE)</label>
-                                        <input type="text" name="username" class="form-control" required>
+                                        <input type="text" name="username" id="pppoe_username" class="form-control" required>
                                     </div>
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-5 mb-3">
                                         <label class="form-label">Password</label>
-                                        <input type="password" name="password" class="form-control" required>
+                                        <div class="input-group">
+                                            <input type="text" name="password" id="pppoe_password" class="form-control" required>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="togglePasswordVisibility()" title="Toggle visibility">
+                                                <i class="bi bi-eye" id="passwordToggleIcon"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 mb-3 d-flex align-items-end">
+                                        <button type="button" class="btn btn-info w-100" onclick="generateCredentials()">
+                                            <i class="bi bi-magic me-1"></i> Generate
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="row">
@@ -1381,5 +1391,52 @@ try {
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function generateCredentials() {
+        const customerSelect = document.querySelector('select[name="customer_id"]');
+        const customerText = customerSelect.options[customerSelect.selectedIndex]?.text || '';
+        const customerName = customerText.split('(')[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        // Generate username: customer name + random 4 digits
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const username = customerName ? customerName.substring(0, 12) + randomNum : 'pppoe' + randomNum;
+        
+        // Generate password: 8 random alphanumeric characters
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let password = '';
+        for (let i = 0; i < 8; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        document.getElementById('pppoe_username').value = username;
+        document.getElementById('pppoe_password').value = password;
+    }
+    
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('pppoe_password');
+        const icon = document.getElementById('passwordToggleIcon');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+    
+    // Auto-generate when customer is selected
+    document.addEventListener('DOMContentLoaded', function() {
+        const customerSelect = document.querySelector('select[name="customer_id"]');
+        if (customerSelect) {
+            customerSelect.addEventListener('change', function() {
+                if (this.value && !document.getElementById('pppoe_username').value) {
+                    generateCredentials();
+                }
+            });
+        }
+    });
+    </script>
 </body>
 </html>
