@@ -6225,20 +6225,20 @@ class HuaweiOLT {
             $this->executeCommand($oltId, $command);
         }
         
-        $isMulticast = !empty($options['is_multicast']);
-        $isVoip = !empty($options['is_voip']);
-        $isTr069 = !empty($options['is_tr069']);
-        $dhcpSnooping = !empty($options['dhcp_snooping']);
-        $lanToLan = !empty($options['lan_to_lan']);
+        $isMulticast = !empty($options['is_multicast']) ? 't' : 'f';
+        $isVoip = !empty($options['is_voip']) ? 't' : 'f';
+        $isTr069 = !empty($options['is_tr069']) ? 't' : 'f';
+        $dhcpSnooping = !empty($options['dhcp_snooping']) ? 't' : 'f';
+        $lanToLan = !empty($options['lan_to_lan']) ? 't' : 'f';
         
         $stmt = $this->db->prepare("
             UPDATE huawei_vlans 
             SET description = ?, 
-                is_multicast = ?, 
-                is_voip = ?, 
-                is_tr069 = ?, 
-                dhcp_snooping = ?, 
-                lan_to_lan = ?,
+                is_multicast = ?::boolean, 
+                is_voip = ?::boolean, 
+                is_tr069 = ?::boolean, 
+                dhcp_snooping = ?::boolean, 
+                lan_to_lan = ?::boolean,
                 updated_at = CURRENT_TIMESTAMP 
             WHERE olt_id = ? AND vlan_id = ?
         ");
