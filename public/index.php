@@ -6293,6 +6293,11 @@ $csrfToken = \App\Auth::generateToken();
                         <i class="bi bi-router text-primary"></i> OMS
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
+                        <i class="bi bi-broadcast text-info"></i> ISP
+                    </a>
+                </li>
                 <?php endif; ?>
                 <?php if (\App\Auth::can('reports.view')): ?>
                 <li class="nav-item">
@@ -6434,6 +6439,11 @@ $csrfToken = \App\Auth::generateToken();
             <li class="nav-item">
                 <a class="nav-link" href="?page=huawei-olt">
                     <i class="bi bi-router text-primary"></i> OMS
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
+                    <i class="bi bi-broadcast text-info"></i> ISP
                 </a>
             </li>
             <?php endif; ?>
@@ -6641,6 +6651,13 @@ $csrfToken = \App\Auth::generateToken();
                 } else {
                     include __DIR__ . '/../templates/huawei_olt.php';
                     exit;
+                }
+                break;
+            case 'isp':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/isp.php';
                 }
                 break;
             case 'finance':
