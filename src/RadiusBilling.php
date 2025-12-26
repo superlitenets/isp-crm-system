@@ -778,4 +778,487 @@ class RadiusBilling {
         
         return ['success' => true, 'renewed' => $renewed];
     }
+    
+    // ==================== Expiry & Alerts ====================
+    
+    public function getExpiringSubscriptions(int $days = 7): array {
+        $stmt = $this->db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+                   p.name as package_name, p.price as package_price,
+                   EXTRACT(DAY FROM s.expiry_date - CURRENT_DATE) as days_remaining
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.status = 'active' AND s.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 day' * ?
+            ORDER BY s.expiry_date ASC
+        ");
+        $stmt->execute([$days]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSubscriptionsNearQuota(int $percentThreshold = 80): array {
+        $stmt = $this->db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
+                   p.name as package_name, p.data_quota_mb,
+                   ROUND((s.data_used_mb::numeric / NULLIF(p.data_quota_mb, 0)) * 100, 1) as usage_percent
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.status = 'active' AND p.data_quota_mb > 0
+            AND (s.data_used_mb::numeric / p.data_quota_mb) * 100 >= ?
+            ORDER BY usage_percent DESC
+        ");
+        $stmt->execute([$percentThreshold]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function sendExpiryAlerts(): array {
+        $sent = 0;
+        $sms = new \App\SMS();
+        
+        // Get subscriptions expiring in 3 days
+        $expiring = $this->getExpiringSubscriptions(3);
+        
+        foreach ($expiring as $sub) {
+            if (empty($sub['customer_phone'])) continue;
+            
+            $days = (int)$sub['days_remaining'];
+            $message = "Dear {$sub['customer_name']}, your internet subscription ({$sub['package_name']}) ";
+            $message .= $days == 0 ? "expires TODAY." : "expires in {$days} day(s).";
+            $message .= " Please renew to avoid disconnection. Amount: KES " . number_format($sub['package_price']);
+            
+            try {
+                $gateway = new \App\SMSGateway();
+                $gateway->send($sub['customer_phone'], $message);
+                $sent++;
+            } catch (\Exception $e) {
+                // Log error but continue
+            }
+        }
+        
+        return ['success' => true, 'sent' => $sent];
+    }
+    
+    // ==================== M-Pesa Integration ====================
+    
+    public function processPayment(string $transactionId, string $phone, float $amount, string $accountRef = ''): array {
+        // Find subscription by phone or account reference
+        $stmt = $this->db->prepare("
+            SELECT s.* FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            WHERE c.phone LIKE ? OR s.username = ?
+            LIMIT 1
+        ");
+        $phoneClean = preg_replace('/^254/', '0', $phone);
+        $stmt->execute(['%' . $phoneClean, $accountRef]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found for phone: ' . $phone];
+        }
+        
+        $package = $this->getPackage($sub['package_id']);
+        if (!$package) {
+            return ['success' => false, 'error' => 'Package not found'];
+        }
+        
+        // Check if payment covers package price
+        if ($amount < $package['price']) {
+            return ['success' => false, 'error' => 'Insufficient amount. Package costs KES ' . $package['price']];
+        }
+        
+        // Renew subscription
+        $result = $this->renewSubscription($sub['id']);
+        
+        if ($result['success']) {
+            // Record payment
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_billing (subscription_id, package_id, amount, billing_type, 
+                    period_start, period_end, status, payment_method, transaction_ref)
+                VALUES (?, ?, ?, 'renewal', CURRENT_DATE, ?, 'paid', 'mpesa', ?)
+            ");
+            $stmt->execute([
+                $sub['id'], 
+                $sub['package_id'], 
+                $amount, 
+                $result['expiry_date'],
+                $transactionId
+            ]);
+        }
+        
+        return $result;
+    }
+    
+    // ==================== CoA (Change of Authorization) ====================
+    
+    public function disconnectUser(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        // Get active sessions
+        $stmt = $this->db->prepare("
+            SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
+            FROM radius_sessions rs
+            LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+            WHERE rs.subscription_id = ? AND rs.stopped_at IS NULL
+        ");
+        $stmt->execute([$subscriptionId]);
+        $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        $disconnected = 0;
+        foreach ($sessions as $session) {
+            if ($this->sendCoADisconnect($session)) {
+                $disconnected++;
+            }
+        }
+        
+        return ['success' => true, 'disconnected' => $disconnected];
+    }
+    
+    private function sendCoADisconnect(array $session): bool {
+        if (empty($session['nas_ip']) || empty($session['nas_secret'])) {
+            return false;
+        }
+        
+        // Build CoA Disconnect-Request packet
+        // This requires radclient or custom RADIUS implementation
+        $command = sprintf(
+            'echo "Acct-Session-Id=%s,User-Name=%s" | radclient -x %s:3799 disconnect %s 2>&1',
+            escapeshellarg($session['session_id']),
+            escapeshellarg($session['username'] ?? ''),
+            escapeshellarg($session['nas_ip']),
+            escapeshellarg($session['nas_secret'])
+        );
+        
+        exec($command, $output, $returnCode);
+        return $returnCode === 0;
+    }
+    
+    // ==================== Reports ====================
+    
+    public function getRevenueReport(string $period = 'monthly', ?string $startDate = null, ?string $endDate = null): array {
+        $startDate = $startDate ?? date('Y-m-01');
+        $endDate = $endDate ?? date('Y-m-t');
+        
+        $groupBy = match($period) {
+            'daily' => "DATE(created_at)",
+            'weekly' => "DATE_TRUNC('week', created_at)",
+            'monthly' => "DATE_TRUNC('month', created_at)",
+            default => "DATE_TRUNC('month', created_at)"
+        };
+        
+        $stmt = $this->db->prepare("
+            SELECT 
+                {$groupBy} as period,
+                COUNT(*) as transactions,
+                SUM(amount) as total_revenue,
+                SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_revenue,
+                SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending_revenue
+            FROM radius_billing
+            WHERE created_at BETWEEN ? AND ?
+            GROUP BY {$groupBy}
+            ORDER BY period DESC
+        ");
+        $stmt->execute([$startDate, $endDate . ' 23:59:59']);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getPackagePopularity(): array {
+        $stmt = $this->db->query("
+            SELECT p.name, p.price, COUNT(s.id) as subscriber_count,
+                   SUM(CASE WHEN s.status = 'active' THEN 1 ELSE 0 END) as active_count,
+                   p.price * COUNT(CASE WHEN s.status = 'active' THEN 1 END) as potential_revenue
+            FROM radius_packages p
+            LEFT JOIN radius_subscriptions s ON s.package_id = p.id
+            GROUP BY p.id, p.name, p.price
+            ORDER BY subscriber_count DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSubscriptionStats(): array {
+        $stmt = $this->db->query("
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END) as suspended,
+                SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) as expired,
+                SUM(CASE WHEN expiry_date = CURRENT_DATE THEN 1 ELSE 0 END) as expiring_today,
+                SUM(CASE WHEN expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7 THEN 1 ELSE 0 END) as expiring_week
+            FROM radius_subscriptions
+        ");
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Usage Analytics ====================
+    
+    public function getTopUsers(int $limit = 20, string $period = 'today'): array {
+        $dateFilter = match($period) {
+            'today' => "DATE(started_at) = CURRENT_DATE",
+            'week' => "started_at >= CURRENT_DATE - INTERVAL '7 days'",
+            'month' => "started_at >= CURRENT_DATE - INTERVAL '30 days'",
+            default => "DATE(started_at) = CURRENT_DATE"
+        };
+        
+        $stmt = $this->db->prepare("
+            SELECT s.username, c.name as customer_name,
+                   SUM(rs.input_octets + rs.output_octets) / 1073741824.0 as total_gb,
+                   SUM(rs.input_octets) / 1073741824.0 as download_gb,
+                   SUM(rs.output_octets) / 1073741824.0 as upload_gb,
+                   COUNT(rs.id) as session_count
+            FROM radius_sessions rs
+            LEFT JOIN radius_subscriptions s ON rs.subscription_id = s.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            WHERE {$dateFilter}
+            GROUP BY s.username, c.name
+            ORDER BY total_gb DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getPeakHours(): array {
+        $stmt = $this->db->query("
+            SELECT EXTRACT(HOUR FROM started_at) as hour,
+                   COUNT(*) as session_count,
+                   SUM(input_octets + output_octets) / 1073741824.0 as total_gb
+            FROM radius_sessions
+            WHERE started_at >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY EXTRACT(HOUR FROM started_at)
+            ORDER BY hour
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getBandwidthTrends(int $days = 30): array {
+        $stmt = $this->db->prepare("
+            SELECT DATE(started_at) as date,
+                   SUM(input_octets) / 1073741824.0 as download_gb,
+                   SUM(output_octets) / 1073741824.0 as upload_gb,
+                   COUNT(DISTINCT subscription_id) as unique_users
+            FROM radius_sessions
+            WHERE started_at >= CURRENT_DATE - INTERVAL '1 day' * ?
+            GROUP BY DATE(started_at)
+            ORDER BY date
+        ");
+        $stmt->execute([$days]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== MAC Binding ====================
+    
+    public function bindMAC(int $subscriptionId, string $mac): array {
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        if (strlen($mac) !== 12) {
+            return ['success' => false, 'error' => 'Invalid MAC address format'];
+        }
+        
+        // Format as XX:XX:XX:XX:XX:XX
+        $mac = implode(':', str_split($mac, 2));
+        
+        $stmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$mac, $subscriptionId]);
+        
+        return ['success' => true, 'mac' => $mac];
+    }
+    
+    public function unbindMAC(int $subscriptionId): array {
+        $stmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$subscriptionId]);
+        return ['success' => true];
+    }
+    
+    public function verifyMAC(int $subscriptionId, string $mac): bool {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub || empty($sub['mac_address'])) {
+            return true; // No MAC binding, allow
+        }
+        
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9:]/', '', $mac));
+        return $sub['mac_address'] === $mac;
+    }
+    
+    // ==================== IP Pool Management ====================
+    
+    public function getIPPools(): array {
+        $stmt = $this->db->query("SELECT * FROM radius_ip_pools ORDER BY name");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function createIPPool(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_ip_pools (name, start_ip, end_ip, gateway, netmask, dns1, dns2, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['start_ip'],
+                $data['end_ip'],
+                $data['gateway'] ?? null,
+                $data['netmask'] ?? '255.255.255.0',
+                $data['dns1'] ?? '8.8.8.8',
+                $data['dns2'] ?? '8.8.4.4',
+                $data['is_active'] ?? true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getIPPoolAllocation(int $poolId): array {
+        $stmt = $this->db->prepare("
+            SELECT s.static_ip, s.username, c.name as customer_name, s.status
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_ip_pools p ON s.static_ip >= p.start_ip AND s.static_ip <= p.end_ip
+            WHERE p.id = ? AND s.static_ip IS NOT NULL
+            ORDER BY INET(s.static_ip)
+        ");
+        $stmt->execute([$poolId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== NAS Monitoring ====================
+    
+    public function getNASStatus(): array {
+        $devices = $this->getNASDevices();
+        $result = [];
+        
+        foreach ($devices as $nas) {
+            $status = [
+                'id' => $nas['id'],
+                'name' => $nas['name'],
+                'ip_address' => $nas['ip_address'],
+                'online' => false,
+                'latency_ms' => null,
+                'active_sessions' => 0,
+                'last_check' => date('Y-m-d H:i:s')
+            ];
+            
+            // Ping check
+            exec("ping -c 1 -W 2 " . escapeshellarg($nas['ip_address']) . " 2>&1", $output, $returnCode);
+            if ($returnCode === 0) {
+                $status['online'] = true;
+                if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {
+                    $status['latency_ms'] = (float)$matches[1];
+                }
+            }
+            
+            // Active sessions count
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) FROM radius_sessions 
+                WHERE nas_id = ? AND stopped_at IS NULL
+            ");
+            $stmt->execute([$nas['id']]);
+            $status['active_sessions'] = (int)$stmt->fetchColumn();
+            
+            $result[] = $status;
+        }
+        
+        return $result;
+    }
+    
+    // ==================== Bulk Import ====================
+    
+    public function importSubscriptionsCSV(string $csvContent): array {
+        $lines = explode("\n", trim($csvContent));
+        $header = str_getcsv(array_shift($lines));
+        
+        $imported = 0;
+        $errors = [];
+        
+        foreach ($lines as $lineNum => $line) {
+            if (empty(trim($line))) continue;
+            
+            $row = array_combine($header, str_getcsv($line));
+            
+            try {
+                // Required fields: customer_id, package_id, username, password
+                if (empty($row['username']) || empty($row['password'])) {
+                    $errors[] = "Line " . ($lineNum + 2) . ": Missing username or password";
+                    continue;
+                }
+                
+                $result = $this->createSubscription([
+                    'customer_id' => $row['customer_id'] ?? null,
+                    'package_id' => $row['package_id'] ?? 1,
+                    'username' => $row['username'],
+                    'password' => $row['password'],
+                    'access_type' => $row['access_type'] ?? 'pppoe',
+                    'static_ip' => $row['static_ip'] ?? null,
+                    'mac_address' => $row['mac_address'] ?? null,
+                    'notes' => $row['notes'] ?? 'Imported via CSV'
+                ]);
+                
+                if ($result['success']) {
+                    $imported++;
+                } else {
+                    $errors[] = "Line " . ($lineNum + 2) . ": " . $result['error'];
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Line " . ($lineNum + 2) . ": " . $e->getMessage();
+            }
+        }
+        
+        return ['success' => true, 'imported' => $imported, 'errors' => $errors];
+    }
+    
+    // ==================== Package Upgrade/Downgrade ====================
+    
+    public function changePackage(int $subscriptionId, int $newPackageId, bool $prorated = true): array {
+        try {
+            $sub = $this->getSubscription($subscriptionId);
+            if (!$sub) {
+                return ['success' => false, 'error' => 'Subscription not found'];
+            }
+            
+            $oldPackage = $this->getPackage($sub['package_id']);
+            $newPackage = $this->getPackage($newPackageId);
+            
+            if (!$newPackage) {
+                return ['success' => false, 'error' => 'New package not found'];
+            }
+            
+            $proratedAmount = 0;
+            $creditAmount = 0;
+            
+            if ($prorated && $sub['expiry_date']) {
+                $daysRemaining = max(0, (strtotime($sub['expiry_date']) - time()) / 86400);
+                $totalDays = $oldPackage['validity_days'] ?? 30;
+                
+                // Calculate credit for unused days
+                $dailyRate = $oldPackage['price'] / $totalDays;
+                $creditAmount = round($dailyRate * $daysRemaining, 2);
+                
+                // Calculate prorated amount for new package
+                $newDailyRate = $newPackage['price'] / ($newPackage['validity_days'] ?? 30);
+                $proratedAmount = round($newDailyRate * $daysRemaining, 2);
+            }
+            
+            // Update subscription
+            $stmt = $this->db->prepare("
+                UPDATE radius_subscriptions SET package_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+            ");
+            $stmt->execute([$newPackageId, $subscriptionId]);
+            
+            // Disconnect user to apply new speed
+            $this->disconnectUser($subscriptionId);
+            
+            return [
+                'success' => true,
+                'old_package' => $oldPackage['name'],
+                'new_package' => $newPackage['name'],
+                'credit_amount' => $creditAmount,
+                'prorated_amount' => $proratedAmount,
+                'difference' => $proratedAmount - $creditAmount
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
 }

@@ -38,13 +38,22 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump).
 - **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation (via `wg genkey`), configuration export, MikroTik script generation with auto-detected public IP, and real-time traffic statistics. OLT service uses host network mode to access VPN routes for ping functionality.
 - **ISP RADIUS Billing Module**: Comprehensive MikroTik RADIUS billing system with full AAA (Authentication, Authorization, Accounting) support. Features include:
-  - **NAS Device Management**: Register and manage MikroTik routers with RADIUS secret configuration and optional RouterOS API access.
-  - **Service Packages**: Create packages with configurable speeds, data quotas, validity periods, billing cycles (daily/weekly/monthly/quarterly/yearly), and simultaneous session limits.
-  - **Customer Subscriptions**: PPPoE, Hotspot, Static IP, and DHCP access types with encrypted password storage, automatic expiry handling, and suspension management.
+  - **NAS Device Management**: Register and manage MikroTik routers with RADIUS secret configuration and optional RouterOS API access. Real-time NAS status monitoring with ping checks and active session counts.
+  - **Service Packages**: Create packages with configurable speeds, data quotas, validity periods, billing cycles (daily/weekly/monthly/quarterly/yearly), and simultaneous session limits. FUP (Fair Usage Policy) support with throttled speeds after quota.
+  - **Customer Subscriptions**: PPPoE, Hotspot, Static IP, and DHCP access types with encrypted password storage, automatic expiry handling, and suspension management. Auto-generated PPPoE credentials (username from customer name + 4 digits, 8-char random password).
   - **Session Tracking**: Real-time active session monitoring with data usage tracking (upload/download octets).
   - **Hotspot Vouchers**: Batch voucher generation for prepaid hotspot access with unique codes.
-  - **Billing History**: Invoice generation, payment tracking, and billing records.
+  - **Billing History**: Invoice generation, payment tracking, and billing records with M-Pesa transaction references.
   - **Dashboard**: Real-time statistics for active subscriptions, sessions, expiring accounts, monthly revenue, and data usage.
+  - **Expiring Subscriptions**: Dedicated view showing subscriptions expiring in the next 14 days with quick renewal actions and SMS alert functionality.
+  - **Revenue Reports**: Monthly revenue breakdown, package popularity analytics, and subscription statistics (active/suspended/expired).
+  - **Usage Analytics**: Top users by data consumption, peak usage hours heatmap, and bandwidth trends.
+  - **M-Pesa Integration**: Automatic subscription renewal on M-Pesa payment, matching by phone number or username.
+  - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires.
+  - **MAC Binding**: Bind subscriptions to specific MAC addresses for security.
+  - **IP Pool Management**: Create and manage IP address pools for dynamic allocation.
+  - **Bulk Import**: CSV import for batch subscription creation with validation.
+  - **Package Upgrade/Downgrade**: Change packages with prorated billing calculations.
 - **Licensing System**: Standalone license server for redistributing the CRM to other ISPs. Features include:
   - **License Server** (`license-server/`): Deployable standalone PHP app with admin dashboard, REST API, customer/license/activation management, usage analytics.
   - **License Client** (`src/LicenseClient.php`, `src/LicenseMiddleware.php`): Integrated validation with 7-day grace period for offline operation.

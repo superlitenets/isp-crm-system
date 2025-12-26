@@ -393,6 +393,22 @@ try {
                     <i class="bi bi-diagram-2 me-2"></i> IP Pools
                 </a>
                 <hr class="my-2 border-light opacity-25">
+                <a class="nav-link <?= $view === 'expiring' ? 'active' : '' ?>" href="?page=isp&view=expiring">
+                    <i class="bi bi-clock-history me-2"></i> Expiring Soon
+                    <?php $expiringCount = count($radiusBilling->getExpiringSubscriptions(7)); if ($expiringCount > 0): ?>
+                    <span class="badge bg-warning ms-auto"><?= $expiringCount ?></span>
+                    <?php endif; ?>
+                </a>
+                <a class="nav-link <?= $view === 'reports' ? 'active' : '' ?>" href="?page=isp&view=reports">
+                    <i class="bi bi-graph-up me-2"></i> Reports
+                </a>
+                <a class="nav-link <?= $view === 'analytics' ? 'active' : '' ?>" href="?page=isp&view=analytics">
+                    <i class="bi bi-bar-chart me-2"></i> Analytics
+                </a>
+                <a class="nav-link <?= $view === 'import' ? 'active' : '' ?>" href="?page=isp&view=import">
+                    <i class="bi bi-upload me-2"></i> Import CSV
+                </a>
+                <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=isp&view=settings">
                     <i class="bi bi-gear me-2"></i> Settings
                 </a>
@@ -442,6 +458,19 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'ip_pools' ? 'active' : '' ?>" href="?page=isp&view=ip_pools">
                     <i class="bi bi-diagram-2 me-2"></i> IP Pools
+                </a>
+                <hr class="my-2 border-light opacity-25">
+                <a class="nav-link <?= $view === 'expiring' ? 'active' : '' ?>" href="?page=isp&view=expiring">
+                    <i class="bi bi-clock-history me-2"></i> Expiring Soon
+                </a>
+                <a class="nav-link <?= $view === 'reports' ? 'active' : '' ?>" href="?page=isp&view=reports">
+                    <i class="bi bi-graph-up me-2"></i> Reports
+                </a>
+                <a class="nav-link <?= $view === 'analytics' ? 'active' : '' ?>" href="?page=isp&view=analytics">
+                    <i class="bi bi-bar-chart me-2"></i> Analytics
+                </a>
+                <a class="nav-link <?= $view === 'import' ? 'active' : '' ?>" href="?page=isp&view=import">
+                    <i class="bi bi-upload me-2"></i> Import CSV
                 </a>
                 <hr class="my-2 border-light opacity-25">
                 <a class="nav-link <?= $view === 'settings' ? 'active' : '' ?>" href="?page=isp&view=settings">
@@ -1370,18 +1399,343 @@ try {
                 </div>
             </div>
 
+            <?php elseif ($view === 'expiring'): ?>
+            <?php $expiringList = $radiusBilling->getExpiringSubscriptions(14); ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-clock-history"></i> Expiring Subscriptions</h4>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="send_expiry_alerts">
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-send me-1"></i> Send Expiry Alerts</button>
+                </form>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <?php if (empty($expiringList)): ?>
+                    <div class="p-5 text-center text-muted">
+                        <i class="bi bi-check-circle fs-1 mb-3 d-block text-success"></i>
+                        <h5>All Clear!</h5>
+                        <p>No subscriptions expiring in the next 14 days.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Username</th>
+                                    <th>Package</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Left</th>
+                                    <th>Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($expiringList as $sub): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= htmlspecialchars($sub['customer_name'] ?? 'N/A') ?></strong>
+                                        <br><small class="text-muted"><?= htmlspecialchars($sub['customer_phone'] ?? '') ?></small>
+                                    </td>
+                                    <td><code><?= htmlspecialchars($sub['username']) ?></code></td>
+                                    <td><?= htmlspecialchars($sub['package_name'] ?? 'N/A') ?></td>
+                                    <td><?= date('M j, Y', strtotime($sub['expiry_date'])) ?></td>
+                                    <td>
+                                        <?php $days = (int)$sub['days_remaining']; ?>
+                                        <span class="badge bg-<?= $days <= 1 ? 'danger' : ($days <= 3 ? 'warning' : 'info') ?>">
+                                            <?= $days ?> day<?= $days != 1 ? 's' : '' ?>
+                                        </span>
+                                    </td>
+                                    <td>KES <?= number_format($sub['package_price'] ?? 0) ?></td>
+                                    <td>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="renew_subscription">
+                                            <input type="hidden" name="subscription_id" value="<?= $sub['id'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-repeat"></i> Renew</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'reports'): ?>
+            <?php 
+            $revenueReport = $radiusBilling->getRevenueReport('monthly');
+            $packageStats = $radiusBilling->getPackagePopularity();
+            $subStats = $radiusBilling->getSubscriptionStats();
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-graph-up"></i> Revenue Reports</h4>
+            </div>
+            
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="fs-2 fw-bold text-success"><?= number_format($subStats['active'] ?? 0) ?></div>
+                            <div class="text-muted">Active Subscribers</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="fs-2 fw-bold text-warning"><?= number_format($subStats['expiring_week'] ?? 0) ?></div>
+                            <div class="text-muted">Expiring This Week</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="fs-2 fw-bold text-danger"><?= number_format($subStats['suspended'] ?? 0) ?></div>
+                            <div class="text-muted">Suspended</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="fs-2 fw-bold text-info"><?= number_format($subStats['total'] ?? 0) ?></div>
+                            <div class="text-muted">Total Subscriptions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><i class="bi bi-cash me-2"></i>Monthly Revenue</div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Period</th>
+                                            <th>Transactions</th>
+                                            <th>Total Revenue</th>
+                                            <th>Paid</th>
+                                            <th>Pending</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($revenueReport as $row): ?>
+                                        <tr>
+                                            <td><?= date('F Y', strtotime($row['period'])) ?></td>
+                                            <td><?= number_format($row['transactions']) ?></td>
+                                            <td><strong>KES <?= number_format($row['total_revenue'] ?? 0) ?></strong></td>
+                                            <td class="text-success">KES <?= number_format($row['paid_revenue'] ?? 0) ?></td>
+                                            <td class="text-warning">KES <?= number_format($row['pending_revenue'] ?? 0) ?></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($revenueReport)): ?>
+                                        <tr><td colspan="5" class="text-center text-muted py-4">No billing data yet</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><i class="bi bi-box me-2"></i>Package Popularity</div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($packageStats as $pkg): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?= htmlspecialchars($pkg['name']) ?></strong>
+                                        <br><small class="text-muted">KES <?= number_format($pkg['price']) ?>/mo</small>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill"><?= $pkg['active_count'] ?> active</span>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'analytics'): ?>
+            <?php 
+            $topUsers = $radiusBilling->getTopUsers(10, 'month');
+            $peakHours = $radiusBilling->getPeakHours();
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-bar-chart"></i> Usage Analytics</h4>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><i class="bi bi-trophy me-2"></i>Top 10 Users (This Month)</div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>User</th>
+                                            <th>Download</th>
+                                            <th>Upload</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($topUsers as $i => $user): ?>
+                                        <tr>
+                                            <td><?= $i + 1 ?></td>
+                                            <td>
+                                                <strong><?= htmlspecialchars($user['customer_name'] ?? $user['username']) ?></strong>
+                                                <br><small class="text-muted"><?= htmlspecialchars($user['username']) ?></small>
+                                            </td>
+                                            <td><?= number_format($user['download_gb'] ?? 0, 2) ?> GB</td>
+                                            <td><?= number_format($user['upload_gb'] ?? 0, 2) ?> GB</td>
+                                            <td><strong><?= number_format($user['total_gb'] ?? 0, 2) ?> GB</strong></td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($topUsers)): ?>
+                                        <tr><td colspan="5" class="text-center text-muted py-4">No usage data yet</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header"><i class="bi bi-clock me-2"></i>Peak Usage Hours</div>
+                        <div class="card-body">
+                            <?php if (!empty($peakHours)): ?>
+                            <div class="row">
+                                <?php foreach ($peakHours as $hour): ?>
+                                <div class="col-3 mb-2">
+                                    <div class="text-center p-2 rounded" style="background: rgba(14,165,233,<?= min(1, ($hour['session_count'] / max(1, max(array_column($peakHours, 'session_count')))) * 0.5 + 0.1) ?>);">
+                                        <div class="fw-bold"><?= str_pad($hour['hour'], 2, '0', STR_PAD_LEFT) ?>:00</div>
+                                        <small><?= $hour['session_count'] ?> sessions</small>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php else: ?>
+                            <p class="text-center text-muted py-4">No session data yet</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php elseif ($view === 'import'): ?>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="page-title mb-0"><i class="bi bi-upload"></i> Bulk Import Subscriptions</h4>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header">Upload CSV File</div>
+                        <div class="card-body">
+                            <form method="post" enctype="multipart/form-data">
+                                <input type="hidden" name="action" value="import_csv">
+                                <div class="mb-3">
+                                    <label class="form-label">CSV File</label>
+                                    <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Or paste CSV content</label>
+                                    <textarea name="csv_content" class="form-control font-monospace" rows="10" placeholder="customer_id,package_id,username,password,access_type,static_ip,mac_address,notes"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i> Import</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header">CSV Format</div>
+                        <div class="card-body">
+                            <p class="small">Required columns:</p>
+                            <ul class="small">
+                                <li><code>username</code> - PPPoE username</li>
+                                <li><code>password</code> - PPPoE password</li>
+                            </ul>
+                            <p class="small">Optional columns:</p>
+                            <ul class="small">
+                                <li><code>customer_id</code> - Link to customer</li>
+                                <li><code>package_id</code> - Package ID</li>
+                                <li><code>access_type</code> - pppoe/hotspot/static/dhcp</li>
+                                <li><code>static_ip</code> - Static IP address</li>
+                                <li><code>mac_address</code> - MAC binding</li>
+                                <li><code>notes</code> - Notes</li>
+                            </ul>
+                            <hr>
+                            <p class="small mb-1"><strong>Example:</strong></p>
+                            <code class="small">username,password,package_id<br>user1,pass123,1<br>user2,pass456,2</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <?php elseif ($view === 'settings'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-gear"></i> ISP Settings</h4>
             </div>
             
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5>RADIUS Server Configuration</h5>
-                    <p class="text-muted">Configure your RADIUS server settings for MikroTik integration.</p>
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        RADIUS server settings are configured in your MikroTik router. Point your NAS devices to this server's IP address.
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header">RADIUS Server Configuration</div>
+                        <div class="card-body">
+                            <p class="text-muted">Configure your RADIUS server settings for MikroTik integration.</p>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                RADIUS server settings are configured in your MikroTik router. Point your NAS devices to this server's IP address.
+                            </div>
+                            <ul class="list-unstyled">
+                                <li><strong>Auth Port:</strong> 1812/UDP</li>
+                                <li><strong>Acct Port:</strong> 1813/UDP</li>
+                                <li><strong>CoA Port:</strong> 3799/UDP</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header">NAS Status</div>
+                        <div class="card-body p-0">
+                            <?php $nasStatus = $radiusBilling->getNASStatus(); ?>
+                            <div class="list-group list-group-flush">
+                                <?php foreach ($nasStatus as $nas): ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?= htmlspecialchars($nas['name']) ?></strong>
+                                        <br><small class="text-muted"><?= $nas['ip_address'] ?></small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-<?= $nas['online'] ? 'success' : 'danger' ?>">
+                                            <?= $nas['online'] ? 'Online' : 'Offline' ?>
+                                        </span>
+                                        <?php if ($nas['online'] && $nas['latency_ms']): ?>
+                                        <br><small class="text-muted"><?= $nas['latency_ms'] ?>ms</small>
+                                        <?php endif; ?>
+                                        <br><small><?= $nas['active_sessions'] ?> sessions</small>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                                <?php if (empty($nasStatus)): ?>
+                                <div class="list-group-item text-center text-muted">No NAS devices configured</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
