@@ -291,7 +291,7 @@ class Ticket {
             }
 
             try {
-                if (isset($data['status']) && in_array($data['status'], ['resolved', 'closed']) && !in_array($ticket['status'], ['resolved', 'closed'])) {
+                if (isset($data['status']) && $data['status'] === 'resolved' && $ticket['status'] !== 'resolved') {
                     $ticketCommission = new TicketCommission($this->db);
                     $commissionResult = $ticketCommission->processTicketClosure($id);
                     if ($commissionResult['success']) {
@@ -395,8 +395,7 @@ class Ticket {
     private function getStatusMessage(string $status): string {
         return match($status) {
             'in_progress' => 'A technician is now working on your issue.',
-            'resolved' => 'Your issue has been resolved. Thank you for your patience.',
-            'closed' => 'Your ticket has been closed.',
+            'resolved' => 'Your issue has been completed. Thank you for your patience.',
             'pending' => 'Your ticket is pending further information.',
             default => 'Your ticket status has been updated.'
         };
@@ -494,7 +493,7 @@ class Ticket {
             LEFT JOIN users u ON t.assigned_to = u.id
             LEFT JOIN teams tm ON t.team_id = tm.id
             WHERE t.customer_id = ?
-              AND t.status IN ('resolved', 'closed')
+              AND t.status IN ('resolved')
               AND (t.assigned_to IS NOT NULL OR t.team_id IS NOT NULL)
             GROUP BY t.assigned_to, t.team_id, u.name, u.phone, tm.name
             ORDER BY ticket_count DESC, last_resolved DESC
@@ -577,7 +576,7 @@ class Ticket {
             WHERE sla_response_due < ? 
             AND first_response_at IS NULL 
             AND sla_response_breached = FALSE
-            AND status NOT IN ('resolved', 'closed')
+            AND status NOT IN ('resolved')
             RETURNING id
         ");
         $responseBreached->execute([$now]);
@@ -587,7 +586,7 @@ class Ticket {
             UPDATE tickets SET sla_resolution_breached = TRUE, updated_at = CURRENT_TIMESTAMP
             WHERE sla_resolution_due < ? 
             AND sla_resolution_breached = FALSE
-            AND status NOT IN ('resolved', 'closed')
+            AND status NOT IN ('resolved')
             RETURNING id
         ");
         $resolutionBreached->execute([$now]);
@@ -669,7 +668,7 @@ class Ticket {
         }
         
         if (!empty($filters['sla_breached'])) {
-            $sql .= " AND t.status NOT IN ('resolved', 'closed') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
+            $sql .= " AND t.status NOT IN ('resolved') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
         
         $sql .= " ORDER BY 
@@ -733,7 +732,7 @@ class Ticket {
         }
         
         if (!empty($filters['sla_breached'])) {
-            $sql .= " AND t.status NOT IN ('resolved', 'closed') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
+            $sql .= " AND t.status NOT IN ('resolved') AND (t.sla_resolution_breached = TRUE OR t.sla_response_breached = TRUE OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))";
         }
         
         $stmt = $this->db->prepare($sql);
@@ -747,8 +746,7 @@ class Ticket {
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'open') as open,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-                COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
-                COUNT(*) FILTER (WHERE status = 'closed') as closed,
+                COUNT(*) FILTER (WHERE status = 'resolved') as completed,
                 COUNT(*) FILTER (WHERE priority = 'critical') as critical,
                 COUNT(*) FILTER (WHERE priority = 'high') as high
             FROM tickets
@@ -939,8 +937,7 @@ class Ticket {
             'open' => 'Open',
             'in_progress' => 'In Progress',
             'pending' => 'Pending',
-            'resolved' => 'Completed',
-            'closed' => 'Closed'
+            'resolved' => 'Completed'
         ];
     }
 
@@ -1289,10 +1286,7 @@ class Ticket {
         $oldStatus = $ticket['status'];
         $updates = ['status' => $newStatus, 'updated_at' => date('Y-m-d H:i:s')];
         
-        if ($newStatus === 'closed' && $oldStatus !== 'closed') {
-            $updates['closed_at'] = date('Y-m-d H:i:s');
-        }
-        if (in_array($newStatus, ['resolved', 'closed']) && !$ticket['resolved_at']) {
+        if ($newStatus === 'resolved' && !$ticket['resolved_at']) {
             $updates['resolved_at'] = date('Y-m-d H:i:s');
         }
         
@@ -1312,7 +1306,7 @@ class Ticket {
             $this->activityLog->log('status_change', 'ticket', $ticketId, $ticket['ticket_number'], 
                 "Status changed: {$oldStatus} -> {$newStatus}");
             
-            if (in_array($newStatus, ['resolved', 'closed'])) {
+            if ($newStatus === 'resolved') {
                 $ticketCommission = new TicketCommission($this->db);
                 $ticketCommission->processTicketClosure($ticketId);
             }
@@ -1441,8 +1435,7 @@ class Ticket {
                 COUNT(*) as total_tickets,
                 COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tickets,
-                COUNT(*) FILTER (WHERE status = 'resolved') as resolved_tickets,
-                COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
+                COUNT(*) FILTER (WHERE status = 'resolved') as completed_tickets,
                 COUNT(*) FILTER (WHERE is_escalated = TRUE) as escalated_tickets,
                 COUNT(*) FILTER (WHERE sla_resolution_breached = TRUE) as sla_breached,
                 AVG(satisfaction_rating) FILTER (WHERE satisfaction_rating IS NOT NULL) as avg_satisfaction,
@@ -1467,7 +1460,7 @@ class Ticket {
         
         $stmt = $this->db->query("
             SELECT u.name, COUNT(t.id) as ticket_count,
-                   COUNT(*) FILTER (WHERE t.status IN ('resolved', 'closed')) as resolved_count
+                   COUNT(*) FILTER (WHERE t.status IN ('resolved')) as resolved_count
             FROM users u
             LEFT JOIN tickets t ON u.id = t.assigned_to AND t.created_at >= NOW() - INTERVAL '30 days'
             WHERE u.role IN ('technician', 'admin')
@@ -1503,7 +1496,7 @@ class Ticket {
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
             LEFT JOIN users u ON t.assigned_to = u.id
-            WHERE t.status NOT IN ('resolved', 'closed')
+            WHERE t.status NOT IN ('resolved')
               AND (t.sla_resolution_breached = TRUE 
                    OR (t.sla_resolution_due IS NOT NULL AND t.sla_resolution_due < NOW()))
             ORDER BY t.sla_resolution_due ASC

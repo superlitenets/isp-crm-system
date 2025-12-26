@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             '<th>Ticket</th><th>Subject</th><th>Status</th><th>Handled By</th><th>Date</th></tr></thead><tbody>';
                         data.recent_tickets.forEach(t => {
                             const handler = t.technician_name || t.team_name || '-';
-                            const statusClass = t.status === 'resolved' || t.status === 'closed' ? 'success' : 
+                            const statusClass = t.status === 'resolved' ? 'success' : 
                                                (t.status === 'in_progress' ? 'info' : 'secondary');
                             html += '<tr>' +
                                 '<td><a href="?page=tickets&action=view&id=' + t.id + '">' + t.ticket_number + '</a></td>' +
@@ -647,7 +647,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
     </div>
 </div>
 
-<?php if (!in_array($ticketData['status'], ['resolved', 'closed'])): ?>
+<?php if ($ticketData['status'] !== 'resolved'): ?>
 <div class="card mb-4 border-primary">
     <div class="card-header bg-primary bg-opacity-10">
         <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
@@ -660,8 +660,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                 'open' => ['icon' => 'folder2-open', 'color' => 'secondary'],
                 'in_progress' => ['icon' => 'play-circle', 'color' => 'info'],
                 'pending' => ['icon' => 'pause-circle', 'color' => 'warning'],
-                'resolved' => ['icon' => 'check-circle', 'color' => 'success'],
-                'closed' => ['icon' => 'x-circle', 'color' => 'dark']
+                'resolved' => ['icon' => 'check-circle', 'color' => 'success']
             ];
             foreach ($statusActions as $status => $config): 
                 if ($status !== $ticketData['status']):
@@ -686,7 +685,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
 </div>
 <?php endif; ?>
 
-<?php if (in_array($ticketData['status'], ['resolved', 'closed']) && !$satisfactionRating): ?>
+<?php if ($ticketData['status'] === 'resolved' && !$satisfactionRating): ?>
 <div class="card mb-4 border-success">
     <div class="card-header bg-success text-white">
         <h6 class="mb-0"><i class="bi bi-star"></i> Customer Satisfaction Rating</h6>
@@ -902,7 +901,7 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
                             <i class="bi bi-<?= $resIcon ?>"></i> <?= ucfirst(str_replace('_', ' ', $resStatus)) ?>
                         </span>
                     </div>
-                    <?php if (in_array($ticketData['status'], ['resolved', 'closed']) && $ticketData['resolved_at']): ?>
+                    <?php if ($ticketData['status'] === 'resolved' && $ticketData['resolved_at']): ?>
                     <small class="text-muted">Completed: <?= date('M j, g:i A', strtotime($ticketData['resolved_at'])) ?></small>
                     <?php elseif ($ticketData['sla_resolution_due'] && $resStatus !== 'breached'): ?>
                     <small class="text-muted">Due: <?= date('M j, g:i A', strtotime($ticketData['sla_resolution_due'])) ?></small>
@@ -1638,7 +1637,7 @@ $escalatedFilter = $_GET['escalated'] ?? '';
                                 <span class="badge bg-danger" title="SLA Breached"><i class="bi bi-x-circle-fill"></i> Breached</span>
                                 <?php elseif ($isAtRisk): ?>
                                 <span class="badge bg-warning text-dark" title="SLA At Risk"><i class="bi bi-exclamation-triangle-fill"></i> At Risk</span>
-                                <?php elseif (in_array($t['status'], ['resolved', 'closed'])): ?>
+                                <?php elseif ($t['status'] === 'resolved'): ?>
                                 <span class="badge bg-success" title="SLA Met"><i class="bi bi-check-circle-fill"></i> Met</span>
                                 <?php else: ?>
                                 <span class="badge bg-success" title="SLA On Track"><i class="bi bi-check-circle"></i> On Track</span>
