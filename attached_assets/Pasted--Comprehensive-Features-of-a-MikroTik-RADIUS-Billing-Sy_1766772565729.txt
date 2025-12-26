@@ -1,0 +1,349 @@
+✅ Comprehensive Features of a MikroTik RADIUS Billing System
+1️⃣ Access Technologies (Core Network Support)
+Supported Access Types
+
+PPPoE Authentication & Accounting
+
+Static IP Customers (RADIUS / Policy-Based)
+
+DHCP Authentication (MAC-Based)
+
+Hotspot (Captive Portal / Voucher-Based)
+
+Unified Capabilities Across All Access Types
+
+Centralized RADIUS authentication
+
+Unified billing & accounting engine
+
+Multi-NAS support (multiple MikroTik routers)
+
+IPv4 and IPv6 readiness
+
+2️⃣ RADIUS Authentication, Authorization & Accounting (AAA)
+Authentication
+
+Username / password authentication
+
+MAC-based authentication (DHCP, Hotspot)
+
+Voucher authentication
+
+Multi-factor / OTP (optional)
+
+Authorization (Policy Control)
+
+Speed limits via RADIUS attributes
+
+Quota enforcement
+
+Session limits
+
+Access time control
+
+Service-based policy assignment
+
+Accounting
+
+Session start, stop & interim updates
+
+Per-session traffic usage tracking
+
+Online/offline session visibility
+
+Historical accounting records
+
+3️⃣ Billing & Subscription Management
+Billing Models
+
+Time-based packages (daily, weekly, monthly)
+
+Quota-based packages (GB/TB)
+
+Speed-tiered packages
+
+Hybrid packages (time + quota)
+
+Enterprise SLA-based billing
+
+Subscription Lifecycle
+
+Activate / Suspend / Renew / Terminate
+
+Grace periods
+
+Prorated upgrades & downgrades
+
+Multiple services per customer
+
+4️⃣ IP-Aware Redirect Payment & Expiry System
+Automatic Redirection
+
+Redirect expired users to payment page
+
+Redirect suspended users to disable page
+
+Redirect quota-exhausted users to top-up page
+
+Client IP Detection
+
+Automatically fetch customer IP address
+
+Match IP against:
+
+Active RADIUS sessions
+
+Static IP allocations
+
+DHCP leases
+
+Hotspot sessions
+
+Identify customer without login
+
+Walled Garden Access
+
+Allow billing portal & payment gateways only
+
+Block full internet until payment
+
+5️⃣ Smart Payment Portal
+Customer Experience
+
+Zero-login payment flow
+
+Auto-detected customer account
+
+Display:
+
+Current plan
+
+Expiry date
+
+Outstanding balance
+
+Service type
+
+Package Fetching
+
+Dynamically load packages
+
+Filter by:
+
+Access type
+
+Customer category
+
+Device capability
+
+Support renewals, upgrades & top-ups
+
+6️⃣ Payment Gateways & Automation
+Supported Payments
+
+M-Pesa STK Push
+
+Paybill / BuyGoods
+
+Voucher codes
+
+Wallet / prepaid balance
+
+Automation
+
+Instant payment confirmation
+
+Automatic service renewal
+
+Session reconnection after payment
+
+Retry & failure handling
+
+7️⃣ Session Control & Enforcement
+
+Auto-disconnect on expiry
+
+Session timeout enforcement
+
+Idle timeout
+
+Simultaneous session limits
+
+Forced reconnection after renewal
+
+8️⃣ Speed, Quota & Policy Management
+
+Per-user bandwidth profiles
+
+Dynamic speed change after quota exhaustion
+
+Fair Usage Policy (FUP)
+
+Burst & priority profiles
+
+Policy tagging (for routing / BGP / QoS)
+
+9️⃣ Static IP & Enterprise Features
+
+Static IP binding
+
+Multiple IPs per customer
+
+Framed routes & policy routing
+
+SLA profiles (CIR / PIR)
+
+Enterprise billing & invoicing
+
+🔟 DHCP & MAC Authentication Features
+
+MAC-based access control
+
+Device binding per customer
+
+Lease expiry enforcement
+
+Device count limits
+
+Zero-touch provisioning
+
+1️⃣1️⃣ Hotspot & Voucher System
+
+Voucher batch generation
+
+Time & data vouchers
+
+Captive portal customization
+
+SMS & OTP login
+
+MAC cookie support
+
+1️⃣2️⃣ Customer Self-Service Portal
+
+View service status
+
+Usage & expiry tracking
+
+Online/offline status
+
+Invoice & receipt downloads
+
+Plan renewal & upgrades
+
+Support ticket submission
+
+1️⃣3️⃣ Notifications & Communication
+
+SMS notifications:
+
+Expiry reminders
+
+Payment confirmation
+
+Disconnection alerts
+
+Email notifications:
+
+Invoices
+
+Usage summaries
+
+Customizable message templates
+
+1️⃣4️⃣ Reporting & Analytics
+Network Reports
+
+Active sessions
+
+Bandwidth utilization
+
+NAS performance
+
+Financial Reports
+
+Revenue summaries
+
+Payment reconciliation
+
+Tax & VAT reports
+
+Customer Reports
+
+Usage history
+
+Plan distribution
+
+Churn analysis
+
+1️⃣5️⃣ Automation & Scheduler
+
+Auto-suspension on non-payment
+
+Auto-renewal jobs
+
+Database backup (FTP / Cloud)
+
+Cleanup of expired sessions
+
+Scheduled notifications
+
+1️⃣6️⃣ Admin & Multi-Tenant Management
+
+Multi-tenant architecture
+
+ISP / reseller isolation
+
+Role-based access control (RBAC)
+
+Audit logs & change tracking
+
+Bulk import / export tools
+
+1️⃣7️⃣ API & Integrations
+
+REST API for CRM & apps
+
+Webhooks for payment callbacks
+
+MikroTik RouterOS API integration
+
+SMS gateway integration
+
+Accounting & ERP integration
+
+1️⃣8️⃣ Security & Compliance
+
+HTTPS & TLS encryption
+
+Secure credential storage
+
+IP spoofing protection
+
+Payment tokenization
+
+Compliance with local data regulations
+
+1️⃣9️⃣ Deployment & Scalability
+
+Docker & Docker Compose support
+
+High availability RADIUS setup
+
+Database replication
+
+Horizontal scaling
+
+Multi-region readiness
+
+2️⃣0️⃣ Advanced ISP Features (Optional)
+
+GPON / FTTH provisioning
+
+TR-069 / ACS integration
+
+ONU & CPE inventory
+
+NOC monitoring (SNMP)
+
+BGP & policy tagging support
