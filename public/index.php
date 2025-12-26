@@ -646,7 +646,7 @@ if ($page === 'api' && $action === 'log_whatsapp') {
 }
 
 if ($page === 'api' && $action === 'send_whatsapp') {
-    ob_clean();
+    while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -659,7 +659,14 @@ if ($page === 'api' && $action === 'send_whatsapp') {
         exit;
     }
     
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        echo json_encode(['success' => false, 'error' => 'Invalid JSON input: ' . json_last_error_msg()]);
+        exit;
+    }
+    
     $ticketId = $input['ticket_id'] ?? null;
     $orderId = $input['order_id'] ?? null;
     $complaintId = $input['complaint_id'] ?? null;
@@ -1949,18 +1956,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($ticketId && $newStatus) {
                     try {
                         $result = $ticket->quickStatusChange($ticketId, $newStatus, $currentUser['id']);
-                        if ($result) {
-                            $message = 'Status changed to ' . ucwords(str_replace('_', ' ', $newStatus)) . ' successfully!';
-                            $messageType = 'success';
-                        } else {
-                            $message = 'Failed to change status.';
-                            $messageType = 'danger';
-                        }
                         \App\Auth::regenerateToken();
+                        if ($result) {
+                            $_SESSION['flash_message'] = 'Status changed to ' . ucwords(str_replace('_', ' ', $newStatus)) . ' successfully!';
+                            $_SESSION['flash_type'] = 'success';
+                        } else {
+                            $_SESSION['flash_message'] = 'Failed to change status.';
+                            $_SESSION['flash_type'] = 'danger';
+                        }
                     } catch (Exception $e) {
-                        $message = 'Error: ' . $e->getMessage();
-                        $messageType = 'danger';
+                        $_SESSION['flash_message'] = 'Error: ' . $e->getMessage();
+                        $_SESSION['flash_type'] = 'danger';
                     }
+                    header('Location: ?page=tickets&action=view&id=' . $ticketId);
+                    exit;
                 }
                 break;
             
