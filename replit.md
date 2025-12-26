@@ -37,6 +37,14 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Billing System Integration**: One-ISP API integration for customer data lookup and import.
 - **Database Backup System**: Built-in functionality for manual PostgreSQL backups (pg_dump).
 - **WireGuard VPN Integration**: Secure VPN connectivity management between VPS and OLT sites, including server/peer management, key generation (via `wg genkey`), configuration export, MikroTik script generation with auto-detected public IP, and real-time traffic statistics. OLT service uses host network mode to access VPN routes for ping functionality.
+- **ISP RADIUS Billing Module**: Comprehensive MikroTik RADIUS billing system with full AAA (Authentication, Authorization, Accounting) support. Features include:
+  - **NAS Device Management**: Register and manage MikroTik routers with RADIUS secret configuration and optional RouterOS API access.
+  - **Service Packages**: Create packages with configurable speeds, data quotas, validity periods, billing cycles (daily/weekly/monthly/quarterly/yearly), and simultaneous session limits.
+  - **Customer Subscriptions**: PPPoE, Hotspot, Static IP, and DHCP access types with encrypted password storage, automatic expiry handling, and suspension management.
+  - **Session Tracking**: Real-time active session monitoring with data usage tracking (upload/download octets).
+  - **Hotspot Vouchers**: Batch voucher generation for prepaid hotspot access with unique codes.
+  - **Billing History**: Invoice generation, payment tracking, and billing records.
+  - **Dashboard**: Real-time statistics for active subscriptions, sessions, expiring accounts, monthly revenue, and data usage.
 - **Licensing System**: Standalone license server for redistributing the CRM to other ISPs. Features include:
   - **License Server** (`license-server/`): Deployable standalone PHP app with admin dashboard, REST API, customer/license/activation management, usage analytics.
   - **License Client** (`src/LicenseClient.php`, `src/LicenseMiddleware.php`): Integrated validation with 7-day grace period for offline operation.
