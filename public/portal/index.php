@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../src/Mpesa.php';
 require_once __DIR__ . '/../../src/GenieACS.php';
 
 try {
-    $db = getDbConnection();
+    $db = Database::getConnection();
     $radiusBilling = new \App\RadiusBilling($db);
     $genieACS = new \App\GenieACS($db);
 } catch (Exception $e) {
