@@ -1523,6 +1523,45 @@ if ($page === 'isp') {
         exit;
     }
     
+    if ($action === 'ping_subscriber') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $subId = (int)($_GET['id'] ?? 0);
+        $sub = $radiusBilling->getSubscription($subId);
+        
+        if (!$sub) {
+            echo json_encode(['success' => false, 'error' => 'Subscriber not found']);
+            exit;
+        }
+        
+        $ipAddress = $sub['static_ip'] ?? null;
+        if (!$ipAddress) {
+            $stmt = $db->prepare("
+                SELECT framed_ip_address FROM radius_sessions 
+                WHERE subscription_id = ? AND session_end IS NULL 
+                ORDER BY started_at DESC LIMIT 1
+            ");
+            $stmt->execute([$subId]);
+            $ipAddress = $stmt->fetchColumn();
+        }
+        
+        if (!$ipAddress) {
+            echo json_encode(['success' => false, 'error' => 'No IP address found. Subscriber may be offline.']);
+            exit;
+        }
+        
+        $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null];
+        exec("ping -c 1 -W 2 " . escapeshellarg($ipAddress) . " 2>&1", $output, $returnCode);
+        if ($returnCode === 0) {
+            $result['online'] = true;
+            if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {
+                $result['latency_ms'] = (float)$matches[1];
+            }
+        }
+        echo json_encode($result);
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp.php';
     exit;
 }

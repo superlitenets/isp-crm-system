@@ -368,7 +368,7 @@ try {
                     <i class="bi bi-speedometer2 me-2"></i> Dashboard
                 </a>
                 <a class="nav-link <?= $view === 'subscriptions' ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
-                    <i class="bi bi-people me-2"></i> Subscriptions
+                    <i class="bi bi-people me-2"></i> Subscribers
                 </a>
                 <a class="nav-link <?= $view === 'sessions' ? 'active' : '' ?>" href="?page=isp&view=sessions">
                     <i class="bi bi-broadcast me-2"></i> Active Sessions
@@ -435,7 +435,7 @@ try {
                     <i class="bi bi-speedometer2 me-2"></i> Dashboard
                 </a>
                 <a class="nav-link <?= $view === 'subscriptions' ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
-                    <i class="bi bi-people me-2"></i> Subscriptions
+                    <i class="bi bi-people me-2"></i> Subscribers
                 </a>
                 <a class="nav-link <?= $view === 'sessions' ? 'active' : '' ?>" href="?page=isp&view=sessions">
                     <i class="bi bi-broadcast me-2"></i> Active Sessions
@@ -513,7 +513,7 @@ try {
                                 </div>
                             </div>
                             <div class="stat-value"><?= number_format($stats['active_subscriptions']) ?></div>
-                            <div class="stat-label">Active Subscriptions</div>
+                            <div class="stat-label">Active Subscribers</div>
                         </div>
                     </div>
                 </div>
@@ -619,13 +619,13 @@ try {
                 <div class="col-lg-6">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Expiring Subscriptions</h5>
+                            <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Expiring Subscribers</h5>
                             <a href="?page=isp&view=subscriptions&filter=expiring" class="btn btn-sm btn-outline-warning">View All</a>
                         </div>
                         <div class="card-body p-0">
                             <?php $expiring = $radiusBilling->getSubscriptions(['expiring_soon' => true, 'limit' => 5]); ?>
                             <?php if (empty($expiring)): ?>
-                            <div class="p-4 text-center text-muted">No subscriptions expiring soon</div>
+                            <div class="p-4 text-center text-muted">No subscribers expiring soon</div>
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover mb-0">
@@ -724,9 +724,9 @@ try {
             ?>
             
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="page-title mb-0"><i class="bi bi-people"></i> Subscriptions</h4>
+                <h4 class="page-title mb-0"><i class="bi bi-people"></i> Subscribers</h4>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubscriptionModal">
-                    <i class="bi bi-plus-lg me-1"></i> New Subscription
+                    <i class="bi bi-plus-lg me-1"></i> New Subscriber
                 </button>
             </div>
             
@@ -813,6 +813,9 @@ try {
                                     <td><?= number_format($sub['data_used_mb'] / 1024, 2) ?> GB</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-info" onclick="pingSubscriber(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')" title="Ping IP">
+                                                <i class="bi bi-lightning"></i>
+                                            </button>
                                             <?php if ($sub['status'] === 'active'): ?>
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="action" value="suspend_subscription">
@@ -847,7 +850,7 @@ try {
                         <form method="post">
                             <input type="hidden" name="action" value="create_subscription">
                             <div class="modal-header">
-                                <h5 class="modal-title">New Subscription</h5>
+                                <h5 class="modal-title">New Subscriber</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
@@ -923,7 +926,7 @@ try {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Create Subscription</button>
+                                <button type="submit" class="btn btn-primary">Create Subscriber</button>
                             </div>
                         </form>
                     </div>
@@ -1520,7 +1523,7 @@ try {
             <?php elseif ($view === 'expiring'): ?>
             <?php $expiringList = $radiusBilling->getExpiringSubscriptions(14); ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="page-title mb-0"><i class="bi bi-clock-history"></i> Expiring Subscriptions</h4>
+                <h4 class="page-title mb-0"><i class="bi bi-clock-history"></i> Expiring Subscribers</h4>
                 <form method="post" class="d-inline">
                     <input type="hidden" name="action" value="send_expiry_alerts">
                     <button type="submit" class="btn btn-warning"><i class="bi bi-send me-1"></i> Send Expiry Alerts</button>
@@ -1533,7 +1536,7 @@ try {
                     <div class="p-5 text-center text-muted">
                         <i class="bi bi-check-circle fs-1 mb-3 d-block text-success"></i>
                         <h5>All Clear!</h5>
-                        <p>No subscriptions expiring in the next 14 days.</p>
+                        <p>No subscribers expiring in the next 14 days.</p>
                     </div>
                     <?php else: ?>
                     <div class="table-responsive">
@@ -1621,7 +1624,7 @@ try {
                     <div class="card shadow-sm h-100">
                         <div class="card-body text-center">
                             <div class="fs-2 fw-bold text-info"><?= number_format($subStats['total'] ?? 0) ?></div>
-                            <div class="text-muted">Total Subscriptions</div>
+                            <div class="text-muted">Total Subscribers</div>
                         </div>
                     </div>
                 </div>
@@ -1754,7 +1757,7 @@ try {
 
             <?php elseif ($view === 'import'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="page-title mb-0"><i class="bi bi-upload"></i> Bulk Import Subscriptions</h4>
+                <h4 class="page-title mb-0"><i class="bi bi-upload"></i> Bulk Import Subscribers</h4>
             </div>
             
             <div class="row">
@@ -1934,6 +1937,52 @@ try {
                     <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
                     <h5 class="mt-3 text-warning">Error</h5>
                     <p class="mb-0">Failed to test connectivity</p>
+                `;
+            });
+    }
+    
+    function pingSubscriber(subId, username) {
+        const modal = new bootstrap.Modal(document.getElementById('testNASModal'));
+        const resultDiv = document.getElementById('testNASResult');
+        
+        resultDiv.innerHTML = `
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Pinging...</span>
+            </div>
+            <p class="mt-2">Pinging subscriber ${username}...</p>
+        `;
+        modal.show();
+        
+        fetch('/index.php?page=isp&action=ping_subscriber&id=' + subId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.online) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h5 class="mt-3 text-success">Reachable</h5>
+                        <p class="mb-1"><strong>IP:</strong> ${data.ip_address}</p>
+                        <p class="mb-0"><strong>Latency:</strong> ${data.latency_ms ? data.latency_ms + ' ms' : 'N/A'}</p>
+                    `;
+                } else if (data.error) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                        <h5 class="mt-3 text-warning">Cannot Ping</h5>
+                        <p class="mb-0">${data.error}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                        <h5 class="mt-3 text-danger">Unreachable</h5>
+                        <p class="mb-1"><strong>IP:</strong> ${data.ip_address || 'Unknown'}</p>
+                        <p class="mb-0">Could not reach the subscriber</p>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                    <h5 class="mt-3 text-warning">Error</h5>
+                    <p class="mb-0">Failed to ping subscriber</p>
                 `;
             });
     }
