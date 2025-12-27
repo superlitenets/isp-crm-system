@@ -712,6 +712,15 @@ try {
             $subscriptions = $radiusBilling->getSubscriptions($filters);
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
+            $onlineSubscribers = $radiusBilling->getOnlineSubscribers();
+            
+            // Apply online/offline filter
+            $onlineFilter = $_GET['online'] ?? '';
+            if ($onlineFilter === 'online') {
+                $subscriptions = array_filter($subscriptions, fn($s) => in_array($s['id'], $onlineSubscribers));
+            } elseif ($onlineFilter === 'offline') {
+                $subscriptions = array_filter($subscriptions, fn($s) => !in_array($s['id'], $onlineSubscribers));
+            }
             ?>
             
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -738,6 +747,13 @@ try {
                             </select>
                         </div>
                         <div class="col-md-2">
+                            <select name="online" class="form-select">
+                                <option value="">All (Online/Offline)</option>
+                                <option value="online" <?= ($_GET['online'] ?? '') === 'online' ? 'selected' : '' ?>>Online Only</option>
+                                <option value="offline" <?= ($_GET['online'] ?? '') === 'offline' ? 'selected' : '' ?>>Offline Only</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <button type="submit" class="btn btn-secondary w-100">Filter</button>
                         </div>
                     </form>
@@ -750,6 +766,7 @@ try {
                                     <th>Customer</th>
                                     <th>Package</th>
                                     <th>Type</th>
+                                    <th>Online</th>
                                     <th>Status</th>
                                     <th>Expiry</th>
                                     <th>Data Used</th>
@@ -758,6 +775,7 @@ try {
                             </thead>
                             <tbody>
                                 <?php foreach ($subscriptions as $sub): ?>
+                                <?php $isOnline = in_array($sub['id'], $onlineSubscribers); ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($sub['username']) ?></strong></td>
                                     <td><?= htmlspecialchars($sub['customer_name'] ?? '-') ?></td>
@@ -766,6 +784,13 @@ try {
                                         <br><small class="text-muted"><?= $sub['download_speed'] ?>/<?= $sub['upload_speed'] ?></small>
                                     </td>
                                     <td><span class="badge bg-secondary"><?= strtoupper($sub['access_type']) ?></span></td>
+                                    <td>
+                                        <?php if ($isOnline): ?>
+                                        <span class="badge bg-success"><i class="bi bi-wifi me-1"></i>Online</span>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php
                                         $statusClass = match($sub['status']) {

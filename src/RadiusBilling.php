@@ -743,21 +743,55 @@ class RadiusBilling {
     
     public function processExpiredSubscriptions(): array {
         $processed = 0;
+        $ipsReleased = 0;
         
         // Get expired subscriptions past grace period
         $stmt = $this->db->query("
-            SELECT id, grace_period_days, expiry_date FROM radius_subscriptions 
+            SELECT id, grace_period_days, expiry_date, static_ip FROM radius_subscriptions 
             WHERE status = 'active' 
             AND expiry_date < CURRENT_DATE - INTERVAL '1 day' * grace_period_days
         ");
         
         while ($sub = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $this->db->prepare("UPDATE radius_subscriptions SET status = 'expired' WHERE id = ?")
-                ->execute([$sub['id']]);
+            // Disconnect active sessions
+            $this->disconnectUser($sub['id']);
+            
+            // Release static IP back to pool if assigned
+            $releaseIp = !empty($sub['static_ip']);
+            
+            // Update subscription: set expired and clear static IP
+            $this->db->prepare("
+                UPDATE radius_subscriptions 
+                SET status = 'expired', 
+                    static_ip = NULL,
+                    updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            ")->execute([$sub['id']]);
+            
+            if ($releaseIp) {
+                $ipsReleased++;
+            }
             $processed++;
         }
         
-        return ['success' => true, 'processed' => $processed];
+        return ['success' => true, 'processed' => $processed, 'ips_released' => $ipsReleased];
+    }
+    
+    public function getSubscriberOnlineStatus(int $subscriptionId): bool {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) FROM radius_sessions 
+            WHERE subscription_id = ? AND stopped_at IS NULL
+        ");
+        $stmt->execute([$subscriptionId]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+    
+    public function getOnlineSubscribers(): array {
+        $stmt = $this->db->query("
+            SELECT DISTINCT subscription_id FROM radius_sessions 
+            WHERE stopped_at IS NULL
+        ");
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'subscription_id');
     }
     
     public function processAutoRenewals(): array {
