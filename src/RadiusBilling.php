@@ -780,7 +780,7 @@ class RadiusBilling {
     public function getSubscriberOnlineStatus(int $subscriptionId): bool {
         $stmt = $this->db->prepare("
             SELECT COUNT(*) FROM radius_sessions 
-            WHERE subscription_id = ? AND stopped_at IS NULL
+            WHERE subscription_id = ? AND session_end IS NULL
         ");
         $stmt->execute([$subscriptionId]);
         return (int)$stmt->fetchColumn() > 0;
@@ -789,7 +789,7 @@ class RadiusBilling {
     public function getOnlineSubscribers(): array {
         $stmt = $this->db->query("
             SELECT DISTINCT subscription_id FROM radius_sessions 
-            WHERE stopped_at IS NULL
+            WHERE session_end IS NULL
         ");
         return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'subscription_id');
     }
@@ -936,7 +936,7 @@ class RadiusBilling {
             SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
             FROM radius_sessions rs
             LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
-            WHERE rs.subscription_id = ? AND rs.stopped_at IS NULL
+            WHERE rs.subscription_id = ? AND rs.session_end IS NULL
         ");
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -1186,7 +1186,7 @@ class RadiusBilling {
             // Active sessions count
             $stmt = $this->db->prepare("
                 SELECT COUNT(*) FROM radius_sessions 
-                WHERE nas_id = ? AND stopped_at IS NULL
+                WHERE nas_id = ? AND session_end IS NULL
             ");
             $stmt->execute([$nas['id']]);
             $status['active_sessions'] = (int)$stmt->fetchColumn();
