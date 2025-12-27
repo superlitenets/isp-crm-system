@@ -3,9 +3,11 @@ session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/RadiusBilling.php';
 require_once __DIR__ . '/../../src/Mpesa.php';
+require_once __DIR__ . '/../../src/GenieACS.php';
 
 $db = getDbConnection();
 $radiusBilling = new \App\RadiusBilling($db);
+$genieACS = new \App\GenieACS($db);
 
 $message = '';
 $messageType = 'info';
@@ -13,6 +15,9 @@ $subscription = null;
 $sessions = [];
 $invoices = [];
 $usageHistory = [];
+$customerOnu = null;
+$tr069DeviceId = null;
+$wifiSettings = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
@@ -63,6 +68,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+                
+            case 'update_wifi':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+                if (!$subscription) {
+                    $message = 'Subscription not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $stmt = $db->prepare("SELECT o.*, o.tr069_device_id FROM huawei_onus o WHERE o.customer_id = ? AND o.tr069_device_id IS NOT NULL LIMIT 1");
+                $stmt->execute([$subscription['customer_id']]);
+                $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$onu || empty($onu['tr069_device_id'])) {
+                    $message = 'No WiFi device found for your account. Contact support.';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $wifiBand = $_POST['wifi_band'] ?? '2.4';
+                $newSsid = trim($_POST['wifi_ssid'] ?? '');
+                $newPassword = trim($_POST['wifi_password'] ?? '');
+                
+                if (empty($newSsid) && empty($newPassword)) {
+                    $message = 'Please enter a WiFi name or password to update';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                if (!empty($newPassword) && strlen($newPassword) < 8) {
+                    $message = 'WiFi password must be at least 8 characters';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                if (!empty($newSsid) && strlen($newSsid) < 1) {
+                    $message = 'WiFi name cannot be empty';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                try {
+                    if ($wifiBand === '5') {
+                        $result = $genieACS->setWiFi5GSettings(
+                            $onu['tr069_device_id'],
+                            $newSsid ?: '',
+                            $newPassword ?: ''
+                        );
+                    } else {
+                        $result = $genieACS->setWiFiSettings(
+                            $onu['tr069_device_id'],
+                            $newSsid ?: '',
+                            $newPassword ?: ''
+                        );
+                    }
+                    
+                    if ($result['success']) {
+                        $message = 'WiFi settings updated successfully! Changes may take a few minutes to apply.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to update WiFi: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error updating WiFi: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
         }
     }
 }
@@ -90,6 +169,14 @@ if (isset($_SESSION['portal_subscription_id'])) {
         $stmt = $db->prepare("SELECT * FROM customers WHERE id = ?");
         $stmt->execute([$subscription['customer_id']]);
         $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = $db->prepare("SELECT o.*, o.tr069_device_id FROM huawei_onus o WHERE o.customer_id = ? ORDER BY o.id DESC LIMIT 1");
+        $stmt->execute([$subscription['customer_id']]);
+        $customerOnu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($customerOnu && !empty($customerOnu['tr069_device_id'])) {
+            $tr069DeviceId = $customerOnu['tr069_device_id'];
+        }
     }
 }
 ?>
@@ -239,6 +326,9 @@ if (isset($_SESSION['portal_subscription_id'])) {
             <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#overview">Overview</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sessions">Sessions</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
+            <?php if ($tr069DeviceId): ?>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#wifi"><i class="bi bi-wifi me-1"></i>WiFi Settings</a></li>
+            <?php endif; ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#payment">Make Payment</a></li>
         </ul>
         
@@ -353,6 +443,81 @@ if (isset($_SESSION['portal_subscription_id'])) {
                 </div>
             </div>
             
+            <?php if ($tr069DeviceId): ?>
+            <div class="tab-pane fade" id="wifi">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-wifi" style="font-size: 48px; color: #667eea;"></i>
+                                <h5 class="mt-3">WiFi Settings</h5>
+                                <p class="text-muted">Change your WiFi name and password</p>
+                            </div>
+                            <form method="post">
+                                <input type="hidden" name="action" value="update_wifi">
+                                <div class="mb-3">
+                                    <label class="form-label">WiFi Band</label>
+                                    <select name="wifi_band" class="form-select">
+                                        <option value="2.4">2.4 GHz</option>
+                                        <option value="5">5 GHz</option>
+                                    </select>
+                                    <small class="text-muted">Select which WiFi band to configure</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">New WiFi Name (SSID)</label>
+                                    <input type="text" name="wifi_ssid" class="form-control" 
+                                           placeholder="Enter new WiFi name" maxlength="32">
+                                    <small class="text-muted">Leave empty to keep current name</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">New WiFi Password</label>
+                                    <div class="input-group">
+                                        <input type="password" name="wifi_password" id="wifi_password" 
+                                               class="form-control" placeholder="Enter new password" 
+                                               minlength="8" maxlength="63">
+                                        <button type="button" class="btn btn-outline-secondary" 
+                                                onclick="toggleWifiPassword()">
+                                            <i class="bi bi-eye" id="wifi_eye_icon"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Minimum 8 characters. Leave empty to keep current password.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-check-circle me-2"></i>Update WiFi Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>Your Device Info</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">Device</td><td><?= htmlspecialchars($customerOnu['name'] ?? 'ONU') ?></td></tr>
+                                <tr><td class="text-muted">Serial Number</td><td><code><?= htmlspecialchars($customerOnu['sn'] ?? 'N/A') ?></code></td></tr>
+                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($customerOnu['onu_type'] ?? 'N/A') ?></td></tr>
+                                <tr><td class="text-muted">Status</td><td>
+                                    <span class="badge bg-<?= ($customerOnu['status'] ?? '') === 'online' ? 'success' : 'secondary' ?>">
+                                        <?= ucfirst($customerOnu['status'] ?? 'Unknown') ?>
+                                    </span>
+                                </td></tr>
+                            </table>
+                            
+                            <div class="alert alert-info mt-4">
+                                <i class="bi bi-lightbulb me-2"></i>
+                                <strong>Tips:</strong>
+                                <ul class="mb-0 mt-2 ps-3">
+                                    <li>Changes take 1-2 minutes to apply</li>
+                                    <li>Use a strong password with letters, numbers &amp; symbols</li>
+                                    <li>Reconnect your devices after changing WiFi settings</li>
+                                    <li>5 GHz is faster but has shorter range</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
             <div class="tab-pane fade" id="payment">
                 <div class="row justify-content-center">
                     <div class="col-md-6">
@@ -388,5 +553,20 @@ if (isset($_SESSION['portal_subscription_id'])) {
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function toggleWifiPassword() {
+        const input = document.getElementById('wifi_password');
+        const icon = document.getElementById('wifi_eye_icon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+    </script>
 </body>
 </html>

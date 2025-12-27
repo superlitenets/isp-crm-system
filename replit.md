@@ -50,6 +50,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Usage Analytics**: Top users by data consumption, peak usage hours heatmap, and bandwidth trends.
   - **M-Pesa Integration**: Automatic subscription renewal on M-Pesa payment, matching by phone number or username.
   - **Captive Portal Expiry Page**: Public `/expired.php` page for expired subscribers. Detects client IP via X-Forwarded-For/proxy headers, matches to subscription in database, shows account details and renewal amount. Includes M-Pesa STK Push for instant payment. MikroTik redirects expired users to this page via walled garden.
+  - **Customer Self-Service Portal**: Full-featured portal at `/portal` where customers log in with PPPoE credentials to view usage, sessions, invoices, make M-Pesa payments, and manage their WiFi settings via TR-069. WiFi management allows changing 2.4GHz and 5GHz SSID and password remotely through GenieACS.
   - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires.
   - **MAC Binding**: Bind subscriptions to specific MAC addresses for security.
   - **IP Pool Management**: Create and manage IP address pools for dynamic allocation.
