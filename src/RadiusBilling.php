@@ -819,11 +819,11 @@ class RadiusBilling {
         $stmt = $this->db->prepare("
             SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
                    p.name as package_name, p.price as package_price,
-                   EXTRACT(DAY FROM s.expiry_date - CURRENT_DATE) as days_remaining
+                   (s.expiry_date::date - CURRENT_DATE) as days_remaining
             FROM radius_subscriptions s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN radius_packages p ON s.package_id = p.id
-            WHERE s.status = 'active' AND s.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 day' * ?
+            WHERE s.status = 'active' AND s.expiry_date::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + (? || ' days')::interval)
             ORDER BY s.expiry_date ASC
         ");
         $stmt->execute([$days]);
