@@ -42,8 +42,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
             
         case 'create_subscription':
-            $result = $radiusBilling->createSubscription($_POST);
-            $message = $result['success'] ? 'Subscription created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
+            $postData = $_POST;
+            
+            if (($_POST['customer_mode'] ?? 'existing') === 'new') {
+                $newName = trim($_POST['new_customer_name'] ?? '');
+                $newPhone = trim($_POST['new_customer_phone'] ?? '');
+                
+                if (empty($newName) || empty($newPhone)) {
+                    $message = 'Error: Customer name and phone are required';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $phone = preg_replace('/[^0-9]/', '', $newPhone);
+                if (substr($phone, 0, 1) === '0') {
+                    $phone = '254' . substr($phone, 1);
+                } elseif (substr($phone, 0, 3) !== '254') {
+                    $phone = '254' . $phone;
+                }
+                
+                try {
+                    $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address) VALUES (?, ?, ?, ?) RETURNING id");
+                    $stmt->execute([
+                        $newName,
+                        $phone,
+                        trim($_POST['new_customer_email'] ?? '') ?: null,
+                        trim($_POST['new_customer_address'] ?? '') ?: null
+                    ]);
+                    $newCustomerId = $stmt->fetchColumn();
+                    $postData['customer_id'] = $newCustomerId;
+                    $postData['package_id'] = $_POST['package_id_new'] ?? $_POST['package_id'];
+                } catch (Exception $e) {
+                    $message = 'Error creating customer: ' . $e->getMessage();
+                    $messageType = 'danger';
+                    break;
+                }
+            }
+            
+            $result = $radiusBilling->createSubscription($postData);
+            $message = $result['success'] ? 'Subscriber created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
             
@@ -854,24 +891,78 @@ try {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Customer</label>
-                                        <select name="customer_id" class="form-select" required>
-                                            <option value="">Select Customer</option>
-                                            <?php foreach ($customers as $c): ?>
-                                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= $c['phone'] ?>)</option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                <div class="mb-3">
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="radio" class="btn-check" name="customer_mode" id="existingCustomer" value="existing" checked onchange="toggleCustomerMode()">
+                                        <label class="btn btn-outline-primary" for="existingCustomer">
+                                            <i class="bi bi-person-check me-1"></i> Select Existing Customer
+                                        </label>
+                                        <input type="radio" class="btn-check" name="customer_mode" id="newCustomer" value="new" onchange="toggleCustomerMode()">
+                                        <label class="btn btn-outline-success" for="newCustomer">
+                                            <i class="bi bi-person-plus me-1"></i> Create New Customer
+                                        </label>
                                     </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Package</label>
-                                        <select name="package_id" class="form-select" required>
-                                            <option value="">Select Package</option>
-                                            <?php foreach ($packages as $p): ?>
-                                            <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                </div>
+                                
+                                <div id="existingCustomerSection">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Customer</label>
+                                            <select name="customer_id" id="customerSelect" class="form-select">
+                                                <option value="">Select Customer</option>
+                                                <?php foreach ($customers as $c): ?>
+                                                <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= $c['phone'] ?>)</option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Package</label>
+                                            <select name="package_id" class="form-select" required>
+                                                <option value="">Select Package</option>
+                                                <?php foreach ($packages as $p): ?>
+                                                <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="newCustomerSection" style="display: none;">
+                                    <div class="card bg-light mb-3">
+                                        <div class="card-header"><i class="bi bi-person-plus me-1"></i> New Customer Details</div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Customer Name <span class="text-danger">*</span></label>
+                                                    <input type="text" name="new_customer_name" id="newCustomerName" class="form-control" placeholder="Full name">
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                                    <input type="text" name="new_customer_phone" id="newCustomerPhone" class="form-control" placeholder="07XXXXXXXX">
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Email</label>
+                                                    <input type="email" name="new_customer_email" class="form-control" placeholder="email@example.com">
+                                                </div>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">Address</label>
+                                                    <input type="text" name="new_customer_address" class="form-control" placeholder="Physical address">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Package</label>
+                                            <select name="package_id_new" class="form-select">
+                                                <option value="">Select Package</option>
+                                                <?php foreach ($packages as $p): ?>
+                                                <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="row">
@@ -1939,6 +2030,29 @@ try {
                     <p class="mb-0">Failed to test connectivity</p>
                 `;
             });
+    }
+    
+    function toggleCustomerMode() {
+        const isNew = document.getElementById('newCustomer').checked;
+        const existingSection = document.getElementById('existingCustomerSection');
+        const newSection = document.getElementById('newCustomerSection');
+        const customerSelect = document.getElementById('customerSelect');
+        const newCustomerName = document.getElementById('newCustomerName');
+        const newCustomerPhone = document.getElementById('newCustomerPhone');
+        
+        if (isNew) {
+            existingSection.style.display = 'none';
+            newSection.style.display = 'block';
+            customerSelect.removeAttribute('required');
+            newCustomerName.setAttribute('required', 'required');
+            newCustomerPhone.setAttribute('required', 'required');
+        } else {
+            existingSection.style.display = 'block';
+            newSection.style.display = 'none';
+            customerSelect.setAttribute('required', 'required');
+            newCustomerName.removeAttribute('required');
+            newCustomerPhone.removeAttribute('required');
+        }
     }
     
     function pingSubscriber(subId, username) {
