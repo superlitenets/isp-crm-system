@@ -79,10 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         switch ($_POST['action']) {
             case 'login':
                 $phone = trim($_POST['phone'] ?? '');
+                $password = trim($_POST['password'] ?? '');
                 $normalizedPhone = normalizePhone($phone);
                 
                 $stmt = $db->prepare("
-                    SELECT rs.* FROM radius_subscriptions rs
+                    SELECT rs.*, c.phone as customer_phone FROM radius_subscriptions rs
                     JOIN customers c ON c.id = rs.customer_id
                     WHERE REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') = ?
                        OR REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') LIKE ?
@@ -93,10 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sub = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($sub) {
-                    $_SESSION['portal_subscription_id'] = $sub['id'];
-                    $_SESSION['portal_username'] = $sub['username'];
-                    header('Location: ?');
-                    exit;
+                    if ($sub['password'] === $password) {
+                        $_SESSION['portal_subscription_id'] = $sub['id'];
+                        $_SESSION['portal_username'] = $sub['username'];
+                        header('Location: ?');
+                        exit;
+                    } else {
+                        $message = 'Invalid password. Please try again.';
+                        $messageType = 'danger';
+                    }
                 } else {
                     $message = 'No account found with this phone number. Please contact support.';
                     $messageType = 'danger';
@@ -297,15 +303,15 @@ if (isset($_SESSION['portal_subscription_id'])) {
         <div class="login-box">
             <div class="portal-card p-5">
                 <div class="text-center mb-4">
-                    <i class="bi bi-phone" style="font-size: 64px; color: #667eea;"></i>
+                    <i class="bi bi-person-circle" style="font-size: 64px; color: #667eea;"></i>
                     <h4 class="mt-3">Customer Portal</h4>
-                    <p class="text-muted">Enter your phone number to access your account</p>
+                    <p class="text-muted">Login with your phone number and PPPoE password</p>
                 </div>
                 <form method="post">
                     <input type="hidden" name="action" value="login">
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label class="form-label">Phone Number</label>
-                        <div class="input-group input-group-lg">
+                        <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-telephone"></i></span>
                             <input type="tel" name="phone" class="form-control" 
                                    placeholder="0712 345 678" required
@@ -313,8 +319,20 @@ if (isset($_SESSION['portal_subscription_id'])) {
                         </div>
                         <small class="text-muted">Use the phone number registered with your account</small>
                     </div>
+                    <div class="mb-4">
+                        <label class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-key"></i></span>
+                            <input type="password" name="password" id="loginPassword" class="form-control" 
+                                   placeholder="Your PPPoE password" required>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleLoginPassword()">
+                                <i class="bi bi-eye" id="loginPasswordIcon"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Your internet connection password</small>
+                    </div>
                     <button type="submit" class="btn btn-primary btn-lg w-100">
-                        <i class="bi bi-box-arrow-in-right me-2"></i>Access My Account
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Login
                     </button>
                 </form>
                 <hr class="my-4">
@@ -326,6 +344,19 @@ if (isset($_SESSION['portal_subscription_id'])) {
                 </div>
             </div>
         </div>
+        <script>
+        function toggleLoginPassword() {
+            const input = document.getElementById('loginPassword');
+            const icon = document.getElementById('loginPasswordIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+        </script>
         <?php else: ?>
         
         <div class="row g-4 mb-4">
