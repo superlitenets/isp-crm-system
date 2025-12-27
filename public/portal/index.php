@@ -62,7 +62,7 @@ if (!isset($_SESSION['portal_subscription_id'])) {
         FROM radius_sessions rsess
         JOIN radius_subscriptions rs ON rs.id = rsess.subscription_id
         WHERE rsess.framed_ip_address = ? AND rsess.session_end IS NULL
-        ORDER BY rsess.started_at DESC LIMIT 1
+        ORDER BY rsess.session_start DESC LIMIT 1
     ");
     $stmt->execute([$clientIp]);
     $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
