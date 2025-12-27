@@ -1512,13 +1512,19 @@ if ($page === 'isp') {
         }
         
         $result = ['success' => true, 'online' => false, 'latency_ms' => null];
-        exec("ping -c 1 -W 2 " . escapeshellarg($nas['ip_address']) . " 2>&1", $output, $returnCode);
-        if ($returnCode === 0) {
+        $ip = $nas['ip_address'];
+        $port = $nas['api_port'] ?? 8728;
+        
+        $startTime = microtime(true);
+        $socket = @fsockopen($ip, $port, $errno, $errstr, 2);
+        $endTime = microtime(true);
+        
+        if ($socket) {
+            fclose($socket);
             $result['online'] = true;
-            if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {
-                $result['latency_ms'] = (float)$matches[1];
-            }
+            $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
         }
+        
         echo json_encode($result);
         exit;
     }
@@ -1551,13 +1557,25 @@ if ($page === 'isp') {
         }
         
         $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null];
-        exec("ping -c 1 -W 2 " . escapeshellarg($ipAddress) . " 2>&1", $output, $returnCode);
-        if ($returnCode === 0) {
+        
+        $startTime = microtime(true);
+        $socket = @fsockopen($ipAddress, 80, $errno, $errstr, 2);
+        $endTime = microtime(true);
+        
+        if ($socket) {
+            fclose($socket);
             $result['online'] = true;
-            if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {
-                $result['latency_ms'] = (float)$matches[1];
+            $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+        } else {
+            $socket = @fsockopen($ipAddress, 443, $errno, $errstr, 2);
+            $endTime = microtime(true);
+            if ($socket) {
+                fclose($socket);
+                $result['online'] = true;
+                $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
             }
         }
+        
         echo json_encode($result);
         exit;
     }
