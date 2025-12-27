@@ -19,24 +19,79 @@ $customerOnu = null;
 $tr069DeviceId = null;
 $wifiSettings = null;
 
+function getClientIp() {
+    $headers = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'];
+    foreach ($headers as $header) {
+        if (!empty($_SERVER[$header])) {
+            $ips = explode(',', $_SERVER[$header]);
+            $ip = trim($ips[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) || 
+                filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? '';
+}
+
+function normalizePhone($phone) {
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+    if (strlen($phone) === 9) {
+        $phone = '254' . $phone;
+    } elseif (strlen($phone) === 10 && substr($phone, 0, 1) === '0') {
+        $phone = '254' . substr($phone, 1);
+    } elseif (strlen($phone) === 12 && substr($phone, 0, 3) === '254') {
+    } elseif (strlen($phone) === 13 && substr($phone, 0, 4) === '+254') {
+        $phone = substr($phone, 1);
+    }
+    return $phone;
+}
+
+if (!isset($_SESSION['portal_subscription_id'])) {
+    $clientIp = getClientIp();
+    
+    $stmt = $db->prepare("
+        SELECT rs.id as subscription_id 
+        FROM radius_sessions rsess
+        JOIN radius_subscriptions rs ON rs.id = rsess.subscription_id
+        WHERE rsess.framed_ip = ? AND rsess.ended_at IS NULL
+        ORDER BY rsess.started_at DESC LIMIT 1
+    ");
+    $stmt->execute([$clientIp]);
+    $autoLogin = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($autoLogin) {
+        $_SESSION['portal_subscription_id'] = $autoLogin['subscription_id'];
+        $_SESSION['portal_auto_login'] = true;
+        $_SESSION['portal_client_ip'] = $clientIp;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'login':
-                $username = trim($_POST['username'] ?? '');
-                $password = trim($_POST['password'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                $normalizedPhone = normalizePhone($phone);
                 
-                $stmt = $db->prepare("SELECT * FROM radius_subscriptions WHERE username = ?");
-                $stmt->execute([$username]);
+                $stmt = $db->prepare("
+                    SELECT rs.* FROM radius_subscriptions rs
+                    JOIN customers c ON c.id = rs.customer_id
+                    WHERE REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') = ?
+                       OR REPLACE(REPLACE(REPLACE(c.phone, '+', ''), ' ', ''), '-', '') LIKE ?
+                    ORDER BY rs.created_at DESC LIMIT 1
+                ");
+                $phonePattern = '%' . substr($normalizedPhone, -9);
+                $stmt->execute([$normalizedPhone, $phonePattern]);
                 $sub = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                if ($sub && $sub['password'] === $password) {
+                if ($sub) {
                     $_SESSION['portal_subscription_id'] = $sub['id'];
                     $_SESSION['portal_username'] = $sub['username'];
                     header('Location: ?');
                     exit;
                 } else {
-                    $message = 'Invalid username or password';
+                    $message = 'No account found with this phone number. Please contact support.';
                     $messageType = 'danger';
                 }
                 break;
@@ -235,22 +290,33 @@ if (isset($_SESSION['portal_subscription_id'])) {
         <div class="login-box">
             <div class="portal-card p-5">
                 <div class="text-center mb-4">
-                    <i class="bi bi-person-circle" style="font-size: 64px; color: #667eea;"></i>
-                    <h4 class="mt-3">Customer Login</h4>
-                    <p class="text-muted">Enter your PPPoE credentials</p>
+                    <i class="bi bi-phone" style="font-size: 64px; color: #667eea;"></i>
+                    <h4 class="mt-3">Customer Portal</h4>
+                    <p class="text-muted">Enter your phone number to access your account</p>
                 </div>
                 <form method="post">
                     <input type="hidden" name="action" value="login">
-                    <div class="mb-3">
-                        <label class="form-label">Username</label>
-                        <input type="text" name="username" class="form-control form-control-lg" required>
+                    <div class="mb-4">
+                        <label class="form-label">Phone Number</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                            <input type="tel" name="phone" class="form-control" 
+                                   placeholder="0712 345 678" required
+                                   pattern="[0-9+\s\-]{9,15}">
+                        </div>
+                        <small class="text-muted">Use the phone number registered with your account</small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="password" class="form-control form-control-lg" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Access My Account
+                    </button>
                 </form>
+                <hr class="my-4">
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Connected to our network? You'll be logged in automatically.
+                    </small>
+                </div>
             </div>
         </div>
         <?php else: ?>
