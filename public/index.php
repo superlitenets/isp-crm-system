@@ -1497,6 +1497,32 @@ if ($page === 'isp') {
         echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page.</div>';
         exit;
     }
+    
+    // Handle AJAX actions
+    $action = $_GET['action'] ?? '';
+    if ($action === 'test_nas') {
+        header('Content-Type: application/json');
+        $radiusBilling = new \App\RadiusBilling($db);
+        $nasId = (int)($_GET['id'] ?? 0);
+        $nas = $radiusBilling->getNAS($nasId);
+        
+        if (!$nas) {
+            echo json_encode(['success' => false, 'error' => 'NAS not found']);
+            exit;
+        }
+        
+        $result = ['success' => true, 'online' => false, 'latency_ms' => null];
+        exec("ping -c 1 -W 2 " . escapeshellarg($nas['ip_address']) . " 2>&1", $output, $returnCode);
+        if ($returnCode === 0) {
+            $result['online'] = true;
+            if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {
+                $result['latency_ms'] = (float)$matches[1];
+            }
+        }
+        echo json_encode($result);
+        exit;
+    }
+    
     include __DIR__ . '/../templates/isp.php';
     exit;
 }

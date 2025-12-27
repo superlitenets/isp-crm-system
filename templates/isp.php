@@ -872,22 +872,23 @@ try {
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-5 mb-3">
+                                    <div class="col-md-4 mb-3">
                                         <label class="form-label">Username (PPPoE)</label>
-                                        <input type="text" name="username" id="pppoe_username" class="form-control" required>
+                                        <input type="text" name="username" id="pppoe_username" class="form-control" value="<?= htmlspecialchars($radiusBilling->getNextUsername()) ?>" readonly style="background-color: #e9ecef;">
+                                        <small class="text-muted">Auto-generated, cannot be changed</small>
                                     </div>
                                     <div class="col-md-5 mb-3">
                                         <label class="form-label">Password</label>
                                         <div class="input-group">
-                                            <input type="text" name="password" id="pppoe_password" class="form-control" required>
+                                            <input type="text" name="password" id="pppoe_password" class="form-control" value="<?= htmlspecialchars($radiusBilling->generatePassword()) ?>" required>
                                             <button type="button" class="btn btn-outline-secondary" onclick="togglePasswordVisibility()" title="Toggle visibility">
                                                 <i class="bi bi-eye" id="passwordToggleIcon"></i>
                                             </button>
                                         </div>
                                     </div>
-                                    <div class="col-md-2 mb-3 d-flex align-items-end">
-                                        <button type="button" class="btn btn-info w-100" onclick="generateCredentials()">
-                                            <i class="bi bi-magic me-1"></i> Generate
+                                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                                        <button type="button" class="btn btn-info w-100" onclick="regeneratePassword()">
+                                            <i class="bi bi-magic me-1"></i> New Password
                                         </button>
                                     </div>
                                 </div>
@@ -1185,11 +1186,19 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this NAS device?')">
-                                            <input type="hidden" name="action" value="delete_nas">
-                                            <input type="hidden" name="id" value="<?= $nas['id'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                        </form>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-success" onclick="testNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Test Connectivity">
+                                                <i class="bi bi-lightning"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="editNAS(<?= htmlspecialchars(json_encode($nas)) ?>)" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Delete this NAS device?')">
+                                                <input type="hidden" name="action" value="delete_nas">
+                                                <input type="hidden" name="id" value="<?= $nas['id'] ?>">
+                                                <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -1258,6 +1267,90 @@ try {
                                 <button type="submit" class="btn btn-primary">Add NAS</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="editNASModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_nas">
+                            <input type="hidden" name="id" id="edit_nas_id">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit NAS Device</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" name="name" id="edit_nas_name" class="form-control" required>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label">IP Address</label>
+                                        <input type="text" name="ip_address" id="edit_nas_ip" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">RADIUS Port</label>
+                                        <input type="number" name="ports" id="edit_nas_ports" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">RADIUS Secret</label>
+                                    <input type="password" name="secret" id="edit_nas_secret" class="form-control" placeholder="Leave blank to keep current">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" id="edit_nas_description" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="is_active" id="edit_nas_active" value="1">
+                                    <label class="form-check-label" for="edit_nas_active">Active</label>
+                                </div>
+                                <hr>
+                                <h6>MikroTik API (Optional)</h6>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="api_enabled" id="edit_api_enabled" value="1">
+                                    <label class="form-check-label" for="edit_api_enabled">Enable API Access</label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">API Port</label>
+                                        <input type="number" name="api_port" id="edit_api_port" class="form-control">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">API Username</label>
+                                        <input type="text" name="api_username" id="edit_api_username" class="form-control">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">API Password</label>
+                                        <input type="password" name="api_password" class="form-control" placeholder="Leave blank to keep">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="testNASModal" tabindex="-1">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">NAS Connectivity Test</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center" id="testNASResult">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Testing...</span>
+                            </div>
+                            <p class="mt-2">Testing connectivity...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1771,23 +1864,12 @@ try {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    function generateCredentials() {
-        const customerSelect = document.querySelector('select[name="customer_id"]');
-        const customerText = customerSelect.options[customerSelect.selectedIndex]?.text || '';
-        const customerName = customerText.split('(')[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        // Generate username: customer name + random 4 digits
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        const username = customerName ? customerName.substring(0, 12) + randomNum : 'pppoe' + randomNum;
-        
-        // Generate password: 8 random alphanumeric characters
+    function regeneratePassword() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
         let password = '';
         for (let i = 0; i < 8; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
-        
-        document.getElementById('pppoe_username').value = username;
         document.getElementById('pppoe_password').value = password;
     }
     
@@ -1805,17 +1887,56 @@ try {
         }
     }
     
-    // Auto-generate when customer is selected
-    document.addEventListener('DOMContentLoaded', function() {
-        const customerSelect = document.querySelector('select[name="customer_id"]');
-        if (customerSelect) {
-            customerSelect.addEventListener('change', function() {
-                if (this.value && !document.getElementById('pppoe_username').value) {
-                    generateCredentials();
+    function editNAS(nas) {
+        document.getElementById('edit_nas_id').value = nas.id;
+        document.getElementById('edit_nas_name').value = nas.name;
+        document.getElementById('edit_nas_ip').value = nas.ip_address;
+        document.getElementById('edit_nas_ports').value = nas.ports;
+        document.getElementById('edit_nas_description').value = nas.description || '';
+        document.getElementById('edit_nas_active').checked = nas.is_active == 1;
+        document.getElementById('edit_api_enabled').checked = nas.api_enabled == 1;
+        document.getElementById('edit_api_port').value = nas.api_port || 8728;
+        document.getElementById('edit_api_username').value = nas.api_username || '';
+        new bootstrap.Modal(document.getElementById('editNASModal')).show();
+    }
+    
+    function testNAS(nasId, ipAddress) {
+        const modal = new bootstrap.Modal(document.getElementById('testNASModal'));
+        const resultDiv = document.getElementById('testNASResult');
+        
+        resultDiv.innerHTML = `
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Testing...</span>
+            </div>
+            <p class="mt-2">Testing connectivity to ${ipAddress}...</p>
+        `;
+        modal.show();
+        
+        fetch('/index.php?page=isp&action=test_nas&id=' + nasId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.online) {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                        <h5 class="mt-3 text-success">Reachable</h5>
+                        <p class="mb-0">Latency: ${data.latency_ms ? data.latency_ms + ' ms' : 'N/A'}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-x-circle-fill text-danger fs-1"></i>
+                        <h5 class="mt-3 text-danger">Unreachable</h5>
+                        <p class="mb-0">${data.error || 'Could not reach the device'}</p>
+                    `;
                 }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill text-warning fs-1"></i>
+                    <h5 class="mt-3 text-warning">Error</h5>
+                    <p class="mb-0">Failed to test connectivity</p>
+                `;
             });
-        }
-    });
+    }
     </script>
 </body>
 </html>

@@ -35,6 +35,56 @@ class RadiusBilling {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
     }
     
+    // ==================== Username Generation ====================
+    
+    public function getISPPrefix(): string {
+        $stmt = $this->db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'isp_username_prefix'");
+        $stmt->execute();
+        $result = $stmt->fetchColumn();
+        return $result ?: 'SFL';
+    }
+    
+    public function setISPPrefix(string $prefix): bool {
+        $stmt = $this->db->prepare("
+            INSERT INTO company_settings (setting_key, setting_value, setting_type)
+            VALUES ('isp_username_prefix', ?, 'string')
+            ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value
+        ");
+        return $stmt->execute([$prefix]);
+    }
+    
+    public function getNextUsername(): string {
+        $prefix = $this->getISPPrefix();
+        
+        $stmt = $this->db->prepare("
+            SELECT username FROM radius_subscriptions 
+            WHERE username LIKE ? 
+            ORDER BY LENGTH(username) DESC, username DESC 
+            LIMIT 1
+        ");
+        $stmt->execute([$prefix . '%']);
+        $lastUsername = $stmt->fetchColumn();
+        
+        if ($lastUsername) {
+            $numericPart = preg_replace('/^' . preg_quote($prefix, '/') . '/', '', $lastUsername);
+            $nextNum = (int)$numericPart + 1;
+        } else {
+            $nextNum = 1;
+        }
+        
+        $digits = max(3, strlen((string)$nextNum));
+        return $prefix . str_pad($nextNum, $digits, '0', STR_PAD_LEFT);
+    }
+    
+    public function generatePassword(int $length = 8): string {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        $password = '';
+        for ($i = 0; $i < $length; $i++) {
+            $password .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        return $password;
+    }
+    
     // ==================== NAS Management ====================
     
     public function getNASDevices(): array {
