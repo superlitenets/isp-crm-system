@@ -1,13 +1,20 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/RadiusBilling.php';
 require_once __DIR__ . '/../../src/Mpesa.php';
 require_once __DIR__ . '/../../src/GenieACS.php';
 
-$db = getDbConnection();
-$radiusBilling = new \App\RadiusBilling($db);
-$genieACS = new \App\GenieACS($db);
+try {
+    $db = getDbConnection();
+    $radiusBilling = new \App\RadiusBilling($db);
+    $genieACS = new \App\GenieACS($db);
+} catch (Exception $e) {
+    die('Database connection error: ' . $e->getMessage());
+}
 
 $message = '';
 $messageType = 'info';
