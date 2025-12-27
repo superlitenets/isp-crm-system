@@ -177,6 +177,11 @@ if (isset($_SESSION['portal_subscription_id'])) {
         if ($customerOnu && !empty($customerOnu['tr069_device_id'])) {
             $tr069DeviceId = $customerOnu['tr069_device_id'];
         }
+        
+        $routerIp = null;
+        if ($customerOnu && !empty($customerOnu['ip_address'])) {
+            $routerIp = $customerOnu['ip_address'];
+        }
     }
 }
 ?>
@@ -328,6 +333,8 @@ if (isset($_SESSION['portal_subscription_id'])) {
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
             <?php if ($tr069DeviceId): ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#wifi"><i class="bi bi-wifi me-1"></i>WiFi Settings</a></li>
+            <?php elseif ($routerIp): ?>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#router"><i class="bi bi-router me-1"></i>Router Settings</a></li>
             <?php endif; ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#payment">Make Payment</a></li>
         </ul>
@@ -442,6 +449,72 @@ if (isset($_SESSION['portal_subscription_id'])) {
                     </div>
                 </div>
             </div>
+            
+            <?php if ($routerIp && !$tr069DeviceId): ?>
+            <div class="tab-pane fade" id="router">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="portal-card p-4">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-router" style="font-size: 64px; color: #667eea;"></i>
+                                <h4 class="mt-3">Router Settings</h4>
+                                <p class="text-muted">Access your router's web interface to manage WiFi and network settings</p>
+                            </div>
+                            
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">Your Router IP</h6>
+                                            <h3 class="text-primary mb-3"><code><?= htmlspecialchars($routerIp) ?></code></h3>
+                                            <a href="http://<?= htmlspecialchars($routerIp) ?>" 
+                                               target="_blank" 
+                                               class="btn btn-primary btn-lg w-100">
+                                                <i class="bi bi-box-arrow-up-right me-2"></i>Open Router Settings
+                                            </a>
+                                            <small class="text-muted d-block mt-2">Opens in a new tab</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100 bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title"><i class="bi bi-info-circle me-2"></i>Device Information</h6>
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <tr><td class="text-muted">Device</td><td><?= htmlspecialchars($customerOnu['name'] ?? 'Router') ?></td></tr>
+                                                <tr><td class="text-muted">Serial</td><td><code><?= htmlspecialchars($customerOnu['sn'] ?? 'N/A') ?></code></td></tr>
+                                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($customerOnu['onu_type'] ?? 'N/A') ?></td></tr>
+                                                <tr><td class="text-muted">Status</td><td>
+                                                    <span class="badge bg-<?= ($customerOnu['status'] ?? '') === 'online' ? 'success' : 'secondary' ?>">
+                                                        <?= ucfirst($customerOnu['status'] ?? 'Unknown') ?>
+                                                    </span>
+                                                </td></tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning mt-4">
+                                <h6><i class="bi bi-shield-lock me-2"></i>Login Credentials</h6>
+                                <p class="mb-2">You'll need your router's admin credentials to log in. Common default logins:</p>
+                                <ul class="mb-0">
+                                    <li><strong>Username:</strong> admin &nbsp; <strong>Password:</strong> admin</li>
+                                    <li><strong>Username:</strong> user &nbsp; <strong>Password:</strong> user</li>
+                                    <li>Check the label on your router for the default password</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="bi bi-lightbulb me-2"></i>
+                                <strong>Note:</strong> You must be connected to your home network (WiFi or LAN cable) to access the router settings. 
+                                This won't work from outside your home network.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <?php if ($tr069DeviceId): ?>
             <div class="tab-pane fade" id="wifi">
