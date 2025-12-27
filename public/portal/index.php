@@ -1,0 +1,392 @@
+<?php
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../src/RadiusBilling.php';
+require_once __DIR__ . '/../../src/Mpesa.php';
+
+$db = getDbConnection();
+$radiusBilling = new \App\RadiusBilling($db);
+
+$message = '';
+$messageType = 'info';
+$subscription = null;
+$sessions = [];
+$invoices = [];
+$usageHistory = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            case 'login':
+                $username = trim($_POST['username'] ?? '');
+                $password = trim($_POST['password'] ?? '');
+                
+                $stmt = $db->prepare("SELECT * FROM radius_subscriptions WHERE username = ?");
+                $stmt->execute([$username]);
+                $sub = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($sub && $sub['password'] === $password) {
+                    $_SESSION['portal_subscription_id'] = $sub['id'];
+                    $_SESSION['portal_username'] = $sub['username'];
+                    header('Location: ?');
+                    exit;
+                } else {
+                    $message = 'Invalid username or password';
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'logout':
+                session_destroy();
+                header('Location: ?');
+                exit;
+                
+            case 'pay':
+                $phone = $_POST['phone'] ?? '';
+                $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+                $package = $radiusBilling->getPackage($subscription['package_id']);
+                
+                try {
+                    $mpesa = new \App\Mpesa();
+                    if ($mpesa->isConfigured()) {
+                        $result = $mpesa->stkPush($phone, $package['price'], $subscription['username'], "Internet Renewal");
+                        if ($result && ($result['ResponseCode'] ?? '') == '0') {
+                            $message = 'Payment request sent to your phone. Enter your M-Pesa PIN.';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Payment request failed: ' . ($result['errorMessage'] ?? 'Unknown error');
+                            $messageType = 'danger';
+                        }
+                    }
+                } catch (Exception $e) {
+                    $message = 'Payment error: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+        }
+    }
+}
+
+if (isset($_SESSION['portal_subscription_id'])) {
+    $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+    
+    if ($subscription) {
+        $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY started_at DESC LIMIT 20");
+        $stmt->execute([$subscription['id']]);
+        $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $stmt = $db->prepare("SELECT * FROM radius_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 10");
+        $stmt->execute([$subscription['id']]);
+        $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $stmt = $db->prepare("SELECT * FROM radius_usage_logs WHERE subscription_id = ? ORDER BY log_date DESC LIMIT 30");
+        $stmt->execute([$subscription['id']]);
+        $usageHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $stmt = $db->prepare("SELECT * FROM radius_packages WHERE id = ?");
+        $stmt->execute([$subscription['package_id']]);
+        $package = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = $db->prepare("SELECT * FROM customers WHERE id = ?");
+        $stmt->execute([$subscription['customer_id']]);
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Portal - ISP Billing</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #f5f7fa; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .portal-card { background: white; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08); }
+        .stat-card { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 15px; }
+        .stat-card.success { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .stat-card.warning { background: linear-gradient(135deg, #f2994a, #f2c94c); }
+        .stat-card.danger { background: linear-gradient(135deg, #eb3349, #f45c43); }
+        .login-box { max-width: 400px; margin: 100px auto; }
+        .usage-bar { height: 10px; border-radius: 5px; background: #e9ecef; overflow: hidden; }
+        .usage-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+        .nav-pills .nav-link.active { background: linear-gradient(135deg, #667eea, #764ba2); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #1e3a5f, #0d1b2a);">
+        <div class="container">
+            <a class="navbar-brand" href="?"><i class="bi bi-wifi me-2"></i>Customer Portal</a>
+            <?php if ($subscription): ?>
+            <div class="d-flex align-items-center">
+                <span class="text-white-50 me-3">Welcome, <?= htmlspecialchars($customer['name'] ?? $subscription['username']) ?></span>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="logout">
+                    <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+                </form>
+            </div>
+            <?php endif; ?>
+        </div>
+    </nav>
+    
+    <div class="container py-4">
+        <?php if ($message): ?>
+        <div class="alert alert-<?= $messageType ?> alert-dismissible fade show">
+            <?= htmlspecialchars($message) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (!$subscription): ?>
+        <div class="login-box">
+            <div class="portal-card p-5">
+                <div class="text-center mb-4">
+                    <i class="bi bi-person-circle" style="font-size: 64px; color: #667eea;"></i>
+                    <h4 class="mt-3">Customer Login</h4>
+                    <p class="text-muted">Enter your PPPoE credentials</p>
+                </div>
+                <form method="post">
+                    <input type="hidden" name="action" value="login">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control form-control-lg" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" class="form-control form-control-lg" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
+                </form>
+            </div>
+        </div>
+        <?php else: ?>
+        
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="stat-card p-4 h-100">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Package</div>
+                            <div class="fs-5 fw-bold"><?= htmlspecialchars($package['name'] ?? 'N/A') ?></div>
+                            <div class="small opacity-75"><?= $package['download_speed'] ?? '' ?>/<?= $package['upload_speed'] ?? '' ?></div>
+                        </div>
+                        <i class="bi bi-box fs-2 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card <?= $subscription['status'] === 'active' ? 'success' : 'danger' ?> p-4 h-100">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Status</div>
+                            <div class="fs-5 fw-bold"><?= ucfirst($subscription['status']) ?></div>
+                            <div class="small opacity-75">Expires: <?= $subscription['expiry_date'] ? date('M j, Y', strtotime($subscription['expiry_date'])) : 'N/A' ?></div>
+                        </div>
+                        <i class="bi bi-<?= $subscription['status'] === 'active' ? 'check-circle' : 'x-circle' ?> fs-2 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card warning p-4 h-100">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Data Used</div>
+                            <div class="fs-5 fw-bold"><?= number_format($subscription['data_used_mb'] / 1024, 2) ?> GB</div>
+                            <?php if ($package['data_quota_mb']): ?>
+                            <div class="small opacity-75">of <?= number_format($package['data_quota_mb'] / 1024, 0) ?> GB</div>
+                            <?php else: ?>
+                            <div class="small opacity-75">Unlimited</div>
+                            <?php endif; ?>
+                        </div>
+                        <i class="bi bi-bar-chart fs-2 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card p-4 h-100">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Balance</div>
+                            <div class="fs-5 fw-bold">KES <?= number_format($subscription['credit_balance'] ?? 0) ?></div>
+                            <div class="small opacity-75">Credit available</div>
+                        </div>
+                        <i class="bi bi-wallet2 fs-2 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <?php if ($package['data_quota_mb']): ?>
+        <div class="portal-card p-4 mb-4">
+            <h6 class="mb-3">Data Usage</h6>
+            <?php 
+            $usagePercent = min(100, ($subscription['data_used_mb'] / $package['data_quota_mb']) * 100);
+            $barColor = $usagePercent >= 100 ? '#dc3545' : ($usagePercent >= 80 ? '#ffc107' : '#28a745');
+            ?>
+            <div class="usage-bar">
+                <div class="usage-bar-fill" style="width: <?= $usagePercent ?>%; background: <?= $barColor ?>;"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-2 small text-muted">
+                <span><?= number_format($subscription['data_used_mb'] / 1024, 2) ?> GB used</span>
+                <span><?= number_format(max(0, $package['data_quota_mb'] - $subscription['data_used_mb']) / 1024, 2) ?> GB remaining</span>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#overview">Overview</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sessions">Sessions</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#payment">Make Payment</a></li>
+        </ul>
+        
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="overview">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-person me-2"></i>Account Details</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">Username</td><td><code><?= htmlspecialchars($subscription['username']) ?></code></td></tr>
+                                <tr><td class="text-muted">Customer</td><td><?= htmlspecialchars($customer['name'] ?? 'N/A') ?></td></tr>
+                                <tr><td class="text-muted">Phone</td><td><?= htmlspecialchars($customer['phone'] ?? 'N/A') ?></td></tr>
+                                <tr><td class="text-muted">Access Type</td><td><?= strtoupper($subscription['access_type']) ?></td></tr>
+                                <tr><td class="text-muted">Static IP</td><td><?= $subscription['static_ip'] ?: 'Dynamic' ?></td></tr>
+                                <tr><td class="text-muted">MAC Address</td><td><?= $subscription['mac_address'] ?: 'Not bound' ?></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-box me-2"></i>Package Details</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">Package</td><td><?= htmlspecialchars($package['name'] ?? 'N/A') ?></td></tr>
+                                <tr><td class="text-muted">Download Speed</td><td><?= $package['download_speed'] ?? 'N/A' ?></td></tr>
+                                <tr><td class="text-muted">Upload Speed</td><td><?= $package['upload_speed'] ?? 'N/A' ?></td></tr>
+                                <tr><td class="text-muted">Monthly Price</td><td>KES <?= number_format($package['price'] ?? 0) ?></td></tr>
+                                <tr><td class="text-muted">Data Quota</td><td><?= $package['data_quota_mb'] ? number_format($package['data_quota_mb'] / 1024) . ' GB' : 'Unlimited' ?></td></tr>
+                                <tr><td class="text-muted">Validity</td><td><?= $package['validity_days'] ?? 30 ?> days</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="sessions">
+                <div class="portal-card p-4">
+                    <h6 class="mb-3"><i class="bi bi-clock-history me-2"></i>Recent Sessions</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Started</th>
+                                    <th>Ended</th>
+                                    <th>Duration</th>
+                                    <th>Download</th>
+                                    <th>Upload</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($sessions as $sess): ?>
+                                <tr>
+                                    <td><?= date('M j, H:i', strtotime($sess['started_at'] ?? $sess['session_start'])) ?></td>
+                                    <td><?= $sess['stopped_at'] ? date('M j, H:i', strtotime($sess['stopped_at'])) : '<span class="badge bg-success">Active</span>' ?></td>
+                                    <td>
+                                        <?php 
+                                        $start = strtotime($sess['started_at'] ?? $sess['session_start']);
+                                        $end = $sess['stopped_at'] ? strtotime($sess['stopped_at']) : time();
+                                        $dur = $end - $start;
+                                        echo floor($dur/3600) . 'h ' . floor(($dur%3600)/60) . 'm';
+                                        ?>
+                                    </td>
+                                    <td><?= number_format(($sess['input_octets'] ?? 0) / 1048576, 2) ?> MB</td>
+                                    <td><?= number_format(($sess['output_octets'] ?? 0) / 1048576, 2) ?> MB</td>
+                                    <td><code><?= $sess['framed_ip_address'] ?? '-' ?></code></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($sessions)): ?>
+                                <tr><td colspan="6" class="text-center text-muted py-4">No sessions found</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="invoices">
+                <div class="portal-card p-4">
+                    <h6 class="mb-3"><i class="bi bi-receipt me-2"></i>Invoices & Payments</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Paid On</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($invoices as $inv): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($inv['invoice_number']) ?></td>
+                                    <td><?= date('M j, Y', strtotime($inv['created_at'])) ?></td>
+                                    <td>KES <?= number_format($inv['total_amount']) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= $inv['status'] === 'paid' ? 'success' : 'warning' ?>">
+                                            <?= ucfirst($inv['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= $inv['paid_at'] ? date('M j, Y', strtotime($inv['paid_at'])) : '-' ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($invoices)): ?>
+                                <tr><td colspan="5" class="text-center text-muted py-4">No invoices yet</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="payment">
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="portal-card p-5">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-phone" style="font-size: 48px; color: #28a745;"></i>
+                                <h5 class="mt-3">Pay via M-Pesa</h5>
+                                <p class="text-muted">Renew your subscription instantly</p>
+                            </div>
+                            <div class="alert alert-info">
+                                <strong>Amount:</strong> KES <?= number_format($package['price'] ?? 0) ?><br>
+                                <strong>Package:</strong> <?= htmlspecialchars($package['name'] ?? '') ?> (<?= $package['validity_days'] ?? 30 ?> days)
+                            </div>
+                            <form method="post">
+                                <input type="hidden" name="action" value="pay">
+                                <div class="mb-3">
+                                    <label class="form-label">M-Pesa Phone Number</label>
+                                    <input type="tel" name="phone" class="form-control form-control-lg" 
+                                           value="<?= htmlspecialchars($customer['phone'] ?? '') ?>" 
+                                           placeholder="0712345678" required>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-lg w-100">
+                                    <i class="bi bi-phone me-2"></i>Pay KES <?= number_format($package['price'] ?? 0) ?>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <?php endif; ?>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

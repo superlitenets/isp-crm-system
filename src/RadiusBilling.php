@@ -1295,4 +1295,355 @@ class RadiusBilling {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+    
+    // ==================== Referral System ====================
+    
+    public function generateReferralCode(int $subscriptionId): string {
+        $code = strtoupper(substr(md5($subscriptionId . time()), 0, 8));
+        $this->db->prepare("UPDATE radius_subscriptions SET referral_code = ? WHERE id = ?")
+            ->execute([$code, $subscriptionId]);
+        return $code;
+    }
+    
+    public function applyReferral(int $newSubscriptionId, string $referralCode): array {
+        $stmt = $this->db->prepare("SELECT id FROM radius_subscriptions WHERE referral_code = ?");
+        $stmt->execute([$referralCode]);
+        $referrer = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$referrer) {
+            return ['success' => false, 'error' => 'Invalid referral code'];
+        }
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO radius_referrals (referrer_subscription_id, referred_subscription_id, referral_code, reward_type, reward_value, status)
+            VALUES (?, ?, ?, 'days', 7, 'pending')
+        ");
+        $stmt->execute([$referrer['id'], $newSubscriptionId, $referralCode]);
+        
+        return ['success' => true, 'referrer_id' => $referrer['id']];
+    }
+    
+    public function processReferralReward(int $referralId): array {
+        $stmt = $this->db->prepare("SELECT * FROM radius_referrals WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$referralId]);
+        $referral = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$referral) {
+            return ['success' => false, 'error' => 'Referral not found or already processed'];
+        }
+        
+        if ($referral['reward_type'] === 'days') {
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    expiry_date = expiry_date + INTERVAL '1 day' * ?
+                WHERE id = ?
+            ")->execute([$referral['reward_value'], $referral['referrer_subscription_id']]);
+        } elseif ($referral['reward_type'] === 'credit') {
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET 
+                    credit_balance = credit_balance + ?
+                WHERE id = ?
+            ")->execute([$referral['reward_value'], $referral['referrer_subscription_id']]);
+        }
+        
+        $this->db->prepare("UPDATE radius_referrals SET status = 'rewarded', rewarded_at = NOW() WHERE id = ?")
+            ->execute([$referralId]);
+        
+        return ['success' => true];
+    }
+    
+    public function getReferralStats(int $subscriptionId): array {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) as total_referrals,
+                   SUM(CASE WHEN status = 'rewarded' THEN reward_value ELSE 0 END) as total_rewards
+            FROM radius_referrals WHERE referrer_subscription_id = ?
+        ");
+        $stmt->execute([$subscriptionId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Promotional Packages ====================
+    
+    public function getActivePromotions(): array {
+        $stmt = $this->db->query("
+            SELECT p.*, pkg.name as package_name FROM radius_promotions p
+            LEFT JOIN radius_packages pkg ON p.package_id = pkg.id
+            WHERE p.is_active = TRUE 
+            AND (p.start_date IS NULL OR p.start_date <= CURRENT_DATE)
+            AND (p.end_date IS NULL OR p.end_date >= CURRENT_DATE)
+            AND (p.max_uses IS NULL OR p.current_uses < p.max_uses)
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function applyPromoCode(string $code, int $packageId): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM radius_promotions 
+            WHERE promo_code = ? AND is_active = TRUE
+            AND (package_id IS NULL OR package_id = ?)
+            AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+            AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+            AND (max_uses IS NULL OR current_uses < max_uses)
+        ");
+        $stmt->execute([$code, $packageId]);
+        $promo = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$promo) {
+            return ['success' => false, 'error' => 'Invalid or expired promo code'];
+        }
+        
+        $package = $this->getPackage($packageId);
+        $discount = 0;
+        
+        if ($promo['discount_type'] === 'percent') {
+            $discount = $package['price'] * ($promo['discount_value'] / 100);
+        } else {
+            $discount = $promo['discount_value'];
+        }
+        
+        $this->db->prepare("UPDATE radius_promotions SET current_uses = current_uses + 1 WHERE id = ?")
+            ->execute([$promo['id']]);
+        
+        return [
+            'success' => true,
+            'promo' => $promo,
+            'original_price' => $package['price'],
+            'discount' => $discount,
+            'final_price' => max(0, $package['price'] - $discount)
+        ];
+    }
+    
+    public function createPromotion(array $data): array {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_promotions (name, description, package_id, discount_type, discount_value, promo_code, start_date, end_date, max_uses, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? '',
+                $data['package_id'] ?? null,
+                $data['discount_type'] ?? 'percent',
+                $data['discount_value'],
+                $data['promo_code'] ?? strtoupper(substr(md5(time()), 0, 8)),
+                $data['start_date'] ?? null,
+                $data['end_date'] ?? null,
+                $data['max_uses'] ?? null,
+                $data['is_active'] ?? true
+            ]);
+            return ['success' => true, 'id' => $this->db->lastInsertId()];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    // ==================== Invoice Generation ====================
+    
+    public function generateInvoice(int $subscriptionId, float $amount, string $description = ''): array {
+        try {
+            $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            
+            $taxRate = 0.16;
+            $taxAmount = round($amount * $taxRate, 2);
+            $totalAmount = $amount + $taxAmount;
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO radius_invoices (subscription_id, invoice_number, amount, tax_amount, total_amount, description, due_date, status)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_DATE + INTERVAL '7 days', 'unpaid')
+            ");
+            $stmt->execute([$subscriptionId, $invoiceNumber, $amount, $taxAmount, $totalAmount, $description]);
+            
+            return [
+                'success' => true,
+                'invoice_number' => $invoiceNumber,
+                'amount' => $amount,
+                'tax' => $taxAmount,
+                'total' => $totalAmount
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getInvoice(string $invoiceNumber): ?array {
+        $stmt = $this->db->prepare("
+            SELECT i.*, s.username, c.name as customer_name, c.phone, c.email,
+                   p.name as package_name
+            FROM radius_invoices i
+            LEFT JOIN radius_subscriptions s ON i.subscription_id = s.id
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE i.invoice_number = ?
+        ");
+        $stmt->execute([$invoiceNumber]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function markInvoicePaid(string $invoiceNumber, string $paymentMethod = 'mpesa', string $transactionRef = ''): array {
+        $stmt = $this->db->prepare("
+            UPDATE radius_invoices SET 
+                status = 'paid', 
+                paid_at = NOW(), 
+                payment_method = ?, 
+                transaction_ref = ?
+            WHERE invoice_number = ? AND status = 'unpaid'
+        ");
+        $stmt->execute([$paymentMethod, $transactionRef, $invoiceNumber]);
+        
+        return ['success' => $stmt->rowCount() > 0];
+    }
+    
+    public function getUnpaidInvoices(int $subscriptionId): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM radius_invoices 
+            WHERE subscription_id = ? AND status = 'unpaid'
+            ORDER BY due_date ASC
+        ");
+        $stmt->execute([$subscriptionId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Credit/Debt Management ====================
+    
+    public function addCredit(int $subscriptionId, float $amount, string $reason = ''): array {
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions SET credit_balance = credit_balance + ? WHERE id = ?
+        ");
+        $stmt->execute([$amount, $subscriptionId]);
+        
+        return ['success' => true, 'added' => $amount];
+    }
+    
+    public function useCredit(int $subscriptionId, float $amount): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub || $sub['credit_balance'] < $amount) {
+            return ['success' => false, 'error' => 'Insufficient credit'];
+        }
+        
+        $stmt = $this->db->prepare("
+            UPDATE radius_subscriptions SET credit_balance = credit_balance - ? WHERE id = ?
+        ");
+        $stmt->execute([$amount, $subscriptionId]);
+        
+        return ['success' => true, 'used' => $amount, 'remaining' => $sub['credit_balance'] - $amount];
+    }
+    
+    public function getDebtors(): array {
+        $stmt = $this->db->query("
+            SELECT s.*, c.name as customer_name, c.phone,
+                   COALESCE(SUM(i.total_amount), 0) as total_unpaid
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_invoices i ON i.subscription_id = s.id AND i.status = 'unpaid'
+            GROUP BY s.id, c.name, c.phone
+            HAVING COALESCE(SUM(i.total_amount), 0) > 0
+            ORDER BY total_unpaid DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Technician Assignment ====================
+    
+    public function linkToTicket(int $subscriptionId, int $ticketId): array {
+        try {
+            $this->db->prepare("
+                UPDATE radius_subscriptions SET notes = CONCAT(COALESCE(notes, ''), '\nLinked to Ticket #', ?) WHERE id = ?
+            ")->execute([$ticketId, $subscriptionId]);
+            
+            return ['success' => true];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function getSubscriptionByCustomer(int $customerId): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM radius_subscriptions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1");
+        $stmt->execute([$customerId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    // ==================== Bandwidth Graphs Data ====================
+    
+    public function getDailyUsage(int $subscriptionId, int $days = 30): array {
+        $stmt = $this->db->prepare("
+            SELECT log_date, download_mb, upload_mb, session_count, session_time_seconds
+            FROM radius_usage_logs
+            WHERE subscription_id = ? AND log_date >= CURRENT_DATE - INTERVAL '1 day' * ?
+            ORDER BY log_date ASC
+        ");
+        $stmt->execute([$subscriptionId, $days]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getHourlyUsage(int $subscriptionId): array {
+        $stmt = $this->db->prepare("
+            SELECT EXTRACT(HOUR FROM started_at) as hour,
+                   SUM(input_octets) / 1048576.0 as download_mb,
+                   SUM(output_octets) / 1048576.0 as upload_mb
+            FROM radius_sessions
+            WHERE subscription_id = ? AND started_at >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY EXTRACT(HOUR FROM started_at)
+            ORDER BY hour
+        ");
+        $stmt->execute([$subscriptionId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    // ==================== Multi-Router Support ====================
+    
+    public function syncToMikroTik(int $nasId, int $subscriptionId): array {
+        $nas = $this->getNAS($nasId);
+        $sub = $this->getSubscription($subscriptionId);
+        $package = $this->getPackage($sub['package_id']);
+        
+        if (!$nas || !$nas['api_enabled']) {
+            return ['success' => false, 'error' => 'NAS not configured for API access'];
+        }
+        
+        try {
+            $api = new MikroTikAPI(
+                $nas['ip_address'],
+                $nas['api_port'] ?? 8728,
+                $nas['api_username'],
+                $this->decrypt($nas['api_password_encrypted'])
+            );
+            
+            $rateLimit = ($package['upload_speed'] ?? '5M') . '/' . ($package['download_speed'] ?? '10M');
+            
+            $result = $api->addPPPoESecret(
+                $sub['username'],
+                $sub['password'],
+                $package['name'] ?? 'default',
+                $sub['static_ip']
+            );
+            
+            return ['success' => true, 'result' => $result];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    public function removeFromMikroTik(int $nasId, string $username): array {
+        $nas = $this->getNAS($nasId);
+        
+        if (!$nas || !$nas['api_enabled']) {
+            return ['success' => false, 'error' => 'NAS not configured for API access'];
+        }
+        
+        try {
+            $api = new MikroTikAPI(
+                $nas['ip_address'],
+                $nas['api_port'] ?? 8728,
+                $nas['api_username'],
+                $this->decrypt($nas['api_password_encrypted'])
+            );
+            
+            $api->disconnectPPPoE($username);
+            $result = $api->removePPPoESecret($username);
+            
+            return ['success' => true, 'result' => $result];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
 }
