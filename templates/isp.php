@@ -989,21 +989,21 @@ try {
                                 <div class="row">
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">Access Type</label>
-                                        <select name="access_type" class="form-select">
+                                        <select name="access_type" id="access_type" class="form-select" onchange="toggleStaticFields()">
                                             <option value="pppoe">PPPoE</option>
                                             <option value="hotspot">Hotspot</option>
                                             <option value="static">Static IP</option>
                                             <option value="dhcp">DHCP</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">Static IP (Optional)</label>
-                                        <input type="text" name="static_ip" class="form-control" placeholder="e.g., 192.168.1.100">
+                                    <div class="col-md-4 mb-3" id="static_ip_field" style="display: none;">
+                                        <label class="form-label">Static IP <span class="text-danger">*</span></label>
+                                        <input type="text" name="static_ip" id="static_ip_input" class="form-control" placeholder="e.g., 192.168.1.100">
                                     </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">NAS Device</label>
-                                        <select name="nas_id" class="form-select">
-                                            <option value="">Any NAS</option>
+                                    <div class="col-md-4 mb-3" id="nas_field" style="display: none;">
+                                        <label class="form-label">NAS Device <span class="text-danger">*</span></label>
+                                        <select name="nas_id" id="nas_id_select" class="form-select">
+                                            <option value="">Select NAS</option>
                                             <?php foreach ($nasDevices as $nas): ?>
                                             <option value="<?= $nas['id'] ?>"><?= htmlspecialchars($nas['name']) ?></option>
                                             <?php endforeach; ?>
@@ -1978,6 +1978,28 @@ try {
             passwordInput.type = 'password';
             icon.classList.remove('bi-eye-slash');
             icon.classList.add('bi-eye');
+        }
+    }
+    
+    function toggleStaticFields() {
+        const accessType = document.getElementById('access_type').value;
+        const staticIpField = document.getElementById('static_ip_field');
+        const nasField = document.getElementById('nas_field');
+        const staticIpInput = document.getElementById('static_ip_input');
+        const nasSelect = document.getElementById('nas_id_select');
+        
+        if (accessType === 'static') {
+            staticIpField.style.display = 'block';
+            nasField.style.display = 'block';
+            staticIpInput.required = true;
+            nasSelect.required = true;
+        } else {
+            staticIpField.style.display = 'none';
+            nasField.style.display = 'none';
+            staticIpInput.required = false;
+            nasSelect.required = false;
+            staticIpInput.value = '';
+            nasSelect.value = '';
         }
     }
     
