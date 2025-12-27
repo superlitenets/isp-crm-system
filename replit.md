@@ -49,6 +49,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Revenue Reports**: Monthly revenue breakdown, package popularity analytics, and subscription statistics (active/suspended/expired).
   - **Usage Analytics**: Top users by data consumption, peak usage hours heatmap, and bandwidth trends.
   - **M-Pesa Integration**: Automatic subscription renewal on M-Pesa payment, matching by phone number or username.
+  - **Captive Portal Expiry Page**: Public `/expired.php` page for expired subscribers. Detects client IP via X-Forwarded-For/proxy headers, matches to subscription in database, shows account details and renewal amount. Includes M-Pesa STK Push for instant payment. MikroTik redirects expired users to this page via walled garden.
   - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires.
   - **MAC Binding**: Bind subscriptions to specific MAC addresses for security.
   - **IP Pool Management**: Create and manage IP address pools for dynamic allocation.
