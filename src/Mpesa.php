@@ -535,16 +535,25 @@ class Mpesa {
     
     private function processRadiusC2BPayment(string $accountRef, float $amount, string $transId, string $phone): void {
         try {
+            // Normalize phone and account reference for matching
+            $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
+            $normalizedAccountRef = preg_replace('/[^0-9]/', '', $accountRef);
+            $phoneSearch = '%' . substr($normalizedPhone, -9);
+            $accountRefSearch = '%' . substr($normalizedAccountRef, -9);
+            
+            // Match by: 1) Username, 2) Account ref as phone, 3) Sender phone number
+            // The account reference (BillRefNumber) is expected to be customer's phone number
             $stmt = $this->db->prepare("
                 SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
                 FROM radius_subscriptions s
                 LEFT JOIN customers c ON s.customer_id = c.id
                 LEFT JOIN radius_packages p ON s.package_id = p.id
-                WHERE s.username = ? OR c.phone LIKE ?
+                WHERE s.username = ? 
+                   OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+                   OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
                 ORDER BY s.id DESC LIMIT 1
             ");
-            $phoneSearch = '%' . substr(preg_replace('/[^0-9]/', '', $phone), -9);
-            $stmt->execute([$accountRef, $phoneSearch]);
+            $stmt->execute([$accountRef, $accountRefSearch, $phoneSearch]);
             $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($subscription && $amount >= ($subscription['price'] ?? 0)) {

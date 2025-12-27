@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'create_subscription':
             $postData = $_POST;
+            $customerId = null;
             
             if (($_POST['customer_mode'] ?? 'existing') === 'new') {
                 $newName = trim($_POST['new_customer_name'] ?? '');
@@ -61,6 +62,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $phone = '254' . $phone;
                 }
                 
+                // Check if phone already has a subscriber
+                $existingCheck = $db->prepare("
+                    SELECT rs.id, c.name FROM radius_subscriptions rs 
+                    JOIN customers c ON c.id = rs.customer_id 
+                    WHERE REPLACE(REPLACE(c.phone, '+', ''), ' ', '') = ? 
+                       OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+                ");
+                $existingCheck->execute([$phone, '%' . substr($phone, -9)]);
+                $existing = $existingCheck->fetch(PDO::FETCH_ASSOC);
+                
+                if ($existing) {
+                    $message = "Error: Phone number already has a subscriber ({$existing['name']}). One subscriber per phone allowed.";
+                    $messageType = 'danger';
+                    break;
+                }
+                
                 try {
                     $stmt = $db->prepare("INSERT INTO customers (name, phone, email, address) VALUES (?, ?, ?, ?) RETURNING id");
                     $stmt->execute([
@@ -77,11 +94,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                     break;
                 }
+            } else {
+                // Check if existing customer already has a subscriber
+                $customerId = (int)($_POST['customer_id'] ?? 0);
+                if ($customerId) {
+                    $existingCheck = $db->prepare("SELECT id FROM radius_subscriptions WHERE customer_id = ?");
+                    $existingCheck->execute([$customerId]);
+                    if ($existingCheck->fetch()) {
+                        $message = "Error: This customer already has a subscriber. One subscriber per phone allowed.";
+                        $messageType = 'danger';
+                        break;
+                    }
+                }
             }
             
             $result = $radiusBilling->createSubscription($postData);
             $message = $result['success'] ? 'Subscriber created successfully' : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
+            break;
+            
+        case 'update_subscription':
+            $id = (int)$_POST['id'];
+            try {
+                $stmt = $db->prepare("
+                    UPDATE radius_subscriptions SET 
+                        package_id = ?,
+                        password = ?,
+                        password_encrypted = ?,
+                        expiry_date = ?,
+                        static_ip = ?,
+                        mac_address = ?,
+                        auto_renew = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ");
+                $stmt->execute([
+                    (int)$_POST['package_id'],
+                    $_POST['password'],
+                    $radiusBilling->encrypt($_POST['password']),
+                    $_POST['expiry_date'] ?: null,
+                    !empty($_POST['static_ip']) ? $_POST['static_ip'] : null,
+                    !empty($_POST['mac_address']) ? $_POST['mac_address'] : null,
+                    isset($_POST['auto_renew']) ? 1 : 0,
+                    $id
+                ]);
+                $message = 'Subscription updated successfully';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error updating subscription: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'update_subscriber_customer':
+            $customerId = (int)$_POST['customer_id'];
+            try {
+                $stmt = $db->prepare("UPDATE customers SET name = ?, phone = ?, email = ?, address = ? WHERE id = ?");
+                $stmt->execute([
+                    $_POST['name'],
+                    $_POST['phone'],
+                    !empty($_POST['email']) ? $_POST['email'] : null,
+                    !empty($_POST['address']) ? $_POST['address'] : null,
+                    $customerId
+                ]);
+                $message = 'Customer information updated';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error updating customer: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'update_subscription_notes':
+            $id = (int)$_POST['id'];
+            try {
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$_POST['notes'] ?? '', $id]);
+                $message = 'Notes saved';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error saving notes: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'reset_data_usage':
+            $id = (int)$_POST['id'];
+            try {
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET data_used_mb = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$id]);
+                $message = 'Data usage reset to 0';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error resetting data: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'add_credit':
+            $subId = (int)$_POST['subscription_id'];
+            $amount = (float)$_POST['amount'];
+            try {
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET credit_balance = COALESCE(credit_balance, 0) + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$amount, $subId]);
+                $message = 'Credit of KES ' . number_format($amount) . ' added successfully';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error adding credit: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'disconnect_session':
+            $sessionId = (int)$_POST['session_id'];
+            try {
+                $stmt = $db->prepare("UPDATE radius_sessions SET session_end = CURRENT_TIMESTAMP, terminate_cause = 'Admin-Reset' WHERE id = ?");
+                $stmt->execute([$sessionId]);
+                $message = 'Session disconnected';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error disconnecting session: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'generate_invoice':
+            $subId = (int)$_POST['subscription_id'];
+            try {
+                $sub = $radiusBilling->getSubscription($subId);
+                $package = $radiusBilling->getPackage($sub['package_id']);
+                $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                
+                $stmt = $db->prepare("
+                    INSERT INTO radius_invoices (subscription_id, invoice_number, total_amount, status, created_at)
+                    VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+                ");
+                $stmt->execute([$subId, $invoiceNumber, $package['price'] ?? 0]);
+                $message = "Invoice {$invoiceNumber} generated";
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error generating invoice: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
             break;
             
         case 'renew_subscription':
@@ -108,6 +262,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
     }
+    
+    // Handle redirect after action
+    if (!empty($_POST['return_to']) && $_POST['return_to'] === 'subscriber' && !empty($_POST['id'])) {
+        $_SESSION['isp_message'] = $message;
+        $_SESSION['isp_message_type'] = $messageType;
+        header('Location: ?page=isp&view=subscriber&id=' . (int)$_POST['id']);
+        exit;
+    } elseif (!empty($_POST['return_to']) && $_POST['return_to'] === 'subscriber' && !empty($_POST['subscription_id'])) {
+        $_SESSION['isp_message'] = $message;
+        $_SESSION['isp_message_type'] = $messageType;
+        header('Location: ?page=isp&view=subscriber&id=' . (int)$_POST['subscription_id']);
+        exit;
+    }
+}
+
+// Retrieve flash message
+if (isset($_SESSION['isp_message'])) {
+    $message = $_SESSION['isp_message'];
+    $messageType = $_SESSION['isp_message_type'] ?? 'info';
+    unset($_SESSION['isp_message'], $_SESSION['isp_message_type']);
 }
 
 $stats = $radiusBilling->getDashboardStats();
@@ -849,29 +1023,9 @@ try {
                                     </td>
                                     <td><?= number_format($sub['data_used_mb'] / 1024, 2) ?> GB</td>
                                     <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button type="button" class="btn btn-outline-info" onclick="pingSubscriber(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')" title="Ping IP">
-                                                <i class="bi bi-lightning"></i>
-                                            </button>
-                                            <?php if ($sub['status'] === 'active'): ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="suspend_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-warning" title="Suspend"><i class="bi bi-pause"></i></button>
-                                            </form>
-                                            <?php else: ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="activate_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-success" title="Activate"><i class="bi bi-play"></i></button>
-                                            </form>
-                                            <?php endif; ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="renew_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-primary" title="Renew"><i class="bi bi-arrow-clockwise"></i></button>
-                                            </form>
-                                        </div>
+                                        <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-sm btn-primary" title="View Details">
+                                            <i class="bi bi-eye me-1"></i> View
+                                        </a>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -1023,6 +1177,664 @@ try {
                     </div>
                 </div>
             </div>
+
+            <?php elseif ($view === 'subscriber'): ?>
+            <?php
+            $subId = (int)($_GET['id'] ?? 0);
+            $subscriber = $radiusBilling->getSubscription($subId);
+            if (!$subscriber) {
+                echo '<div class="alert alert-danger">Subscriber not found.</div>';
+            } else {
+                $customer = null;
+                if ($subscriber['customer_id']) {
+                    $stmt = $db->prepare("SELECT * FROM customers WHERE id = ?");
+                    $stmt->execute([$subscriber['customer_id']]);
+                    $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+                }
+                $package = $radiusBilling->getPackage($subscriber['package_id']);
+                $packages = $radiusBilling->getPackages();
+                $nasDevices = $radiusBilling->getNASDevices();
+                
+                // Get billing history
+                $stmt = $db->prepare("SELECT * FROM radius_billing WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 20");
+                $stmt->execute([$subId]);
+                $billingHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get session history
+                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? ORDER BY session_start DESC LIMIT 50");
+                $stmt->execute([$subId]);
+                $sessionHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get active session
+                $stmt = $db->prepare("SELECT * FROM radius_sessions WHERE subscription_id = ? AND session_end IS NULL ORDER BY session_start DESC LIMIT 1");
+                $stmt->execute([$subId]);
+                $activeSession = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                // Get invoices
+                $stmt = $db->prepare("SELECT * FROM radius_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 20");
+                $stmt->execute([$subId]);
+                $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get tickets for this customer
+                $tickets = [];
+                if ($customer) {
+                    $stmt = $db->prepare("SELECT t.*, (SELECT COUNT(*) FROM ticket_comments WHERE ticket_id = t.id) as comment_count FROM tickets t WHERE t.customer_id = ? ORDER BY t.created_at DESC LIMIT 10");
+                    $stmt->execute([$customer['id']]);
+                    $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+                
+                $isOnline = !empty($activeSession);
+                $statusClass = match($subscriber['status']) {
+                    'active' => 'success',
+                    'suspended' => 'warning',
+                    'expired' => 'danger',
+                    default => 'secondary'
+                };
+            ?>
+            
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <a href="?page=isp&view=subscriptions" class="btn btn-outline-secondary btn-sm mb-2">
+                        <i class="bi bi-arrow-left me-1"></i> Back to Subscribers
+                    </a>
+                    <h4 class="page-title mb-0">
+                        <i class="bi bi-person-badge"></i> 
+                        <?= htmlspecialchars($subscriber['username']) ?>
+                        <?php if ($isOnline): ?>
+                        <span class="badge bg-success ms-2"><i class="bi bi-wifi me-1"></i>Online</span>
+                        <?php else: ?>
+                        <span class="badge bg-secondary ms-2"><i class="bi bi-wifi-off me-1"></i>Offline</span>
+                        <?php endif; ?>
+                        <span class="badge bg-<?= $statusClass ?> ms-1"><?= ucfirst($subscriber['status']) ?></span>
+                    </h4>
+                </div>
+                <div class="btn-group">
+                    <?php if ($subscriber['status'] === 'active'): ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="suspend_subscription">
+                        <input type="hidden" name="id" value="<?= $subId ?>">
+                        <input type="hidden" name="return_to" value="subscriber">
+                        <button type="submit" class="btn btn-warning"><i class="bi bi-pause-fill me-1"></i> Suspend</button>
+                    </form>
+                    <?php else: ?>
+                    <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="activate_subscription">
+                        <input type="hidden" name="id" value="<?= $subId ?>">
+                        <input type="hidden" name="return_to" value="subscriber">
+                        <button type="submit" class="btn btn-success"><i class="bi bi-play-fill me-1"></i> Activate</button>
+                    </form>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#renewModal">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Renew
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
+                        <i class="bi bi-lightning me-1"></i> Ping
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row g-4">
+                <!-- Left Column -->
+                <div class="col-lg-4">
+                    <!-- Customer Info Card -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-person me-2"></i>Customer Information</h6>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCustomerModal">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <?php if ($customer): ?>
+                            <table class="table table-sm mb-0">
+                                <tr><td class="text-muted" style="width:40%">Name</td><td><strong><?= htmlspecialchars($customer['name']) ?></strong></td></tr>
+                                <tr><td class="text-muted">Phone</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
+                                <tr><td class="text-muted">Email</td><td><?= htmlspecialchars($customer['email'] ?? '-') ?></td></tr>
+                                <tr><td class="text-muted">Address</td><td><?= htmlspecialchars($customer['address'] ?? '-') ?></td></tr>
+                                <tr><td class="text-muted">Account #</td><td><code><?= htmlspecialchars($customer['phone']) ?></code></td></tr>
+                            </table>
+                            <?php else: ?>
+                            <p class="text-muted mb-0">No customer linked</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Subscription Info Card -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-box me-2"></i>Subscription Details</h6>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSubscriptionModal">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tr><td class="text-muted" style="width:40%">Username</td><td><code><?= htmlspecialchars($subscriber['username']) ?></code></td></tr>
+                                <tr><td class="text-muted">Password</td><td>
+                                    <code id="pwdDisplay">••••••••</code>
+                                    <button class="btn btn-sm btn-link p-0 ms-2" onclick="document.getElementById('pwdDisplay').textContent = '<?= htmlspecialchars($subscriber['password'] ?? '••••••••') ?>'">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </td></tr>
+                                <tr><td class="text-muted">Package</td><td><strong><?= htmlspecialchars($package['name'] ?? '-') ?></strong></td></tr>
+                                <tr><td class="text-muted">Speed</td><td><?= $package['download_speed'] ?? '-' ?> / <?= $package['upload_speed'] ?? '-' ?></td></tr>
+                                <tr><td class="text-muted">Price</td><td>KES <?= number_format($package['price'] ?? 0) ?></td></tr>
+                                <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
+                                <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
+                                <tr><td class="text-muted">MAC Address</td><td><code><?= $subscriber['mac_address'] ?: '-' ?></code></td></tr>
+                                <tr><td class="text-muted">Start Date</td><td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td></tr>
+                                <tr>
+                                    <td class="text-muted">Expiry Date</td>
+                                    <td>
+                                        <?php if ($subscriber['expiry_date']): ?>
+                                        <?= date('M j, Y', strtotime($subscriber['expiry_date'])) ?>
+                                        <?php 
+                                        $daysLeft = (strtotime($subscriber['expiry_date']) - time()) / 86400;
+                                        if ($daysLeft < 0): ?>
+                                        <span class="badge bg-danger">Expired</span>
+                                        <?php elseif ($daysLeft < 7): ?>
+                                        <span class="badge bg-warning"><?= ceil($daysLeft) ?> days left</span>
+                                        <?php endif; ?>
+                                        <?php else: ?>
+                                        -
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <tr><td class="text-muted">Auto Renew</td><td><?= $subscriber['auto_renew'] ? '<span class="text-success">Yes</span>' : '<span class="text-muted">No</span>' ?></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Credit/Balance Card -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Account Balance</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h4 class="text-success mb-0">KES <?= number_format($subscriber['credit_balance'] ?? 0) ?></h4>
+                                    <small class="text-muted">Credit Balance</small>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="text-info mb-0">KES <?= number_format($subscriber['credit_limit'] ?? 0) ?></h4>
+                                    <small class="text-muted">Credit Limit</small>
+                                </div>
+                            </div>
+                            <hr>
+                            <button class="btn btn-outline-success btn-sm w-100" data-bs-toggle="modal" data-bs-target="#addCreditModal">
+                                <i class="bi bi-plus-circle me-1"></i> Add Credit
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Usage Card -->
+                    <?php if ($package && $package['data_quota_mb']): ?>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Data Usage</h6>
+                        </div>
+                        <div class="card-body">
+                            <?php 
+                            $usagePercent = min(100, ($subscriber['data_used_mb'] / $package['data_quota_mb']) * 100);
+                            $barColor = $usagePercent >= 100 ? '#dc3545' : ($usagePercent >= 80 ? '#ffc107' : '#28a745');
+                            ?>
+                            <div class="progress mb-2" style="height: 20px;">
+                                <div class="progress-bar" style="width: <?= $usagePercent ?>%; background: <?= $barColor ?>;">
+                                    <?= round($usagePercent) ?>%
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span><?= number_format($subscriber['data_used_mb'] / 1024, 2) ?> GB used</span>
+                                <span><?= number_format($package['data_quota_mb'] / 1024, 2) ?> GB total</span>
+                            </div>
+                            <button class="btn btn-outline-warning btn-sm w-100 mt-3" onclick="if(confirm('Reset data usage to 0?')) { document.getElementById('resetDataForm').submit(); }">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Usage
+                            </button>
+                            <form id="resetDataForm" method="post" style="display:none;">
+                                <input type="hidden" name="action" value="reset_data_usage">
+                                <input type="hidden" name="id" value="<?= $subId ?>">
+                                <input type="hidden" name="return_to" value="subscriber">
+                            </form>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Right Column -->
+                <div class="col-lg-8">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#sessionsTab">
+                                <i class="bi bi-broadcast me-1"></i> Sessions
+                                <?php if ($isOnline): ?><span class="badge bg-success">1</span><?php endif; ?>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#billingTab">
+                                <i class="bi bi-receipt me-1"></i> Billing
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#invoicesTab">
+                                <i class="bi bi-file-text me-1"></i> Invoices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#ticketsTab">
+                                <i class="bi bi-ticket me-1"></i> Tickets
+                                <?php $openTickets = count(array_filter($tickets, fn($t) => in_array($t['status'], ['open', 'in_progress']))); ?>
+                                <?php if ($openTickets): ?><span class="badge bg-danger"><?= $openTickets ?></span><?php endif; ?>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#notesTab">
+                                <i class="bi bi-sticky me-1"></i> Notes
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Sessions Tab -->
+                        <div class="tab-pane fade show active" id="sessionsTab">
+                            <?php if ($activeSession): ?>
+                            <div class="alert alert-success mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><i class="bi bi-wifi me-2"></i>Active Session</strong>
+                                        <br><small>IP: <code><?= htmlspecialchars($activeSession['framed_ip_address'] ?? '-') ?></code> | 
+                                        Started: <?= date('M j, g:i A', strtotime($activeSession['session_start'])) ?></small>
+                                    </div>
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="disconnect_session">
+                                        <input type="hidden" name="session_id" value="<?= $activeSession['id'] ?>">
+                                        <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                        <input type="hidden" name="return_to" value="subscriber">
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Disconnect this session?')">
+                                            <i class="bi bi-x-circle me-1"></i> Disconnect
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <div class="card shadow-sm">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Session History</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Started</th>
+                                                    <th>Ended</th>
+                                                    <th>Duration</th>
+                                                    <th>IP Address</th>
+                                                    <th>Download</th>
+                                                    <th>Upload</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($sessionHistory as $sess): ?>
+                                                <tr>
+                                                    <td><?= date('M j, H:i', strtotime($sess['session_start'])) ?></td>
+                                                    <td><?= $sess['session_end'] ? date('M j, H:i', strtotime($sess['session_end'])) : '<span class="badge bg-success">Active</span>' ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        $start = strtotime($sess['session_start']);
+                                                        $end = $sess['session_end'] ? strtotime($sess['session_end']) : time();
+                                                        $dur = $end - $start;
+                                                        echo floor($dur/3600) . 'h ' . floor(($dur%3600)/60) . 'm';
+                                                        ?>
+                                                    </td>
+                                                    <td><code><?= $sess['framed_ip_address'] ?? '-' ?></code></td>
+                                                    <td><?= number_format(($sess['input_octets'] ?? 0) / 1048576, 2) ?> MB</td>
+                                                    <td><?= number_format(($sess['output_octets'] ?? 0) / 1048576, 2) ?> MB</td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($sessionHistory)): ?>
+                                                <tr><td colspan="6" class="text-center text-muted py-4">No session history</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Billing Tab -->
+                        <div class="tab-pane fade" id="billingTab">
+                            <div class="card shadow-sm">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Billing History</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Type</th>
+                                                    <th>Amount</th>
+                                                    <th>Period</th>
+                                                    <th>Status</th>
+                                                    <th>Reference</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($billingHistory as $bill): ?>
+                                                <tr>
+                                                    <td><?= date('M j, Y', strtotime($bill['created_at'])) ?></td>
+                                                    <td><span class="badge bg-secondary"><?= ucfirst($bill['billing_type'] ?? '-') ?></span></td>
+                                                    <td>KES <?= number_format($bill['amount'] ?? 0) ?></td>
+                                                    <td><?= $bill['period_start'] ? date('M j', strtotime($bill['period_start'])) . ' - ' . date('M j', strtotime($bill['period_end'])) : '-' ?></td>
+                                                    <td>
+                                                        <span class="badge bg-<?= ($bill['status'] ?? '') === 'paid' ? 'success' : 'warning' ?>">
+                                                            <?= ucfirst($bill['status'] ?? 'pending') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td><small><?= htmlspecialchars($bill['mpesa_reference'] ?? '-') ?></small></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($billingHistory)): ?>
+                                                <tr><td colspan="6" class="text-center text-muted py-4">No billing history</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Invoices Tab -->
+                        <div class="tab-pane fade" id="invoicesTab">
+                            <div class="card shadow-sm">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">Invoices</h6>
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="action" value="generate_invoice">
+                                        <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                        <input type="hidden" name="return_to" value="subscriber">
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-plus me-1"></i> Generate Invoice
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Invoice #</th>
+                                                    <th>Date</th>
+                                                    <th>Amount</th>
+                                                    <th>Status</th>
+                                                    <th>Paid On</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($invoices as $inv): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($inv['invoice_number'] ?? '-') ?></td>
+                                                    <td><?= date('M j, Y', strtotime($inv['created_at'])) ?></td>
+                                                    <td>KES <?= number_format($inv['total_amount'] ?? 0) ?></td>
+                                                    <td>
+                                                        <span class="badge bg-<?= ($inv['status'] ?? '') === 'paid' ? 'success' : 'warning' ?>">
+                                                            <?= ucfirst($inv['status'] ?? 'pending') ?>
+                                                        </span>
+                                                    </td>
+                                                    <td><?= !empty($inv['paid_at']) ? date('M j, Y', strtotime($inv['paid_at'])) : '-' ?></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($invoices)): ?>
+                                                <tr><td colspan="5" class="text-center text-muted py-4">No invoices</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tickets Tab -->
+                        <div class="tab-pane fade" id="ticketsTab">
+                            <div class="card shadow-sm">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Support Tickets</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ticket #</th>
+                                                    <th>Subject</th>
+                                                    <th>Category</th>
+                                                    <th>Status</th>
+                                                    <th>Created</th>
+                                                    <th>Replies</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($tickets as $t): ?>
+                                                <tr>
+                                                    <td><a href="?page=tickets&action=view&id=<?= $t['id'] ?>"><?= htmlspecialchars($t['ticket_number']) ?></a></td>
+                                                    <td><?= htmlspecialchars($t['subject']) ?></td>
+                                                    <td><span class="badge bg-light text-dark"><?= ucfirst($t['category'] ?? '-') ?></span></td>
+                                                    <td>
+                                                        <?php
+                                                        $tStatusClass = match($t['status']) {
+                                                            'open' => 'primary',
+                                                            'in_progress' => 'info',
+                                                            'resolved' => 'success',
+                                                            'closed' => 'secondary',
+                                                            default => 'warning'
+                                                        };
+                                                        ?>
+                                                        <span class="badge bg-<?= $tStatusClass ?>"><?= ucfirst(str_replace('_', ' ', $t['status'])) ?></span>
+                                                    </td>
+                                                    <td><?= date('M j', strtotime($t['created_at'])) ?></td>
+                                                    <td><?= $t['comment_count'] ?? 0 ?></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                                <?php if (empty($tickets)): ?>
+                                                <tr><td colspan="6" class="text-center text-muted py-4">No tickets</td></tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Notes Tab -->
+                        <div class="tab-pane fade" id="notesTab">
+                            <div class="card shadow-sm">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Notes</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="update_subscription_notes">
+                                        <input type="hidden" name="id" value="<?= $subId ?>">
+                                        <input type="hidden" name="return_to" value="subscriber">
+                                        <textarea name="notes" class="form-control mb-3" rows="5"><?= htmlspecialchars($subscriber['notes'] ?? '') ?></textarea>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-save me-1"></i> Save Notes
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Renew Modal -->
+            <div class="modal fade" id="renewModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="renew_subscription">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Renew Subscription</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Package</label>
+                                    <select name="package_id" class="form-select">
+                                        <?php foreach ($packages as $p): ?>
+                                        <option value="<?= $p['id'] ?>" <?= $p['id'] == $subscriber['package_id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?> (<?= $p['validity_days'] ?> days)
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Current expiry: <?= $subscriber['expiry_date'] ? date('M j, Y', strtotime($subscriber['expiry_date'])) : 'Not set' ?>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Renew Now</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Subscription Modal -->
+            <div class="modal fade" id="editSubscriptionModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_subscription">
+                            <input type="hidden" name="id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Subscription</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Package</label>
+                                    <select name="package_id" class="form-select">
+                                        <?php foreach ($packages as $p): ?>
+                                        <option value="<?= $p['id'] ?>" <?= $p['id'] == $subscriber['package_id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($p['name']) ?> - KES <?= number_format($p['price']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Password</label>
+                                    <input type="text" name="password" class="form-control" value="<?= htmlspecialchars($subscriber['password'] ?? '') ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Expiry Date</label>
+                                    <input type="date" name="expiry_date" class="form-control" value="<?= $subscriber['expiry_date'] ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Static IP</label>
+                                    <input type="text" name="static_ip" class="form-control" value="<?= htmlspecialchars($subscriber['static_ip'] ?? '') ?>" placeholder="Leave empty for dynamic">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">MAC Address</label>
+                                    <input type="text" name="mac_address" class="form-control" value="<?= htmlspecialchars($subscriber['mac_address'] ?? '') ?>">
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" name="auto_renew" class="form-check-input" id="autoRenewCheck" <?= $subscriber['auto_renew'] ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="autoRenewCheck">Auto-renew subscription</label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Customer Modal -->
+            <div class="modal fade" id="editCustomerModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update_subscriber_customer">
+                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                            <input type="hidden" name="customer_id" value="<?= $customer['id'] ?? '' ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Customer Information</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($customer['name'] ?? '') ?>" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Phone</label>
+                                    <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($customer['phone'] ?? '') ?>" required>
+                                    <small class="text-muted">Used as account number for M-Pesa payments</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($customer['email'] ?? '') ?>">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Address</label>
+                                    <textarea name="address" class="form-control" rows="2"><?= htmlspecialchars($customer['address'] ?? '') ?></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add Credit Modal -->
+            <div class="modal fade" id="addCreditModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="add_credit">
+                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add Credit</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Amount (KES)</label>
+                                    <input type="number" name="amount" class="form-control" min="1" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Reference/Notes</label>
+                                    <input type="text" name="reference" class="form-control" placeholder="e.g., Manual credit, Refund, etc.">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">Add Credit</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <?php } ?>
 
             <?php elseif ($view === 'sessions'): ?>
             <?php $sessions = $radiusBilling->getActiveSessions(); ?>
