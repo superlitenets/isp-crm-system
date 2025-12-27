@@ -1511,18 +1511,47 @@ if ($page === 'isp') {
             exit;
         }
         
-        $result = ['success' => true, 'online' => false, 'latency_ms' => null];
         $ip = $nas['ip_address'];
-        $port = $nas['api_port'] ?? 8728;
+        $apiPort = $nas['api_port'] ?? 8728;
+        
+        $result = [
+            'success' => true,
+            'online' => false,
+            'api_online' => false,
+            'latency_ms' => null,
+            'api_latency_ms' => null,
+            'reachable_port' => null
+        ];
+        
+        $portsToCheck = [22, 23, 80, 443, 8291];
+        
+        foreach ($portsToCheck as $port) {
+            $startTime = microtime(true);
+            $socket = @fsockopen($ip, $port, $errno, $errstr, 1);
+            $endTime = microtime(true);
+            
+            if ($socket) {
+                fclose($socket);
+                $result['online'] = true;
+                $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+                $result['reachable_port'] = $port;
+                break;
+            }
+        }
         
         $startTime = microtime(true);
-        $socket = @fsockopen($ip, $port, $errno, $errstr, 2);
+        $socket = @fsockopen($ip, $apiPort, $errno, $errstr, 2);
         $endTime = microtime(true);
         
         if ($socket) {
             fclose($socket);
-            $result['online'] = true;
-            $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+            $result['api_online'] = true;
+            $result['api_latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+            if (!$result['online']) {
+                $result['online'] = true;
+                $result['latency_ms'] = $result['api_latency_ms'];
+                $result['reachable_port'] = $apiPort;
+            }
         }
         
         echo json_encode($result);

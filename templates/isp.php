@@ -2010,16 +2010,24 @@ try {
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.online) {
+                    let apiStatus = data.api_online 
+                        ? `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Online (${data.api_latency_ms} ms)</span>`
+                        : `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Offline</span>`;
+                    
                     resultDiv.innerHTML = `
                         <i class="bi bi-check-circle-fill text-success fs-1"></i>
-                        <h5 class="mt-3 text-success">Reachable</h5>
-                        <p class="mb-0">Latency: ${data.latency_ms ? data.latency_ms + ' ms' : 'N/A'}</p>
+                        <h5 class="mt-3 text-success">Device Reachable</h5>
+                        <table class="table table-sm mt-3 mb-0 text-start">
+                            <tr><td><strong>Network:</strong></td><td><span class="text-success"><i class="bi bi-check-circle me-1"></i>Reachable</span></td></tr>
+                            <tr><td><strong>Latency:</strong></td><td>${data.latency_ms} ms (port ${data.reachable_port})</td></tr>
+                            <tr><td><strong>API Status:</strong></td><td>${apiStatus}</td></tr>
+                        </table>
                     `;
                 } else {
                     resultDiv.innerHTML = `
                         <i class="bi bi-x-circle-fill text-danger fs-1"></i>
                         <h5 class="mt-3 text-danger">Unreachable</h5>
-                        <p class="mb-0">${data.error || 'Could not reach the device'}</p>
+                        <p class="mb-0">${data.error || 'Could not reach the device on any port'}</p>
                     `;
                 }
             })
