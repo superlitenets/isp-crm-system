@@ -210,9 +210,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 }
                 break;
+                
+            case 'create_ticket':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+                if (!$subscription) {
+                    $message = 'Subscription not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $subject = trim($_POST['subject'] ?? '');
+                $description = trim($_POST['description'] ?? '');
+                $category = $_POST['category'] ?? 'complaint';
+                
+                if (empty($subject) || empty($description)) {
+                    $message = 'Please fill in both subject and description';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                try {
+                    $ticketNumber = 'TKT-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                    $stmt = $db->prepare("
+                        INSERT INTO tickets (ticket_number, customer_id, subject, description, category, priority, status, source, created_at)
+                        VALUES (?, ?, ?, ?, ?, 'medium', 'open', 'portal', NOW())
+                    ");
+                    $stmt->execute([
+                        $ticketNumber,
+                        $subscription['customer_id'],
+                        $subject,
+                        $description,
+                        $category
+                    ]);
+                    
+                    $message = "Ticket #{$ticketNumber} created successfully. We'll respond as soon as possible.";
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Error creating ticket: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
+            case 'add_ticket_comment':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+                $ticketId = (int)($_POST['ticket_id'] ?? 0);
+                $comment = trim($_POST['comment'] ?? '');
+                
+                if (empty($comment)) {
+                    $message = 'Please enter a comment';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $stmt = $db->prepare("SELECT * FROM tickets WHERE id = ? AND customer_id = ?");
+                $stmt->execute([$ticketId, $subscription['customer_id']]);
+                $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$ticket) {
+                    $message = 'Ticket not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                try {
+                    $stmt = $db->prepare("
+                        INSERT INTO ticket_comments (ticket_id, comment, is_internal, created_at)
+                        VALUES (?, ?, FALSE, NOW())
+                    ");
+                    $stmt->execute([$ticketId, $comment]);
+                    
+                    $db->prepare("UPDATE tickets SET updated_at = NOW() WHERE id = ?")->execute([$ticketId]);
+                    
+                    $message = 'Reply added successfully';
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Error adding reply: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
         }
     }
 }
+
+$tickets = [];
 
 if (isset($_SESSION['portal_subscription_id'])) {
     $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
@@ -250,6 +342,12 @@ if (isset($_SESSION['portal_subscription_id'])) {
         if ($customerOnu && !empty($customerOnu['ip_address'])) {
             $routerIp = $customerOnu['ip_address'];
         }
+        
+        $stmt = $db->prepare("SELECT t.*, 
+            (SELECT COUNT(*) FROM ticket_comments tc WHERE tc.ticket_id = t.id) as comment_count
+            FROM tickets t WHERE t.customer_id = ? ORDER BY t.created_at DESC LIMIT 50");
+        $stmt->execute([$subscription['customer_id']]);
+        $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 ?>
@@ -431,10 +529,19 @@ if (isset($_SESSION['portal_subscription_id'])) {
         </div>
         <?php endif; ?>
         
-        <ul class="nav nav-pills mb-4">
+        <ul class="nav nav-pills mb-4 flex-wrap">
             <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#overview">Overview</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sessions">Sessions</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="pill" href="#tickets">
+                    <i class="bi bi-ticket me-1"></i>Tickets
+                    <?php $openTickets = count(array_filter($tickets, fn($t) => in_array($t['status'], ['open', 'in_progress']))); ?>
+                    <?php if ($openTickets > 0): ?>
+                    <span class="badge bg-danger"><?= $openTickets ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
             <?php if ($tr069DeviceId): ?>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#wifi"><i class="bi bi-wifi me-1"></i>WiFi Settings</a></li>
             <?php elseif ($routerIp): ?>
@@ -553,6 +660,149 @@ if (isset($_SESSION['portal_subscription_id'])) {
                     </div>
                 </div>
             </div>
+            
+            <div class="tab-pane fade" id="tickets">
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-plus-circle me-2"></i>Create New Ticket</h6>
+                            <form method="post">
+                                <input type="hidden" name="action" value="create_ticket">
+                                <div class="mb-3">
+                                    <label class="form-label">Category</label>
+                                    <select name="category" class="form-select" required>
+                                        <option value="complaint">Complaint</option>
+                                        <option value="technical">Technical Issue</option>
+                                        <option value="billing">Billing Inquiry</option>
+                                        <option value="request">Service Request</option>
+                                        <option value="feedback">Feedback</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Subject</label>
+                                    <input type="text" name="subject" class="form-control" placeholder="Brief description of your issue" required maxlength="200">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <textarea name="description" class="form-control" rows="4" placeholder="Please describe your issue in detail..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-send me-2"></i>Submit Ticket
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-ticket me-2"></i>My Tickets</h6>
+                            <?php if (empty($tickets)): ?>
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-ticket" style="font-size: 48px;"></i>
+                                <p class="mt-3">No tickets yet. Create one if you need help!</p>
+                            </div>
+                            <?php else: ?>
+                            <div class="list-group">
+                                <?php foreach ($tickets as $t): ?>
+                                <?php 
+                                $statusColors = [
+                                    'open' => 'primary',
+                                    'in_progress' => 'info',
+                                    'pending' => 'warning',
+                                    'resolved' => 'success',
+                                    'closed' => 'secondary'
+                                ];
+                                $statusColor = $statusColors[$t['status']] ?? 'secondary';
+                                ?>
+                                <div class="list-group-item list-group-item-action" data-bs-toggle="modal" data-bs-target="#ticketModal<?= $t['id'] ?>" style="cursor: pointer;">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1"><?= htmlspecialchars($t['subject']) ?></h6>
+                                        <small class="text-muted"><?= date('M j', strtotime($t['created_at'])) ?></small>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-<?= $statusColor ?>"><?= ucfirst(str_replace('_', ' ', $t['status'])) ?></span>
+                                            <span class="badge bg-light text-dark"><?= ucfirst($t['category'] ?? 'general') ?></span>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-chat-dots me-1"></i><?= $t['comment_count'] ?? 0 ?> replies
+                                        </small>
+                                    </div>
+                                    <small class="text-muted">#<?= htmlspecialchars($t['ticket_number']) ?></small>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <?php 
+            foreach ($tickets as $t): 
+                $stmt = $db->prepare("SELECT * FROM ticket_comments WHERE ticket_id = ? ORDER BY created_at ASC");
+                $stmt->execute([$t['id']]);
+                $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            ?>
+            <div class="modal fade" id="ticketModal<?= $t['id'] ?>" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div>
+                                <h5 class="modal-title mb-1"><?= htmlspecialchars($t['subject']) ?></h5>
+                                <small class="text-muted">#<?= htmlspecialchars($t['ticket_number']) ?> | <?= ucfirst($t['category'] ?? 'general') ?></small>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <span class="badge bg-<?= $statusColors[$t['status']] ?? 'secondary' ?> me-2"><?= ucfirst(str_replace('_', ' ', $t['status'])) ?></span>
+                                <small class="text-muted">Created: <?= date('M j, Y g:i A', strtotime($t['created_at'])) ?></small>
+                            </div>
+                            
+                            <div class="bg-light p-3 rounded mb-4">
+                                <strong>Your Message:</strong>
+                                <p class="mb-0 mt-2"><?= nl2br(htmlspecialchars($t['description'])) ?></p>
+                            </div>
+                            
+                            <?php if (!empty($comments)): ?>
+                            <h6 class="mb-3"><i class="bi bi-chat-dots me-2"></i>Conversation</h6>
+                            <div class="ticket-comments" style="max-height: 300px; overflow-y: auto;">
+                                <?php foreach ($comments as $c): ?>
+                                <?php if (!$c['is_internal']): ?>
+                                <div class="mb-3 p-3 rounded <?= $c['user_id'] ? 'bg-primary bg-opacity-10 ms-4' : 'bg-light me-4' ?>">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <strong><?= $c['user_id'] ? '<i class="bi bi-headset me-1"></i>Support' : '<i class="bi bi-person me-1"></i>You' ?></strong>
+                                        <small class="text-muted"><?= date('M j, g:i A', strtotime($c['created_at'])) ?></small>
+                                    </div>
+                                    <p class="mb-0"><?= nl2br(htmlspecialchars($c['comment'])) ?></p>
+                                </div>
+                                <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <?php if (!in_array($t['status'], ['closed', 'resolved'])): ?>
+                            <form method="post" class="mt-4">
+                                <input type="hidden" name="action" value="add_ticket_comment">
+                                <input type="hidden" name="ticket_id" value="<?= $t['id'] ?>">
+                                <div class="mb-3">
+                                    <label class="form-label">Add a Reply</label>
+                                    <textarea name="comment" class="form-control" rows="3" placeholder="Type your message..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send me-2"></i>Send Reply
+                                </button>
+                            </form>
+                            <?php else: ?>
+                            <div class="alert alert-success mt-3">
+                                <i class="bi bi-check-circle me-2"></i>This ticket has been <?= $t['status'] ?>. Thank you for contacting us!
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
             
             <?php if ($routerIp && !$tr069DeviceId): ?>
             <div class="tab-pane fade" id="router">
