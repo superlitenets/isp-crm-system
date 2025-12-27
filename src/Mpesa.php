@@ -384,12 +384,63 @@ class Mpesa {
             
             if ($updated && $resultCode === 0 && $amount > 0) {
                 $this->applyPaymentToInvoiceFromCallback($checkoutRequestId, $amount, $receiptNumber);
+                $this->processRadiusPayment($checkoutRequestId, $amount, $receiptNumber, $phoneNumber);
             }
             
             return $updated;
         } catch (\Exception $e) {
             error_log("STK callback error: " . $e->getMessage());
             return false;
+        }
+    }
+    
+    private function processRadiusPayment(string $checkoutRequestId, float $amount, ?string $receiptNumber, ?string $phoneNumber): void {
+        try {
+            $stmt = $this->db->prepare("SELECT account_reference FROM mpesa_transactions WHERE checkout_request_id = ?");
+            $stmt->execute([$checkoutRequestId]);
+            $trans = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$trans) return;
+            
+            $accountRef = $trans['account_reference'];
+            
+            $stmt = $this->db->prepare("
+                SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                LEFT JOIN radius_packages p ON s.package_id = p.id
+                WHERE s.username = ? OR c.phone LIKE ?
+                ORDER BY s.id DESC LIMIT 1
+            ");
+            $phoneSearch = '%' . substr(preg_replace('/[^0-9]/', '', $phoneNumber ?? ''), -9);
+            $stmt->execute([$accountRef, $phoneSearch]);
+            $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($subscription) {
+                require_once __DIR__ . '/RadiusBilling.php';
+                $radiusBilling = new RadiusBilling($this->db);
+                
+                $renewResult = $radiusBilling->renewSubscription($subscription['id']);
+                
+                if ($renewResult['success']) {
+                    error_log("RADIUS subscription renewed for {$subscription['username']} via M-Pesa {$receiptNumber}");
+                    
+                    if (!empty($subscription['phone'])) {
+                        try {
+                            require_once __DIR__ . '/SMSGateway.php';
+                            $sms = new SMSGateway();
+                            $message = "Payment received! Your {$subscription['package_name']} subscription has been renewed until " . 
+                                       date('M j, Y', strtotime($renewResult['expiry_date'])) . ". " .
+                                       "Ref: {$receiptNumber}. Thank you!";
+                            $sms->send($subscription['phone'], $message);
+                        } catch (\Exception $e) {
+                            error_log("SMS confirmation error: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("RADIUS payment processing error: " . $e->getMessage());
         }
     }
     
@@ -448,7 +499,7 @@ class Mpesa {
                 ON CONFLICT (trans_id) DO NOTHING
             ");
             
-            return $stmt->execute([
+            $result = $stmt->execute([
                 $data['TransactionType'] ?? null,
                 $data['TransID'] ?? null,
                 $transTime,
@@ -465,9 +516,62 @@ class Mpesa {
                 $customerId,
                 json_encode($data)
             ]);
+            
+            if ($result) {
+                $this->processRadiusC2BPayment(
+                    $data['BillRefNumber'] ?? '',
+                    (float)($data['TransAmount'] ?? 0),
+                    $data['TransID'] ?? '',
+                    $data['MSISDN'] ?? ''
+                );
+            }
+            
+            return $result;
         } catch (\Exception $e) {
             error_log("C2B confirmation error: " . $e->getMessage());
             return false;
+        }
+    }
+    
+    private function processRadiusC2BPayment(string $accountRef, float $amount, string $transId, string $phone): void {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT s.*, c.name as customer_name, c.phone, p.name as package_name, p.price
+                FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                LEFT JOIN radius_packages p ON s.package_id = p.id
+                WHERE s.username = ? OR c.phone LIKE ?
+                ORDER BY s.id DESC LIMIT 1
+            ");
+            $phoneSearch = '%' . substr(preg_replace('/[^0-9]/', '', $phone), -9);
+            $stmt->execute([$accountRef, $phoneSearch]);
+            $subscription = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($subscription && $amount >= ($subscription['price'] ?? 0)) {
+                require_once __DIR__ . '/RadiusBilling.php';
+                $radiusBilling = new RadiusBilling($this->db);
+                
+                $renewResult = $radiusBilling->renewSubscription($subscription['id']);
+                
+                if ($renewResult['success']) {
+                    error_log("RADIUS subscription renewed for {$subscription['username']} via C2B {$transId}");
+                    
+                    if (!empty($subscription['phone'])) {
+                        try {
+                            require_once __DIR__ . '/SMSGateway.php';
+                            $sms = new SMSGateway();
+                            $message = "Payment received! Your {$subscription['package_name']} subscription has been renewed until " . 
+                                       date('M j, Y', strtotime($renewResult['expiry_date'])) . ". " .
+                                       "Ref: {$transId}. Thank you!";
+                            $sms->send($subscription['phone'], $message);
+                        } catch (\Exception $e) {
+                            error_log("SMS confirmation error: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("RADIUS C2B payment processing error: " . $e->getMessage());
         }
     }
     
