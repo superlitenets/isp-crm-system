@@ -482,17 +482,17 @@ if (isset($_SESSION['portal_subscription_id'])) {
                             <h5 class="mt-3">Unable to Load Router Interface</h5>
                             <p class="text-muted">This can happen if:</p>
                             <ul class="text-start text-muted small">
-                                <li>You're not connected to your home WiFi network</li>
-                                <li>Your router blocks embedding in other pages</li>
-                                <li>The router is offline or unreachable</li>
+                                <li>Your router is powered off or disconnected</li>
+                                <li>Network connectivity issue between server and router</li>
+                                <li>The router is taking too long to respond</li>
                             </ul>
                             <div class="mt-3">
-                                <a href="http://<?= htmlspecialchars($routerIp) ?>" target="_blank" class="btn btn-primary">
-                                    <i class="bi bi-box-arrow-up-right me-2"></i>Open Router in New Tab
-                                </a>
+                                <button class="btn btn-primary" onclick="refreshRouterFrame()">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>Try Again
+                                </button>
                             </div>
                             <div class="alert alert-info mt-3 text-start small">
-                                <strong>Tip:</strong> Open a new browser tab and type <code><?= htmlspecialchars($routerIp) ?></code> in the address bar.
+                                <strong>Router IP:</strong> <code><?= htmlspecialchars($routerIp) ?></code>
                                 <br><strong>Common logins:</strong> admin/admin or user/user
                             </div>
                         </div>
@@ -500,7 +500,6 @@ if (isset($_SESSION['portal_subscription_id'])) {
                         <iframe id="router-iframe" 
                                 src="about:blank"
                                 style="width: 100%; height: 600px; border: none; display: none;"
-                                sandbox="allow-forms allow-scripts allow-same-origin"
                                 loading="lazy"></iframe>
                     </div>
                     
@@ -671,20 +670,9 @@ if (isset($_SESSION['portal_subscription_id'])) {
         iframe.style.display = 'none';
         
         iframe.onload = function() {
-            try {
-                const doc = iframe.contentDocument || iframe.contentWindow.document;
-                if (doc && doc.body && doc.body.innerHTML.length > 0) {
-                    loading.style.display = 'none';
-                    iframe.style.display = 'block';
-                    routerFrameLoaded = true;
-                } else {
-                    showRouterError();
-                }
-            } catch (e) {
-                loading.style.display = 'none';
-                iframe.style.display = 'block';
-                routerFrameLoaded = true;
-            }
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+            routerFrameLoaded = true;
         };
         
         iframe.onerror = function() {
@@ -695,9 +683,9 @@ if (isset($_SESSION['portal_subscription_id'])) {
             if (!routerFrameLoaded) {
                 showRouterError();
             }
-        }, 10000);
+        }, 15000);
         
-        iframe.src = 'http://' + routerIp;
+        iframe.src = '/portal/router-proxy.php?path=/';
     }
     
     function showRouterError() {
