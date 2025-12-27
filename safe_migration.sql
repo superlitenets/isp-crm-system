@@ -1,6 +1,21 @@
 -- Safe Migration Script - Only adds missing columns/tables
 -- Run: docker exec -i isp_crm_db psql -U crm -d isp_crm < safe_migration.sql
 
+-- =====================================================
+-- RADIUS Billing tables and columns
+-- =====================================================
+
+-- Radius subscriptions additions
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS password VARCHAR(255);
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS credit_balance NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE radius_subscriptions ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50);
+
+-- Radius sessions column fixes
+ALTER TABLE radius_sessions ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;
+ALTER TABLE radius_sessions ADD COLUMN IF NOT EXISTS stopped_at TIMESTAMP;
+
+-- =====================================================
 -- Payroll table additions
 ALTER TABLE payroll ADD COLUMN IF NOT EXISTS allowances NUMERIC DEFAULT 0;
 
@@ -214,4 +229,4 @@ CREATE TABLE IF NOT EXISTS onu_discovery_log (
     authorized_by INTEGER
 );
 
-RAISE NOTICE 'Migration completed successfully!';
+DO $$ BEGIN RAISE NOTICE 'Migration completed successfully!'; END $$;
