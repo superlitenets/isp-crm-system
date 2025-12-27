@@ -365,12 +365,12 @@ class RadiusBilling {
                 $data['password'], // Cleartext for RADIUS CHAP/MS-CHAP
                 $this->encrypt($data['password']),
                 $data['access_type'] ?? $package['package_type'],
-                $data['static_ip'] ?? null,
-                $data['mac_address'] ?? null,
+                !empty($data['static_ip']) ? $data['static_ip'] : null,
+                !empty($data['mac_address']) ? $data['mac_address'] : null,
                 'active',
                 $startDate,
                 $expiryDate,
-                $data['nas_id'] ?? null,
+                !empty($data['nas_id']) ? (int)$data['nas_id'] : null,
                 $data['notes'] ?? ''
             ]);
             
