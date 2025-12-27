@@ -452,63 +452,76 @@ if (isset($_SESSION['portal_subscription_id'])) {
             
             <?php if ($routerIp && !$tr069DeviceId): ?>
             <div class="tab-pane fade" id="router">
-                <div class="row justify-content-center">
-                    <div class="col-md-8">
-                        <div class="portal-card p-4">
-                            <div class="text-center mb-4">
-                                <i class="bi bi-router" style="font-size: 64px; color: #667eea;"></i>
-                                <h4 class="mt-3">Router Settings</h4>
-                                <p class="text-muted">Access your router's web interface to manage WiFi and network settings</p>
+                <div class="portal-card p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-router me-2 text-primary" style="font-size: 24px;"></i>
+                            <div>
+                                <h5 class="mb-0">Router Settings</h5>
+                                <small class="text-muted"><?= htmlspecialchars($customerOnu['name'] ?? 'Router') ?> - <?= htmlspecialchars($routerIp) ?></small>
                             </div>
-                            
-                            <div class="row g-4">
-                                <div class="col-md-6">
-                                    <div class="card h-100">
-                                        <div class="card-body text-center">
-                                            <h6 class="card-title">Your Router IP</h6>
-                                            <h3 class="text-primary mb-3"><code><?= htmlspecialchars($routerIp) ?></code></h3>
-                                            <a href="http://<?= htmlspecialchars($routerIp) ?>" 
-                                               target="_blank" 
-                                               class="btn btn-primary btn-lg w-100">
-                                                <i class="bi bi-box-arrow-up-right me-2"></i>Open Router Settings
-                                            </a>
-                                            <small class="text-muted d-block mt-2">Opens in a new tab</small>
-                                        </div>
-                                    </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="refreshRouterFrame()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                            <a href="http://<?= htmlspecialchars($routerIp) ?>" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div id="router-frame-container" style="position: relative; min-height: 600px; background: #f8f9fa; border-radius: 8px; overflow: hidden;">
+                        <div id="router-loading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; z-index: 10;">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <p class="text-muted">Loading router interface...</p>
+                        </div>
+                        
+                        <div id="router-error" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; max-width: 500px; z-index: 10;">
+                            <i class="bi bi-exclamation-triangle text-warning" style="font-size: 48px;"></i>
+                            <h5 class="mt-3">Unable to Load Router Interface</h5>
+                            <p class="text-muted">This can happen if:</p>
+                            <ul class="text-start text-muted small">
+                                <li>You're not connected to your home WiFi network</li>
+                                <li>Your router blocks embedding in other pages</li>
+                                <li>The router is offline or unreachable</li>
+                            </ul>
+                            <div class="mt-3">
+                                <a href="http://<?= htmlspecialchars($routerIp) ?>" target="_blank" class="btn btn-primary">
+                                    <i class="bi bi-box-arrow-up-right me-2"></i>Open Router in New Tab
+                                </a>
+                            </div>
+                            <div class="alert alert-info mt-3 text-start small">
+                                <strong>Tip:</strong> Open a new browser tab and type <code><?= htmlspecialchars($routerIp) ?></code> in the address bar.
+                                <br><strong>Common logins:</strong> admin/admin or user/user
+                            </div>
+                        </div>
+                        
+                        <iframe id="router-iframe" 
+                                src="about:blank"
+                                style="width: 100%; height: 600px; border: none; display: none;"
+                                sandbox="allow-forms allow-scripts allow-same-origin"
+                                loading="lazy"></iframe>
+                    </div>
+                    
+                    <div class="row mt-3 g-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body py-2">
+                                    <small class="text-muted d-block">Device Info</small>
+                                    <strong><?= htmlspecialchars($customerOnu['onu_type'] ?? 'Router') ?></strong>
+                                    <span class="badge bg-<?= ($customerOnu['status'] ?? '') === 'online' ? 'success' : 'secondary' ?> ms-2">
+                                        <?= ucfirst($customerOnu['status'] ?? 'Unknown') ?>
+                                    </span>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="card h-100 bg-light">
-                                        <div class="card-body">
-                                            <h6 class="card-title"><i class="bi bi-info-circle me-2"></i>Device Information</h6>
-                                            <table class="table table-sm table-borderless mb-0">
-                                                <tr><td class="text-muted">Device</td><td><?= htmlspecialchars($customerOnu['name'] ?? 'Router') ?></td></tr>
-                                                <tr><td class="text-muted">Serial</td><td><code><?= htmlspecialchars($customerOnu['sn'] ?? 'N/A') ?></code></td></tr>
-                                                <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($customerOnu['onu_type'] ?? 'N/A') ?></td></tr>
-                                                <tr><td class="text-muted">Status</td><td>
-                                                    <span class="badge bg-<?= ($customerOnu['status'] ?? '') === 'online' ? 'success' : 'secondary' ?>">
-                                                        <?= ucfirst($customerOnu['status'] ?? 'Unknown') ?>
-                                                    </span>
-                                                </td></tr>
-                                            </table>
-                                        </div>
-                                    </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body py-2">
+                                    <small class="text-muted d-block">Default Login</small>
+                                    <strong>Username:</strong> admin &nbsp; <strong>Password:</strong> admin
                                 </div>
-                            </div>
-                            
-                            <div class="alert alert-warning mt-4">
-                                <h6><i class="bi bi-shield-lock me-2"></i>Login Credentials</h6>
-                                <p class="mb-2">You'll need your router's admin credentials to log in. Common default logins:</p>
-                                <ul class="mb-0">
-                                    <li><strong>Username:</strong> admin &nbsp; <strong>Password:</strong> admin</li>
-                                    <li><strong>Username:</strong> user &nbsp; <strong>Password:</strong> user</li>
-                                    <li>Check the label on your router for the default password</li>
-                                </ul>
-                            </div>
-                            
-                            <div class="alert alert-info">
-                                <i class="bi bi-lightbulb me-2"></i>
-                                <strong>Note:</strong> You must be connected to your home network (WiFi or LAN cable) to access the router settings. 
-                                This won't work from outside your home network.
                             </div>
                         </div>
                     </div>
@@ -640,6 +653,78 @@ if (isset($_SESSION['portal_subscription_id'])) {
             icon.classList.add('bi-eye');
         }
     }
+    
+    const routerIp = '<?= htmlspecialchars($routerIp ?? '') ?>';
+    let routerFrameLoaded = false;
+    
+    function loadRouterFrame() {
+        if (!routerIp) return;
+        
+        const iframe = document.getElementById('router-iframe');
+        const loading = document.getElementById('router-loading');
+        const error = document.getElementById('router-error');
+        
+        if (!iframe) return;
+        
+        loading.style.display = 'block';
+        error.style.display = 'none';
+        iframe.style.display = 'none';
+        
+        iframe.onload = function() {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                if (doc && doc.body && doc.body.innerHTML.length > 0) {
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                    routerFrameLoaded = true;
+                } else {
+                    showRouterError();
+                }
+            } catch (e) {
+                loading.style.display = 'none';
+                iframe.style.display = 'block';
+                routerFrameLoaded = true;
+            }
+        };
+        
+        iframe.onerror = function() {
+            showRouterError();
+        };
+        
+        setTimeout(function() {
+            if (!routerFrameLoaded) {
+                showRouterError();
+            }
+        }, 10000);
+        
+        iframe.src = 'http://' + routerIp;
+    }
+    
+    function showRouterError() {
+        const loading = document.getElementById('router-loading');
+        const error = document.getElementById('router-error');
+        const iframe = document.getElementById('router-iframe');
+        
+        if (loading) loading.style.display = 'none';
+        if (error) error.style.display = 'block';
+        if (iframe) iframe.style.display = 'none';
+    }
+    
+    function refreshRouterFrame() {
+        routerFrameLoaded = false;
+        loadRouterFrame();
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const routerTab = document.querySelector('a[href="#router"]');
+        if (routerTab) {
+            routerTab.addEventListener('shown.bs.tab', function() {
+                if (!routerFrameLoaded) {
+                    loadRouterFrame();
+                }
+            });
+        }
+    });
     </script>
 </body>
 </html>
