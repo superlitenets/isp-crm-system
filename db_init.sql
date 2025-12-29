@@ -1945,3 +1945,23 @@ CREATE INDEX IF NOT EXISTS idx_signal_history_recorded_at ON onu_signal_history(
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS success BOOLEAN DEFAULT false;
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS message TEXT;
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- TR-069 / GenieACS Default Settings
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'genieacs_enabled', '0', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'genieacs_enabled');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'genieacs_url', '', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'genieacs_url');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'genieacs_username', '', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'genieacs_username');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'genieacs_password', '', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'genieacs_password');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'genieacs_timeout', '30', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'genieacs_timeout');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'tr069_acs_url', '', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_acs_url');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'tr069_profile_id', '', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_profile_id');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'tr069_vlan', '69', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_vlan');
+INSERT INTO settings (setting_key, setting_value, setting_group) 
+SELECT 'tr069_priority', '2', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_priority');
