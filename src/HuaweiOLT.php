@@ -3406,6 +3406,143 @@ class HuaweiOLT {
         return $result ?: null;
     }
     
+    /**
+     * SmartOLT-style: Get OLT service profile ID by ONU type name
+     * SmartOLT uses ONU model names (HG8546M, HG8145V5) as service profile names
+     */
+    public function getOltSrvProfileByOnuType(int $oltId, string $onuType): ?array {
+        // Query the OLT for its service profiles
+        $result = $this->executeCommand($oltId, 'display ont-srvprofile gpon all');
+        if (!$result['success']) return null;
+        
+        $output = $result['output'] ?? '';
+        $lines = explode("\n", $output);
+        
+        // Parse profiles looking for matching ONU type
+        // Format: "Profile-ID  Profile-name      Binding times"
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\d+)\s*$/', trim($line), $matches)) {
+                $profileId = (int)$matches[1];
+                $profileName = $matches[2];
+                $bindingCount = (int)$matches[3];
+                
+                // Check if profile name matches ONU type (case-insensitive)
+                if (strcasecmp($profileName, $onuType) === 0) {
+                    return [
+                        'id' => $profileId,
+                        'name' => $profileName,
+                        'binding_count' => $bindingCount
+                    ];
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get default line profile for an OLT (typically SMARTOLT_FLEXIBLE_GPON or similar)
+     */
+    public function getDefaultOltLineProfile(int $oltId): ?array {
+        // First check if there's a setting for this OLT
+        $stmt = $this->db->prepare("SELECT default_line_profile FROM huawei_olts WHERE id = ?");
+        $stmt->execute([$oltId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!empty($row['default_line_profile'])) {
+            return ['id' => (int)$row['default_line_profile'], 'name' => 'OLT Default'];
+        }
+        
+        // Query OLT for line profiles and find most used one
+        $result = $this->executeCommand($oltId, 'display ont-lineprofile gpon all');
+        if (!$result['success']) return null;
+        
+        $output = $result['output'] ?? '';
+        $lines = explode("\n", $output);
+        $bestProfile = null;
+        $maxBindings = 0;
+        
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+(\S+)\s+(\d+)\s*$/', trim($line), $matches)) {
+                $profileId = (int)$matches[1];
+                $profileName = $matches[2];
+                $bindingCount = (int)$matches[3];
+                
+                // Skip default profile (ID 0) and prefer most used profile
+                if ($profileId > 0 && $bindingCount > $maxBindings) {
+                    $maxBindings = $bindingCount;
+                    $bestProfile = [
+                        'id' => $profileId,
+                        'name' => $profileName,
+                        'binding_count' => $bindingCount
+                    ];
+                }
+            }
+        }
+        
+        return $bestProfile;
+    }
+    
+    /**
+     * Find or create a CRM service profile matching the ONU type
+     * SmartOLT style: uses ONU model as service profile
+     */
+    public function findOrCreateProfileByOnuType(int $oltId, string $onuType): ?array {
+        if (empty($onuType)) return null;
+        
+        // First, check if we have a CRM profile with this ONU type name
+        $stmt = $this->db->prepare("SELECT * FROM huawei_service_profiles WHERE LOWER(name) = LOWER(?) AND is_active = TRUE LIMIT 1");
+        $stmt->execute([$onuType]);
+        $crmProfile = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($crmProfile) {
+            return $crmProfile;
+        }
+        
+        // Check if this ONU type exists as a service profile on the OLT
+        $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $onuType);
+        if (!$oltSrvProfile) {
+            // ONU type service profile doesn't exist on OLT
+            return null;
+        }
+        
+        // Get the default line profile for this OLT
+        $lineProfile = $this->getDefaultOltLineProfile($oltId);
+        $lineProfileId = $lineProfile ? $lineProfile['id'] : 2; // Fallback to SMARTOLT_FLEXIBLE_GPON
+        
+        // Create a CRM profile for this ONU type
+        $newProfileId = $this->addServiceProfile([
+            'name' => $onuType,
+            'description' => "Auto-created for ONU type {$onuType}",
+            'profile_type' => 'internet',
+            'line_profile' => (string)$lineProfileId,
+            'srv_profile' => (string)$oltSrvProfile['id'],
+            'is_default' => false,
+            'is_active' => true
+        ]);
+        
+        return $this->getServiceProfile($newProfileId);
+    }
+    
+    /**
+     * Get the equipment ID (ONU type) for an ONU from discovery log
+     */
+    public function getOnuEquipmentId(int $onuId): ?string {
+        $onu = $this->getONU($onuId);
+        if (!$onu) return null;
+        
+        // First check if ONU has equipment_id already
+        if (!empty($onu['equipment_id'])) {
+            return $onu['equipment_id'];
+        }
+        
+        // Check discovery log
+        $stmt = $this->db->prepare("SELECT equipment_id FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
+        $stmt->execute([$onu['sn']]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return $row['equipment_id'] ?? null;
+    }
+    
     public function addServiceProfile(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_service_profiles (name, description, profile_type, vlan_id, vlan_mode,
@@ -4707,8 +4844,19 @@ class HuaweiOLT {
         $onu = $this->getONU($onuId);
         $profile = $this->getServiceProfile($profileId);
         
+        // SmartOLT-style: If no profile found, try to use ONU type as service profile
+        if (!$profile && $onu) {
+            $equipmentId = $this->getOnuEquipmentId($onuId);
+            if ($equipmentId) {
+                $profile = $this->findOrCreateProfileByOnuType($onu['olt_id'], $equipmentId);
+                if ($profile) {
+                    error_log("SmartOLT-style: Using auto-matched profile '{$profile['name']}' for ONU type {$equipmentId}");
+                }
+            }
+        }
+        
         if (!$onu || !$profile) {
-            return ['success' => false, 'message' => 'ONU or Profile not found'];
+            return ['success' => false, 'message' => 'ONU or Profile not found. Ensure ONU type has a matching service profile on the OLT.'];
         }
         
         $frame = $onu['frame'] ?? 0;
