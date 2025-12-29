@@ -2092,6 +2092,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'warning';
                 }
                 break;
+            case 'configure_pppoe_wan':
+                require_once __DIR__ . '/../src/HuaweiOLT.php';
+                $huaweiOLT = new \App\HuaweiOLT($db);
+                $onuDbId = (int)($_POST['onu_db_id'] ?? 0);
+                
+                if ($onuDbId <= 0) {
+                    $message = 'Invalid ONU ID';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $config = [
+                    'pppoe_vlan' => (int)($_POST['pppoe_vlan'] ?? 902),
+                    'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                    'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                    'gemport' => (int)($_POST['gemport'] ?? 1),
+                    'nat_enabled' => isset($_POST['nat_enabled']),
+                    'priority' => (int)($_POST['priority'] ?? 0)
+                ];
+                
+                $result = $huaweiOLT->configureWANPPPoE($onuDbId, $config);
+                $message = $result['message'] ?? ($result['success'] ? 'PPPoE configured' : 'Configuration failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'tr069_refresh':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
@@ -4639,6 +4663,9 @@ try {
                                             </form>
                                             <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot">
                                                 <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                            <button class="btn btn-outline-success" onclick="showPPPoEWanModal(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Add Internet Service">
+                                                <i class="bi bi-globe"></i>
                                             </button>
                                             <?php endif; ?>
                                             <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="btn btn-outline-info" title="Configure">
@@ -11804,6 +11831,77 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const type = document.getElementById('pppoeConnectionType').value;
         document.getElementById('pppoeCredentials').classList.toggle('d-none', type !== 'pppoe');
         document.getElementById('staticIpFields').classList.toggle('d-none', type !== 'static');
+    }
+    </script>
+    
+    <div class="modal fade" id="pppoeWanModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-router me-2"></i>Add Internet Service (PPPoE)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="?page=huawei-olt">
+                    <input type="hidden" name="action" value="configure_pppoe_wan">
+                    <input type="hidden" name="onu_db_id" id="pppoeWanOnuId">
+                    <div class="modal-body">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            This will configure PPPoE WAN on the OLT (via OMCI) and queue credentials for TR-069 push.
+                        </div>
+                        <p class="text-muted small">ONU: <strong id="pppoeWanOnuSn"></strong></p>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">PPPoE VLAN</label>
+                                <input type="number" name="pppoe_vlan" class="form-control" value="902" required>
+                                <small class="text-muted">Internet service VLAN</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">GEM Port</label>
+                                <input type="number" name="gemport" class="form-control" value="1">
+                                <small class="text-muted">Usually 1 for internet</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">PPPoE Username <span class="text-danger">*</span></label>
+                            <input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">PPPoE Password <span class="text-danger">*</span></label>
+                            <input type="text" name="pppoe_password" class="form-control" placeholder="password" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Priority</label>
+                                <input type="number" name="priority" class="form-control" value="0" min="0" max="7">
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input type="checkbox" name="nat_enabled" class="form-check-input" id="pppoeNatEnabled" checked>
+                                    <label class="form-check-label" for="pppoeNatEnabled">Enable NAT</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check me-1"></i> Configure PPPoE
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function showPPPoEWanModal(onuDbId, serial) {
+        document.getElementById('pppoeWanOnuId').value = onuDbId;
+        document.getElementById('pppoeWanOnuSn').textContent = serial;
+        new bootstrap.Modal(document.getElementById('pppoeWanModal')).show();
     }
     </script>
     
