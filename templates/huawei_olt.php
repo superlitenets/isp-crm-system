@@ -2066,7 +2066,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 // Get pending config
-                $stmt = $db->prepare("SELECT id, config_data FROM huawei_onu_tr069_config WHERE onu_id = ? AND status = 'pending'");
+                $stmt = $db->prepare("SELECT onu_id, config_data FROM huawei_onu_tr069_config WHERE onu_id = ? AND status = 'pending'");
                 $stmt->execute([$onuId]);
                 $pendingConfig = $stmt->fetch(\PDO::FETCH_ASSOC);
                 
@@ -2115,15 +2115,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         
                         // Only mark as applied if ALL calls succeeded
                         if ($allSuccess) {
-                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET status = 'applied', applied_at = CURRENT_TIMESTAMP, error_message = NULL WHERE id = ?");
-                            $stmt->execute([$pendingConfig['id']]);
+                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET status = 'applied', applied_at = CURRENT_TIMESTAMP, error_message = NULL WHERE onu_id = ?");
+                            $stmt->execute([$pendingConfig['onu_id']]);
                             $message = 'TR-069 configuration applied successfully';
                             $messageType = 'success';
                         } else {
                             // Keep status as pending and store error
                             $errorMsg = implode('; ', $errors);
-                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                            $stmt->execute([$errorMsg, $pendingConfig['id']]);
+                            $stmt = $db->prepare("UPDATE huawei_onu_tr069_config SET error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE onu_id = ?");
+                            $stmt->execute([$errorMsg, $pendingConfig['onu_id']]);
                             $message = 'Failed to apply TR-069 configuration: ' . $errorMsg;
                             $messageType = 'danger';
                         }
