@@ -89,7 +89,7 @@ services:
       - crm_network
 
   genieacs:
-    image: drumsergio/genieacs:latest
+    image: drumsergio/genieacs:1.2.12
     container_name: isp_crm_genieacs
     restart: unless-stopped
     environment:
