@@ -450,6 +450,65 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_olt_vlans') {
     exit;
 }
 
+// AJAX endpoint for getting VLANs by OLT with PON default
+if (isset($_GET['action']) && $_GET['action'] === 'get_auth_vlans') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_GET['olt_id'] ?? 0);
+    $fsp = trim($_GET['fsp'] ?? ''); // frame/slot/port e.g. "0/1/0"
+    
+    if (!$oltId) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID required']);
+        exit;
+    }
+    
+    try {
+        // Get VLANs for this OLT
+        $stmt = $db->prepare("SELECT vlan_id, description, vlan_type, is_tr069 FROM huawei_vlans WHERE olt_id = ? AND is_active = TRUE ORDER BY vlan_id");
+        $stmt->execute([$oltId]);
+        $vlans = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Get default VLAN for this PON port if fsp provided
+        $defaultVlan = null;
+        if ($fsp && preg_match('/^(\d+)\/(\d+)\/(\d+)$/', $fsp, $m)) {
+            $portName = "gpon $fsp";
+            $stmt = $db->prepare("SELECT default_vlan FROM huawei_olt_pon_ports WHERE olt_id = ? AND port_name = ?");
+            $stmt->execute([$oltId, $portName]);
+            $ponPort = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($ponPort && $ponPort['default_vlan']) {
+                $defaultVlan = (int)$ponPort['default_vlan'];
+            }
+        }
+        
+        echo json_encode(['success' => true, 'vlans' => $vlans, 'default_vlan' => $defaultVlan]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX endpoint for setting PON port default VLAN
+if (isset($_GET['action']) && $_GET['action'] === 'set_pon_default_vlan') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_POST['olt_id'] ?? 0);
+    $portName = trim($_POST['port_name'] ?? '');
+    $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+    
+    if (!$oltId || !$portName) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID and port name required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("UPDATE huawei_olt_pon_ports SET default_vlan = ? WHERE olt_id = ? AND port_name = ?");
+        $stmt->execute([$vlanId, $oltId, $portName]);
+        
+        echo json_encode(['success' => true, 'updated' => $stmt->rowCount()]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint to add service VLAN to ONU
 if (isset($_GET['action']) && $_GET['action'] === 'add_onu_service_vlan') {
     header('Content-Type: application/json');
@@ -10152,6 +10211,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <?php if (!empty($port['native_vlan'])): ?>
                                             <div class="small text-muted">VLAN: <?= $port['native_vlan'] ?></div>
                                             <?php endif; ?>
+                                            <?php if (!empty($port['default_vlan'])): ?>
+                                            <div class="small text-primary mt-1">
+                                                <i class="bi bi-check2-circle me-1"></i>Default: VLAN <?= $port['default_vlan'] ?>
+                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="card-footer bg-transparent d-flex gap-1 flex-wrap justify-content-center py-2">
                                             <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="btn btn-sm btn-outline-primary" title="View ONUs">
@@ -10171,6 +10235,43 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#vlanModal<?= str_replace('/', '_', $port['port_name']) ?>" title="Assign VLAN">
                                                 <i class="bi bi-diagram-2"></i>
                                             </button>
+                                            <button type="button" class="btn btn-sm btn-outline-<?= !empty($port['default_vlan']) ? 'primary' : 'secondary' ?>" 
+                                                    data-bs-toggle="modal" data-bs-target="#defaultVlanModal<?= str_replace('/', '_', $port['port_name']) ?>" 
+                                                    title="Set Default VLAN for Authorization">
+                                                <i class="bi bi-star<?= !empty($port['default_vlan']) ? '-fill' : '' ?>"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="modal fade" id="defaultVlanModal<?= str_replace('/', '_', $port['port_name']) ?>" tabindex="-1">
+                                    <div class="modal-dialog modal-sm">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h6 class="modal-title"><i class="bi bi-star me-1"></i> Default VLAN for <?= htmlspecialchars($port['port_name']) ?></h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="small text-muted mb-3">This VLAN will be pre-selected when authorizing ONUs on this PON port.</p>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Default VLAN</label>
+                                                    <select class="form-select" id="defaultVlan<?= str_replace('/', '_', $port['port_name']) ?>">
+                                                        <option value="">-- None --</option>
+                                                        <?php foreach ($cachedVLANs as $vlan): ?>
+                                                        <option value="<?= $vlan['vlan_id'] ?>" <?= ($port['default_vlan'] ?? '') == $vlan['vlan_id'] ? 'selected' : '' ?>>
+                                                            VLAN <?= $vlan['vlan_id'] ?><?= $vlan['description'] ? ' - ' . htmlspecialchars($vlan['description']) : '' ?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="button" class="btn btn-primary" 
+                                                        onclick="setDefaultVlan(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', document.getElementById('defaultVlan<?= str_replace('/', '_', $port['port_name']) ?>').value)">
+                                                    <i class="bi bi-check me-1"></i> Save
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -10948,18 +11049,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Service VLAN (Internet) <span class="text-danger">*</span></label>
                                         <select name="vlan_id" id="authVlanId" class="form-select" required>
-                                            <option value="">-- Select Service VLAN --</option>
-                                            <?php
-                                            $vlansStmt = $db->query("SELECT DISTINCT vlan_id, description, is_tr069 FROM huawei_vlans WHERE is_active = true ORDER BY vlan_id");
-                                            while ($vlan = $vlansStmt->fetch(PDO::FETCH_ASSOC)): 
-                                                $label = "VLAN {$vlan['vlan_id']}";
-                                                if (!empty($vlan['description'])) $label .= ' - ' . htmlspecialchars($vlan['description']);
-                                                if ($vlan['is_tr069']) $label .= ' [TR-069]';
-                                            ?>
-                                            <option value="<?= $vlan['vlan_id'] ?>"><?= $label ?></option>
-                                            <?php endwhile; ?>
+                                            <option value="">-- Select OLT first --</option>
                                         </select>
-                                        <small class="text-muted">TR-069 VLAN + DHCP WAN will be auto-configured by OLT</small>
+                                        <small class="text-muted">VLANs filtered by OLT. Default may be set per PON port.</small>
                                     </div>
                                 </div>
                                 <div class="mb-3">
@@ -12188,6 +12280,42 @@ echo "# ================================================\n";
         
         document.getElementById('authModeBridge').checked = true;
         
+        // Load VLANs for this specific OLT with PON default
+        var vlanSelect = document.getElementById('authVlanId');
+        vlanSelect.innerHTML = '<option value="">Loading VLANs...</option>';
+        
+        if (oltId) {
+            var url = '?action=get_auth_vlans&olt_id=' + oltId;
+            if (frameSlotPort) {
+                url += '&fsp=' + encodeURIComponent(frameSlotPort);
+            }
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    vlanSelect.innerHTML = '<option value="">-- Select Service VLAN --</option>';
+                    if (data.success && data.vlans) {
+                        data.vlans.forEach(v => {
+                            var label = 'VLAN ' + v.vlan_id;
+                            if (v.description) label += ' - ' + v.description;
+                            if (v.is_tr069) label += ' [TR-069]';
+                            var opt = document.createElement('option');
+                            opt.value = v.vlan_id;
+                            opt.textContent = label;
+                            if (data.default_vlan && v.vlan_id == data.default_vlan) {
+                                opt.selected = true;
+                            }
+                            vlanSelect.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(e => {
+                    vlanSelect.innerHTML = '<option value="">Error loading VLANs</option>';
+                });
+        } else {
+            vlanSelect.innerHTML = '<option value="">-- Select OLT first --</option>';
+        }
+        
         new bootstrap.Modal(document.getElementById('authModal')).show();
     }
     
@@ -12207,6 +12335,23 @@ echo "# ================================================\n";
                 document.getElementById('authModeBridge').checked = true;
             }
         }
+    }
+    
+    function setDefaultVlan(oltId, portName, vlanId) {
+        fetch('?action=set_pon_default_vlan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&vlan_id=' + (vlanId || '')
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to set default VLAN: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(e => alert('Error: ' + e.message));
     }
     
     function rebootOnu(id) {
