@@ -1,0 +1,118 @@
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 58ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (651 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 74ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (651 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 73ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (651 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 76ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (651 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 76ms - Success: 2, Failed: 0
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:17 +0300 "GET /index.php" 302
+isp_crm_nginx           | 91.232.238.106 - - [29/Dec/2025:09:52:17 +0000] "GET /robots.txt HTTP/1.0" 302 0 "-" "xfa1" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:21 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:21 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:21 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:21 +0000] "GET /?page=huawei-olt&ajax=realtime_onus&unconfigured=1 HTTP/2.0" 200 118 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:21 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:21 +0000] "GET /?page=huawei-olt&ajax=realtime_stats HTTP/2.0" 200 246 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:25 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:25 +0000] "GET /?page=huawei-olt&ajax=realtime_onus&unconfigured=1 HTTP/2.0" 200 118 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:25 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:25 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:52:25 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:52:25 +0000] "GET /?page=huawei-olt&ajax=realtime_stats HTTP/2.0" 200 246 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (651 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
