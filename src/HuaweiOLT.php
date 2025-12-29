@@ -5243,13 +5243,25 @@ class HuaweiOLT {
         $output = '';
         $errors = [];
         
+        // Helper to check for real errors (ignoring "already configured" messages)
+        $hasRealError = function($output) {
+            if (empty($output)) return false;
+            // Ignore "Make configuration repeatedly" - means already configured (OK)
+            // Ignore "already exists" - means already configured (OK)
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+                return false;
+            }
+            // Check for actual failures
+            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+        };
+        
         // Step 1: Configure native VLAN
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd1 .= "ont port native-vlan {$port} {$onuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
         $output .= "[Step 1: Native VLAN]\n" . ($result1['output'] ?? '') . "\n";
-        if (!$result1['success'] || preg_match('/(?:Failure|Error)/i', $result1['output'] ?? '')) {
+        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
             $errors[] = "Native VLAN config failed";
         }
         
@@ -5259,7 +5271,7 @@ class HuaweiOLT {
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
         $output .= "[Step 2: DHCP Config]\n" . ($result2['output'] ?? '') . "\n";
-        if (!$result2['success'] || preg_match('/(?:Failure|Error)/i', $result2['output'] ?? '')) {
+        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
             $errors[] = "DHCP config failed";
         }
         
@@ -5270,7 +5282,7 @@ class HuaweiOLT {
         $cmd3 .= "quit";
         $result3 = $this->executeCommand($oltId, $cmd3);
         $output .= "[Step 3: ACS URL]\n" . ($result3['output'] ?? '') . "\n";
-        if (!$result3['success'] || preg_match('/(?:Failure|Error)/i', $result3['output'] ?? '')) {
+        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
             $errors[] = "ACS URL config failed";
         }
         
@@ -5278,7 +5290,7 @@ class HuaweiOLT {
         $cmd4 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
         $result4 = $this->executeCommand($oltId, $cmd4);
         $output .= "[Step 4: Service Port]\n" . ($result4['output'] ?? '') . "\n";
-        if (!$result4['success'] || preg_match('/(?:Failure|Error)/i', $result4['output'] ?? '')) {
+        if (!$result4['success'] || $hasRealError($result4['output'] ?? '')) {
             $errors[] = "Service port creation failed";
         }
         
