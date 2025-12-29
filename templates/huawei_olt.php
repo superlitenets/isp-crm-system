@@ -5027,17 +5027,9 @@ try {
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-activity me-2"></i>Live Status & Signal</span>
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
-                                    <i class="bi bi-broadcast me-1"></i> Fetch Live
-                                </button>
-                                <button type="button" class="btn btn-sm btn-warning" onclick="getOnuFullStatus(<?= $currentOnu['id'] ?>)">
-                                    <i class="bi bi-clipboard-data me-1"></i> Get Status
-                                </button>
-                                <button type="button" class="btn btn-sm btn-dark" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
-                                    <i class="bi bi-code-slash me-1"></i> Show Config
-                                </button>
-                            </div>
+                            <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
+                                <i class="bi bi-broadcast me-1"></i> Read ONU Details
+                            </button>
                         </div>
                         <div class="card-body">
                             <div id="liveDataLoading" class="text-center py-3 d-none">
@@ -5355,241 +5347,105 @@ try {
             <style>.spin-animation { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
             
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-12">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-warning text-dark">
-                            <i class="bi bi-tools me-2"></i>Remote Troubleshooting
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU configuration? The ONU will temporarily go offline.')">
-                                    <input type="hidden" name="action" value="reset_onu_config">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-warning w-100">
-                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Reset ONU Configuration
-                                    </button>
-                                </form>
-                                
-                                <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU? It will go offline temporarily.')">
-                                    <input type="hidden" name="action" value="reboot_onu">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-primary w-100">
-                                        <i class="bi bi-arrow-clockwise me-2"></i>Reboot ONU
-                                    </button>
-                                </form>
-                                
-                                <form method="post" class="d-inline" onsubmit="return confirm('WARNING: Delete this ONU from the OLT? Customer will lose connection!')">
-                                    <input type="hidden" name="action" value="delete_onu_olt">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="bi bi-trash me-2"></i>Delete from OLT
-                                    </button>
-                                </form>
-                            </div>
-                            
-                            <hr>
-                            
-                            <h6 class="mb-3"><i class="bi bi-pencil me-2"></i>Update Description on OLT</h6>
-                            <form method="post" class="row g-2">
-                                <input type="hidden" name="action" value="update_onu_description">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <div class="col-8">
-                                    <input type="text" name="description" class="form-control form-control-sm" 
-                                           value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" 
-                                           placeholder="Customer name or location" maxlength="64">
-                                </div>
-                                <div class="col-4">
-                                    <button type="submit" class="btn btn-primary btn-sm w-100">Update</button>
-                                </div>
-                            </form>
-                            
-                            <hr>
-                            
-                            <h6 class="mb-3"><i class="bi bi-arrows-move me-2"></i>Move ONU to Different Port</h6>
-                            <form method="post" onsubmit="return confirm('Move this ONU to a different port? The ONU will be deleted from the current location and re-added to the new location.')">
-                                <input type="hidden" name="action" value="move_onu">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <div class="row g-2 mb-2">
-                                    <div class="col-4">
-                                        <label class="form-label small">New Slot</label>
-                                        <input type="number" name="new_slot" class="form-control form-control-sm" 
-                                               value="<?= $currentOnu['slot'] ?>" min="0" max="21" required>
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="form-label small">New Port</label>
-                                        <input type="number" name="new_port" class="form-control form-control-sm" 
-                                               value="<?= $currentOnu['port'] ?>" min="0" max="15" required>
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="form-label small">ONU ID <small class="text-muted">(opt)</small></label>
-                                        <input type="number" name="new_onu_id" class="form-control form-control-sm" 
-                                               placeholder="Auto" min="0" max="127">
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-warning btn-sm w-100">
-                                    <i class="bi bi-arrows-move me-1"></i> Move ONU
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-success text-white">
-                            <i class="bi bi-sliders me-2"></i>Service Profile
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label">Current Profile</label>
-                                <div class="d-flex align-items-center">
-                                    <?php if ($currentOnu['service_profile_id']): ?>
-                                        <?php 
-                                        $currentProfile = null;
-                                        foreach ($profiles as $p) {
-                                            if ($p['id'] == $currentOnu['service_profile_id']) {
-                                                $currentProfile = $p;
-                                                break;
-                                            }
-                                        }
-                                        ?>
-                                        <span class="badge bg-primary fs-6 me-2">
-                                            <?= htmlspecialchars($currentProfile['name'] ?? 'Unknown') ?>
-                                        </span>
-                                        <?php if ($currentProfile): ?>
-                                        <small class="text-muted">
-                                            <?= htmlspecialchars($currentProfile['download_speed'] ?? '') ?>/<?= htmlspecialchars($currentProfile['upload_speed'] ?? '') ?> Mbps
-                                        </small>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="badge bg-secondary fs-6">No Profile Assigned</span>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            
-                            <hr>
-                            
-                            <h6 class="mb-3"><i class="bi bi-arrow-up-circle me-2"></i>Change Service Profile</h6>
-                            <form method="post" onsubmit="return confirm('Change service profile? OMCI will be re-applied automatically.')">
-                                <input type="hidden" name="action" value="change_onu_profile">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <div class="row g-2">
-                                    <div class="col-8">
-                                        <select name="new_profile_id" class="form-select form-select-sm" required>
-                                            <option value="">-- Select New Profile --</option>
-                                            <?php foreach ($profiles as $profile): ?>
-                                            <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($profile['name']) ?>
-                                                (<?= $profile['download_speed'] ?? '?' ?>/<?= $profile['upload_speed'] ?? '?' ?> Mbps)
-                                            </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="col-4">
-                                        <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
-                                    </div>
-                                </div>
-                                <small class="text-muted mt-2 d-block">
-                                    Changing the profile will automatically update OMCI settings (VLAN, speed, QoS).
-                                </small>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- TR-069 Device Status -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-purple text-white d-flex justify-content-between align-items-center" style="background-color:#6f42c1">
-                            <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS Status</span>
-                            <?php if ($tr069Device): ?>
-                            <span class="badge bg-light text-dark"><i class="bi bi-check-circle-fill text-success me-1"></i>Connected to ACS</span>
-                            <?php else: ?>
-                            <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Awaiting ACS Connection</span>
-                            <?php endif; ?>
+                            <i class="bi bi-tools me-2"></i>Service Profile & Troubleshooting
                         </div>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6 class="text-muted mb-3"><i class="bi bi-cpu me-2"></i>Device Information</h6>
-                                    <?php if ($tr069Info): ?>
-                                    <table class="table table-sm table-borderless mb-0">
-                                        <tr><th width="40%">Manufacturer</th><td><?= htmlspecialchars($tr069Info['manufacturer'] ?? '-') ?> (OUI: <?= htmlspecialchars($tr069Info['oui'] ?? '-') ?>)</td></tr>
-                                        <tr><th>Model</th><td><?= htmlspecialchars($tr069Info['product_class'] ?? $tr069Device['model'] ?? '-') ?></td></tr>
-                                        <tr><th>Software Ver.</th><td><?= htmlspecialchars($tr069Info['software_version'] ?? '-') ?></td></tr>
-                                        <tr><th>Hardware Ver.</th><td><?= htmlspecialchars($tr069Info['hardware_version'] ?? '-') ?></td></tr>
-                                        <tr><th>Serial</th><td><code><?= htmlspecialchars($tr069Info['serial'] ?? $currentOnu['sn']) ?></code></td></tr>
-                                        <tr><th>WAN IP</th><td><?= htmlspecialchars($tr069Info['ip_address'] ?? '-') ?></td></tr>
-                                        <tr><th>Last Inform</th><td>
-                                            <?php if (!empty($tr069Info['last_inform'])): ?>
-                                            <?= date('M j, H:i:s', strtotime($tr069Info['last_inform'])) ?>
-                                            <?php elseif (!empty($tr069Device['last_inform'])): ?>
-                                            <?= date('M j, H:i:s', strtotime($tr069Device['last_inform'])) ?>
-                                            <?php else: ?>-<?php endif; ?>
-                                        </td></tr>
-                                        <tr><th>Uptime</th><td><?= $tr069Info['uptime'] ? gmdate('d\d H\h i\m', (int)$tr069Info['uptime']) : '-' ?></td></tr>
-                                    </table>
-                                    <?php elseif ($tr069Device): ?>
-                                    <table class="table table-sm table-borderless mb-0">
-                                        <tr><th width="40%">Device ID</th><td><code class="small"><?= htmlspecialchars(substr($tr069Device['device_id'], 0, 40)) ?>...</code></td></tr>
-                                        <tr><th>Model</th><td><?= htmlspecialchars($tr069Device['model'] ?? '-') ?></td></tr>
-                                        <tr><th>Manufacturer</th><td><?= htmlspecialchars($tr069Device['manufacturer'] ?? '-') ?></td></tr>
-                                        <tr><th>Last Inform</th><td><?= $tr069Device['last_inform'] ? date('M j, H:i:s', strtotime($tr069Device['last_inform'])) : '-' ?></td></tr>
-                                    </table>
-                                    <?php else: ?>
-                                    <div class="alert alert-warning mb-0">
-                                        <i class="bi bi-exclamation-triangle me-2"></i>
-                                        Device has not connected to GenieACS yet. Once it connects via TR-069, information will appear here.
+                                    <h6 class="mb-3"><i class="bi bi-sliders me-2"></i>Service Profile</h6>
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <?php if ($currentOnu['service_profile_id']): ?>
+                                                <?php 
+                                                $currentProfile = null;
+                                                foreach ($profiles as $p) {
+                                                    if ($p['id'] == $currentOnu['service_profile_id']) {
+                                                        $currentProfile = $p;
+                                                        break;
+                                                    }
+                                                }
+                                                ?>
+                                                <span class="badge bg-primary fs-6 me-2">
+                                                    <?= htmlspecialchars($currentProfile['name'] ?? 'Unknown') ?>
+                                                </span>
+                                                <?php if ($currentProfile): ?>
+                                                <small class="text-muted">
+                                                    <?= htmlspecialchars($currentProfile['download_speed'] ?? '') ?>/<?= htmlspecialchars($currentProfile['upload_speed'] ?? '') ?> Mbps
+                                                </small>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary fs-6">No Profile Assigned</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="col-md-6">
-                                    <h6 class="text-muted mb-3"><i class="bi bi-sliders2 me-2"></i>Pending Configuration</h6>
-                                    <?php if ($pendingTr069Config && $pendingTr069Config['status'] === 'pending'): ?>
-                                    <?php $cfg = $pendingTr069Config['config'] ?? []; ?>
-                                    <?php if (!empty($pendingTr069Config['error_message'])): ?>
-                                    <div class="alert alert-danger mb-3">
-                                        <i class="bi bi-x-circle me-2"></i><strong>Last push failed:</strong> <?= htmlspecialchars($pendingTr069Config['error_message']) ?>
-                                    </div>
-                                    <?php else: ?>
-                                    <div class="alert alert-info mb-3">
-                                        <i class="bi bi-hourglass-split me-2"></i><strong>Configuration queued</strong> - waiting to push to device
-                                    </div>
-                                    <?php endif; ?>
-                                    <table class="table table-sm table-borderless mb-3">
-                                        <?php if (!empty($cfg['pppoe_username'])): ?>
-                                        <tr><th width="40%">PPPoE User</th><td><?= htmlspecialchars($cfg['pppoe_username']) ?></td></tr>
-                                        <?php endif; ?>
-                                        <?php if (!empty($cfg['wan_vlan'])): ?>
-                                        <tr><th>WAN VLAN</th><td><?= $cfg['wan_vlan'] ?></td></tr>
-                                        <?php endif; ?>
-                                        <?php if (!empty($cfg['wifi_ssid_24'])): ?>
-                                        <tr><th>WiFi 2.4G SSID</th><td><?= htmlspecialchars($cfg['wifi_ssid_24']) ?></td></tr>
-                                        <?php endif; ?>
-                                        <?php if (!empty($cfg['wifi_ssid_5'])): ?>
-                                        <tr><th>WiFi 5G SSID</th><td><?= htmlspecialchars($cfg['wifi_ssid_5']) ?></td></tr>
-                                        <?php endif; ?>
-                                    </table>
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="action" value="apply_pending_tr069">
+                                    <form method="post" onsubmit="return confirm('Change service profile? OMCI will be re-applied automatically.')">
+                                        <input type="hidden" name="action" value="change_onu_profile">
                                         <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                        <button type="submit" class="btn btn-primary" <?= !$tr069Device ? 'disabled' : '' ?>>
-                                            <i class="bi bi-cloud-upload me-1"></i> Push to Device Now
-                                        </button>
+                                        <div class="row g-2">
+                                            <div class="col-8">
+                                                <select name="new_profile_id" class="form-select form-select-sm" required>
+                                                    <option value="">-- Select New Profile --</option>
+                                                    <?php foreach ($profiles as $profile): ?>
+                                                    <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($profile['name']) ?>
+                                                        (<?= $profile['download_speed'] ?? '?' ?>/<?= $profile['upload_speed'] ?? '?' ?> Mbps)
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-4">
+                                                <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
+                                            </div>
+                                        </div>
                                     </form>
-                                    <?php if (!$tr069Device): ?>
-                                    <small class="text-muted d-block mt-2">Device must connect to ACS first</small>
-                                    <?php endif; ?>
-                                    <?php elseif ($pendingTr069Config && $pendingTr069Config['status'] === 'applied'): ?>
-                                    <div class="alert alert-success mb-0">
-                                        <i class="bi bi-check-circle-fill me-2"></i>
-                                        Configuration applied on <?= date('M j, H:i', strtotime($pendingTr069Config['applied_at'])) ?>
+                                    
+                                    <hr>
+                                    
+                                    <h6 class="mb-3"><i class="bi bi-pencil me-2"></i>Update Description</h6>
+                                    <form method="post" class="row g-2">
+                                        <input type="hidden" name="action" value="update_onu_description">
+                                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                        <div class="col-8">
+                                            <input type="text" name="description" class="form-control form-control-sm" 
+                                                   value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" 
+                                                   placeholder="Customer name or location" maxlength="64">
+                                        </div>
+                                        <div class="col-4">
+                                            <button type="submit" class="btn btn-primary btn-sm w-100">Update</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h6 class="mb-3"><i class="bi bi-wrench me-2"></i>Remote Actions</h6>
+                                    <div class="d-grid gap-2 mb-3">
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU? It will go offline temporarily.')">
+                                            <input type="hidden" name="action" value="reboot_onu">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                                                <i class="bi bi-arrow-clockwise me-2"></i>Reboot ONU
+                                            </button>
+                                        </form>
+                                        
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU configuration? The ONU will temporarily go offline.')">
+                                            <input type="hidden" name="action" value="reset_onu_config">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm w-100">
+                                                <i class="bi bi-arrow-counterclockwise me-2"></i>Reset Config
+                                            </button>
+                                        </form>
+                                        
+                                        <form method="post" class="d-inline" onsubmit="return confirm('WARNING: Delete this ONU from the OLT and return to pending? Customer will lose connection!')">
+                                            <input type="hidden" name="action" value="delete_onu_olt">
+                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                                                <i class="bi bi-trash me-2"></i>Delete & Return to Pending
+                                            </button>
+                                        </form>
                                     </div>
-                                    <?php else: ?>
-                                    <p class="text-muted mb-0"><i class="bi bi-check-circle me-1"></i>No pending configuration</p>
-                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
