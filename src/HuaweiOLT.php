@@ -5158,6 +5158,18 @@ class HuaweiOLT {
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
+        // Mark discovery log entry as authorized
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE onu_discovery_log 
+                SET authorized = true, authorized_at = CURRENT_TIMESTAMP 
+                WHERE serial_number = ? AND olt_id = ?
+            ");
+            $stmt->execute([$onu['sn'], $oltId]);
+        } catch (\Exception $e) {
+            error_log("Failed to update discovery log for {$onu['sn']}: " . $e->getMessage());
+        }
+        
         return [
             'success' => true,
             'message' => $statusMessage,
