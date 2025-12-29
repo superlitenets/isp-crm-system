@@ -12285,7 +12285,7 @@ echo "# ================================================\n";
         vlanSelect.innerHTML = '<option value="">Loading VLANs...</option>';
         
         if (oltId) {
-            var url = '?action=get_auth_vlans&olt_id=' + oltId;
+            var url = '?page=huawei-olt&action=get_auth_vlans&olt_id=' + oltId;
             if (frameSlotPort) {
                 url += '&fsp=' + encodeURIComponent(frameSlotPort);
             }
@@ -12338,7 +12338,7 @@ echo "# ================================================\n";
     }
     
     function setDefaultVlan(oltId, portName, vlanId) {
-        fetch('?action=set_pon_default_vlan', {
+        fetch('?page=huawei-olt&action=set_pon_default_vlan', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&vlan_id=' + (vlanId || '')
