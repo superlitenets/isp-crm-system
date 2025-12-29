@@ -6807,20 +6807,16 @@ class HuaweiOLT {
             'raw' => []
         ];
         
-        // 1. Get ONT configuration (ont add, ipconfig, tr069-server-config)
-        $ontCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port} {$onuId}\r\nquit";
-        $ontResult = $this->executeCommand($oltId, $ontCmd);
-        if ($ontResult['success']) {
-            $config['raw']['ont_config'] = $ontResult['output'];
-            $config['ont_config'] = $this->parseOntConfig($ontResult['output'], $frame, $slot, $port, $onuId);
-        }
+        // Combined command - get both ONT config and service-port in one session
+        $combinedCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port} {$onuId}\r\nquit\r\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
+        $result = $this->executeCommand($oltId, $combinedCmd);
         
-        // 2. Get service-port configuration
-        $spCmd = "display service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
-        $spResult = $this->executeCommand($oltId, $spCmd);
-        if ($spResult['success']) {
-            $config['raw']['service_ports'] = $spResult['output'];
-            $config['service_ports'] = $this->parseServicePortConfig($spResult['output'], $frame, $slot, $port, $onuId);
+        if ($result['success']) {
+            $output = $result['output'];
+            $config['raw']['ont_config'] = $output;
+            $config['raw']['service_ports'] = $output;
+            $config['ont_config'] = $this->parseOntConfig($output, $frame, $slot, $port, $onuId);
+            $config['service_ports'] = $this->parseServicePortConfig($output, $frame, $slot, $port, $onuId);
         }
         
         // Build the full config script
@@ -6978,52 +6974,27 @@ class HuaweiOLT {
             'raw' => []
         ];
         
-        // 1. Get optical info
-        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\nquit";
-        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
-        if ($opticalResult['success']) {
-            $status['raw']['optical'] = $opticalResult['output'];
-            $status['optical'] = $this->parseOpticalStatus($opticalResult['output']);
-        }
+        // Combined command - all queries in one session for speed
+        $combinedCmd = "interface gpon {$frame}/{$slot}\r\n" .
+            "display ont optical-info {$port} {$onuId}\r\n" .
+            "display ont info {$port} {$onuId}\r\n" .
+            "display ont wan-info {$port} {$onuId}\r\n" .
+            "display ont port state {$port} {$onuId} eth-port all\r\n" .
+            "display ont info {$port} {$onuId} history\r\n" .
+            "quit\r\n" .
+            "display mac-address port {$frame}/{$slot}/{$port} ont {$onuId}";
         
-        // 2. Get ONU details (control flag, run state, distance, CPU, memory, etc.)
-        $detailCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId}\r\nquit";
-        $detailResult = $this->executeCommand($oltId, $detailCmd);
-        if ($detailResult['success']) {
-            $status['raw']['details'] = $detailResult['output'];
-            $status['details'] = $this->parseOnuDetails($detailResult['output']);
-        }
+        $result = $this->executeCommand($oltId, $combinedCmd);
         
-        // 3. Get WAN info
-        $wanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont wan-info {$port} {$onuId}\r\nquit";
-        $wanResult = $this->executeCommand($oltId, $wanCmd);
-        if ($wanResult['success']) {
-            $status['raw']['wan'] = $wanResult['output'];
-            $status['wan'] = $this->parseWanInfo($wanResult['output']);
-        }
-        
-        // 4. Get LAN port status
-        $lanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont port state {$port} {$onuId} eth-port all\r\nquit";
-        $lanResult = $this->executeCommand($oltId, $lanCmd);
-        if ($lanResult['success']) {
-            $status['raw']['lan'] = $lanResult['output'];
-            $status['lan'] = $this->parseLanPorts($lanResult['output']);
-        }
-        
-        // 5. Get history (up/down times)
-        $historyCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId} history\r\nquit";
-        $historyResult = $this->executeCommand($oltId, $historyCmd);
-        if ($historyResult['success']) {
-            $status['raw']['history'] = $historyResult['output'];
-            $status['history'] = $this->parseOnuHistory($historyResult['output']);
-        }
-        
-        // 6. Get MAC addresses
-        $macCmd = "display mac-address port {$frame}/{$slot}/{$port} ont {$onuId}";
-        $macResult = $this->executeCommand($oltId, $macCmd);
-        if ($macResult['success']) {
-            $status['raw']['mac'] = $macResult['output'];
-            $status['mac'] = $this->parseMacAddresses($macResult['output']);
+        if ($result['success']) {
+            $output = $result['output'];
+            $status['raw']['full'] = $output;
+            $status['optical'] = $this->parseOpticalStatus($output);
+            $status['details'] = $this->parseOnuDetails($output);
+            $status['wan'] = $this->parseWanInfo($output);
+            $status['lan'] = $this->parseLanPorts($output);
+            $status['history'] = $this->parseOnuHistory($output);
+            $status['mac'] = $this->parseMacAddresses($output);
         }
         
         return ['success' => true, 'status' => $status];
