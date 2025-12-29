@@ -7088,7 +7088,7 @@ class HuaweiOLT {
             'control_flag' => '/Control flag\s*:\s*(.+)/i',
             'run_state' => '/Run state\s*:\s*(.+)/i',
             'match_state' => '/Match state\s*:\s*(.+)/i',
-            'distance' => '/ONT distance\(m\)\s*:\s*(\d+)/i',
+            'distance' => '/(?:ONT\s+)?distance\s*\(?m?\)?\s*:\s*(\d+)/i',
             'memory_occupation' => '/Memory occupation\s*:\s*(.+)/i',
             'cpu_occupation' => '/CPU occupation\s*:\s*(.+)/i',
             'temperature' => '/Temperature\s*:\s*(.+)/i',
