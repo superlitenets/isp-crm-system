@@ -5119,17 +5119,19 @@ class HuaweiOLT {
         if ($tr069Vlan && $assignedOnuId !== null) {
             // Get ACS URL from settings
             $acsUrl = $this->getTR069AcsUrl();
+            $tr069Priority = $options['tr069_priority'] ?? 2;
             
             // Enter interface context for TR-069 configuration
             $tr069Script = "interface gpon {$frame}/{$slot}\r\n";
             
-            // Configure native VLAN for TR-069 on ONU
-            $tr069Script .= "ont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
+            // Step 1: Create WAN with DHCP on TR-069 VLAN using IPHOST (ip-index 0)
+            // This creates the WAN connection for TR-069 management
+            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} ip-index 0 dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
             
-            // Configure IP mode for TR-069 (DHCP)
-            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} ip-index 0 dhcp vlan {$tr069Vlan}\r\n";
+            // Step 2: Set WAN service type to TR-069 (similar to ont internet-config for INTERNET)
+            $tr069Script .= "ont tr069-config {$port} {$assignedOnuId} ip-index 0\r\n";
             
-            // Push ACS URL directly (like SmartOLT does)
+            // Step 3: Configure TR-069 server settings (ACS URL and periodic inform)
             if ($acsUrl) {
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url \"{$acsUrl}\"\r\n";
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
@@ -5277,33 +5279,33 @@ class HuaweiOLT {
             return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
         };
         
-        // Step 1: Configure native VLAN
+        // Step 1: Create WAN with DHCP on TR-069 VLAN using IPHOST (ip-index 0)
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont port native-vlan {$port} {$onuId} eth 1 vlan {$tr069Vlan} priority 0\r\n";
+        $cmd1 .= "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan} priority 2\r\n";
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[Step 1: Native VLAN]\n" . ($result1['output'] ?? '') . "\n";
+        $output .= "[Step 1: WAN DHCP Config]\n" . ($result1['output'] ?? '') . "\n";
         if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
-            $errors[] = "Native VLAN config failed";
+            $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Configure DHCP IP
+        // Step 2: Set WAN service type to TR-069
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan}\r\n";
+        $cmd2 .= "ont tr069-config {$port} {$onuId} ip-index 0\r\n";
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: DHCP Config]\n" . ($result2['output'] ?? '') . "\n";
+        $output .= "[Step 2: TR-069 Service Type]\n" . ($result2['output'] ?? '') . "\n";
         if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
-            $errors[] = "DHCP config failed";
+            $errors[] = "TR-069 service type config failed";
         }
         
-        // Step 3: Push ACS URL
+        // Step 3: Push ACS URL and periodic inform
         $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd3 .= "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"\r\n";
         $cmd3 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
         $cmd3 .= "quit";
         $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= "[Step 3: ACS URL]\n" . ($result3['output'] ?? '') . "\n";
+        $output .= "[Step 3: ACS URL Config]\n" . ($result3['output'] ?? '') . "\n";
         if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
             $errors[] = "ACS URL config failed";
         }
