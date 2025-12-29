@@ -2271,6 +2271,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'get_onu_full_status':
+                header('Content-Type: application/json');
+                $result = $huaweiOLT->getONUFullStatus((int)$_POST['onu_id']);
+                echo json_encode($result);
+                exit;
             case 'refresh_tr069_ip':
                 $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
                 if ($result['success']) {
@@ -4941,9 +4946,14 @@ try {
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-activity me-2"></i>Live Status & Signal</span>
-                            <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
-                                <i class="bi bi-broadcast me-1"></i> Fetch Live
-                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
+                                    <i class="bi bi-broadcast me-1"></i> Fetch Live
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning" onclick="getOnuFullStatus(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-clipboard-data me-1"></i> Get Status
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div id="liveDataLoading" class="text-center py-3 d-none">
@@ -11860,6 +11870,26 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
     
+    <div class="modal fade" id="onuFullStatusModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-clipboard-data me-2"></i>ONU Full Status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="onuFullStatusBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Fetching ONU status from OLT...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="modal fade" id="configScriptModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -12656,6 +12686,133 @@ echo "# ================================================\n";
         document.getElementById('actionType').value = 'refresh_onu_optical';
         document.getElementById('actionOnuId').value = id;
         document.getElementById('actionForm').submit();
+    }
+    
+    function getOnuFullStatus(onuId) {
+        const modal = new bootstrap.Modal(document.getElementById('onuFullStatusModal'));
+        const body = document.getElementById('onuFullStatusBody');
+        
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-3">Fetching ONU status from OLT...</p></div>';
+        modal.show();
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=get_onu_full_status&onu_id=' + onuId
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch status') + '</div>';
+                return;
+            }
+            
+            const s = data.status;
+            let html = '<div class="row">';
+            
+            // Optical Status
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-info text-white"><i class="bi bi-broadcast me-2"></i>Optical Status</div><div class="card-body"><table class="table table-sm mb-0">';
+            if (s.optical) {
+                html += '<tr><td>Module Type</td><td><strong>' + (s.optical.module_type || '-') + '</strong></td></tr>';
+                html += '<tr><td>ONU Rx Power</td><td><strong>' + (s.optical.rx_power !== null ? s.optical.rx_power + ' dBm' : '-') + '</strong></td></tr>';
+                html += '<tr><td>ONU Tx Power</td><td><strong>' + (s.optical.tx_power !== null ? s.optical.tx_power + ' dBm' : '-') + '</strong></td></tr>';
+                html += '<tr><td>OLT Rx Power</td><td><strong>' + (s.optical.olt_rx_power !== null ? s.optical.olt_rx_power + ' dBm' : '-') + '</strong></td></tr>';
+                html += '<tr><td>Temperature</td><td><strong>' + (s.optical.temperature !== null ? s.optical.temperature + ' C' : '-') + '</strong></td></tr>';
+            } else {
+                html += '<tr><td colspan="2" class="text-muted">No optical data</td></tr>';
+            }
+            html += '</table></div></div></div>';
+            
+            // ONU Details
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-primary text-white"><i class="bi bi-info-circle me-2"></i>ONU Details</div><div class="card-body"><table class="table table-sm mb-0">';
+            if (s.details) {
+                html += '<tr><td>Run State</td><td><span class="badge bg-' + (s.details.run_state === 'online' ? 'success' : 'secondary') + '">' + (s.details.run_state || '-') + '</span></td></tr>';
+                html += '<tr><td>Control Flag</td><td>' + (s.details.control_flag || '-') + '</td></tr>';
+                html += '<tr><td>Match State</td><td>' + (s.details.match_state || '-') + '</td></tr>';
+                html += '<tr><td>Distance</td><td>' + (s.details.distance ? s.details.distance + ' m' : '-') + '</td></tr>';
+                html += '<tr><td>Memory</td><td>' + (s.details.memory_occupation || '-') + '</td></tr>';
+                html += '<tr><td>CPU</td><td>' + (s.details.cpu_occupation || '-') + '</td></tr>';
+                html += '<tr><td>Temperature</td><td>' + (s.details.temperature || '-') + '</td></tr>';
+                html += '<tr><td>Online Duration</td><td>' + (s.details.online_duration || '-') + '</td></tr>';
+                html += '<tr><td>Last Down Cause</td><td><span class="text-danger">' + (s.details.last_down_cause || '-') + '</span></td></tr>';
+                html += '<tr><td>Last Up Time</td><td>' + (s.details.last_up_time || '-') + '</td></tr>';
+                html += '<tr><td>Last Down Time</td><td>' + (s.details.last_down_time || '-') + '</td></tr>';
+                html += '<tr><td>Line Profile</td><td>' + (s.details.line_profile || '-') + '</td></tr>';
+                html += '<tr><td>Service Profile</td><td>' + (s.details.service_profile || '-') + '</td></tr>';
+                html += '<tr><td>TR-069 ACS Profile</td><td>' + (s.details.tr069_acs_profile || '-') + '</td></tr>';
+            } else {
+                html += '<tr><td colspan="2" class="text-muted">No details available</td></tr>';
+            }
+            html += '</table></div></div></div>';
+            
+            // WAN Interfaces
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-success text-white"><i class="bi bi-globe me-2"></i>WAN Interfaces</div><div class="card-body">';
+            if (s.wan && s.wan.length > 0) {
+                s.wan.forEach((w, i) => {
+                    html += '<div class="' + (i > 0 ? 'mt-3 pt-3 border-top' : '') + '"><strong>(' + w.index + ') ' + (w.name || 'WAN') + '</strong>';
+                    html += '<table class="table table-sm mb-0 mt-1">';
+                    html += '<tr><td>Service Type</td><td>' + (w.service_type || '-') + '</td></tr>';
+                    html += '<tr><td>Access Type</td><td>' + (w.ipv4_access_type || '-') + '</td></tr>';
+                    html += '<tr><td>Status</td><td><span class="badge bg-' + (w.ipv4_status === 'Connected' ? 'success' : 'secondary') + '">' + (w.ipv4_status || '-') + '</span></td></tr>';
+                    html += '<tr><td>IP Address</td><td><strong>' + (w.ipv4_address || '-') + '</strong></td></tr>';
+                    html += '<tr><td>Gateway</td><td>' + (w.default_gateway || '-') + '</td></tr>';
+                    html += '<tr><td>VLAN</td><td>' + (w.manage_vlan || '-') + '</td></tr>';
+                    html += '<tr><td>MAC</td><td><code>' + (w.mac_address || '-') + '</code></td></tr>';
+                    html += '</table></div>';
+                });
+            } else {
+                html += '<p class="text-muted mb-0">No WAN interfaces found</p>';
+            }
+            html += '</div></div></div>';
+            
+            // LAN Ports
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-secondary text-white"><i class="bi bi-ethernet me-2"></i>LAN Ports</div><div class="card-body">';
+            if (s.lan && s.lan.length > 0) {
+                html += '<table class="table table-sm mb-0"><thead><tr><th>Port</th><th>Type</th><th>Speed</th><th>Link</th></tr></thead><tbody>';
+                s.lan.forEach(p => {
+                    html += '<tr><td>' + p.port + '</td><td>' + p.type + '</td><td>' + (p.speed || '-') + '</td>';
+                    html += '<td><span class="badge bg-' + (p.link_state === 'up' ? 'success' : 'secondary') + '">' + p.link_state + '</span></td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="text-muted mb-0">No LAN port data</p>';
+            }
+            html += '</div></div></div>';
+            
+            // History
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-dark text-white"><i class="bi bi-clock-history me-2"></i>History</div><div class="card-body">';
+            if (s.history && s.history.length > 0) {
+                html += '<table class="table table-sm mb-0"><thead><tr><th>#</th><th>Up Time</th><th>Down Time</th><th>Reason</th></tr></thead><tbody>';
+                s.history.forEach(h => {
+                    html += '<tr><td>' + h.index + '</td><td>' + h.up_time + '</td>';
+                    html += '<td>' + (h.offline_time || (h.status === 'online' ? '<span class="text-success">Currently Online</span>' : '-')) + '</td>';
+                    html += '<td><span class="text-danger">' + (h.down_reason || '-') + '</span></td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="text-muted mb-0">No history data</p>';
+            }
+            html += '</div></div></div>';
+            
+            // MAC Addresses
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-warning"><i class="bi bi-card-list me-2"></i>MAC Addresses on OLT</div><div class="card-body">';
+            if (s.mac && s.mac.length > 0) {
+                html += '<table class="table table-sm mb-0"><thead><tr><th>MAC</th><th>VLAN</th><th>Type</th></tr></thead><tbody>';
+                s.mac.forEach(m => {
+                    html += '<tr><td><code>' + m.mac + '</code></td><td>' + m.vlan + '</td><td>' + m.learn_type + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="text-muted mb-0">No MAC addresses found</p>';
+            }
+            html += '</div></div></div>';
+            
+            html += '</div>';
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
+        });
     }
     
     function setCommand(cmd) {

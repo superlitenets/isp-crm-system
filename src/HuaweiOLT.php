@@ -6546,6 +6546,304 @@ class HuaweiOLT {
         return $this->executeCommand($oltId, $command);
     }
     
+    /**
+     * Get comprehensive ONU status including optical, details, WAN, LAN, history, MACs
+     */
+    public function getONUFullStatus(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'];
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        if ($onuId === null) {
+            return ['success' => false, 'error' => 'ONU not authorized on OLT'];
+        }
+        
+        $status = [
+            'onu' => $onu,
+            'optical' => null,
+            'details' => null,
+            'wan' => null,
+            'lan' => null,
+            'history' => null,
+            'mac' => null,
+            'raw' => []
+        ];
+        
+        // 1. Get optical info
+        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\nquit";
+        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+        if ($opticalResult['success']) {
+            $status['raw']['optical'] = $opticalResult['output'];
+            $status['optical'] = $this->parseOpticalStatus($opticalResult['output']);
+        }
+        
+        // 2. Get ONU details (control flag, run state, distance, CPU, memory, etc.)
+        $detailCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId}\r\nquit";
+        $detailResult = $this->executeCommand($oltId, $detailCmd);
+        if ($detailResult['success']) {
+            $status['raw']['details'] = $detailResult['output'];
+            $status['details'] = $this->parseOnuDetails($detailResult['output']);
+        }
+        
+        // 3. Get WAN info
+        $wanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont wan-info {$port} {$onuId}\r\nquit";
+        $wanResult = $this->executeCommand($oltId, $wanCmd);
+        if ($wanResult['success']) {
+            $status['raw']['wan'] = $wanResult['output'];
+            $status['wan'] = $this->parseWanInfo($wanResult['output']);
+        }
+        
+        // 4. Get LAN port status
+        $lanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont port state {$port} {$onuId} eth-port all\r\nquit";
+        $lanResult = $this->executeCommand($oltId, $lanCmd);
+        if ($lanResult['success']) {
+            $status['raw']['lan'] = $lanResult['output'];
+            $status['lan'] = $this->parseLanPorts($lanResult['output']);
+        }
+        
+        // 5. Get history (up/down times)
+        $historyCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId} history\r\nquit";
+        $historyResult = $this->executeCommand($oltId, $historyCmd);
+        if ($historyResult['success']) {
+            $status['raw']['history'] = $historyResult['output'];
+            $status['history'] = $this->parseOnuHistory($historyResult['output']);
+        }
+        
+        // 6. Get MAC addresses
+        $macCmd = "display mac-address port {$frame}/{$slot}/{$port} ont {$onuId}";
+        $macResult = $this->executeCommand($oltId, $macCmd);
+        if ($macResult['success']) {
+            $status['raw']['mac'] = $macResult['output'];
+            $status['mac'] = $this->parseMacAddresses($macResult['output']);
+        }
+        
+        return ['success' => true, 'status' => $status];
+    }
+    
+    private function parseOpticalStatus(string $output): array {
+        $optical = [
+            'module_type' => null,
+            'rx_power' => null,
+            'tx_power' => null,
+            'temperature' => null,
+            'olt_rx_power' => null,
+            'catv_rx_power' => null
+        ];
+        
+        if (preg_match('/Module type\s*:\s*(.+)/i', $output, $m)) {
+            $optical['module_type'] = trim($m[1]);
+        }
+        if (preg_match('/Rx optical power\(dBm\)\s*:\s*([\d\.\-]+)/i', $output, $m)) {
+            $optical['rx_power'] = (float)$m[1];
+        }
+        if (preg_match('/Tx optical power\(dBm\)\s*:\s*([\d\.\-]+)/i', $output, $m)) {
+            $optical['tx_power'] = (float)$m[1];
+        }
+        if (preg_match('/Temperature\(C\)\s*:\s*([\d\.\-]+)/i', $output, $m)) {
+            $optical['temperature'] = (float)$m[1];
+        }
+        if (preg_match('/OLT Rx ONT optical power\(dBm\)\s*:\s*([\d\.\-]+)/i', $output, $m)) {
+            $optical['olt_rx_power'] = (float)$m[1];
+        }
+        if (preg_match('/CATV Rx optical power\(dBm\)\s*:\s*([\d\.\-]+)/i', $output, $m)) {
+            $optical['catv_rx_power'] = (float)$m[1];
+        }
+        
+        return $optical;
+    }
+    
+    private function parseOnuDetails(string $output): array {
+        $details = [
+            'control_flag' => null,
+            'run_state' => null,
+            'match_state' => null,
+            'distance' => null,
+            'memory_occupation' => null,
+            'cpu_occupation' => null,
+            'temperature' => null,
+            'sn' => null,
+            'management_mode' => null,
+            'description' => null,
+            'last_down_cause' => null,
+            'last_up_time' => null,
+            'last_down_time' => null,
+            'last_dying_gasp_time' => null,
+            'online_duration' => null,
+            'line_profile' => null,
+            'service_profile' => null,
+            'fec_upstream' => null,
+            'tr069_acs_profile' => null
+        ];
+        
+        $patterns = [
+            'control_flag' => '/Control flag\s*:\s*(.+)/i',
+            'run_state' => '/Run state\s*:\s*(.+)/i',
+            'match_state' => '/Match state\s*:\s*(.+)/i',
+            'distance' => '/ONT distance\(m\)\s*:\s*(\d+)/i',
+            'memory_occupation' => '/Memory occupation\s*:\s*(.+)/i',
+            'cpu_occupation' => '/CPU occupation\s*:\s*(.+)/i',
+            'temperature' => '/Temperature\s*:\s*(.+)/i',
+            'sn' => '/SN\s*:\s*(\S+)/i',
+            'management_mode' => '/Management mode\s*:\s*(.+)/i',
+            'description' => '/Description\s*:\s*(.+)/i',
+            'last_down_cause' => '/Last down cause\s*:\s*(.+)/i',
+            'last_up_time' => '/Last up time\s*:\s*(.+)/i',
+            'last_down_time' => '/Last down time\s*:\s*(.+)/i',
+            'last_dying_gasp_time' => '/Last dying gasp time\s*:\s*(.+)/i',
+            'online_duration' => '/ONT online duration\s*:\s*(.+)/i',
+            'line_profile' => '/Line profile name\s*:\s*(.+)/i',
+            'service_profile' => '/Service profile name\s*:\s*(.+)/i',
+            'fec_upstream' => '/FEC upstream\s*:\s*(.+)/i',
+            'tr069_acs_profile' => '/TR069 ACS profile\s*:\s*(.+)/i'
+        ];
+        
+        foreach ($patterns as $key => $pattern) {
+            if (preg_match($pattern, $output, $m)) {
+                $details[$key] = trim($m[1]);
+            }
+        }
+        
+        return $details;
+    }
+    
+    private function parseWanInfo(string $output): array {
+        $interfaces = [];
+        $current = null;
+        
+        $lines = explode("\n", $output);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // New interface starts with (N)
+            if (preg_match('/^\((\d+)\)/', $line, $m)) {
+                if ($current) {
+                    $interfaces[] = $current;
+                }
+                $current = ['index' => (int)$m[1]];
+                continue;
+            }
+            
+            if (!$current) continue;
+            
+            $patterns = [
+                'name' => '/^Name\s*:\s*(.+)/i',
+                'service_type' => '/^Service type\s*:\s*(.+)/i',
+                'connection_type' => '/^Connection type\s*:\s*(.+)/i',
+                'ipv4_status' => '/^IPv4 Connection status\s*:\s*(.+)/i',
+                'ipv4_access_type' => '/^IPv4 access type\s*:\s*(.+)/i',
+                'ipv4_address' => '/^IPv4 address\s*:\s*(.+)/i',
+                'subnet_mask' => '/^Subnet mask\s*:\s*(.+)/i',
+                'default_gateway' => '/^Default gateway\s*:\s*(.+)/i',
+                'manage_vlan' => '/^Manage VLAN\s*:\s*(.+)/i',
+                'manage_priority' => '/^Manage priority\s*:\s*(.+)/i',
+                'mac_address' => '/^MAC address\s*:\s*(.+)/i'
+            ];
+            
+            foreach ($patterns as $key => $pattern) {
+                if (preg_match($pattern, $line, $m)) {
+                    $current[$key] = trim($m[1]);
+                }
+            }
+        }
+        
+        if ($current) {
+            $interfaces[] = $current;
+        }
+        
+        return $interfaces;
+    }
+    
+    private function parseLanPorts(string $output): array {
+        $ports = [];
+        $lines = explode("\n", $output);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Match: 1  FE -  - down noloop
+            if (preg_match('/^\s*(\d+)\s+(FE|GE)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/i', $line, $m)) {
+                $ports[] = [
+                    'port' => (int)$m[1],
+                    'type' => $m[2],
+                    'speed' => $m[3] === '-' ? null : $m[3],
+                    'duplex' => $m[4] === '-' ? null : $m[4],
+                    'link_state' => $m[5],
+                    'ring_status' => $m[6]
+                ];
+            }
+        }
+        
+        return $ports;
+    }
+    
+    private function parseOnuHistory(string $output): array {
+        $history = [];
+        $lines = explode("\n", $output);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Match: 05  2025-12-29 08:30:29+03:00   ONU is currently online
+            // or: 04  2025-12-28 08:26:56+03:00   2025-12-28 22:33:01+03:00     ONT dying-gasp
+            if (preg_match('/^(\d+)\s+(\d{4}-\d{2}-\d{2}\s+[\d:+]+)\s+(.+)$/i', $line, $m)) {
+                $entry = [
+                    'index' => (int)$m[1],
+                    'up_time' => trim($m[2]),
+                    'offline_time' => null,
+                    'down_reason' => null
+                ];
+                
+                $rest = trim($m[3]);
+                if (stripos($rest, 'currently online') !== false) {
+                    $entry['status'] = 'online';
+                } else {
+                    // Try to parse offline time and reason
+                    if (preg_match('/^(\d{4}-\d{2}-\d{2}\s+[\d:+]+)\s+(.+)$/i', $rest, $m2)) {
+                        $entry['offline_time'] = trim($m2[1]);
+                        $entry['down_reason'] = trim($m2[2]);
+                    } else {
+                        $entry['down_reason'] = $rest;
+                    }
+                }
+                
+                $history[] = $entry;
+            }
+        }
+        
+        return $history;
+    }
+    
+    private function parseMacAddresses(string $output): array {
+        $macs = [];
+        $lines = explode("\n", $output);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Match: 400  gpon d4:b1:08:8b:77:45 dynamic  0 /3 /10  14   1   902
+            if (preg_match('/^(\d+)\s+(\S+)\s+([0-9a-f:]+)\s+(\S+)\s+(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i', $line, $m)) {
+                $macs[] = [
+                    'service_port' => (int)$m[1],
+                    'type' => $m[2],
+                    'mac' => $m[3],
+                    'learn_type' => $m[4],
+                    'frame' => (int)$m[5],
+                    'slot' => (int)$m[6],
+                    'port' => (int)$m[7],
+                    'vpi' => (int)$m[8],
+                    'vci' => (int)$m[9],
+                    'vlan' => (int)$m[10]
+                ];
+            }
+        }
+        
+        return $macs;
+    }
+    
     // ==================== Cached Data Management ====================
     
     public function getCachedBoards(int $oltId): array {
