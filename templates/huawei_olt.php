@@ -10006,7 +10006,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                     <span class="badge bg-success" title="VoIP/Management"><i class="bi bi-telephone"></i></span>
                                                 <?php endif; ?>
                                                 <?php if (!empty($vlan['is_tr069'])): ?>
-                                                    <span class="badge bg-purple" title="TR-069 Management" style="background-color:#6f42c1"><i class="bi bi-gear-wide-connected"></i></span>
+                                                    <span class="badge bg-purple" title="TR-069 Management VLAN" style="background-color:#6f42c1"><i class="bi bi-gear-wide-connected"></i> TR-069</span>
                                                 <?php endif; ?>
                                                 <?php if (!empty($vlan['dhcp_snooping'])): ?>
                                                     <span class="badge bg-warning text-dark" title="DHCP Snooping"><i class="bi bi-shield-check"></i></span>
