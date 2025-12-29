@@ -6094,7 +6094,6 @@ try {
                 </div>
             </div>
             
-            
             <!-- OMCI LAN Port Configuration -->
             <?php 
             $onuTypeInfo = $huaweiOLT->getOnuTypeInfo($currentOnu['id']);
