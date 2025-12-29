@@ -509,6 +509,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'set_pon_default_vlan') {
     exit;
 }
 
+// AJAX endpoint for updating PON port description
+if (isset($_GET['action']) && $_GET['action'] === 'update_port_description') {
+    header('Content-Type: application/json');
+    $oltId = (int)($_POST['olt_id'] ?? 0);
+    $portName = trim($_POST['port_name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    
+    if (!$oltId || !$portName) {
+        echo json_encode(['success' => false, 'error' => 'OLT ID and port name required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("UPDATE huawei_olt_pon_ports SET description = ? WHERE olt_id = ? AND port_name = ?");
+        $stmt->execute([$description ?: null, $oltId, $portName]);
+        
+        echo json_encode(['success' => true, 'updated' => $stmt->rowCount()]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint to add service VLAN to ONU
 if (isset($_GET['action']) && $_GET['action'] === 'add_onu_service_vlan') {
     header('Content-Type: application/json');
@@ -10185,77 +10208,119 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 </button>
                             </form>
                         </div>
-                        <div class="card-body">
-                            <?php if (!empty($cachedPorts)): ?>
-                            <div class="row g-3">
-                                <?php foreach ($cachedPorts as $port): ?>
-                                <?php 
-                                $status = strtolower($port['oper_status'] ?? '');
-                                $isUp = in_array($status, ['up', 'online', 'normal', 'enable']);
-                                $adminEnabled = strtolower($port['admin_status'] ?? '') === 'enable';
-                                ?>
-                                <div class="col-md-4">
-                                    <div class="card h-100 <?= $isUp ? 'border-success' : 'border-secondary' ?>">
-                                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-2">
-                                            <strong><?= htmlspecialchars($port['port_name']) ?></strong>
-                                            <span class="badge bg-<?= $isUp ? 'success' : 'secondary' ?>">
-                                                <?= htmlspecialchars(ucfirst($port['oper_status'] ?? '-')) ?>
-                                            </span>
-                                        </div>
-                                        <div class="card-body text-center py-3">
-                                            <i class="bi bi-ethernet fs-2 <?= $isUp ? 'text-success' : 'text-secondary' ?>"></i>
-                                            <div class="small text-muted mt-1"><?= htmlspecialchars($port['port_type'] ?? 'GPON') ?></div>
-                                            <div class="mt-2 small">
-                                                <i class="bi bi-diagram-3 me-1"></i> <?= $port['onu_count'] ?? 0 ?> ONUs
+                        <div class="card-body p-0">
+                            <?php if (!empty($cachedPorts)): 
+                                // Group ports by slot
+                                $portsBySlot = [];
+                                foreach ($cachedPorts as $port) {
+                                    $portName = $port['port_name'];
+                                    if (preg_match('/(\d+)\/(\d+)\/(\d+)/', $portName, $m)) {
+                                        $slot = (int)$m[2];
+                                        $portsBySlot[$slot][] = $port;
+                                    } else {
+                                        $portsBySlot[0][] = $port;
+                                    }
+                                }
+                                ksort($portsBySlot);
+                            ?>
+                            <div class="accordion" id="ponSlotsAccordion">
+                                <?php foreach ($portsBySlot as $slotNum => $slotPorts): ?>
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button <?= $slotNum > 1 ? 'collapsed' : '' ?>" type="button" data-bs-toggle="collapse" data-bs-target="#slot<?= $slotNum ?>">
+                                            <i class="bi bi-cpu me-2"></i> Slot <?= $slotNum ?> 
+                                            <span class="badge bg-secondary ms-2"><?= count($slotPorts) ?> ports</span>
+                                        </button>
+                                    </h2>
+                                    <div id="slot<?= $slotNum ?>" class="accordion-collapse collapse <?= $slotNum <= 1 ? 'show' : '' ?>" data-bs-parent="#ponSlotsAccordion">
+                                        <div class="accordion-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th style="width: 80px;">Port</th>
+                                                            <th style="width: 70px;">Status</th>
+                                                            <th style="width: 60px;">ONUs</th>
+                                                            <th style="width: 100px;">Default VLAN</th>
+                                                            <th>Description</th>
+                                                            <th style="width: 140px;" class="text-end">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($slotPorts as $port): 
+                                                            $status = strtolower($port['oper_status'] ?? '');
+                                                            $isUp = in_array($status, ['up', 'online', 'normal', 'enable']);
+                                                            $adminEnabled = strtolower($port['admin_status'] ?? '') === 'enable';
+                                                            $portId = str_replace('/', '_', $port['port_name']);
+                                                        ?>
+                                                        <tr>
+                                                            <td>
+                                                                <strong><?= htmlspecialchars($port['port_name']) ?></strong>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-<?= $isUp ? 'success' : 'secondary' ?>">
+                                                                    <?= $isUp ? 'Up' : 'Down' ?>
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="text-decoration-none">
+                                                                    <?= $port['onu_count'] ?? 0 ?>
+                                                                </a>
+                                                            </td>
+                                                            <td>
+                                                                <?php if (!empty($port['default_vlan'])): ?>
+                                                                <span class="badge bg-primary"><?= $port['default_vlan'] ?></span>
+                                                                <?php else: ?>
+                                                                <span class="text-muted">-</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td>
+                                                                <input type="text" class="form-control form-control-sm border-0 bg-transparent px-0" 
+                                                                       value="<?= htmlspecialchars($port['description'] ?? '') ?>"
+                                                                       placeholder="Add description..."
+                                                                       onchange="updatePortDescription(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', this.value)"
+                                                                       style="min-width: 150px;">
+                                                            </td>
+                                                            <td class="text-end">
+                                                                <div class="btn-group btn-group-sm">
+                                                                    <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" 
+                                                                       class="btn btn-outline-primary" title="View ONUs">
+                                                                        <i class="bi bi-eye"></i>
+                                                                    </a>
+                                                                    <button type="button" class="btn btn-outline-<?= !empty($port['default_vlan']) ? 'primary' : 'secondary' ?>" 
+                                                                            data-bs-toggle="modal" data-bs-target="#portSettingsModal<?= $portId ?>" 
+                                                                            title="Port Settings">
+                                                                        <i class="bi bi-gear"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                            <?php if (!empty($port['native_vlan'])): ?>
-                                            <div class="small text-muted">VLAN: <?= $port['native_vlan'] ?></div>
-                                            <?php endif; ?>
-                                            <?php if (!empty($port['default_vlan'])): ?>
-                                            <div class="small text-primary mt-1">
-                                                <i class="bi bi-check2-circle me-1"></i>Default: VLAN <?= $port['default_vlan'] ?>
-                                            </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="card-footer bg-transparent d-flex gap-1 flex-wrap justify-content-center py-2">
-                                            <a href="?page=huawei-olt&view=onus&olt_id=<?= $oltId ?>&port=<?= urlencode($port['port_name']) ?>" class="btn btn-sm btn-outline-primary" title="View ONUs">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="toggle_port">
-                                                <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                                                <input type="hidden" name="port_name" value="<?= htmlspecialchars($port['port_name']) ?>">
-                                                <input type="hidden" name="enable" value="<?= $adminEnabled ? '0' : '1' ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-<?= $adminEnabled ? 'warning' : 'success' ?>" 
-                                                        title="<?= $adminEnabled ? 'Disable' : 'Enable' ?> Port" 
-                                                        onclick="return confirm('<?= $adminEnabled ? 'Disable' : 'Enable' ?> port <?= $port['port_name'] ?>?')">
-                                                    <i class="bi bi-<?= $adminEnabled ? 'pause' : 'play' ?>-fill"></i>
-                                                </button>
-                                            </form>
-                                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#vlanModal<?= str_replace('/', '_', $port['port_name']) ?>" title="Assign VLAN">
-                                                <i class="bi bi-diagram-2"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-outline-<?= !empty($port['default_vlan']) ? 'primary' : 'secondary' ?>" 
-                                                    data-bs-toggle="modal" data-bs-target="#defaultVlanModal<?= str_replace('/', '_', $port['port_name']) ?>" 
-                                                    title="Set Default VLAN for Authorization">
-                                                <i class="bi bi-star<?= !empty($port['default_vlan']) ? '-fill' : '' ?>"></i>
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div class="modal fade" id="defaultVlanModal<?= str_replace('/', '_', $port['port_name']) ?>" tabindex="-1">
-                                    <div class="modal-dialog modal-sm">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h6 class="modal-title"><i class="bi bi-star me-1"></i> Default VLAN for <?= htmlspecialchars($port['port_name']) ?></h6>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <p class="small text-muted mb-3">This VLAN will be pre-selected when authorizing ONUs on this PON port.</p>
-                                                <div class="mb-3">
-                                                    <label class="form-label">Default VLAN</label>
-                                                    <select class="form-select" id="defaultVlan<?= str_replace('/', '_', $port['port_name']) ?>">
+                                <?php endforeach; ?>
+                            </div>
+                            
+                            <?php foreach ($cachedPorts as $port): 
+                                $portId = str_replace('/', '_', $port['port_name']);
+                                $adminEnabled = strtolower($port['admin_status'] ?? '') === 'enable';
+                            ?>
+                            <div class="modal fade" id="portSettingsModal<?= $portId ?>" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h6 class="modal-title"><i class="bi bi-gear me-2"></i>Port Settings: <?= htmlspecialchars($port['port_name']) ?></h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Default VLAN for Authorization</label>
+                                                    <select class="form-select" id="defaultVlan<?= $portId ?>">
                                                         <option value="">-- None --</option>
                                                         <?php foreach ($cachedVLANs as $vlan): ?>
                                                         <option value="<?= $vlan['vlan_id'] ?>" <?= ($port['default_vlan'] ?? '') == $vlan['vlan_id'] ? 'selected' : '' ?>>
@@ -10263,59 +10328,66 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
+                                                    <small class="text-muted">Pre-selected when authorizing ONUs on this port</small>
                                                 </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="button" class="btn btn-primary" 
-                                                        onclick="setDefaultVlan(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', document.getElementById('defaultVlan<?= str_replace('/', '_', $port['port_name']) ?>').value)">
-                                                    <i class="bi bi-check me-1"></i> Save
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="modal fade" id="vlanModal<?= str_replace('/', '_', $port['port_name']) ?>" tabindex="-1">
-                                    <div class="modal-dialog modal-sm">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h6 class="modal-title">Assign VLAN to <?= htmlspecialchars($port['port_name']) ?></h6>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <form method="post">
-                                                <div class="modal-body">
-                                                    <input type="hidden" name="action" value="assign_port_vlan">
-                                                    <input type="hidden" name="olt_id" value="<?= $oltId ?>">
-                                                    <input type="hidden" name="port_name" value="<?= htmlspecialchars($port['port_name']) ?>">
-                                                    <div class="mb-3">
-                                                        <label class="form-label">VLAN ID</label>
-                                                        <select name="vlan_id" class="form-select" required>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Port Status</label>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="badge bg-<?= $adminEnabled ? 'success' : 'secondary' ?>">
+                                                            <?= $adminEnabled ? 'Enabled' : 'Disabled' ?>
+                                                        </span>
+                                                        <form method="post" class="d-inline">
+                                                            <input type="hidden" name="action" value="toggle_port">
+                                                            <input type="hidden" name="olt_id" value="<?= $oltId ?>">
+                                                            <input type="hidden" name="port_name" value="<?= htmlspecialchars($port['port_name']) ?>">
+                                                            <input type="hidden" name="enable" value="<?= $adminEnabled ? '0' : '1' ?>">
+                                                            <button type="submit" class="btn btn-sm btn-outline-<?= $adminEnabled ? 'warning' : 'success' ?>" 
+                                                                    onclick="return confirm('<?= $adminEnabled ? 'Disable' : 'Enable' ?> port <?= $port['port_name'] ?>?')">
+                                                                <?= $adminEnabled ? 'Disable' : 'Enable' ?>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Description</label>
+                                                    <input type="text" class="form-control" id="portDesc<?= $portId ?>" 
+                                                           value="<?= htmlspecialchars($port['description'] ?? '') ?>" 
+                                                           placeholder="e.g., Building A - Floor 1">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Assign VLAN to Port</label>
+                                                    <div class="input-group">
+                                                        <select class="form-select" id="assignVlan<?= $portId ?>">
                                                             <?php foreach ($cachedVLANs as $vlan): ?>
-                                                            <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: $vlan['vlan_type'] ?? 'smart') ?></option>
+                                                            <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'smart') ?></option>
                                                             <?php endforeach; ?>
                                                         </select>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label">Mode</label>
-                                                        <select name="vlan_mode" class="form-select">
+                                                        <select class="form-select" id="assignVlanMode<?= $portId ?>" style="max-width: 100px;">
                                                             <option value="tag">Tagged</option>
-                                                            <option value="untag">Untagged</option>
+                                                            <option value="untag">Untag</option>
                                                         </select>
+                                                        <button type="button" class="btn btn-outline-primary" 
+                                                                onclick="assignPortVlan(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', '<?= $portId ?>')">
+                                                            Assign
+                                                        </button>
                                                     </div>
                                                 </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-primary">Assign</button>
-                                                </div>
-                                            </form>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            <button type="button" class="btn btn-primary" 
+                                                    onclick="savePortSettings(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', '<?= $portId ?>')">
+                                                <i class="bi bi-check me-1"></i> Save Changes
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <?php endforeach; ?>
                             </div>
+                            <?php endforeach; ?>
+                            
                             <?php else: ?>
-                            <div class="alert alert-info mb-0">
+                            <div class="alert alert-info m-3">
                                 <i class="bi bi-info-circle me-2"></i>No cached data. Click "Sync from OLT" to fetch PON port information.
                             </div>
                             <?php endif; ?>
@@ -12352,6 +12424,52 @@ echo "# ================================================\n";
             }
         })
         .catch(e => alert('Error: ' + e.message));
+    }
+    
+    function updatePortDescription(oltId, portName, description) {
+        fetch('?page=huawei-olt&action=update_port_description', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&description=' + encodeURIComponent(description)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                alert('Failed to update description: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(e => console.error('Error updating description:', e.message));
+    }
+    
+    function savePortSettings(oltId, portName, portId) {
+        var defaultVlan = document.getElementById('defaultVlan' + portId).value;
+        var description = document.getElementById('portDesc' + portId).value;
+        
+        Promise.all([
+            fetch('?page=huawei-olt&action=set_pon_default_vlan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&vlan_id=' + (defaultVlan || '')
+            }),
+            fetch('?page=huawei-olt&action=update_port_description', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&description=' + encodeURIComponent(description)
+            })
+        ])
+        .then(() => location.reload())
+        .catch(e => alert('Error saving settings: ' + e.message));
+    }
+    
+    function assignPortVlan(oltId, portName, portId) {
+        var vlanId = document.getElementById('assignVlan' + portId).value;
+        var mode = document.getElementById('assignVlanMode' + portId).value;
+        
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = '<input name="action" value="assign_port_vlan"><input name="olt_id" value="' + oltId + '"><input name="port_name" value="' + portName + '"><input name="vlan_id" value="' + vlanId + '"><input name="vlan_mode" value="' + mode + '">';
+        document.body.appendChild(form);
+        form.submit();
     }
     
     function rebootOnu(id) {
