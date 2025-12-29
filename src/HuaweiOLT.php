@@ -4148,13 +4148,27 @@ class HuaweiOLT {
     // ==================== Provisioning Logs ====================
     
     public function addLog(array $data): int {
+        // Validate onu_id exists before inserting (to avoid FK violation)
+        $onuId = $data['onu_id'] ?? null;
+        if ($onuId !== null) {
+            try {
+                $checkStmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE id = ?");
+                $checkStmt->execute([$onuId]);
+                if (!$checkStmt->fetch()) {
+                    $onuId = null; // ONU doesn't exist, set to null
+                }
+            } catch (\Exception $e) {
+                $onuId = null;
+            }
+        }
+        
         $stmt = $this->db->prepare("
             INSERT INTO huawei_provisioning_logs (olt_id, onu_id, action, status, message, details, command_sent, command_response, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['olt_id'] ?? null,
-            $data['onu_id'] ?? null,
+            $onuId,
             $data['action'],
             $data['status'] ?? 'pending',
             $data['message'] ?? '',
