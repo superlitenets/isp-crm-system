@@ -5027,9 +5027,17 @@ try {
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-activity me-2"></i>Live Status & Signal</span>
-                            <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
-                                <i class="bi bi-broadcast me-1"></i> Read ONU Details
-                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-light" id="btnFetchLive" onclick="fetchLiveOnuData()">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Refresh
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning" onclick="getOnuFullStatus(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-clipboard-data me-1"></i> Full Status
+                                </button>
+                                <button type="button" class="btn btn-sm btn-dark" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-code-slash me-1"></i> Running Config
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div id="liveDataLoading" class="text-center py-3 d-none">
