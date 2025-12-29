@@ -2276,6 +2276,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $result = $huaweiOLT->getONUFullStatus((int)$_POST['onu_id']);
                 echo json_encode($result);
                 exit;
+            case 'get_onu_config':
+                header('Content-Type: application/json');
+                $result = $huaweiOLT->getONUConfig((int)$_POST['onu_id']);
+                echo json_encode($result);
+                exit;
             case 'refresh_tr069_ip':
                 $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
                 if ($result['success']) {
@@ -4952,6 +4957,9 @@ try {
                                 </button>
                                 <button type="button" class="btn btn-sm btn-warning" onclick="getOnuFullStatus(<?= $currentOnu['id'] ?>)">
                                     <i class="bi bi-clipboard-data me-1"></i> Get Status
+                                </button>
+                                <button type="button" class="btn btn-sm btn-dark" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-code-slash me-1"></i> Show Config
                                 </button>
                             </div>
                         </div>
@@ -11890,6 +11898,29 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
     
+    <div class="modal fade" id="onuConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-code-slash me-2"></i>ONU Configuration</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="onuConfigBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Fetching configuration from OLT...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-primary" onclick="copyOnuConfig()">
+                        <i class="bi bi-clipboard me-1"></i> Copy to Clipboard
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="modal fade" id="configScriptModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -12813,6 +12844,91 @@ echo "# ================================================\n";
         .catch(err => {
             body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
         });
+    }
+    
+    function getOnuConfig(onuId) {
+        const modal = new bootstrap.Modal(document.getElementById('onuConfigModal'));
+        const body = document.getElementById('onuConfigBody');
+        
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-3">Fetching configuration from OLT...</p></div>';
+        modal.show();
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=get_onu_config&onu_id=' + onuId
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch config') + '</div>';
+                return;
+            }
+            
+            const c = data.config;
+            let html = '';
+            
+            // ONU Info header
+            html += '<div class="alert alert-info small mb-3">';
+            html += '<strong>ONU:</strong> ' + (c.onu.sn || '-') + ' | ';
+            html += '<strong>Location:</strong> ' + c.onu.frame + '/' + c.onu.slot + '/' + c.onu.port + ' ONU ' + c.onu.onu_id + ' | ';
+            html += '<strong>Name:</strong> ' + (c.onu.name || '-');
+            html += '</div>';
+            
+            // Config script
+            html += '<div class="mb-3">';
+            html += '<label class="form-label fw-bold">OLT Configuration Commands:</label>';
+            html += '<pre id="onuConfigText" class="bg-dark text-light p-3 rounded" style="white-space: pre-wrap; font-size: 0.85rem;">' + escapeHtml(c.script || '# No configuration found') + '</pre>';
+            html += '</div>';
+            
+            // Raw output sections
+            if (c.raw && c.raw.ont_config) {
+                html += '<div class="accordion" id="rawConfigAccordion">';
+                html += '<div class="accordion-item">';
+                html += '<h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rawOntConfig">Raw ONT Configuration Output</button></h2>';
+                html += '<div id="rawOntConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
+                html += '<div class="accordion-body"><pre class="bg-secondary text-light p-2 rounded small" style="white-space: pre-wrap; max-height: 300px; overflow: auto;">' + escapeHtml(c.raw.ont_config) + '</pre></div>';
+                html += '</div></div>';
+                
+                if (c.raw.service_ports) {
+                    html += '<div class="accordion-item">';
+                    html += '<h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rawSpConfig">Raw Service-Port Output</button></h2>';
+                    html += '<div id="rawSpConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
+                    html += '<div class="accordion-body"><pre class="bg-secondary text-light p-2 rounded small" style="white-space: pre-wrap; max-height: 300px; overflow: auto;">' + escapeHtml(c.raw.service_ports) + '</pre></div>';
+                    html += '</div></div>';
+                }
+                html += '</div>';
+            }
+            
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
+        });
+    }
+    
+    function copyOnuConfig() {
+        const configText = document.getElementById('onuConfigText');
+        if (configText) {
+            navigator.clipboard.writeText(configText.textContent).then(() => {
+                alert('Configuration copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const range = document.createRange();
+                range.selectNode(configText);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                document.execCommand('copy');
+                window.getSelection().removeAllRanges();
+                alert('Configuration copied to clipboard!');
+            });
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     function setCommand(cmd) {

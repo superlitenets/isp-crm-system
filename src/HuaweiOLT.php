@@ -6547,6 +6547,173 @@ class HuaweiOLT {
     }
     
     /**
+     * Get ONU configuration commands as they would appear on the OLT
+     */
+    public function getONUConfig(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'];
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        if ($onuId === null) {
+            return ['success' => false, 'error' => 'ONU not authorized on OLT'];
+        }
+        
+        $config = [
+            'onu' => $onu,
+            'ont_config' => null,
+            'service_ports' => null,
+            'raw' => []
+        ];
+        
+        // 1. Get ONT configuration (ont add, ipconfig, tr069-server-config)
+        $ontCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port}/{$onuId}\r\nquit";
+        $ontResult = $this->executeCommand($oltId, $ontCmd);
+        if ($ontResult['success']) {
+            $config['raw']['ont_config'] = $ontResult['output'];
+            $config['ont_config'] = $this->parseOntConfig($ontResult['output'], $frame, $slot, $port, $onuId);
+        }
+        
+        // 2. Get service-port configuration
+        $spCmd = "display service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
+        $spResult = $this->executeCommand($oltId, $spCmd);
+        if ($spResult['success']) {
+            $config['raw']['service_ports'] = $spResult['output'];
+            $config['service_ports'] = $this->parseServicePortConfig($spResult['output'], $frame, $slot, $port, $onuId);
+        }
+        
+        // Build the full config script
+        $script = $this->buildONUConfigScript($config, $frame, $slot, $port, $onuId);
+        $config['script'] = $script;
+        
+        return ['success' => true, 'config' => $config];
+    }
+    
+    private function parseOntConfig(string $output, int $frame, int $slot, int $port, int $onuId): array {
+        $config = [
+            'ont_add' => null,
+            'ont_ipconfig' => null,
+            'ont_tr069' => null,
+            'ont_port_native_vlan' => [],
+            'other' => []
+        ];
+        
+        $lines = explode("\n", $output);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // ont add command
+            if (preg_match('/ont add\s+(\d+)\s+(\d+)\s+(.+)/i', $line, $m)) {
+                $config['ont_add'] = $line;
+            }
+            // ont ipconfig
+            elseif (preg_match('/ont ipconfig\s+(\d+)\s+(\d+)\s+(.+)/i', $line, $m)) {
+                $config['ont_ipconfig'] = $line;
+            }
+            // ont tr069-server-config
+            elseif (preg_match('/ont tr069-server-config\s+(\d+)\s+(\d+)\s+(.+)/i', $line, $m)) {
+                $config['ont_tr069'] = $line;
+            }
+            // ont port native-vlan
+            elseif (preg_match('/ont port native-vlan\s+(.+)/i', $line, $m)) {
+                $config['ont_port_native_vlan'][] = $line;
+            }
+            // other ont commands
+            elseif (preg_match('/^ont\s+/i', $line)) {
+                $config['other'][] = $line;
+            }
+        }
+        
+        return $config;
+    }
+    
+    private function parseServicePortConfig(string $output, int $frame, int $slot, int $port, int $onuId): array {
+        $servicePorts = [];
+        $lines = explode("\n", $output);
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            // Match service-port table entries
+            // Format: Index VlanID Vlan Attr Port Type Rx/Tx F/S/P VPI VCI ONUId Flow Type Rx/Tx State
+            if (preg_match('/^\s*(\d+)\s+(\d+)\s+(\S+)\s+gpon\s+(\d+\/\d+\/\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i', $line, $m)) {
+                $servicePorts[] = [
+                    'index' => (int)$m[1],
+                    'vlan' => (int)$m[2],
+                    'vlan_attr' => $m[3],
+                    'port' => $m[4],
+                    'gemport' => (int)$m[5],
+                    'vpi' => (int)$m[6],
+                    'vci' => (int)$m[7],
+                    'flow_type' => (int)$m[8]
+                ];
+            }
+        }
+        
+        return $servicePorts;
+    }
+    
+    private function buildONUConfigScript(array $config, int $frame, int $slot, int $port, int $onuId): string {
+        $lines = [];
+        $lines[] = "interface gpon {$frame}/{$slot}";
+        
+        $ontConfig = $config['ont_config'];
+        if ($ontConfig) {
+            if ($ontConfig['ont_add']) {
+                $lines[] = " " . $ontConfig['ont_add'];
+            }
+            if ($ontConfig['ont_ipconfig']) {
+                $lines[] = " " . $ontConfig['ont_ipconfig'];
+            }
+            if ($ontConfig['ont_tr069']) {
+                $lines[] = " " . $ontConfig['ont_tr069'];
+            }
+            foreach ($ontConfig['ont_port_native_vlan'] as $nv) {
+                $lines[] = " " . $nv;
+            }
+            foreach ($ontConfig['other'] as $other) {
+                $lines[] = " " . $other;
+            }
+        }
+        
+        $lines[] = "quit";
+        
+        // Add service-port commands from raw output if available
+        if (!empty($config['raw']['service_ports'])) {
+            // Extract service-port commands from display output - we need to reconstruct them
+            $rawSp = $config['raw']['service_ports'];
+            $spLines = explode("\n", $rawSp);
+            foreach ($spLines as $spLine) {
+                $spLine = trim($spLine);
+                // Look for the table rows with service port data
+                if (preg_match('/^\s*(\d+)\s+(\d+)\s+\S+\s+gpon/i', $spLine, $m)) {
+                    // We found a service port entry, but we need the full command
+                    // The display command shows table format, not command format
+                    // We'll note we found service ports
+                }
+            }
+        }
+        
+        // Also try to get service-port configs via display command that shows actual commands
+        $script = implode("\n", $lines);
+        
+        // Add note about service ports
+        if (!empty($config['service_ports'])) {
+            $script .= "\n\n# Service Ports (from display output):";
+            foreach ($config['service_ports'] as $sp) {
+                $script .= "\n# service-port {$sp['index']} vlan {$sp['vlan']} gpon {$sp['port']} ont {$onuId} gemport {$sp['gemport']}";
+            }
+        }
+        
+        return $script;
+    }
+    
+    /**
      * Get comprehensive ONU status including optical, details, WAN, LAN, history, MACs
      */
     public function getONUFullStatus(int $onuDbId): array {
