@@ -851,6 +851,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
                 break;
             case 'authorize_onu':
+                // Initialize message variables
+                $message = '';
+                $messageType = 'danger';
+                
                 $onuId = (int)$_POST['onu_id'];
                 $zoneId = !empty($_POST['zone_id']) ? (int)$_POST['zone_id'] : null;
                 $zone = $_POST['zone'] ?? '';
