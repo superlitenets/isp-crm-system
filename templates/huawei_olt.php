@@ -1060,14 +1060,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $assignedOnuId = $result['onu_id'] ?? '';
                         $tr069Status = $result['tr069_status'] ?? ['attempted' => false];
                         
+                        // Fetch optical power and distance immediately after authorization
+                        $opticalInfo = '';
+                        try {
+                            $opticalResult = $huaweiOLT->refreshONUOptical($onuId);
+                            if ($opticalResult['success']) {
+                                $rxPower = $opticalResult['rx_power'] ?? 'N/A';
+                                $txPower = $opticalResult['tx_power'] ?? 'N/A';
+                                $distance = $opticalResult['distance'] ?? 'N/A';
+                                $opticalInfo = " | RX: {$rxPower}dBm, TX: {$txPower}dBm, Distance: {$distance}m";
+                            }
+                        } catch (Exception $e) {
+                            // Optical fetch failed, continue without it
+                        }
+                        
                         $message = "ONU authorized successfully! ";
-                        $message .= $assignedOnuId ? "Assigned ONU ID: {$assignedOnuId}. " : "";
-                        $message .= "VLAN: " . ($vlanId ?: 'default') . ". ";
+                        $message .= $assignedOnuId ? "ONU ID: {$assignedOnuId}" : "";
+                        $message .= $opticalInfo;
+                        $message .= " | VLAN: " . ($vlanId ?: 'default') . ". ";
                         
                         // Detailed TR-069 status notification
                         if (isset($tr069Status['attempted']) && $tr069Status['attempted']) {
                             if ($tr069Status['success']) {
-                                $message .= "TR-069 configured: VLAN {$tr069Status['vlan']}, ACS: {$tr069Status['acs_url']}";
+                                $message .= "TR-069 configured: VLAN {$tr069Status['vlan']}";
                                 $messageType = 'success';
                                 $huaweiOLT->updateONU($onuId, [
                                     'tr069_status' => 'configured',
