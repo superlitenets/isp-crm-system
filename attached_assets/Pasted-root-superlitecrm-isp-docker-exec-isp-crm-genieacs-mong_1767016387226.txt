@@ -1,0 +1,428 @@
+root@superlitecrm:~/isp# docker exec isp_crm_genieacs_mongo mongo genieacs --eval "db.devices.find().pretty()"
+MongoDB shell version v4.4.29
+connecting to: mongodb://127.0.0.1:27017/genieacs?compressors=disabled&gssapiServiceName=mongodb
+Implicit session: session { "id" : UUID("1c335d67-ade6-4d3b-87cc-5980c6a5915f") }
+MongoDB server version: 4.4.29
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-JWGDxxljwf",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "JWGDxxljwf"
+        },
+        "_lastInform" : ISODate("2025-12-20T07:05:00.641Z"),
+        "_registered" : ISODate("2025-12-20T07:05:00.641Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-UTxJYKOvlF",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "UTxJYKOvlF"
+        },
+        "_lastInform" : ISODate("2025-12-21T07:33:47.637Z"),
+        "_registered" : ISODate("2025-12-21T07:33:47.637Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-dIKIfgXKMt",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "dIKIfgXKMt"
+        },
+        "_lastInform" : ISODate("2025-12-21T18:36:33.776Z"),
+        "_registered" : ISODate("2025-12-21T18:36:33.776Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-FrSXpvcNgR",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "FrSXpvcNgR"
+        },
+        "_lastInform" : ISODate("2025-12-22T23:23:56.513Z"),
+        "_registered" : ISODate("2025-12-22T23:23:56.513Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-eXUodiWvSt",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "eXUodiWvSt"
+        },
+        "_lastInform" : ISODate("2025-12-24T06:31:42.032Z"),
+        "_registered" : ISODate("2025-12-24T06:31:42.032Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-PukJgzGpNt",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "PukJgzGpNt"
+        },
+        "_lastInform" : ISODate("2025-12-25T09:38:13.148Z"),
+        "_registered" : ISODate("2025-12-25T09:38:13.148Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-hyqIHuwQkV",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "hyqIHuwQkV"
+        },
+        "_lastInform" : ISODate("2025-12-26T08:31:44.244Z"),
+        "_registered" : ISODate("2025-12-26T08:31:44.244Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-HDYimhSXZz",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "HDYimhSXZz"
+        },
+        "_lastInform" : ISODate("2025-12-27T06:38:18.067Z"),
+        "_registered" : ISODate("2025-12-27T06:38:18.067Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-nenuFtIffM",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "nenuFtIffM"
+        },
+        "_lastInform" : ISODate("2025-12-27T20:33:02.779Z"),
+        "_registered" : ISODate("2025-12-27T20:33:02.779Z")
+}
+{
+        "_id" : "DISCOVERYSERVICE-DISCOVERYSERVICE-bdCkFIfrVY",
+        "_deviceId" : {
+                "_Manufacturer" : "DISCOVERYSERVICE",
+                "_OUI" : "DISCOVERYSERVICE",
+                "_ProductClass" : "DISCOVERYSERVICE",
+                "_SerialNumber" : "bdCkFIfrVY"
+        },
+        "_lastInform" : ISODate("2025-12-29T04:58:37.954Z"),
+        "_registered" : ISODate("2025-12-29T04:58:37.954Z")
+}
+{
+        "_id" : "00259E-HG8546M-48575443F2D53A8B",
+        "InternetGatewayDevice" : {
+                "DeviceInfo" : {
+                        "HardwareVersion" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : "10C7.A"
+                        },
+                        "ProvisioningCode" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : ""
+                        },
+                        "SoftwareVersion" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : "V5R019C10S125"
+                        },
+                        "SpecVersion" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : "1.0"
+                        },
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "DeviceSummary" : {
+                        "_object" : false,
+                        "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                        "_type" : "xsd:string",
+                        "_value" : "InternetGatewayDevice:1.4[](Baseline:1, EthernetLAN:1, WiFiLAN:2, Time:1, IPPing:1, DeviceAssociation:1), VoiceService:1.0[1](Endpoint:1, SIPEndpoint:1)",
+                        "_writable" : false
+                },
+                "ManagementServer" : {
+                        "ConnectionRequestURL" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : "http://10.97.132.28:7547/3acdba481ea5eafdb5c8e3fdd948f812"
+                        },
+                        "ParameterKey" : {
+                                "_object" : false,
+                                "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                "_type" : "xsd:string",
+                                "_value" : "0"
+                        },
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "WANDevice" : {
+                        "1" : {
+                                "WANConnectionDevice" : {
+                                        "1" : {
+                                                "WANIPConnection" : {
+                                                        "1" : {
+                                                                "ExternalIPAddress" : {
+                                                                        "_object" : false,
+                                                                        "_timestamp" : ISODate("2025-12-29T13:48:18.027Z"),
+                                                                        "_type" : "xsd:string",
+                                                                        "_value" : "10.97.132.28"
+                                                                },
+                                                                "_object" : true
+                                                        },
+                                                        "_object" : true
+                                                },
+                                                "_object" : true
+                                        },
+                                        "_object" : true
+                                },
+                                "_object" : true
+                        },
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "_object" : true,
+                "Capabilities" : {
+                        "_object" : true,
+                        "_writable" : false
+                },
+                "DHCPv4" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "DHCPv6" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "DNS" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "DeviceConfig" : {
+                        "_object" : true,
+                        "_writable" : false
+                },
+                "DownloadDiagnostics" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "IPPingDiagnostics" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "LANConfigSecurity" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "LANDevice" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "LANDeviceNumberOfEntries" : {
+                        "_object" : false,
+                        "_timestamp" : ISODate("2025-12-29T13:48:18.028Z"),
+                        "_type" : "xsd:unsignedInt",
+                        "_value" : 1,
+                        "_writable" : false
+                },
+                "LANInterfaces" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "Layer3Forwarding" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "Optical" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "QueueManagement" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "Services" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "Time" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "TraceRouteDiagnostics" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "UDPEchoConfig" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "UploadDiagnostics" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "UserInterface" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "WANDeviceNumberOfEntries" : {
+                        "_object" : false,
+                        "_timestamp" : ISODate("2025-12-29T13:48:18.028Z"),
+                        "_type" : "xsd:unsignedInt",
+                        "_value" : 1,
+                        "_writable" : false
+                },
+                "X_HW_ALG" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_APDevice" : {
+                        "_object" : true,
+                        "_writable" : false
+                },
+                "X_HW_APMPolicy" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_ARPPingDiagnostics" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_AmpInfo" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_AppRemoteManage" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_Arp" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_DHCPSLVSERVER" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_DHCP_PING_EMULATOR" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_DNS" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_Dot1agCfm" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_FeatureList" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_GRETunnel" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_IPTV" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_IPv6" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_IPv6Layer3Forwarding" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_MainUPnP" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_NeighborDiscovery" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_NetInfo_Acquisition" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_Option" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_POTSDeviceNumber" : {
+                        "_object" : false,
+                        "_timestamp" : ISODate("2025-12-29T13:48:18.028Z"),
+                        "_type" : "xsd:unsignedInt",
+                        "_value" : 1,
+                        "_writable" : false
+                },
+                "X_HW_PPPOE_EMLUATOR" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_PPPoE_BridgeWAN_AutoEmulator" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_Security" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_ServiceManage" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_SlvUPnP" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_SmartCAT" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_SslConfig" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_UplinkQos" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_UserInfo" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "X_HW_WiFiDiagnostic" : {
+                        "_object" : true,
+                        "_writable" : true
+                },
+                "_timestamp" : ISODate("2025-12-29T13:17:26.191Z"),
+                "_writable" : false
+        },
+        "_deviceId" : {
+                "_Manufacturer" : "Huawei Technologies Co., Ltd",
+                "_OUI" : "00259E",
+                "_ProductClass" : "HG8546M",
+                "_SerialNumber" : "48575443F2D53A8B"
+        },
+        "_lastBoot" : ISODate("2025-12-29T13:48:18.026Z"),
+        "_lastBootstrap" : ISODate("2025-12-29T12:49:57.282Z"),
+        "_lastInform" : ISODate("2025-12-29T13:48:18.026Z"),
+        "_registered" : ISODate("2025-12-29T12:49:57.282Z"),
+        "_timestamp" : ISODate("2025-12-29T13:17:26.191Z")
+}
+root@superlitecrm:~/isp#
