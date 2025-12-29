@@ -2007,11 +2007,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 break;
             case 'tr069_reboot':
+                header('Content-Type: application/json');
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
-                $result = $genieacs->rebootDevice($_POST['device_id']);
-                $message = $result['success'] ? 'Reboot command sent' : ($result['error'] ?? 'Reboot failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
+                $deviceId = $_POST['device_id'] ?? '';
+                $serial = $_POST['serial'] ?? '';
+                
+                if (empty($deviceId) && !empty($serial)) {
+                    $deviceResult = $genieacs->getDeviceBySerial($serial);
+                    if ($deviceResult['success']) {
+                        $deviceId = $deviceResult['device']['_id'] ?? '';
+                    }
+                }
+                
+                if (empty($deviceId)) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found']);
+                    exit;
+                }
+                
+                $result = $genieacs->rebootDevice($deviceId);
+                echo json_encode($result);
+                exit;
+            case 'configure_pppoe':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $serial = $_POST['serial'] ?? '';
+                $connType = $_POST['connection_type'] ?? 'pppoe';
+                
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if (!$deviceResult['success']) {
+                    $message = 'Device not found in GenieACS: ' . $serial;
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $deviceId = $deviceResult['device']['_id'];
+                $params = [];
+                
+                $wanBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1';
+                
+                if ($connType === 'pppoe') {
+                    $pppPath = "{$wanBasePath}.WANPPPConnection.1";
+                    $params[] = ["{$pppPath}.Enable", true, 'xsd:boolean'];
+                    $params[] = ["{$pppPath}.ConnectionType", 'IP_Routed', 'xsd:string'];
+                    if (!empty($_POST['pppoe_username'])) {
+                        $params[] = ["{$pppPath}.Username", $_POST['pppoe_username'], 'xsd:string'];
+                    }
+                    if (!empty($_POST['pppoe_password'])) {
+                        $params[] = ["{$pppPath}.Password", $_POST['pppoe_password'], 'xsd:string'];
+                    }
+                } elseif ($connType === 'dhcp') {
+                    $ipPath = "{$wanBasePath}.WANIPConnection.1";
+                    $params[] = ["{$ipPath}.Enable", true, 'xsd:boolean'];
+                    $params[] = ["{$ipPath}.AddressingType", 'DHCP', 'xsd:string'];
+                } elseif ($connType === 'static') {
+                    $ipPath = "{$wanBasePath}.WANIPConnection.1";
+                    $params[] = ["{$ipPath}.Enable", true, 'xsd:boolean'];
+                    $params[] = ["{$ipPath}.AddressingType", 'Static', 'xsd:string'];
+                    if (!empty($_POST['static_ip'])) {
+                        $params[] = ["{$ipPath}.ExternalIPAddress", $_POST['static_ip'], 'xsd:string'];
+                    }
+                    if (!empty($_POST['subnet_mask'])) {
+                        $params[] = ["{$ipPath}.SubnetMask", $_POST['subnet_mask'], 'xsd:string'];
+                    }
+                    if (!empty($_POST['gateway'])) {
+                        $params[] = ["{$ipPath}.DefaultGateway", $_POST['gateway'], 'xsd:string'];
+                    }
+                    if (!empty($_POST['dns'])) {
+                        $params[] = ["{$ipPath}.DNSServers", $_POST['dns'], 'xsd:string'];
+                    }
+                }
+                
+                if (!empty($params)) {
+                    $result = $genieacs->setParameterValues($deviceId, $params);
+                    if ($result['success']) {
+                        $message = 'WAN configuration sent successfully. Changes may take a moment to apply.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to configure WAN: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                } else {
+                    $message = 'No configuration changes to apply';
+                    $messageType = 'warning';
+                }
                 break;
             case 'tr069_refresh':
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -11652,6 +11731,82 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
     
+    <div class="modal fade" id="pppoeConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-globe me-2"></i>Configure WAN/PPPoE</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="?page=huawei-olt">
+                    <input type="hidden" name="action" value="configure_pppoe">
+                    <input type="hidden" name="serial" id="pppoeSerialInput">
+                    <div class="modal-body">
+                        <p class="text-muted small">ONU: <strong id="pppoeDeviceSn"></strong></p>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Connection Type</label>
+                            <select name="connection_type" class="form-select" id="pppoeConnectionType" onchange="togglePPPoEFields()">
+                                <option value="pppoe">PPPoE (Router Mode)</option>
+                                <option value="dhcp">DHCP (Bridge Mode)</option>
+                                <option value="static">Static IP</option>
+                            </select>
+                        </div>
+                        
+                        <div id="pppoeCredentials">
+                            <div class="mb-3">
+                                <label class="form-label">PPPoE Username</label>
+                                <input type="text" name="pppoe_username" class="form-control" placeholder="username@isp.com">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">PPPoE Password</label>
+                                <input type="password" name="pppoe_password" class="form-control" placeholder="password">
+                            </div>
+                        </div>
+                        
+                        <div id="staticIpFields" class="d-none">
+                            <div class="mb-3">
+                                <label class="form-label">IP Address</label>
+                                <input type="text" name="static_ip" class="form-control" placeholder="192.168.1.100">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Subnet Mask</label>
+                                <input type="text" name="subnet_mask" class="form-control" value="255.255.255.0">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Gateway</label>
+                                <input type="text" name="gateway" class="form-control" placeholder="192.168.1.1">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">DNS Server</label>
+                                <input type="text" name="dns" class="form-control" value="8.8.8.8">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">VLAN ID (optional)</label>
+                            <input type="number" name="vlan_id" class="form-control" placeholder="Leave empty for default">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check me-1"></i> Apply Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function togglePPPoEFields() {
+        const type = document.getElementById('pppoeConnectionType').value;
+        document.getElementById('pppoeCredentials').classList.toggle('d-none', type !== 'pppoe');
+        document.getElementById('staticIpFields').classList.toggle('d-none', type !== 'static');
+    }
+    </script>
+    
     <div class="modal fade" id="configScriptModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -12481,7 +12636,20 @@ echo "# ================================================\n";
             }
             
             const s = data.status;
-            let html = '<div class="row">';
+            let html = '';
+            
+            // Quick Actions bar (only for TR-069 devices)
+            if (s.source === 'tr069') {
+                html += '<div class="alert alert-info d-flex justify-content-between align-items-center mb-3">';
+                html += '<span><i class="bi bi-lightning-charge me-2"></i><strong>TR-069 Connected</strong> - Fast data from GenieACS</span>';
+                html += '<div class="btn-group btn-group-sm">';
+                html += '<button class="btn btn-primary" onclick="openWifiConfig(null, \'' + s.onu.sn + '\')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
+                html += '<button class="btn btn-success" onclick="openPPPoEConfig(\'' + s.onu.sn + '\')"><i class="bi bi-globe me-1"></i>WAN</button>';
+                html += '<button class="btn btn-warning" onclick="tr069Reboot(\'' + s.onu.sn + '\')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
+                html += '</div></div>';
+            }
+            
+            html += '<div class="row">';
             
             // Optical Status
             html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-info text-white"><i class="bi bi-broadcast me-2"></i>Optical Status</div><div class="card-body"><table class="table table-sm mb-0">';
@@ -12518,8 +12686,12 @@ echo "# ================================================\n";
             }
             html += '</table></div></div></div>';
             
-            // WAN Interfaces
-            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-success text-white"><i class="bi bi-globe me-2"></i>WAN Interfaces</div><div class="card-body">';
+            // WAN Interfaces with config button
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-success text-white d-flex justify-content-between align-items-center"><span><i class="bi bi-globe me-2"></i>WAN Interfaces</span>';
+            if (s.source === 'tr069') {
+                html += '<button class="btn btn-sm btn-light" onclick="openPPPoEConfig(\'' + s.onu.sn + '\')"><i class="bi bi-gear me-1"></i>Configure</button>';
+            }
+            html += '</div><div class="card-body">';
             if (s.wan && s.wan.length > 0) {
                 s.wan.forEach((w, i) => {
                     html += '<div class="' + (i > 0 ? 'mt-3 pt-3 border-top' : '') + '"><strong>(' + w.index + ') ' + (w.name || 'WAN') + '</strong>';
@@ -12689,9 +12861,44 @@ echo "# ================================================\n";
     }
     
     function openWifiConfig(deviceId, serialNumber) {
-        document.getElementById('wifiDeviceId').value = deviceId;
+        document.getElementById('wifiDeviceId').value = deviceId || '';
         document.getElementById('wifiDeviceSn').textContent = serialNumber;
+        // Close the full status modal first
+        const statusModal = bootstrap.Modal.getInstance(document.getElementById('onuFullStatusModal'));
+        if (statusModal) statusModal.hide();
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+    }
+    
+    function openPPPoEConfig(serialNumber) {
+        // Close the full status modal first
+        const statusModal = bootstrap.Modal.getInstance(document.getElementById('onuFullStatusModal'));
+        if (statusModal) statusModal.hide();
+        
+        // Open PPPoE/WAN configuration modal
+        document.getElementById('pppoeDeviceSn').textContent = serialNumber;
+        document.getElementById('pppoeSerialInput').value = serialNumber;
+        new bootstrap.Modal(document.getElementById('pppoeConfigModal')).show();
+    }
+    
+    function tr069Reboot(serialNumber) {
+        if (!confirm('Reboot ONU ' + serialNumber + ' via TR-069?')) return;
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=tr069_reboot&serial=' + encodeURIComponent(serialNumber)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Reboot command sent successfully!');
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send reboot command'));
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+        });
     }
     
     function openAdminPasswordConfig(deviceId, serialNumber) {
