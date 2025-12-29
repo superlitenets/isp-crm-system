@@ -5551,31 +5551,59 @@ class HuaweiOLT {
         $slot = $onu['slot'];
         $port = $onu['port'];
         $onuIdNum = $onu['onu_id'];
+        $oltId = $onu['olt_id'];
+        $allOutput = '';
         
-        // Huawei MA5683T requires interface context for ont delete
+        // Step 1: Find and delete all service-ports for this ONU
+        $spCommand = "display service-port port {$frame}/{$slot}/{$port} ont {$onuIdNum}";
+        $spResult = $this->executeCommand($oltId, $spCommand);
+        $spOutput = $spResult['output'] ?? '';
+        $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
+        
+        // Parse service-port IDs from output
+        // Format: "  0   0   gpon  0/1/0       0   1    vlan   ..."
+        $servicePortIds = [];
+        if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
+            $servicePortIds = array_map('intval', $matches[1]);
+        }
+        
+        // Delete each service-port
+        foreach ($servicePortIds as $spId) {
+            $undoCmd = "undo service-port {$spId}";
+            $undoResult = $this->executeCommand($oltId, $undoCmd);
+            $allOutput .= "[Delete SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
+        }
+        
+        // Step 2: Delete the ONU
         $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\nquit";
-        $result = $this->executeCommand($onu['olt_id'], $command);
+        $result = $this->executeCommand($oltId, $command);
         
         // Check for success indicators in output
         $output = $result['output'] ?? '';
+        $allOutput .= "[Delete ONU]\n{$output}";
         $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
         
         if ($success) {
             $this->deleteONU($onuId);
         }
         
+        $spCount = count($servicePortIds);
+        $message = $success 
+            ? "ONU {$onu['sn']} deleted from OLT" . ($spCount > 0 ? " ({$spCount} service-ports removed)" : '')
+            : ($result['message'] ?? 'Delete command failed');
+        
         $this->addLog([
-            'olt_id' => $onu['olt_id'],
+            'olt_id' => $oltId,
             'onu_id' => $onuId,
             'action' => 'delete',
             'status' => $success ? 'success' : 'failed',
-            'message' => $success ? "ONU {$onu['sn']} deleted from OLT" : ($result['message'] ?? 'Delete command failed'),
+            'message' => $message,
             'command_sent' => $command,
-            'command_response' => $output,
+            'command_response' => $allOutput,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        return ['success' => $success, 'message' => $success ? "ONU {$onu['sn']} deleted from OLT" : 'Delete command failed', 'output' => $output];
+        return ['success' => $success, 'message' => $message, 'output' => $allOutput, 'service_ports_deleted' => $spCount];
     }
     
     public function resetONUConfig(int $onuId): array {
