@@ -1,0 +1,36 @@
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# docker logs isp_crm_genieacs_ui --tail 100
+Error response from daemon: No such container: isp_crm_genieacs_ui
+root@superlitecrm:~/isp# docker logs isp_crm_genieacs --tail 100
+2025-12-29 11:49:21,516 INFO Set uid to user 999 succeeded
+2025-12-29 11:49:21,519 INFO supervisord started with pid 1
+2025-12-29 11:49:22,536 INFO spawned: 'genieacs-cwmp' with pid 7
+2025-12-29 11:49:22,541 INFO spawned: 'genieacs-fs' with pid 8
+2025-12-29 11:49:22,546 INFO spawned: 'genieacs-nbi' with pid 9
+2025-12-29 11:49:22,551 INFO spawned: 'genieacs-ui' with pid 10
+2025-12-29 11:49:23,548 INFO success: genieacs-cwmp entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 11:49:23,548 INFO success: genieacs-fs entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 11:49:23,548 INFO success: genieacs-nbi entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 11:49:23,548 INFO success: genieacs-ui entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 13:54:52,275 WARN received SIGTERM indicating exit request
+2025-12-29 13:54:52,277 INFO waiting for genieacs-cwmp, genieacs-fs, genieacs-nbi, genieacs-ui to die
+2025-12-29 13:54:52,513 INFO stopped: genieacs-ui (exit status 0)
+2025-12-29 13:54:52,709 INFO stopped: genieacs-nbi (exit status 0)
+2025-12-29 13:54:52,919 INFO stopped: genieacs-fs (exit status 0)
+2025-12-29 13:54:53,109 INFO stopped: genieacs-cwmp (exit status 0)
+2025-12-29 13:54:54,606 INFO Set uid to user 999 succeeded
+2025-12-29 13:54:54,608 INFO supervisord started with pid 1
+2025-12-29 13:54:55,627 INFO spawned: 'genieacs-cwmp' with pid 8
+2025-12-29 13:54:55,634 INFO spawned: 'genieacs-fs' with pid 9
+2025-12-29 13:54:55,641 INFO spawned: 'genieacs-nbi' with pid 10
+2025-12-29 13:54:55,647 INFO spawned: 'genieacs-ui' with pid 11
+2025-12-29 13:54:57,039 INFO success: genieacs-cwmp entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 13:54:57,040 INFO success: genieacs-fs entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 13:54:57,040 INFO success: genieacs-nbi entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2025-12-29 13:54:57,040 INFO success: genieacs-ui entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# docker ps -a --filter "name=genieacs"
+CONTAINER ID   IMAGE                        COMMAND                  CREATED       STATUS          PORTS                                                                                                                                                                                NAMES
+15ff40aaa4bd   drumsergio/genieacs:latest   "/usr/bin/supervisor…"   2 hours ago   Up 11 minutes   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp, 0.0.0.0:7547->7547/tcp, [::]:7547->7547/tcp, 0.0.0.0:7557->7557/tcp, [::]:7557->7557/tcp, 0.0.0.0:7567->7567/tcp, [::]:7567->7567/tcp   isp_crm_genieacs
+1133e3f22460   mongo:4.4                    "docker-entrypoint.s…"   2 hours ago   Up 2 hours      27017/tcp                                                                                                                                                                            isp_crm_genieacs_mongo
+root@superlitecrm:~/isp#
