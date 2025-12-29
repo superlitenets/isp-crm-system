@@ -12462,7 +12462,18 @@ echo "# ================================================\n";
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_onu_full_status&onu_id=' + onuId
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP error ' + r.status);
+            return r.text();
+        })
+        .then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Response:', text.substring(0, 500));
+                throw new Error('Invalid JSON response');
+            }
+        })
         .then(data => {
             if (!data.success) {
                 body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch status') + '</div>';
@@ -12589,7 +12600,18 @@ echo "# ================================================\n";
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_onu_config&onu_id=' + onuId
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP error ' + r.status);
+            return r.text();
+        })
+        .then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Response:', text.substring(0, 500));
+                throw new Error('Invalid JSON response');
+            }
+        })
         .then(data => {
             if (!data.success) {
                 body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch config') + '</div>';
