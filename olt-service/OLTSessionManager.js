@@ -251,6 +251,9 @@ class OLTSession {
     }
 
     async sendCommand(command, timeout = 60000) {
+        // Flush any stale data first by sending empty line and waiting
+        await this.flushBuffer();
+        
         return new Promise((resolve, reject) => {
             if (!this.socket || !this.connected) {
                 return reject(new Error('Not connected'));
@@ -259,11 +262,15 @@ class OLTSession {
             let response = '';
             let resolved = false;
             let timeoutId = null;
-            
-            const startMarker = `__CMD_START_${Date.now()}__`;
+            let commandSeen = false;
             
             const dataHandler = (chunk) => {
                 response += chunk;
+                
+                // Only start collecting after we see echo of our command
+                if (!commandSeen && response.includes(command.split('\r\n')[0])) {
+                    commandSeen = true;
+                }
                 
                 // Handle pagination
                 if (response.includes('---- More') || response.includes('--More--') || response.includes('Press any key')) {
@@ -273,8 +280,8 @@ class OLTSession {
                     response = response.replace(/Press any key.*$/gi, '');
                 }
                 
-                // Check for prompt (command complete)
-                if (this.promptPattern.test(response)) {
+                // Check for prompt (command complete) - only after seeing our command
+                if (commandSeen && this.promptPattern.test(response)) {
                     if (!resolved) {
                         resolved = true;
                         clearTimeout(timeoutId);
@@ -311,6 +318,24 @@ class OLTSession {
             const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
             console.log(`[OLT ${this.oltId}] Sending: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
             this.socket.write(cmdBuffer);
+        });
+    }
+    
+    async flushBuffer() {
+        return new Promise((resolve) => {
+            // Clear internal buffer
+            this.buffer = '';
+            
+            // Send empty line to flush any pending data
+            if (this.socket && this.connected) {
+                this.socket.write('\r\n');
+            }
+            
+            // Wait briefly for any stale data to arrive and be discarded
+            setTimeout(() => {
+                this.buffer = '';
+                resolve();
+            }, 100);
         });
     }
 
