@@ -919,6 +919,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'configure_wan_pppoe':
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                
+                if (!$onuId) {
+                    $message = 'ONU ID is required';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $config = [
+                    'pppoe_vlan' => !empty($_POST['pppoe_vlan']) ? (int)$_POST['pppoe_vlan'] : 902,
+                    'pppoe_username' => trim($_POST['pppoe_username'] ?? ''),
+                    'pppoe_password' => trim($_POST['pppoe_password'] ?? ''),
+                    'gemport' => !empty($_POST['gemport']) ? (int)$_POST['gemport'] : 1,
+                    'nat_enabled' => isset($_POST['nat_enabled']),
+                    'priority' => !empty($_POST['priority']) ? (int)$_POST['priority'] : 0
+                ];
+                
+                try {
+                    $result = $huaweiOLT->configureWANPPPoE($onuId, $config);
+                    
+                    if ($result['success']) {
+                        $message = $result['message'];
+                        $messageType = 'success';
+                    } else {
+                        $message = $result['message'];
+                        $messageType = 'warning';
+                    }
+                } catch (Exception $e) {
+                    $message = 'PPPoE WAN configuration failed: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
             case 'clear_discovery_entry':
                 $huaweiOLT->clearDiscoveryEntry((int)$_POST['id']);
                 $message = 'Discovery entry cleared';
@@ -5579,6 +5612,48 @@ try {
                     <div class="tab-content" id="tr069TabContent">
                         <!-- WAN Configuration -->
                         <div class="tab-pane fade show active" id="wanConfig" role="tabpanel">
+                            <!-- OMCI PPPoE Setup - Two-step process -->
+                            <div class="alert alert-info mb-4">
+                                <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>PPPoE Setup via OMCI + TR-069</h6>
+                                <p class="mb-2">For PPPoE to work properly, the ONU must first have PPPoE mode configured via OMCI from the OLT, then credentials are pushed via TR-069.</p>
+                                <hr>
+                                <form method="post" class="row g-3" id="omciPppoeForm">
+                                    <input type="hidden" name="action" value="configure_wan_pppoe">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <div class="col-md-2">
+                                        <label class="form-label">PPPoE VLAN</label>
+                                        <input type="number" name="pppoe_vlan" class="form-control" value="902" min="1" max="4094">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">PPPoE Username</label>
+                                        <input type="text" name="pppoe_username" class="form-control" placeholder="username" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">PPPoE Password</label>
+                                        <input type="text" name="pppoe_password" class="form-control" placeholder="password" required>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">GEM Port</label>
+                                        <input type="number" name="gemport" class="form-control" value="1" min="0" max="7">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-warning w-100">
+                                            <i class="bi bi-gear me-1"></i> Configure via OMCI
+                                        </button>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" name="nat_enabled" id="omciNatEnabled" checked>
+                                            <label class="form-check-label" for="omciNatEnabled">Enable NAT</label>
+                                        </div>
+                                        <small class="text-muted">This will: 1) Configure PPPoE WAN mode on OLT via OMCI, 2) Create service-port, 3) Queue credentials for TR-069 push when device connects to ACS</small>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <h6 class="text-muted mb-3"><i class="bi bi-cloud me-2"></i>TR-069 Only WAN Configuration</h6>
+                            <p class="text-muted small mb-3">Use this if PPPoE WAN mode is already configured on the ONU (via OMCI or factory default).</p>
+                            
                             <form method="post" id="wanConfigForm">
                                 <input type="hidden" name="action" value="tr069_wan_config">
                                 <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">

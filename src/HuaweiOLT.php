@@ -5389,6 +5389,148 @@ class HuaweiOLT {
     }
     
     /**
+     * Configure PPPoE WAN via OMCI and queue TR-069 credentials push
+     * Step 1: Configure PPPoE WAN mode on OLT via OMCI
+     * Step 2: Create service-port for PPPoE VLAN
+     * Step 3: Queue PPPoE credentials for TR-069 push when device connects
+     */
+    public function configureWANPPPoE(int $onuDbId, array $config): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $pppoeVlan = (int)($config['pppoe_vlan'] ?? 902);
+        $pppoeUsername = $config['pppoe_username'] ?? '';
+        $pppoePassword = $config['pppoe_password'] ?? '';
+        $gemPort = (int)($config['gemport'] ?? 1);
+        $natEnabled = $config['nat_enabled'] ?? true;
+        $priority = (int)($config['priority'] ?? 0);
+        
+        if (empty($pppoeUsername) || empty($pppoePassword)) {
+            return ['success' => false, 'message' => 'PPPoE username and password are required'];
+        }
+        
+        $output = '';
+        $errors = [];
+        
+        // Helper to check for real errors
+        $hasRealError = function($output) {
+            if (empty($output)) return false;
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+                return false;
+            }
+            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+        };
+        
+        // Step 1: Configure PPPoE WAN via OMCI
+        // Note: Huawei OLT uses ont wan-config or ont pppoe-config command
+        // Try ont wan-config first (newer syntax)
+        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd1 .= "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1 wan-mode pppoe pppoe-proxy enable vlan {$pppoeVlan} priority {$priority}\r\n";
+        $cmd1 .= "quit";
+        $result1 = $this->executeCommand($oltId, $cmd1);
+        $output .= "[Step 1: PPPoE WAN Config]\n" . ($result1['output'] ?? '') . "\n";
+        
+        // If wan-config fails, try alternative syntax
+        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
+            // Try ont ipconfig with pppoe mode (alternative for some OLT versions)
+            $cmd1Alt = "interface gpon {$frame}/{$slot}\r\n";
+            $cmd1Alt .= "ont ipconfig {$port} {$onuId} pppoe vlan {$pppoeVlan} priority {$priority}\r\n";
+            $cmd1Alt .= "quit";
+            $result1Alt = $this->executeCommand($oltId, $cmd1Alt);
+            $output .= "[Step 1 Alt: PPPoE via ipconfig]\n" . ($result1Alt['output'] ?? '') . "\n";
+            
+            if (!$result1Alt['success'] || $hasRealError($result1Alt['output'] ?? '')) {
+                $errors[] = "PPPoE WAN config failed - try manual configuration";
+            }
+        }
+        
+        // Step 2: Create service-port for PPPoE VLAN (if not exists)
+        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} rx-cttr 6 tx-cttr 6";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= "[Step 2: Service Port for PPPoE]\n" . ($result2['output'] ?? '') . "\n";
+        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
+            // Not critical if already exists
+            if (!preg_match('/already exist/i', $result2['output'] ?? '')) {
+                $errors[] = "Service port for PPPoE VLAN creation failed";
+            }
+        }
+        
+        // Step 3: Queue PPPoE credentials for TR-069 push
+        // Create pending TR-069 config to be pushed when device connects to ACS
+        try {
+            // Ensure table exists
+            $this->db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                onu_id INTEGER PRIMARY KEY,
+                config_data TEXT,
+                status VARCHAR(20) DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP,
+                applied_at TIMESTAMP
+            )");
+            
+            $tr069Config = [
+                'onu_id' => $onuDbId,
+                'wan_vlan' => $pppoeVlan,
+                'connection_type' => 'pppoe',
+                'pppoe_username' => $pppoeUsername,
+                'pppoe_password' => $pppoePassword,
+                'nat_enable' => $natEnabled,
+                'config_type' => 'wan_pppoe'
+            ];
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
+                ON CONFLICT (onu_id) DO UPDATE SET
+                    config_data = EXCLUDED.config_data,
+                    status = 'pending',
+                    error_message = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([$onuDbId, json_encode($tr069Config)]);
+            $output .= "[Step 3: TR-069 Config Queued]\nPPPoE credentials queued for TR-069 push\n";
+        } catch (\Exception $e) {
+            $errors[] = "Failed to queue TR-069 config: " . $e->getMessage();
+        }
+        
+        $success = empty($errors);
+        $message = $success 
+            ? "PPPoE WAN configured via OMCI. Credentials queued for TR-069 push when device connects to ACS."
+            : "PPPoE configuration partially failed: " . implode(', ', $errors);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'configure_wan_pppoe',
+            'status' => $success ? 'success' : 'partial',
+            'message' => $message,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'message' => $message,
+            'pppoe_vlan' => $pppoeVlan,
+            'errors' => $errors,
+            'output' => $output
+        ];
+    }
+    
+    /**
      * Fetch TR-069 IP address from OLT for an ONU
      * Uses display ont wan-info command to get the DHCP-assigned IP
      */
