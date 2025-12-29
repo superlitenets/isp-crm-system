@@ -124,6 +124,18 @@ class OLTSession {
             this.socket.connect(this.config.port || 23, this.config.host, () => {
                 clearTimeout(timeout);
                 console.log(`[OLT ${this.oltId}] TCP connected to ${this.config.host}`);
+                
+                // Proactively negotiate character mode to prevent space stripping
+                // Send: WILL SGA (we want character-at-a-time mode)
+                // Send: DONT LINEMODE (reject any line editing that strips spaces)
+                // Send: DO ECHO (let server echo)
+                this.socket.write(Buffer.from([
+                    IAC, WILL, OPT_SGA,       // We will suppress go-ahead (character mode)
+                    IAC, DONT, OPT_LINEMODE,  // Don't use linemode
+                    IAC, DO, OPT_ECHO,        // Server should echo
+                    IAC, DO, OPT_SGA          // Server should suppress go-ahead
+                ]));
+                console.log(`[OLT ${this.oltId}] Sent proactive telnet negotiation (character mode)`);
             });
 
             this.socket.on('data', (data) => {
@@ -232,7 +244,9 @@ class OLTSession {
     
     async runInitSequence() {
         try {
-            await new Promise(r => setTimeout(r, 500));
+            // Wait for telnet negotiation to complete before sending commands
+            // This prevents the space-stripping issue during LINEMODE negotiation
+            await new Promise(r => setTimeout(r, 2000));
             
             await this.sendCommand('enable');
             console.log(`[OLT ${this.oltId}] Entered enable mode`);
