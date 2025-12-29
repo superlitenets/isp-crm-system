@@ -11218,15 +11218,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <label class="form-label">ONU Mode</label>
                                 <div class="mt-2">
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeBridge" value="bridge" checked>
-                                        <label class="form-check-label" for="authModeBridge">
-                                            <i class="bi bi-box me-1"></i>Bridge (1 ETH)
+                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeRouter" value="router" checked>
+                                        <label class="form-check-label" for="authModeRouter">
+                                            <i class="bi bi-router me-1"></i>Router (Multi ETH + POTS)
                                         </label>
                                     </div>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeRouter" value="router">
-                                        <label class="form-check-label" for="authModeRouter">
-                                            <i class="bi bi-router me-1"></i>Router (Multi ETH + POTS)
+                                        <input class="form-check-input" type="radio" name="onu_mode" id="authModeBridge" value="bridge">
+                                        <label class="form-check-label" for="authModeBridge">
+                                            <i class="bi bi-box me-1"></i>Bridge (1 ETH)
                                         </label>
                                     </div>
                                 </div>
