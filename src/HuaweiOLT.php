@@ -3119,11 +3119,14 @@ class HuaweiOLT {
     
     public function getONU(int $id): ?array {
         $stmt = $this->db->prepare("
-            SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name
+            SELECT o.*, olt.name as olt_name, c.name as customer_name, sp.name as profile_name,
+                   ot.model as onu_type_model, dl.equipment_id as discovered_eqid
             FROM huawei_onus o
             LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
             LEFT JOIN customers c ON o.customer_id = c.id
             LEFT JOIN huawei_service_profiles sp ON o.service_profile_id = sp.id
+            LEFT JOIN huawei_onu_types ot ON o.onu_type_id = ot.id
+            LEFT JOIN onu_discovery_log dl ON o.sn = dl.serial_number AND o.olt_id = dl.olt_id
             WHERE o.id = ?
         ");
         $stmt->execute([$id]);
