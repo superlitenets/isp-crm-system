@@ -12445,20 +12445,37 @@ echo "# ================================================\n";
         var defaultVlan = document.getElementById('defaultVlan' + portId).value;
         var description = document.getElementById('portDesc' + portId).value;
         
+        var saveBtn = event.target;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+        
         Promise.all([
             fetch('?page=huawei-olt&action=set_pon_default_vlan', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&vlan_id=' + (defaultVlan || '')
-            }),
+            }).then(r => r.json()),
             fetch('?page=huawei-olt&action=update_port_description', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'olt_id=' + oltId + '&port_name=' + encodeURIComponent(portName) + '&description=' + encodeURIComponent(description)
-            })
+            }).then(r => r.json())
         ])
-        .then(() => location.reload())
-        .catch(e => alert('Error saving settings: ' + e.message));
+        .then(results => {
+            var errors = results.filter(r => !r.success);
+            if (errors.length > 0) {
+                alert('Error: ' + (errors[0].error || 'Failed to save'));
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-check me-1"></i> Save Changes';
+            } else {
+                location.reload();
+            }
+        })
+        .catch(e => {
+            alert('Error saving settings: ' + e.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check me-1"></i> Save Changes';
+        });
     }
     
     function assignPortVlan(oltId, portName, portId) {
