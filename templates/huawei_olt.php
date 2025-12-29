@@ -1551,8 +1551,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             case 'save_tr069_omci_settings':
                 $tr069Settings = [
+                    'tr069_acs_url' => $_POST['tr069_acs_url'] ?? '',
                     'tr069_periodic_interval' => $_POST['tr069_periodic_interval'] ?? '300',
                     'tr069_default_gem_port' => $_POST['tr069_default_gem_port'] ?? '2',
+                    'tr069_line_profile_id' => $_POST['tr069_line_profile_id'] ?? '1',
+                    'tr069_srv_profile_id' => $_POST['tr069_srv_profile_id'] ?? '1',
                     'tr069_acs_username' => $_POST['tr069_acs_username'] ?? '',
                     'tr069_cpe_username' => $_POST['tr069_cpe_username'] ?? ''
                 ];
@@ -8694,23 +8697,15 @@ ont tr069-server-config 1 all profile-id 1</pre>
                             <h5 class="mb-0"><i class="bi bi-broadcast me-2"></i>TR-069 OMCI Configuration</h5>
                         </div>
                         <div class="card-body">
-                            <div class="alert alert-info small">
-                                <i class="bi bi-info-circle me-2"></i>
-                                These settings are pushed to ONUs via OMCI during authorization. The ONU will use these settings to connect to your ACS (GenieACS).
-                            </div>
-                            
                             <form method="post">
                                 <input type="hidden" name="action" value="save_tr069_omci_settings">
                                 
-                                <?php
-                                require_once __DIR__ . '/../src/WireGuardService.php';
-                                $wgServiceTR069 = new \App\WireGuardService($db);
-                                ?>
-                                <div class="alert alert-success small mb-3">
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    <strong>TR-069 ACS URL (from VPN Gateway):</strong><br>
-                                    <code><?= htmlspecialchars($wgServiceTR069->getTR069AcsUrl()) ?></code>
-                                    <div class="form-text mt-1">Automatically uses VPN Gateway IP on port 7547. Configure in VPN Settings.</div>
+                                <div class="mb-3">
+                                    <label class="form-label">TR-069 ACS URL</label>
+                                    <input type="url" name="tr069_acs_url" class="form-control" 
+                                           value="<?= htmlspecialchars($tr069Settings['tr069_acs_url'] ?? 'http://10.200.0.1:7547') ?>" 
+                                           placeholder="http://10.200.0.1:7547">
+                                    <div class="form-text">The ACS URL that ONUs will connect to (e.g., http://your-vpn-gateway:7547)</div>
                                 </div>
                                 
                                 <div class="row">
