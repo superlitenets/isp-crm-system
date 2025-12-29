@@ -470,9 +470,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_auth_vlans') {
         // Get default VLAN for this PON port if fsp provided
         $defaultVlan = null;
         if ($fsp && preg_match('/^(\d+)\/(\d+)\/(\d+)$/', $fsp, $m)) {
-            $portName = "gpon $fsp";
-            $stmt = $db->prepare("SELECT default_vlan FROM huawei_olt_pon_ports WHERE olt_id = ? AND port_name = ?");
-            $stmt->execute([$oltId, $portName]);
+            // Try both formats: "0/1/0" and "gpon 0/1/0"
+            $stmt = $db->prepare("SELECT default_vlan FROM huawei_olt_pon_ports WHERE olt_id = ? AND (port_name = ? OR port_name = ?)");
+            $stmt->execute([$oltId, $fsp, "gpon $fsp"]);
             $ponPort = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($ponPort && $ponPort['default_vlan']) {
                 $defaultVlan = (int)$ponPort['default_vlan'];
