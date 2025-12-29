@@ -1554,8 +1554,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'tr069_acs_url' => $_POST['tr069_acs_url'] ?? '',
                     'tr069_periodic_interval' => $_POST['tr069_periodic_interval'] ?? '300',
                     'tr069_default_gem_port' => $_POST['tr069_default_gem_port'] ?? '2',
-                    'tr069_line_profile_id' => $_POST['tr069_line_profile_id'] ?? '1',
-                    'tr069_srv_profile_id' => $_POST['tr069_srv_profile_id'] ?? '1',
                     'tr069_acs_username' => $_POST['tr069_acs_username'] ?? '',
                     'tr069_cpe_username' => $_POST['tr069_cpe_username'] ?? ''
                 ];
@@ -8718,23 +8716,6 @@ ont tr069-server-config 1 all profile-id 1</pre>
                                         <label class="form-label">Default GEM Port for TR-069</label>
                                         <input type="number" name="tr069_default_gem_port" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_default_gem_port'] ?? '2') ?>" min="1" max="8">
                                         <div class="form-text">GEM port used for TR-069 traffic</div>
-                                    </div>
-                                </div>
-                                
-                                <hr class="my-3">
-                                <h6 class="text-muted"><i class="bi bi-sliders me-2"></i>OLT Profile IDs (for ONU Authorization)</h6>
-                                <p class="form-text mb-2">Enter the profile IDs configured on your OLT. Find them with: <code>display ont-lineprofile gpon all</code> and <code>display ont-srvprofile gpon all</code></p>
-                                
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Line Profile ID</label>
-                                        <input type="number" name="tr069_line_profile_id" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_line_profile_id'] ?? '1') ?>" min="1" max="1024">
-                                        <div class="form-text">ont-lineprofile ID (typically 1-1024)</div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Service Profile ID</label>
-                                        <input type="number" name="tr069_srv_profile_id" class="form-control" value="<?= htmlspecialchars($tr069Settings['tr069_srv_profile_id'] ?? '1') ?>" min="1" max="1024">
-                                        <div class="form-text">ont-srvprofile ID (typically 1-1024)</div>
                                     </div>
                                 </div>
                                 
