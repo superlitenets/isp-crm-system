@@ -1,0 +1,29 @@
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:34:50 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:34:50 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=3202" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [OLT 1] Sending: "interface gpon 0/1
+isp_crm_olt_service     | ont delete 0 1
+isp_crm_olt_service     | quit" (hex: 696e746572666163652067706f6e20302f310d0a6f6e742064656c657465203020310d0a717569740d0a)
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:34:56 +0300 "POST /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:34:57 +0000] "POST /?page=huawei-olt&view=onu_detail&onu_id=3202 HTTP/2.0" 200 343875 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=3202" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:34:57 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:34:57 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=3202" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:34:57 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [29/Dec/2025:09:34:57 +0000] "GET /?page=huawei-olt&ajax=signal_history&onu_id=3202&days=7 HTTP/2.0" 200 29 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=3202" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (39 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] Found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] No pending notifications
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:35:01 +0300 "GET /cron.php" 403
+isp_crm_nginx           | 102.205.236.243 - - [29/Dec/2025:09:35:01 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 403 24 "-" "curl/8.5.0" "-"
+isp_crm_php             | 172.18.0.7 -  29/Dec/2025:12:35:01 +0300 "GET /cron.php" 200
+isp_crm_nginx           | 102.205.236.243 - - [29/Dec/2025:09:35:01 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 200 59 "-" "curl/8.5.0" "-"
