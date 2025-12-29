@@ -1,0 +1,33 @@
+MA5683T(config)#display ont-srvprofile gpon all
+  -----------------------------------------------------------------------------
+  Profile-ID  Profile-name                                Binding times
+  -----------------------------------------------------------------------------
+  0           srv-profile_default_0                       0            
+  1           one-isp-srv-profile                         0            
+  2           HG8247                                      15           
+  3           HG8546M                                     466          
+  4           HG8346M                                     1            
+  5           HG8145V5                                    47           
+  6           HG8145V                                     8            
+  7           HG8447                                      4            
+  8           ONU-type-eth-4-pots-2-catv-0                0            
+  9           HG8245H                                     6            
+  10          HG6143D                                     2            
+  11          HS8145V                                     3            
+  12          HS8546V                                     1            
+  13          ZTE-F660V5.2                                0            
+  14          HG865                                       1            
+  15          HG8545M                                     0            
+  16          AHD1704NU                                   1            
+  17          TT919G                                      0            
+  18          HG3                                         0            
+  19          IGD                                         2            
+  20          Generic_1_V902                              1            
+  21          HG8145V6                                    1            
+  22          H1s-3                                       0            
+  23          NOCLEICODEG1425GB                           0            
+  24          HG6c                                        0            
+  25          EG8141A5                                    1            
+  100         CRM-Standard-SRV                            0            
+  -----------------------------------------------------------------------------
+  Total: 27               
