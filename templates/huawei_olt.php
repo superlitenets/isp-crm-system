@@ -462,8 +462,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_auth_vlans') {
     }
     
     try {
-        // Get VLANs for this OLT
-        $stmt = $db->prepare("SELECT vlan_id, description, vlan_type, is_tr069 FROM huawei_vlans WHERE olt_id = ? AND is_active = TRUE ORDER BY vlan_id");
+        // Get VLANs for this OLT (exclude TR-069 management VLANs from service VLAN selection)
+        $stmt = $db->prepare("SELECT vlan_id, description, vlan_type, is_tr069 FROM huawei_vlans WHERE olt_id = ? AND is_active = TRUE AND (is_tr069 = FALSE OR is_tr069 IS NULL) ORDER BY vlan_id");
         $stmt->execute([$oltId]);
         $vlans = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
@@ -12370,7 +12370,6 @@ echo "# ================================================\n";
                         data.vlans.forEach(v => {
                             var label = 'VLAN ' + v.vlan_id;
                             if (v.description) label += ' - ' + v.description;
-                            if (v.is_tr069) label += ' [TR-069]';
                             var opt = document.createElement('option');
                             opt.value = v.vlan_id;
                             opt.textContent = label;
