@@ -1183,9 +1183,27 @@
  ALTER TABLE onu_discovery_log ADD COLUMN IF NOT EXISTS authorized_at TIMESTAMP;
  ALTER TABLE onu_discovery_log ADD COLUMN IF NOT EXISTS onu_type_id INTEGER;
  ALTER TABLE onu_discovery_log ADD COLUMN IF NOT EXISTS equipment_id VARCHAR(100);
+-- Signal history table for ONU optical monitoring
+CREATE TABLE IF NOT EXISTS onu_signal_history (
+    id SERIAL PRIMARY KEY,
+    onu_id INTEGER REFERENCES huawei_onus(id) ON DELETE CASCADE,
+    rx_power DECIMAL(6,2),
+    tx_power DECIMAL(6,2),
+    distance INTEGER,
+    temperature DECIMAL(5,2),
+    voltage DECIMAL(5,2),
+    status VARCHAR(20),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_signal_history_onu_id ON onu_signal_history(onu_id);
+CREATE INDEX IF NOT EXISTS idx_signal_history_recorded_at ON onu_signal_history(recorded_at);
+
  ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS onu_id INTEGER;
  ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS rx_power NUMERIC;
  ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS tx_power NUMERIC;
+ ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS distance INTEGER;
+ ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS temperature DECIMAL(5,2);
+ ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS voltage DECIMAL(5,2);
  ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS status VARCHAR(20);
  ALTER TABLE onu_signal_history ADD COLUMN IF NOT EXISTS recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
  ALTER TABLE onu_uptime_log ADD COLUMN IF NOT EXISTS onu_id INTEGER;
