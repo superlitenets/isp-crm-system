@@ -637,6 +637,120 @@ class HuaweiOLT {
         return ['success' => true, 'onus' => $onus, 'count' => count($onus)];
     }
     
+    /**
+     * Discover unconfigured/autofind ONUs via SNMP (like SmartOLT does)
+     * Uses hwGponOntAutoFindTable OID: 1.3.6.1.4.1.2011.6.128.1.1.2.52
+     */
+    public function getUnconfiguredONUsViaSNMP(int $oltId): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        if (!function_exists('snmprealwalk')) {
+            return ['success' => false, 'error' => 'PHP SNMP extension not installed'];
+        }
+        
+        $community = $olt['snmp_community'] ?? $olt['snmp_read_community'] ?? 'public';
+        $host = $olt['ip_address'] . ':' . ($olt['snmp_port'] ?? 161);
+        
+        if (function_exists('snmp_set_quick_print')) {
+            snmp_set_quick_print(true);
+        }
+        if (function_exists('snmp_set_valueretrieval')) {
+            snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
+        }
+        
+        // hwGponOntAutoFindTable - contains unconfigured ONUs
+        // .52.1.2 = hwGponDeviceOntAutoFindOnuType (ONU type/equipment ID)
+        // .52.1.3 = hwGponDeviceOntAutoFindSerialNumber
+        // .52.1.4 = hwGponDeviceOntAutoFindPassword (LOID if used)
+        $autofindBase = '1.3.6.1.4.1.2011.6.128.1.1.2.52';
+        $autofindSerialOid = $autofindBase . '.1.3';  // Serial number
+        $autofindTypeOid = $autofindBase . '.1.2';    // ONU type/equipment ID
+        
+        $serials = @snmprealwalk($host, $community, $autofindSerialOid, 15000000, 2);
+        
+        if ($serials === false || empty($serials)) {
+            // Try alternative OID structure
+            $altSerialOid = $autofindBase . '.1.1';
+            $serials = @snmprealwalk($host, $community, $altSerialOid, 15000000, 2);
+        }
+        
+        if ($serials === false || empty($serials)) {
+            return ['success' => false, 'error' => 'No unconfigured ONUs found via SNMP or autofind table not accessible'];
+        }
+        
+        $types = @snmprealwalk($host, $community, $autofindTypeOid, 10000000, 2);
+        
+        $unconfigured = [];
+        foreach ($serials as $oid => $serial) {
+            // Parse index from OID: base.column.frame.slot.port.index
+            $indexPart = substr($oid, strlen($autofindSerialOid) + 1);
+            $parts = explode('.', $indexPart);
+            
+            $frame = 0;
+            $slot = 0;
+            $port = 0;
+            $index = 0;
+            
+            if (count($parts) >= 4) {
+                $frame = (int)$parts[0];
+                $slot = (int)$parts[1];
+                $port = (int)$parts[2];
+                $index = (int)$parts[3];
+            } elseif (count($parts) >= 2) {
+                // ifIndex.index format - decode ifIndex
+                $ifIndex = (int)$parts[0];
+                $index = (int)$parts[1];
+                
+                if ($ifIndex > 0xFFFFFF) {
+                    $ponIndex = $ifIndex & 0xFFFFFF;
+                } else {
+                    $ponIndex = $ifIndex;
+                }
+                
+                if ($ponIndex > 0) {
+                    $port = ($ponIndex >> 13) & 0x7;
+                    $slot = ($ponIndex >> 8) & 0x1F;
+                    $frame = $ponIndex & 0xFF;
+                    
+                    if ($frame > 7) {
+                        $slot = (int)floor($ponIndex / 256);
+                        $port = $ponIndex % 256;
+                        $frame = 0;
+                        
+                        if ($slot > 21 || $port > 15) {
+                            $slot = (int)floor($ponIndex / 8);
+                            $port = $ponIndex % 8;
+                        }
+                    }
+                }
+            }
+            
+            // Get ONU type if available
+            $typeOid = $autofindTypeOid . '.' . $indexPart;
+            $onuType = isset($types[$typeOid]) ? $this->cleanSnmpValue($types[$typeOid]) : '';
+            
+            $cleanSerial = $this->cleanSnmpValue($serial);
+            if (empty($cleanSerial)) continue;
+            
+            $unconfigured[] = [
+                'sn' => $cleanSerial,
+                'frame' => $frame,
+                'slot' => $slot,
+                'port' => $port,
+                'index' => $index,
+                'onu_type' => $onuType,
+                'fsp' => "{$frame}/{$slot}/{$port}"
+            ];
+        }
+        
+        error_log("SNMP Autofind: Found " . count($unconfigured) . " unconfigured ONUs on OLT {$oltId}");
+        
+        return ['success' => true, 'onus' => $unconfigured, 'count' => count($unconfigured)];
+    }
+    
     public function getONUOpticalInfoViaSNMP(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
