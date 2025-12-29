@@ -11851,17 +11851,11 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         <p class="text-muted small">ONU: <strong id="pppoeWanOnuSn"></strong></p>
                         
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">PPPoE VLAN</label>
-                                <input type="number" name="pppoe_vlan" class="form-control" value="902" required>
-                                <small class="text-muted">Internet service VLAN</small>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">GEM Port</label>
-                                <input type="number" name="gemport" class="form-control" value="1">
-                                <small class="text-muted">Usually 1 for internet</small>
-                            </div>
+                        <input type="hidden" name="gemport" value="1">
+                        <div class="mb-3">
+                            <label class="form-label">PPPoE VLAN</label>
+                            <input type="number" name="pppoe_vlan" class="form-control" value="902" required>
+                            <small class="text-muted">Internet service VLAN</small>
                         </div>
                         
                         <div class="mb-3">
