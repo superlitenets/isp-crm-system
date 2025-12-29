@@ -4258,16 +4258,14 @@ try {
                 </div>
             </div>
             
-            <?php if (!empty($discoveredOnus)): ?>
-            <div class="card shadow-sm mb-3 border-warning">
-                <div class="card-header bg-warning bg-opacity-25 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="mb-0"><i class="bi bi-broadcast me-2"></i>Pending Authorization (<?= count($discoveredOnus) ?>)</h6>
-                        <small class="text-muted">Auto-discovered by OLT Session Manager - refreshes every 30 seconds</small>
-                    </div>
-                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i> Requires Action</span>
-                </div>
+            <div class="card shadow-sm">
                 <div class="card-body p-0">
+                    <?php if (empty($onus) && empty($discoveredOnus)): ?>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-inbox fs-1 mb-2 d-block"></i>
+                        No ONUs found
+                    </div>
+                    <?php elseif (empty($onus) && !empty($discoveredOnus)): ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
@@ -4320,22 +4318,6 @@ try {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            
-            <div class="card shadow-sm">
-                <div class="card-body p-0">
-                    <?php if (empty($onus) && empty($discoveredOnus)): ?>
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-inbox fs-1 mb-2 d-block"></i>
-                        No ONUs found
-                    </div>
-                    <?php elseif (empty($onus)): ?>
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-check-circle fs-3 mb-2 d-block text-success"></i>
-                        All discovered ONUs shown above
                     </div>
                     <?php else: ?>
                     <!-- Bulk Action Toolbar -->
