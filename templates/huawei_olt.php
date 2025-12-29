@@ -3410,17 +3410,18 @@ try {
                     </div>
                 </div>
                 <div class="col-md-3">
+                    <?php $totalPendingDash = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
                     <div class="card stat-card stat-warning shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="stat-icon bg-warning bg-opacity-10 text-warning">
                                     <i class="bi bi-hourglass-split fs-4"></i>
                                 </div>
-                                <?php if ($stats['unconfigured_onus'] > 0): ?>
+                                <?php if ($totalPendingDash > 0): ?>
                                 <span class="badge bg-warning text-dark badge-pulse">New!</span>
                                 <?php endif; ?>
                             </div>
-                            <div class="stat-value text-warning"><?= $stats['unconfigured_onus'] ?></div>
+                            <div class="stat-value text-warning" id="dashPendingCount"><?= $totalPendingDash ?></div>
                             <div class="stat-label">Pending Authorization</div>
                             <a href="?page=huawei-olt&view=onus&unconfigured=1" class="btn btn-sm btn-warning w-100 mt-3">
                                 <i class="bi bi-arrow-right me-1"></i> Authorize Now
@@ -3734,14 +3735,15 @@ try {
                     const uptimePercent = totalOnus > 0 ? ((stats.online_onus / totalOnus) * 100).toFixed(1) : 0;
                     
                     // Update stat values with animation
+                    const totalPending = (stats.unconfigured_onus || 0) + (stats.discovered_onus || 0);
                     updateElement('.stat-card.stat-success .stat-value', stats.online_onus.toLocaleString());
                     updateElement('.stat-card.stat-danger .stat-value', (stats.offline_onus + stats.los_onus).toString());
-                    updateElement('.stat-card.stat-warning .stat-value', stats.unconfigured_onus.toString());
+                    updateElement('.stat-card.stat-warning .stat-value', totalPending.toString());
                     
                     // Update pending button
                     const pendingBtn = document.querySelector('a[href*="unconfigured=1"].btn-warning');
                     if (pendingBtn) {
-                        pendingBtn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i> Pending (${stats.unconfigured_onus})`;
+                        pendingBtn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i> Pending (${totalPending})`;
                     }
                     
                     // Update timestamp
@@ -4744,7 +4746,7 @@ try {
                 };
                 
                 // ==================== Browser Notifications ====================
-                let lastPendingCount = <?= $stats['unconfigured_onus'] ?? 0 ?>;
+                let lastPendingCount = <?= ($stats['unconfigured_onus'] ?? 0) + ($stats['discovered_onus'] ?? 0) ?>;
                 let notificationsEnabled = false;
                 
                 async function requestNotificationPermission() {
@@ -4769,7 +4771,7 @@ try {
                         const resp = await fetch('?page=huawei-olt&ajax=realtime_stats');
                         const data = await resp.json();
                         if (data.success) {
-                            const newPending = data.stats.unconfigured_onus;
+                            const newPending = (data.stats.unconfigured_onus || 0) + (data.stats.discovered_onus || 0);
                             if (newPending > lastPendingCount) {
                                 const diff = newPending - lastPendingCount;
                                 sendBrowserNotification('New ONU Discovered!', 
