@@ -5005,6 +5005,8 @@ class HuaweiOLT {
         // Get service profile ID from ONU type
         $srvProfileId = null;
         $autoCreatedProfile = false;
+        $usedProfileName = null;
+        $profileSource = 'unknown';
         
         if ($equipmentId) {
             $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $equipmentId);
@@ -5018,6 +5020,8 @@ class HuaweiOLT {
             
             if ($oltSrvProfile) {
                 $srvProfileId = $oltSrvProfile['id'];
+                $usedProfileName = $oltSrvProfile['name'] ?? $equipmentId;
+                $profileSource = $autoCreatedProfile ? 'auto-created' : 'olt-matched';
                 $msg = $autoCreatedProfile ? "Created and using" : "Using existing";
                 error_log("SmartOLT-style: {$msg} ONU type '{$equipmentId}' → srv_profile {$srvProfileId}, line_profile {$lineProfileId}");
             }
@@ -5029,6 +5033,8 @@ class HuaweiOLT {
             if ($crmProfile) {
                 $lineProfileId = !empty($crmProfile['line_profile']) ? (int)$crmProfile['line_profile'] : $lineProfileId;
                 $srvProfileId = !empty($crmProfile['srv_profile']) ? (int)$crmProfile['srv_profile'] : null;
+                $usedProfileName = $crmProfile['name'] ?? 'CRM Profile';
+                $profileSource = 'crm-fallback';
             }
         }
         
@@ -5039,7 +5045,9 @@ class HuaweiOLT {
         // Store profile IDs for the command
         $profile = [
             'line_profile' => $lineProfileId,
-            'srv_profile' => $srvProfileId
+            'srv_profile' => $srvProfileId,
+            'profile_name' => $usedProfileName,
+            'profile_source' => $profileSource
         ];
         
         $frame = $onu['frame'] ?? 0;
@@ -5203,8 +5211,20 @@ class HuaweiOLT {
             ];
         }
         
-        // Build detailed message
-        $statusMessage = "ONU authorized successfully as ONU ID {$assignedOnuId}";
+        // Build detailed message with profile info
+        $profileInfo = $profile['profile_name'] ? "{$profile['profile_name']} (ID:{$profile['srv_profile']})" : "srv-profile {$profile['srv_profile']}";
+        $profileSourceLabel = match($profile['profile_source']) {
+            'auto-created' => 'auto-created',
+            'olt-matched' => 'matched',
+            'crm-fallback' => 'CRM fallback',
+            default => ''
+        };
+        
+        $statusMessage = "ONU authorized as ID {$assignedOnuId} using {$profileInfo}";
+        if ($profileSourceLabel) {
+            $statusMessage .= " [{$profileSourceLabel}]";
+        }
+        
         if (isset($tr069Status['attempted']) && $tr069Status['attempted']) {
             if ($tr069Status['success']) {
                 $statusMessage .= ". TR-069 configured (VLAN {$tr069Vlan})";
@@ -5218,7 +5238,7 @@ class HuaweiOLT {
         $this->addLog([
             'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize',
             'status' => 'success',
-            'message' => "ONU {$onu['sn']} authorized as {$description}" . ($assignedOnuId ? " (ONU ID: {$assignedOnuId})" : '') . (isset($tr069Status['success']) && $tr069Status['success'] ? " with TR-069" : ''),
+            'message' => "ONU {$onu['sn']} authorized as {$description} (ONU ID: {$assignedOnuId}) using {$profileInfo}" . (isset($tr069Status['success']) && $tr069Status['success'] ? " with TR-069" : ''),
             'command_sent' => $cliScript,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
@@ -5242,6 +5262,12 @@ class HuaweiOLT {
             'onu_id' => $assignedOnuId,
             'description' => $description,
             'output' => $output,
+            'profile_used' => [
+                'name' => $profile['profile_name'],
+                'srv_profile_id' => $profile['srv_profile'],
+                'line_profile_id' => $profile['line_profile'],
+                'source' => $profile['profile_source']
+            ],
             'tr069_configured' => isset($tr069Status['success']) && $tr069Status['success'],
             'tr069_status' => $tr069Status ?? ['attempted' => false]
         ];
