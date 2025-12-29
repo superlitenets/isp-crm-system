@@ -1158,6 +1158,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
+                // Configure PPPoE WAN via OMCI if credentials provided and auth succeeded
+                $pppoeConfigured = false;
+                if ($messageType === 'success' && !empty($_POST['pppoe_username']) && !empty($_POST['pppoe_password'])) {
+                    try {
+                        $pppoeConfig = [
+                            'pppoe_vlan' => (int)($_POST['wan_vlan'] ?? 902),
+                            'pppoe_username' => $_POST['pppoe_username'],
+                            'pppoe_password' => $_POST['pppoe_password'],
+                            'gemport' => 1,
+                            'nat_enabled' => isset($_POST['nat_enable']) ? true : true,
+                            'priority' => 0
+                        ];
+                        $pppoeResult = $huaweiOLT->configureWANPPPoE($onuId, $pppoeConfig);
+                        if ($pppoeResult['success']) {
+                            $pppoeConfigured = true;
+                            $message .= ' PPPoE WAN configured via OMCI.';
+                        } else {
+                            $message .= ' PPPoE OMCI config: ' . ($pppoeResult['message'] ?? 'partial');
+                        }
+                    } catch (Exception $e) {
+                        error_log("PPPoE OMCI config failed: " . $e->getMessage());
+                    }
+                }
+                
                 // Queue TR-069 configuration if WAN/WiFi settings provided and auth succeeded
                 $tr069Queued = false;
                 if ($messageType === 'success' && (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24']))) {
@@ -1172,7 +1196,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'wifi_ssid_24' => $_POST['wifi_ssid_24'] ?? '',
                         'wifi_pass_24' => $_POST['wifi_pass_24'] ?? '',
                         'wifi_ssid_5' => $_POST['wifi_ssid_5'] ?? '',
-                        'wifi_pass_5' => $_POST['wifi_pass_5'] ?? ''
+                        'wifi_pass_5' => $_POST['wifi_pass_5'] ?? '',
+                        'pppoe_omci_configured' => $pppoeConfigured
                     ];
                     
                     // Ensure TR-069 config table exists with all required columns
