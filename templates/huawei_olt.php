@@ -5051,6 +5051,9 @@ try {
                                         <i class="bi bi-arrow-clockwise me-1"></i> Reboot ONU
                                     </button>
                                 </form>
+                                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#tr069ConfigModal">
+                                    <i class="bi bi-broadcast me-1"></i> Push TR-069 Config
+                                </button>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -6556,6 +6559,92 @@ try {
                 barEl.className = `progress-bar bg-${rxClass}`;
                 barEl.style.width = pct + '%';
             }
+            </script>
+            
+            <!-- TR-069 Configuration Modal -->
+            <?php
+            // Get TR-069 settings for modal
+            $tr069AcsUrl = '';
+            $tr069DefaultVlan = '';
+            $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('tr069_acs_url', 'genieacs_url')");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if ($row['setting_key'] === 'tr069_acs_url') $tr069AcsUrl = $row['setting_value'];
+                elseif ($row['setting_key'] === 'genieacs_url' && empty($tr069AcsUrl)) $tr069AcsUrl = $row['setting_value'];
+            }
+            // Get TR-069 VLANs for this OLT
+            $tr069Vlans = [];
+            $stmt = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = TRUE AND is_active = TRUE ORDER BY vlan_id");
+            $stmt->execute([$currentOnu['olt_id']]);
+            $tr069Vlans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            ?>
+            <div class="modal fade" id="tr069ConfigModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title"><i class="bi bi-broadcast me-2"></i>Push TR-069 Configuration</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" id="tr069ConfigForm">
+                            <div class="modal-body">
+                                <input type="hidden" name="action" value="configure_tr069">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    This will push TR-069 configuration directly to the ONU via OMCI commands on the OLT.
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ACS Server URL</label>
+                                    <input type="url" name="acs_url" class="form-control" value="<?= htmlspecialchars($tr069AcsUrl) ?>" placeholder="http://10.200.0.1:7547" required>
+                                    <div class="form-text">The TR-069 ACS server URL (e.g., GenieACS)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">TR-069 Management VLAN</label>
+                                    <?php if (!empty($tr069Vlans)): ?>
+                                    <select name="tr069_vlan" class="form-select" required>
+                                        <?php foreach ($tr069Vlans as $vlan): ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'TR-069 VLAN') ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <?php else: ?>
+                                    <input type="number" name="tr069_vlan" class="form-control" value="69" min="1" max="4094" required>
+                                    <div class="form-text text-warning">No TR-069 VLANs configured for this OLT. Enter VLAN ID manually.</div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">GEM Port</label>
+                                    <input type="number" name="gem_port" class="form-control" value="2" min="1" max="128">
+                                    <div class="form-text">GEM port for TR-069 traffic (default: 2)</div>
+                                </div>
+                                
+                                <div class="card bg-light">
+                                    <div class="card-body small">
+                                        <strong>ONU Details:</strong><br>
+                                        SN: <?= htmlspecialchars($currentOnu['sn']) ?><br>
+                                        Location: <?= $currentOnu['frame'] ?? 0 ?>/<?= $currentOnu['slot'] ?? 0 ?>/<?= $currentOnu['port'] ?? 0 ?> ONU <?= $currentOnu['onu_id'] ?? 'N/A' ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success" id="btnPushTr069">
+                                    <i class="bi bi-broadcast me-1"></i> Push Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            document.getElementById('tr069ConfigForm').addEventListener('submit', function(e) {
+                const btn = document.getElementById('btnPushTr069');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Pushing...';
+            });
             </script>
             <?php endif; ?>
             
