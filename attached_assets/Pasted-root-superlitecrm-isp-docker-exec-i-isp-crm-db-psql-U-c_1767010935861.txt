@@ -1,0 +1,68 @@
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "\d huawei_olts"
+                                             Table "public.huawei_olts"
+        Column        |            Type             | Collation | Nullable |                 Default
+----------------------+-----------------------------+-----------+----------+-----------------------------------------
+ id                   | integer                     |           | not null | nextval('huawei_olts_id_seq'::regclass)
+ name                 | character varying(100)      |           | not null |
+ ip_address           | character varying(45)       |           | not null |
+ port                 | integer                     |           |          | 23
+ connection_type      | character varying(20)       |           |          | 'telnet'::character varying
+ username             | character varying(100)      |           |          |
+ password_encrypted   | text                        |           |          |
+ snmp_read_community  | character varying(100)      |           |          | 'public'::character varying
+ snmp_version         | character varying(10)       |           |          | 'v2c'::character varying
+ snmp_port            | integer                     |           |          | 161
+ vendor               | character varying(50)       |           |          | 'Huawei'::character varying
+ model                | character varying(100)      |           |          |
+ location             | character varying(255)      |           |          |
+ is_active            | boolean                     |           |          | true
+ last_sync_at         | timestamp without time zone |           |          |
+ last_status          | character varying(20)       |           |          | 'unknown'::character varying
+ uptime               | character varying(100)      |           |          |
+ temperature          | character varying(50)       |           |          |
+ created_at           | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ updated_at           | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ snmp_write_community | character varying(100)      |           |          | 'private'::character varying
+ boards_synced_at     | timestamp without time zone |           |          |
+ vlans_synced_at      | timestamp without time zone |           |          |
+ ports_synced_at      | timestamp without time zone |           |          |
+ uplinks_synced_at    | timestamp without time zone |           |          |
+ snmp_last_poll       | timestamp without time zone |           |          |
+ snmp_sys_name        | character varying(255)      |           |          |
+ snmp_sys_descr       | text                        |           |          |
+ snmp_sys_uptime      | character varying(100)      |           |          |
+ snmp_sys_location    | character varying(255)      |           |          |
+ snmp_status          | character varying(50)       |           |          | 'unknown'::character varying
+ software_version     | character varying(100)      |           |          |
+ firmware_version     | character varying(100)      |           |          |
+ hardware_model       | character varying(100)      |           |          |
+ system_synced_at     | timestamp without time zone |           |          |
+ branch_id            | integer                     |           |          |
+ snmp_community       | character varying(100)      |           |          | 'public'::character varying
+ cpu_usage            | integer                     |           |          |
+ memory_usage         | integer                     |           |          |
+ smartolt_id          | integer                     |           |          |
+ default_line_profile | integer                     |           |          |
+Indexes:
+    "huawei_olts_pkey" PRIMARY KEY, btree (id)
+    "idx_huawei_olts_active" btree (is_active)
+    "idx_huawei_olts_ip" btree (ip_address)
+Foreign-key constraints:
+    "huawei_olts_branch_id_fkey" FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "huawei_alerts" CONSTRAINT "huawei_alerts_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_logs" CONSTRAINT "huawei_logs_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_boards" CONSTRAINT "huawei_olt_boards_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_line_profiles" CONSTRAINT "huawei_olt_line_profiles_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_pon_ports" CONSTRAINT "huawei_olt_pon_ports_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_srv_profiles" CONSTRAINT "huawei_olt_srv_profiles_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_uplinks" CONSTRAINT "huawei_olt_uplinks_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_olt_vlans" CONSTRAINT "huawei_olt_vlans_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_onu_mgmt_ips" CONSTRAINT "huawei_onu_mgmt_ips_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_onus" CONSTRAINT "huawei_onus_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_pon_ports" CONSTRAINT "huawei_pon_ports_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "huawei_provisioning_logs" CONSTRAINT "huawei_provisioning_logs_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE SET NULL
+    TABLE "huawei_provisioning_rules" CONSTRAINT "huawei_provisioning_rules_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+    TABLE "onu_discovery_log" CONSTRAINT "onu_discovery_log_olt_id_fkey" FOREIGN KEY (olt_id) REFERENCES huawei_olts(id) ON DELETE CASCADE
+
+root@superlitecrm:~/isp#
