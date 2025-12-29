@@ -75,6 +75,28 @@ class HuaweiOLT {
         return $result ?: null;
     }
     
+    public function getStats(): array {
+        $stats = $this->db->query("
+            SELECT 
+                COUNT(*) as total_onus,
+                COUNT(*) FILTER (WHERE is_authorized = TRUE) as authorized_onus,
+                COUNT(*) FILTER (WHERE is_authorized = FALSE) as unconfigured_onus,
+                COUNT(*) FILTER (WHERE status = 'online') as online_onus,
+                COUNT(*) FILTER (WHERE status = 'offline') as offline_onus,
+                COUNT(*) FILTER (WHERE status = 'los') as los_onus
+            FROM huawei_onus
+        ")->fetch(\PDO::FETCH_ASSOC);
+        
+        return [
+            'total_onus' => (int)($stats['total_onus'] ?? 0),
+            'authorized_onus' => (int)($stats['authorized_onus'] ?? 0),
+            'unconfigured_onus' => (int)($stats['unconfigured_onus'] ?? 0),
+            'online_onus' => (int)($stats['online_onus'] ?? 0),
+            'offline_onus' => (int)($stats['offline_onus'] ?? 0),
+            'los_onus' => (int)($stats['los_onus'] ?? 0)
+        ];
+    }
+    
     public function addOLT(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO huawei_olts (name, ip_address, port, connection_type, username, password_encrypted, 
