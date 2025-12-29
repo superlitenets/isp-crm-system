@@ -3441,6 +3441,110 @@ class HuaweiOLT {
     }
     
     /**
+     * Get ONU type configuration from huawei_onu_types table
+     */
+    public function getOnuTypeConfig(string $onuType): ?array {
+        // First try exact match
+        $stmt = $this->db->prepare("SELECT * FROM huawei_onu_types WHERE LOWER(model) = LOWER(?) AND is_active = true LIMIT 1");
+        $stmt->execute([$onuType]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($result) return $result;
+        
+        // Try partial match
+        $stmt = $this->db->prepare("SELECT * FROM huawei_onu_types WHERE LOWER(model) LIKE LOWER(?) AND is_active = true LIMIT 1");
+        $stmt->execute(['%' . $onuType . '%']);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return $result ?: null;
+    }
+    
+    /**
+     * Create a service profile on the OLT for the given ONU type
+     * Uses the ONU type's port configuration (ETH, POTS, WiFi)
+     */
+    public function createOltSrvProfileForOnuType(int $oltId, string $onuType): ?array {
+        // Get ONU type configuration
+        $onuTypeConfig = $this->getOnuTypeConfig($onuType);
+        
+        // Default port configuration if not in database
+        $ethPorts = $onuTypeConfig['eth_ports'] ?? 4;
+        $potsPorts = $onuTypeConfig['pots_ports'] ?? 0;
+        $catvPorts = 0; // Most don't have CATV
+        
+        // Find the next available profile ID on the OLT
+        $nextProfileId = $this->getNextAvailableOltSrvProfileId($oltId);
+        if ($nextProfileId === null) {
+            error_log("Failed to get next available profile ID for OLT {$oltId}");
+            return null;
+        }
+        
+        // Build the service profile creation command
+        // Format: ont-srvprofile gpon profile-id X profile-name "NAME"
+        //         ont-port eth X pots Y catv Z
+        $commands = [
+            "ont-srvprofile gpon profile-id {$nextProfileId} profile-name {$onuType}",
+            "ont-port eth {$ethPorts} pots {$potsPorts} catv {$catvPorts}",
+            "commit",
+            "quit"
+        ];
+        
+        $cliScript = implode("\r\n", $commands);
+        $result = $this->executeCommand($oltId, $cliScript);
+        
+        if (!$result['success']) {
+            error_log("Failed to create service profile {$onuType} on OLT {$oltId}: " . ($result['output'] ?? 'Unknown error'));
+            return null;
+        }
+        
+        // Check for errors in output
+        $output = $result['output'] ?? '';
+        if (preg_match('/(?:Failure|Error:|failed|Invalid)/i', $output)) {
+            error_log("Error creating service profile: {$output}");
+            return null;
+        }
+        
+        error_log("Created OLT service profile '{$onuType}' with ID {$nextProfileId} (ETH:{$ethPorts}, POTS:{$potsPorts})");
+        
+        return [
+            'id' => $nextProfileId,
+            'name' => $onuType,
+            'binding_count' => 0
+        ];
+    }
+    
+    /**
+     * Get next available service profile ID on the OLT
+     */
+    public function getNextAvailableOltSrvProfileId(int $oltId): ?int {
+        $result = $this->executeCommand($oltId, 'display ont-srvprofile gpon all');
+        if (!$result['success']) return null;
+        
+        $usedIds = [0]; // Reserve 0 for default
+        $output = $result['output'] ?? '';
+        $lines = explode("\n", $output);
+        
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(\d+)\s+\S+\s+\d+\s*$/', trim($line), $matches)) {
+                $usedIds[] = (int)$matches[1];
+            }
+        }
+        
+        // Find next available ID (starting from 2)
+        sort($usedIds);
+        $nextId = 2;
+        foreach ($usedIds as $id) {
+            if ($id == $nextId) {
+                $nextId++;
+            } elseif ($id > $nextId) {
+                break;
+            }
+        }
+        
+        return min($nextId, 255); // Max profile ID is typically 255
+    }
+    
+    /**
      * Get default line profile for an OLT
      * Default is 2 (SMARTOLT_FLEXIBLE_GPON) - can be overridden per OLT
      */
@@ -4834,11 +4938,22 @@ class HuaweiOLT {
         
         // Get service profile ID from ONU type
         $srvProfileId = null;
+        $autoCreatedProfile = false;
+        
         if ($equipmentId) {
             $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $equipmentId);
+            
+            // If service profile doesn't exist on OLT, auto-create it
+            if (!$oltSrvProfile) {
+                error_log("SmartOLT-style: Service profile '{$equipmentId}' not found on OLT, creating...");
+                $oltSrvProfile = $this->createOltSrvProfileForOnuType($oltId, $equipmentId);
+                $autoCreatedProfile = true;
+            }
+            
             if ($oltSrvProfile) {
                 $srvProfileId = $oltSrvProfile['id'];
-                error_log("SmartOLT-style: Using ONU type '{$equipmentId}' → srv_profile {$srvProfileId}, line_profile {$lineProfileId}");
+                $msg = $autoCreatedProfile ? "Created and using" : "Using existing";
+                error_log("SmartOLT-style: {$msg} ONU type '{$equipmentId}' → srv_profile {$srvProfileId}, line_profile {$lineProfileId}");
             }
         }
         
@@ -4852,7 +4967,7 @@ class HuaweiOLT {
         }
         
         if ($srvProfileId === null) {
-            return ['success' => false, 'message' => "No service profile found for ONU type '{$equipmentId}'. Create a service profile on the OLT matching the ONU model."];
+            return ['success' => false, 'message' => "Failed to create service profile for ONU type '{$equipmentId}'. Check OLT connection and try again."];
         }
         
         // Store profile IDs for the command
