@@ -5117,27 +5117,24 @@ class HuaweiOLT {
         $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? null;
         
         if ($tr069Vlan && $assignedOnuId !== null) {
-            // Get ACS URL from settings
+            // Get ACS URL and profile ID from settings
             $acsUrl = $this->getTR069AcsUrl();
             $tr069Priority = $options['tr069_priority'] ?? 2;
             
             // Enter interface context for TR-069 configuration
             $tr069Script = "interface gpon {$frame}/{$slot}\r\n";
             
-            // Step 1: Create WAN with DHCP on TR-069 VLAN using IPHOST (ip-index 0)
-            // This creates the WAN connection for TR-069 management
-            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} ip-index 0 dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
+            // Step 1: Create WAN with DHCP on TR-069 VLAN
+            // Syntax matches working ONU: ont ipconfig <port> <onuId> dhcp vlan <vlan> priority <priority>
+            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
             
-            // Step 2: Set WAN service type to TR-069 (similar to ont internet-config for INTERNET)
-            $tr069Script .= "ont tr069-config {$port} {$assignedOnuId} ip-index 0\r\n";
-            
-            // Step 3: Configure TR-069 server settings (ACS URL and periodic inform)
-            if ($acsUrl) {
+            // Step 2: Configure TR-069 server settings
+            // Prefer profile-id (like working ONU uses), fallback to direct ACS URL
+            if ($tr069ProfileId) {
+                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
+            } elseif ($acsUrl) {
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url \"{$acsUrl}\"\r\n";
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
-            } elseif ($tr069ProfileId) {
-                // Fallback to profile-id if no URL configured
-                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
             }
             
             $tr069Script .= "quit";
@@ -5280,9 +5277,10 @@ class HuaweiOLT {
             return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
         };
         
-        // Step 1: Create WAN with DHCP on TR-069 VLAN using IPHOST (ip-index 0)
+        // Step 1: Create WAN with DHCP on TR-069 VLAN
+        // Syntax matches working ONU: ont ipconfig <port> <onuId> dhcp vlan <vlan> priority <priority>
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan} priority 2\r\n";
+        $cmd1 .= "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority 2\r\n";
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
         $output .= "[Step 1: WAN DHCP Config]\n" . ($result1['output'] ?? '') . "\n";
@@ -5290,32 +5288,22 @@ class HuaweiOLT {
             $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Set WAN service type to TR-069
+        // Step 2: Push ACS URL and periodic inform
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont tr069-config {$port} {$onuId} ip-index 0\r\n";
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"\r\n";
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: TR-069 Service Type]\n" . ($result2['output'] ?? '') . "\n";
+        $output .= "[Step 2: ACS URL Config]\n" . ($result2['output'] ?? '') . "\n";
         if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
-            $errors[] = "TR-069 service type config failed";
-        }
-        
-        // Step 3: Push ACS URL and periodic inform
-        $cmd3 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd3 .= "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"\r\n";
-        $cmd3 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
-        $cmd3 .= "quit";
-        $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= "[Step 3: ACS URL Config]\n" . ($result3['output'] ?? '') . "\n";
-        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
             $errors[] = "ACS URL config failed";
         }
         
-        // Step 4: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
-        $cmd4 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
-        $result4 = $this->executeCommand($oltId, $cmd4);
-        $output .= "[Step 4: Service Port]\n" . ($result4['output'] ?? '') . "\n";
-        if (!$result4['success'] || $hasRealError($result4['output'] ?? '')) {
+        // Step 3: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
+        $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
+        $result3 = $this->executeCommand($oltId, $cmd3);
+        $output .= "[Step 3: Service Port]\n" . ($result3['output'] ?? '') . "\n";
+        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
             $errors[] = "Service port creation failed";
         }
         
@@ -7710,8 +7698,8 @@ class HuaweiOLT {
             }
             
             if ($tr069Vlan) {
-                $batchCommands[] = "ont port native-vlan {$port} {$onuId} eth 1 vlan {$tr069Vlan} priority 0";
-                $batchCommands[] = "ont ipconfig {$port} {$onuId} ip-index 0 dhcp vlan {$tr069Vlan}";
+                // Configure WAN with DHCP for TR-069 (no native-vlan on ETH port needed)
+                $batchCommands[] = "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority 2";
             }
             $batchCommands[] = "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"";
             $batchCommands[] = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
