@@ -250,6 +250,24 @@ class DiscoveryWorker {
 
     async recordDiscovery(olt, onu) {
         try {
+            // Check if ONU is already authorized in huawei_onus
+            const existingOnu = await this.pool.query(`
+                SELECT id, is_authorized FROM huawei_onus 
+                WHERE sn = $1 AND olt_id = $2
+            `, [onu.sn, olt.id]);
+            
+            const isAlreadyAuthorized = existingOnu.rows.length > 0 && existingOnu.rows[0].is_authorized;
+            
+            if (isAlreadyAuthorized) {
+                // ONU is already authorized - update discovery log to mark as authorized
+                await this.pool.query(`
+                    UPDATE onu_discovery_log 
+                    SET authorized = true, authorized_at = COALESCE(authorized_at, CURRENT_TIMESTAMP)
+                    WHERE serial_number = $1 AND olt_id = $2
+                `, [onu.sn, olt.id]);
+                return; // Don't add to discovery list
+            }
+            
             const onuTypeId = await this.matchOnuType(onu.eqid);
             
             if (onuTypeId) {
