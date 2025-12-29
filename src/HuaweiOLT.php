@@ -3631,17 +3631,44 @@ class HuaweiOLT {
         $onu = $this->getONU($onuId);
         if (!$onu) return null;
         
-        // First check if ONU has equipment_id already
+        // First check if ONU has equipment_id or discovered_eqid already
         if (!empty($onu['equipment_id'])) {
             return $onu['equipment_id'];
         }
+        if (!empty($onu['discovered_eqid'])) {
+            return $onu['discovered_eqid'];
+        }
         
-        // Check discovery log
-        $stmt = $this->db->prepare("SELECT equipment_id FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
+        // Check ONU type table if onu_type_id is set
+        if (!empty($onu['onu_type_id'])) {
+            $stmt = $this->db->prepare("SELECT model FROM huawei_onu_types WHERE id = ?");
+            $stmt->execute([$onu['onu_type_id']]);
+            $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($typeRow && !empty($typeRow['model'])) {
+                return $typeRow['model'];
+            }
+        }
+        
+        // Check discovery log as fallback
+        $stmt = $this->db->prepare("SELECT equipment_id, onu_type_id FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
         $stmt->execute([$onu['sn']]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        return $row['equipment_id'] ?? null;
+        if (!empty($row['equipment_id'])) {
+            return $row['equipment_id'];
+        }
+        
+        // Also try to get model from onu_type_id in discovery log
+        if (!empty($row['onu_type_id'])) {
+            $stmt = $this->db->prepare("SELECT model FROM huawei_onu_types WHERE id = ?");
+            $stmt->execute([$row['onu_type_id']]);
+            $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($typeRow && !empty($typeRow['model'])) {
+                return $typeRow['model'];
+            }
+        }
+        
+        return null;
     }
     
     public function addServiceProfile(array $data): int {
