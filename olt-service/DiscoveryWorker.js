@@ -79,6 +79,76 @@ class DiscoveryWorker {
     async discoverOlt(olt) {
         console.log(`[Discovery] Checking OLT: ${olt.name} (${olt.ip_address})`);
 
+        // Try SNMP first for faster, non-blocking discovery
+        let usedSnmp = false;
+        try {
+            usedSnmp = await this.discoverViaSNMP(olt);
+        } catch (error) {
+            console.log(`[Discovery] SNMP discovery failed for ${olt.name}: ${error.message}`);
+        }
+
+        // Fall back to CLI only for unconfigured ONU discovery (autofind)
+        // SNMP can't discover unconfigured ONUs - they're not in the ONU table yet
+        if (!usedSnmp) {
+            await this.discoverViaCLI(olt);
+        } else {
+            // Even with SNMP, we still need CLI for autofind (unconfigured ONUs)
+            await this.discoverUnconfiguredViaCLI(olt);
+        }
+    }
+
+    async discoverViaSNMP(olt) {
+        // Call PHP API to use SNMP for ONU list and optical info
+        const url = `${this.phpApiUrl}/api/snmp-discovery.php?olt_id=${olt.id}`;
+        console.log(`[Discovery] Trying SNMP discovery for ${olt.name}...`);
+        
+        try {
+            const response = await axios.get(url, { timeout: 30000 });
+            if (response.data && response.data.success) {
+                const onus = response.data.onus || [];
+                console.log(`[Discovery] SNMP found ${onus.length} ONUs on ${olt.name}`);
+                
+                // Update optical power and distance in database
+                for (const onu of onus) {
+                    await this.updateOnuFromSNMP(olt.id, onu);
+                }
+                return true;
+            }
+        } catch (error) {
+            console.log(`[Discovery] SNMP API error: ${error.message}`);
+        }
+        return false;
+    }
+
+    async updateOnuFromSNMP(oltId, snmpData) {
+        // Update ONU optical power and distance from SNMP data
+        try {
+            const serial = snmpData.sn?.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            if (!serial) return;
+
+            await this.pool.query(`
+                UPDATE huawei_onus 
+                SET rx_power = COALESCE($1, rx_power),
+                    tx_power = COALESCE($2, tx_power),
+                    distance = COALESCE($3, distance),
+                    status = COALESCE($4, status),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE olt_id = $5 AND UPPER(REPLACE(sn, '-', '')) = $6
+            `, [
+                snmpData.rx_power || null,
+                snmpData.tx_power || null,
+                snmpData.distance || null,
+                snmpData.status || null,
+                oltId,
+                serial
+            ]);
+        } catch (error) {
+            // Ignore update errors - ONU might not exist in DB yet
+        }
+    }
+
+    async discoverViaCLI(olt) {
+        // Full CLI discovery (legacy method)
         const sessionStatus = this.sessionManager.getSessionStatus(olt.id.toString());
         if (!sessionStatus.connected) {
             console.log(`[Discovery] Connecting to ${olt.name}...`);
@@ -95,10 +165,40 @@ class DiscoveryWorker {
         const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 60000 });
 
         const unconfiguredOnus = this.parseAutofindOutput(output);
-        console.log(`[Discovery] Found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
+        console.log(`[Discovery] CLI found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
 
         for (const onu of unconfiguredOnus) {
             await this.recordDiscovery(olt, onu);
+        }
+    }
+
+    async discoverUnconfiguredViaCLI(olt) {
+        // Only discover unconfigured ONUs via CLI (autofind command)
+        // This is the only CLI command needed when SNMP handles the rest
+        try {
+            const sessionStatus = this.sessionManager.getSessionStatus(olt.id.toString());
+            if (!sessionStatus.connected) {
+                const password = this.decryptPassword(olt.password_encrypted);
+                await this.sessionManager.connect(olt.id.toString(), {
+                    host: olt.ip_address,
+                    port: olt.port || 23,
+                    username: olt.username,
+                    password: password
+                });
+            }
+
+            const command = 'display ont autofind all';
+            const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 30000 });
+
+            const unconfiguredOnus = this.parseAutofindOutput(output);
+            if (unconfiguredOnus.length > 0) {
+                console.log(`[Discovery] Found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
+                for (const onu of unconfiguredOnus) {
+                    await this.recordDiscovery(olt, onu);
+                }
+            }
+        } catch (error) {
+            console.log(`[Discovery] Autofind error on ${olt.name}: ${error.message}`);
         }
     }
 

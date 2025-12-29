@@ -5136,77 +5136,59 @@ class HuaweiOLT {
         }
         $this->updateONU($onuId, $updateData);
         
-        // Create service-port if VLAN is specified
+        // =================================================================
+        // BATCHED PROVISIONING: Combine all commands into single script
+        // This avoids multiple round trips (authorization + service-ports + TR-069)
+        // =================================================================
+        
+        $batchScript = '';
+        $tr069Status = ['attempted' => false, 'success' => false];
+        
+        // Service-port for internet VLAN (if specified)
         $vlanId = $options['vlan_id'] ?? $profile['default_vlan'] ?? null;
-        $servicePortResult = null;
         if ($vlanId && $assignedOnuId !== null) {
             $gemPort = $options['gem_port'] ?? 1;
-            // Use tag-transform translate with traffic-table index (matches SmartOLT syntax)
             $inboundIndex = $options['inbound_traffic_index'] ?? 8;
             $outboundIndex = $options['outbound_traffic_index'] ?? 9;
-            $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
-            $servicePortResult = $this->executeCommand($oltId, $spCmd);
-            $output .= "\n" . ($servicePortResult['output'] ?? '');
+            $batchScript .= "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}\r\n";
         }
         
-        // Configure TR-069 via OMCI if enabled in profile or options
-        // Auto-detect TR-069 VLAN from OLT VLANs if not explicitly set
+        // TR-069 configuration (OMCI + service-port) - all in one batch
         $tr069Vlan = $options['tr069_vlan'] ?? $profile['tr069_vlan'] ?? null;
         if (!$tr069Vlan) {
             $tr069Vlan = $this->getTR069VlanForOlt($oltId);
         }
         $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? $this->getTR069ProfileId();
+        $acsUrl = $this->getTR069AcsUrl();
         
         if ($tr069Vlan && $assignedOnuId !== null) {
-            // Get ACS URL from settings (used as fallback if no profile-id)
-            $acsUrl = $this->getTR069AcsUrl();
             $tr069Priority = $options['tr069_priority'] ?? 2;
-            
-            // Enter interface context for TR-069 configuration
-            $tr069Script = "interface gpon {$frame}/{$slot}\r\n";
-            
-            // Step 1: Create WAN with DHCP on TR-069 VLAN
-            // Syntax matches working ONU: ont ipconfig <port> <onuId> dhcp vlan <vlan> priority <priority>
-            $tr069Script .= "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
-            
-            // Step 2: Configure TR-069 server settings
-            // Prefer profile-id (like working ONU uses), fallback to direct ACS URL
-            if ($tr069ProfileId) {
-                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
-            } elseif ($acsUrl) {
-                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url {$acsUrl}\r\n";
-                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
-            }
-            
-            $tr069Script .= "quit";
-            
-            $tr069Result = $this->executeCommand($oltId, $tr069Script);
-            $tr069Output = $tr069Result['output'] ?? '';
-            $output .= "\n[TR-069 Config]\n" . $tr069Output;
-            
-            // Check if TR-069 configuration had errors
-            $tr069HasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $tr069Output);
-            $tr069Success = $tr069Result['success'] && !$tr069HasError;
-            
-            // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
-            // Use tagged VLAN (user-vlan <vlan>) to match ONU's tagged TR-069 traffic
             $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
-            // TR-069 uses traffic-table index 7 (management traffic)
             $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
-            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
-            $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
-            $output .= "\n" . ($tr069SpResult['output'] ?? '');
+            
+            // Enter interface context for TR-069 OMCI commands
+            $batchScript .= "interface gpon {$frame}/{$slot}\r\n";
+            $batchScript .= "ont ipconfig {$port} {$assignedOnuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
+            
+            if ($tr069ProfileId) {
+                $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
+            } elseif ($acsUrl) {
+                $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url {$acsUrl}\r\n";
+                $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
+            }
+            $batchScript .= "quit\r\n";
+            
+            // Service-port for TR-069 VLAN
+            $batchScript .= "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}\r\n";
             
             $tr069Status = [
                 'attempted' => true,
-                'success' => $tr069Success,
+                'success' => true, // Will be updated if batch fails
                 'vlan' => $tr069Vlan,
                 'acs_url' => $acsUrl,
-                'gem_port' => $tr069GemPort,
-                'error' => $tr069HasError ? $tr069Output : null
+                'gem_port' => $tr069GemPort
             ];
         } else {
-            // TR-069 not configured - provide reason
             $tr069Status = [
                 'attempted' => false,
                 'success' => false,
@@ -5214,6 +5196,19 @@ class HuaweiOLT {
                 'vlan' => null,
                 'acs_url' => null
             ];
+        }
+        
+        // Execute all post-authorization commands in single batch
+        if (!empty($batchScript)) {
+            $batchResult = $this->executeCommand($oltId, $batchScript);
+            $batchOutput = $batchResult['output'] ?? '';
+            $output .= "\n[Provisioning]\n" . $batchOutput;
+            
+            // Check for TR-069 specific errors
+            if ($tr069Status['attempted'] && preg_match('/(?:Failure|Error:|failed|Invalid)/i', $batchOutput)) {
+                $tr069Status['success'] = false;
+                $tr069Status['error'] = $batchOutput;
+            }
         }
         
         // Build detailed message with profile info
