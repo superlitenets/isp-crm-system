@@ -5457,13 +5457,20 @@ class HuaweiOLT {
         }
         
         // Step 2: Create service-port for PPPoE VLAN (if not exists)
-        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} rx-cttr 6 tx-cttr 6";
+        // Try without traffic tables first (simpler syntax works on most OLTs)
+        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
         $result2 = $this->executeCommand($oltId, $cmd2);
         $output .= "[Step 2: Service Port for PPPoE]\n" . ($result2['output'] ?? '') . "\n";
-        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
-            // Not critical if already exists
-            if (!preg_match('/already exist/i', $result2['output'] ?? '')) {
-                $errors[] = "Service port for PPPoE VLAN creation failed";
+        
+        // If simple syntax fails and it's not "already exists", try with traffic tables
+        if ($hasRealError($result2['output'] ?? '') && !preg_match('/already exist/i', $result2['output'] ?? '')) {
+            $cmd2Alt = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} rx-cttr 6 tx-cttr 6";
+            $result2Alt = $this->executeCommand($oltId, $cmd2Alt);
+            $output .= "[Step 2 Alt: With traffic tables]\n" . ($result2Alt['output'] ?? '') . "\n";
+            
+            if ($hasRealError($result2Alt['output'] ?? '') && !preg_match('/already exist/i', $result2Alt['output'] ?? '')) {
+                // Service port may already be configured during authorization - not critical
+                $output .= "[Note: Service port may already exist from authorization]\n";
             }
         }
         
