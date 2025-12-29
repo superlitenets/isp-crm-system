@@ -1159,15 +1159,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 // Configure PPPoE WAN via OMCI if credentials provided and auth succeeded
+                // Use vlan_id (service VLAN) as the PPPoE VLAN - no separate wan_vlan needed
+                $serviceVlan = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : 902;
                 $pppoeConfigured = false;
                 if ($messageType === 'success' && !empty($_POST['pppoe_username']) && !empty($_POST['pppoe_password'])) {
                     try {
                         $pppoeConfig = [
-                            'pppoe_vlan' => (int)($_POST['wan_vlan'] ?? 902),
+                            'pppoe_vlan' => $serviceVlan,
                             'pppoe_username' => $_POST['pppoe_username'],
                             'pppoe_password' => $_POST['pppoe_password'],
                             'gemport' => 1,
-                            'nat_enabled' => isset($_POST['nat_enable']) ? true : true,
+                            'nat_enabled' => true,
                             'priority' => 0
                         ];
                         $pppoeResult = $huaweiOLT->configureWANPPPoE($onuId, $pppoeConfig);
@@ -1188,11 +1190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     // Store TR-069 config to be applied when device connects to ACS
                     $tr069Config = [
                         'onu_id' => $onuId,
-                        'wan_vlan' => (int)($_POST['wan_vlan'] ?? 902),
+                        'wan_vlan' => $serviceVlan,
                         'connection_type' => $_POST['connection_type'] ?? 'pppoe',
                         'pppoe_username' => $_POST['pppoe_username'] ?? '',
                         'pppoe_password' => $_POST['pppoe_password'] ?? '',
-                        'nat_enable' => isset($_POST['nat_enable']),
+                        'nat_enable' => true,
                         'wifi_ssid_24' => $_POST['wifi_ssid_24'] ?? '',
                         'wifi_pass_24' => $_POST['wifi_pass_24'] ?? '',
                         'wifi_ssid_5' => $_POST['wifi_ssid_5'] ?? '',
