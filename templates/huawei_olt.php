@@ -1005,41 +1005,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             ]);
                         }
                     } else {
-                        // CLI failed but we can still update database state (simulated success for demo)
-                        $huaweiOLT->updateONU($onuId, [
-                            'is_authorized' => true,
-                            'service_profile_id' => $profileId,
-                            'name' => $description ?: $onu['name'],
-                            'status' => 'online',
-                            'olt_sync_pending' => true,
-                            'tr069_status' => 'pending'
-                        ]);
-                        $message = "ONU marked authorized (pending OLT sync). VLAN: " . ($vlanId ?: 'default') . ". TR-069 ACS: {$acsUrl}";
-                        $messageType = 'success';
+                        // CLI command failed - do NOT mark as authorized
+                        $message = "Authorization failed: " . ($result['message'] ?? 'OLT command failed');
+                        $messageType = 'danger';
                     }
                 } catch (Exception $e) {
-                    // Connection failed - update database anyway for demo mode
-                    $huaweiOLT->updateONU($onuId, [
-                        'is_authorized' => true,
-                        'service_profile_id' => $profileId,
-                        'name' => $description ?: $onu['name'],
-                        'status' => 'online',
-                        'tr069_status' => 'pending',
-                        'olt_sync_pending' => true
-                    ]);
-                    $message = 'ONU authorized (OLT offline - will sync when connected). VLAN ' . ($vlanId ?: 'default') . ' configured.';
-                    $messageType = 'success';
+                    // Connection failed - do NOT mark as authorized
+                    $message = 'Authorization failed: ' . $e->getMessage();
+                    $messageType = 'danger';
                 }
                 
-                // Mark discovery log entry as authorized (remove from pending list)
-                $onuSn = $onu['sn'] ?? $sn;
-                if (!empty($onuSn)) {
-                    $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$onuSn]);
+                // Only mark discovery log and queue TR-069 if authorization succeeded
+                if ($messageType === 'success') {
+                    // Mark discovery log entry as authorized (remove from pending list)
+                    $onuSn = $onu['sn'] ?? $sn;
+                    if (!empty($onuSn)) {
+                        $db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = NOW() WHERE serial_number = ?")->execute([$onuSn]);
+                    }
                 }
                 
-                // Queue TR-069 configuration if WAN/WiFi settings provided
+                // Queue TR-069 configuration if WAN/WiFi settings provided and auth succeeded
                 $tr069Queued = false;
-                if (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24'])) {
+                if ($messageType === 'success' && (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24']))) {
                     // Store TR-069 config to be applied when device connects to ACS
                     $tr069Config = [
                         'onu_id' => $onuId,
