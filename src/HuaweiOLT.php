@@ -281,7 +281,7 @@ class HuaweiOLT {
         
         $output = [];
         $returnCode = 0;
-        exec($cmd, $output, $returnCode);
+        \exec($cmd, $output, $returnCode);
         
         if ($returnCode === 0 && !empty($output)) {
             $result = implode("\n", $output);
@@ -357,7 +357,7 @@ class HuaweiOLT {
         
         $output = [];
         $returnCode = 0;
-        exec($cmd, $output, $returnCode);
+        \exec($cmd, $output, $returnCode);
         
         if ($returnCode === 0 && !empty($output)) {
             $data = [];
