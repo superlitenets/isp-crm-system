@@ -2073,10 +2073,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if ($pendingConfig) {
                     $config = json_decode($pendingConfig['config_data'], true);
                     
-                    // Get TR-069 device ID
+                    // Get TR-069 device ID - first try local table
                     $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.serial_number = o.sn WHERE o.id = ?");
                     $stmt->execute([$onuId]);
                     $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    
+                    // Fallback: Query GenieACS directly by ONU serial
+                    if (!$tr069Device || !$tr069Device['device_id']) {
+                        $stmt = $db->prepare("SELECT sn FROM huawei_onus WHERE id = ?");
+                        $stmt->execute([$onuId]);
+                        $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($onu && !empty($onu['sn'])) {
+                            $deviceResult = $genieacs->getDeviceBySerial($onu['sn']);
+                            if ($deviceResult['success'] && isset($deviceResult['device'])) {
+                                $tr069Device = ['device_id' => $deviceResult['device']['_id']];
+                            }
+                        }
+                    }
                     
                     if ($tr069Device && $tr069Device['device_id']) {
                         $allSuccess = true;
