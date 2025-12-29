@@ -257,16 +257,51 @@ class GenieACS {
     }
     
     public function getWiFiSettings(string $deviceId): array {
-        $params = [
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable',
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Channel',
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Standard',
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID',
-            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable'
-        ];
+        $result = $this->getDevice($deviceId);
         
-        return $this->getParameterValues($deviceId, $params);
+        if (!$result['success'] || empty($result['data'])) {
+            return ['success' => false, 'error' => 'Device not found or no data'];
+        }
+        
+        $device = $result['data'];
+        $wifiData = [];
+        
+        $extractValue = function($device, $path) {
+            $parts = explode('.', $path);
+            $current = $device;
+            foreach ($parts as $part) {
+                if (isset($current[$part])) {
+                    $current = $current[$part];
+                } else {
+                    return null;
+                }
+            }
+            return $current['_value'] ?? $current;
+        };
+        
+        for ($i = 1; $i <= 5; $i++) {
+            $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$i}";
+            $ssid = $extractValue($device, "{$basePath}.SSID");
+            $enable = $extractValue($device, "{$basePath}.Enable");
+            $channel = $extractValue($device, "{$basePath}.Channel");
+            
+            if ($ssid !== null || $enable !== null) {
+                $wifiData[] = [
+                    "{$basePath}.SSID", 
+                    $ssid
+                ];
+                $wifiData[] = [
+                    "{$basePath}.Enable", 
+                    $enable
+                ];
+                $wifiData[] = [
+                    "{$basePath}.Channel", 
+                    $channel
+                ];
+            }
+        }
+        
+        return ['success' => true, 'data' => $wifiData];
     }
     
     public function setPPPoECredentials(string $deviceId, string $username, string $password): array {
