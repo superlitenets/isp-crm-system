@@ -5151,8 +5151,9 @@ class HuaweiOLT {
             $tr069Success = $tr069Result['success'] && !$tr069HasError;
             
             // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
+            // Use tagged VLAN (user-vlan <vlan>) to match ONU's tagged TR-069 traffic
             $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
-            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $output .= "\n" . ($tr069SpResult['output'] ?? '');
             
@@ -5310,8 +5311,8 @@ class HuaweiOLT {
             $errors[] = "ACS URL config failed";
         }
         
-        // Step 4: Create service-port for TR-069
-        $cmd4 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+        // Step 4: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
+        $cmd4 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
         $result4 = $this->executeCommand($oltId, $cmd4);
         $output .= "[Step 4: Service Port]\n" . ($result4['output'] ?? '') . "\n";
         if (!$result4['success'] || $hasRealError($result4['output'] ?? '')) {
