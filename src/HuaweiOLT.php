@@ -5141,7 +5141,10 @@ class HuaweiOLT {
         $servicePortResult = null;
         if ($vlanId && $assignedOnuId !== null) {
             $gemPort = $options['gem_port'] ?? 1;
-            $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan rx-cttr 6 tx-cttr 6";
+            // Use tag-transform translate with traffic-table index (matches SmartOLT syntax)
+            $inboundIndex = $options['inbound_traffic_index'] ?? 8;
+            $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+            $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
             $servicePortResult = $this->executeCommand($oltId, $spCmd);
             $output .= "\n" . ($servicePortResult['output'] ?? '');
         }
@@ -5188,7 +5191,9 @@ class HuaweiOLT {
             // Create service-port for TR-069 VLAN (gemport 2 typically for TR-069)
             // Use tagged VLAN (user-vlan <vlan>) to match ONU's tagged TR-069 traffic
             $tr069GemPort = $options['tr069_gem_port'] ?? $profile['tr069_gem_port'] ?? 2;
-            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
+            // TR-069 uses traffic-table index 7 (management traffic)
+            $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
+            $tr069SpCmd = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
             $tr069SpResult = $this->executeCommand($oltId, $tr069SpCmd);
             $output .= "\n" . ($tr069SpResult['output'] ?? '');
             
@@ -5356,11 +5361,15 @@ class HuaweiOLT {
         }
         
         // Step 3: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
-        $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} rx-cttr 6 tx-cttr 6";
+        // TR-069 uses traffic-table index 7 (management traffic)
+        $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index 7 outbound traffic-table index 7";
         $result3 = $this->executeCommand($oltId, $cmd3);
         $output .= "[Step 3: Service Port]\n" . ($result3['output'] ?? '') . "\n";
         if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
-            $errors[] = "Service port creation failed";
+            // Not critical if already exists
+            if (!preg_match('/already exist/i', $result3['output'] ?? '')) {
+                $errors[] = "Service port creation failed";
+            }
         }
         
         $success = empty($errors);
@@ -5457,21 +5466,14 @@ class HuaweiOLT {
         }
         
         // Step 2: Create service-port for PPPoE VLAN (if not exists)
-        // Try without traffic tables first (simpler syntax works on most OLTs)
-        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
+        // Use traffic-table index syntax (matches SmartOLT) - service VLAN uses index 8/9
+        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9";
         $result2 = $this->executeCommand($oltId, $cmd2);
         $output .= "[Step 2: Service Port for PPPoE]\n" . ($result2['output'] ?? '') . "\n";
         
-        // If simple syntax fails and it's not "already exists", try with traffic tables
+        // Not critical if service port already exists from authorization
         if ($hasRealError($result2['output'] ?? '') && !preg_match('/already exist/i', $result2['output'] ?? '')) {
-            $cmd2Alt = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} rx-cttr 6 tx-cttr 6";
-            $result2Alt = $this->executeCommand($oltId, $cmd2Alt);
-            $output .= "[Step 2 Alt: With traffic tables]\n" . ($result2Alt['output'] ?? '') . "\n";
-            
-            if ($hasRealError($result2Alt['output'] ?? '') && !preg_match('/already exist/i', $result2Alt['output'] ?? '')) {
-                // Service port may already be configured during authorization - not critical
-                $output .= "[Note: Service port may already exist from authorization]\n";
-            }
+            $output .= "[Note: Service port may already exist from authorization]\n";
         }
         
         // Step 3: Queue PPPoE credentials for TR-069 push
