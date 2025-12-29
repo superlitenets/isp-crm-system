@@ -2632,7 +2632,7 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         $genieacs = new \App\GenieACS($db);
         $genieacsConfigured = $genieacs->isConfigured();
         
-        // Check for TR-069 device by serial number
+        // Check for TR-069 device by serial number in local table first
         $stmt = $db->prepare("SELECT * FROM tr069_devices WHERE serial_number = ?");
         $stmt->execute([$currentOnu['sn']]);
         $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -2645,11 +2645,30 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
             $pendingTr069Config['config'] = json_decode($pendingTr069Config['config_data'], true);
         }
         
-        // If device found in ACS and GenieACS is configured, get live info
+        // If device found in local table and GenieACS is configured, get live info
         if ($genieacsConfigured && $tr069Device && $tr069Device['device_id']) {
             $deviceResult = $genieacs->getDeviceInfo($tr069Device['device_id']);
             if ($deviceResult['success']) {
                 $tr069Info = $deviceResult['info'];
+            }
+        }
+        // Fallback: If not in local table but GenieACS is configured, try direct lookup
+        elseif ($genieacsConfigured && !$tr069Device && !empty($currentOnu['sn'])) {
+            $deviceResult = $genieacs->getDeviceBySerial($currentOnu['sn']);
+            if ($deviceResult['success'] && isset($deviceResult['device'])) {
+                $device = $deviceResult['device'];
+                $deviceId = $device['_id'] ?? '';
+                // Create a pseudo tr069Device for display
+                $tr069Device = [
+                    'device_id' => $deviceId,
+                    'serial_number' => $currentOnu['sn'],
+                    'from_genieacs' => true
+                ];
+                // Get device info
+                $infoResult = $genieacs->getDeviceInfo($deviceId);
+                if ($infoResult['success']) {
+                    $tr069Info = $infoResult['info'];
+                }
             }
         }
     } catch (Exception $e) {

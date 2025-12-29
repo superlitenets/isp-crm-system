@@ -38,7 +38,8 @@ class GenieACS {
             // If settings check fails, fall back to URL check
         }
         
-        return !empty($this->baseUrl) && $this->baseUrl !== 'http://localhost:7557';
+        // Just check that URL is not empty - allow localhost/127.0.0.1 URLs
+        return !empty($this->baseUrl);
     }
     
     public function getBaseUrl(): string {
