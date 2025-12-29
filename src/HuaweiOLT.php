@@ -5114,10 +5114,10 @@ class HuaweiOLT {
         if (!$tr069Vlan) {
             $tr069Vlan = $this->getTR069VlanForOlt($oltId);
         }
-        $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? null;
+        $tr069ProfileId = $options['tr069_profile_id'] ?? $profile['tr069_profile_id'] ?? $this->getTR069ProfileId();
         
         if ($tr069Vlan && $assignedOnuId !== null) {
-            // Get ACS URL and profile ID from settings
+            // Get ACS URL from settings (used as fallback if no profile-id)
             $acsUrl = $this->getTR069AcsUrl();
             $tr069Priority = $options['tr069_priority'] ?? 2;
             
@@ -7134,6 +7134,20 @@ class HuaweiOLT {
             }
             
             return null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Get the TR-069 server profile ID from settings
+     * This profile-id is configured on the OLT and contains ACS URL, username, password
+     */
+    private function getTR069ProfileId(): ?int {
+        try {
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_profile_id'");
+            $profileId = $stmt->fetchColumn();
+            return $profileId ? (int)$profileId : null;
         } catch (\Exception $e) {
             return null;
         }
