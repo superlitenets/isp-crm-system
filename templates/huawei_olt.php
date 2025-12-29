@@ -5210,12 +5210,6 @@ try {
                             <i class="bi bi-sliders me-2"></i>Service Profile
                         </div>
                         <div class="card-body">
-                            <div class="alert alert-info small mb-3">
-                                <i class="bi bi-info-circle me-1"></i>
-                                <strong>OMCI configuration is applied automatically</strong> based on the assigned service profile.
-                                Customer-facing settings (WAN, Wi-Fi) are managed via TR-069/ACS below.
-                            </div>
-                            
                             <div class="mb-3">
                                 <label class="form-label">Current Profile</label>
                                 <div class="d-flex align-items-center">
@@ -5280,21 +5274,13 @@ try {
                     <div class="card shadow-sm">
                         <div class="card-header bg-purple text-white d-flex justify-content-between align-items-center" style="background-color:#6f42c1">
                             <span><i class="bi bi-gear-wide-connected me-2"></i>TR-069 / GenieACS Status</span>
-                            <?php if (!$genieacsConfigured): ?>
-                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>ACS Not Configured</span>
-                            <?php elseif ($tr069Device): ?>
+                            <?php if ($tr069Device): ?>
                             <span class="badge bg-light text-dark"><i class="bi bi-check-circle-fill text-success me-1"></i>Connected to ACS</span>
                             <?php else: ?>
                             <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Awaiting ACS Connection</span>
                             <?php endif; ?>
                         </div>
                         <div class="card-body">
-                            <?php if (!$genieacsConfigured): ?>
-                            <div class="alert alert-danger mb-3">
-                                <i class="bi bi-exclamation-triangle me-2"></i>
-                                <strong>GenieACS not configured.</strong> Please configure the ACS URL in OMS Settings to enable TR-069 remote management.
-                            </div>
-                            <?php endif; ?>
                             <div class="row">
                                 <div class="col-md-6">
                                     <h6 class="text-muted mb-3"><i class="bi bi-cpu me-2"></i>Device Information</h6>
@@ -5372,9 +5358,7 @@ try {
                                         Configuration applied on <?= date('M j, H:i', strtotime($pendingTr069Config['applied_at'])) ?>
                                     </div>
                                     <?php else: ?>
-                                    <div class="alert alert-secondary mb-0">
-                                        <i class="bi bi-info-circle me-2"></i>No pending TR-069 configuration. Use the forms below to configure WAN/WiFi/LAN settings.
-                                    </div>
+                                    <p class="text-muted mb-0"><i class="bi bi-check-circle me-1"></i>No pending configuration</p>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -5393,11 +5377,6 @@ try {
                     </span>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-secondary small mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        <strong>Customer-facing settings</strong> (WAN, Wi-Fi, LAN) are managed via TR-069/ACS.
-                        Configuration intents are pushed to GenieACS which applies them to the CPE.
-                    </div>
                     <!-- TR-069 Tabs -->
                     <ul class="nav nav-tabs mb-3" id="tr069Tabs" role="tablist">
                         <li class="nav-item" role="presentation">

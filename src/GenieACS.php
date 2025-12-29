@@ -27,7 +27,22 @@ class GenieACS {
     }
     
     public function isConfigured(): bool {
+        // Check if GenieACS is enabled in settings
+        try {
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_enabled'");
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $enabled = ($row['setting_value'] ?? '0') === '1';
+            
+            if (!$enabled) return false;
+        } catch (\Exception $e) {
+            // If settings check fails, fall back to URL check
+        }
+        
         return !empty($this->baseUrl) && $this->baseUrl !== 'http://localhost:7557';
+    }
+    
+    public function getBaseUrl(): string {
+        return $this->baseUrl;
     }
     
     private function request(string $method, string $endpoint, ?array $data = null, array $query = []): array {
