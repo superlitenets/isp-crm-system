@@ -5133,7 +5133,7 @@ class HuaweiOLT {
             if ($tr069ProfileId) {
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
             } elseif ($acsUrl) {
-                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url \"{$acsUrl}\"\r\n";
+                $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url {$acsUrl}\r\n";
                 $tr069Script .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
             }
             
@@ -5290,7 +5290,7 @@ class HuaweiOLT {
         
         // Step 2: Push ACS URL and periodic inform
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"\r\n";
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}\r\n";
         $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
@@ -7715,7 +7715,7 @@ class HuaweiOLT {
                 // Configure WAN with DHCP for TR-069 (no native-vlan on ETH port needed)
                 $batchCommands[] = "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority 2";
             }
-            $batchCommands[] = "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"";
+            $batchCommands[] = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
             $batchCommands[] = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
             
             if (count($batchCommands) >= $batchSize * 4) {
