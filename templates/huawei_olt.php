@@ -2256,6 +2256,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'refresh_tr069_ip':
+                $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
+                if ($result['success']) {
+                    $message = $result['message'];
+                    $messageType = 'success';
+                } else {
+                    $message = $result['message'] ?? 'Failed to get TR-069 IP';
+                    $messageType = 'warning';
+                }
+                break;
             case 'refresh_all_optical':
             case 'refresh_all_optical_cli':
                 $result = $huaweiOLT->refreshAllONUOpticalViaCLI((int)$_POST['olt_id']);
@@ -4991,7 +5001,12 @@ try {
                                         <span id="liveDistance" class="fw-bold"><?= $currentOnu['distance'] ? $currentOnu['distance'] . ' m' : 'N/A' ?></span>
                                     </div>
                                     <div class="col-4">
-                                        <div class="h6 text-muted">TR-069 IP</div>
+                                        <div class="h6 text-muted">TR-069 IP 
+                                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshTR069IP()" title="Refresh TR-069 IP from OLT">
+                                                <i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i>
+                                            </button>
+                                        </div>
+                                        <span id="tr069IpDisplay">
                                         <?php if (!empty($currentOnu['tr069_ip'])): ?>
                                         <code class="text-primary fw-bold"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></code>
                                         <?php elseif (!empty($tr069Info['ip'])): ?>
@@ -4999,6 +5014,7 @@ try {
                                         <?php else: ?>
                                         <span class="text-muted small">Waiting...</span>
                                         <?php endif; ?>
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -5199,7 +5215,35 @@ try {
                 // Initial load
                 loadSignalHistory(7);
             })();
+            
+            // TR-069 IP refresh function
+            async function refreshTR069IP() {
+                const icon = document.getElementById('tr069RefreshIcon');
+                const display = document.getElementById('tr069IpDisplay');
+                const onuId = <?= $currentOnu['id'] ?>;
+                
+                icon.classList.add('spin-animation');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'refresh_tr069_ip');
+                    formData.append('onu_id', onuId);
+                    
+                    const resp = await fetch('?page=huawei-olt', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    // Page will reload with updated IP
+                    location.reload();
+                } catch (e) {
+                    console.error('Failed to refresh TR-069 IP:', e);
+                    icon.classList.remove('spin-animation');
+                    alert('Failed to refresh TR-069 IP');
+                }
+            }
             </script>
+            <style>.spin-animation { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
             
             <div class="row">
                 <div class="col-md-6">

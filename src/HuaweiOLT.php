@@ -5319,6 +5319,71 @@ class HuaweiOLT {
         ];
     }
     
+    /**
+     * Fetch TR-069 IP address from OLT for an ONU
+     * Uses display ont wan-info command to get the DHCP-assigned IP
+     */
+    public function getONUTR069IP(int $onuDbId): ?string {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu || !$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return null;
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        // Try display ont wan-info command
+        $cmd = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd .= "display ont wan-info {$port} {$onuId}\r\n";
+        $cmd .= "quit";
+        
+        $result = $this->executeCommand($oltId, $cmd);
+        $output = $result['output'] ?? '';
+        
+        // Parse IP address from output
+        // Format: IP address : 10.200.0.x or similar
+        if (preg_match('/IP\s*(?:address)?\s*:\s*([\d.]+)/i', $output, $m)) {
+            $ip = $m[1];
+            if ($ip && $ip !== '0.0.0.0') {
+                // Update the ONU record with the TR-069 IP
+                $this->updateONU($onuDbId, ['tr069_ip' => $ip]);
+                return $ip;
+            }
+        }
+        
+        // Try alternative: display ont ip-host
+        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd2 .= "display ont ip-host-config {$port} {$onuId}\r\n";
+        $cmd2 .= "quit";
+        
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output2 = $result2['output'] ?? '';
+        
+        if (preg_match('/(?:IP|Host)\s*(?:address)?\s*:\s*([\d.]+)/i', $output2, $m)) {
+            $ip = $m[1];
+            if ($ip && $ip !== '0.0.0.0') {
+                $this->updateONU($onuDbId, ['tr069_ip' => $ip]);
+                return $ip;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Refresh TR-069 IP for an ONU (called from UI)
+     */
+    public function refreshONUTR069IP(int $onuDbId): array {
+        $ip = $this->getONUTR069IP($onuDbId);
+        if ($ip) {
+            return ['success' => true, 'tr069_ip' => $ip, 'message' => "TR-069 IP: {$ip}"];
+        }
+        return ['success' => false, 'message' => 'Could not retrieve TR-069 IP from OLT'];
+    }
+    
     private function generateNextSNSCode(int $oltId): string {
         // Find highest SNS number for this OLT
         $stmt = $this->db->prepare("
