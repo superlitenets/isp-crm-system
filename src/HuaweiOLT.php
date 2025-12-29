@@ -6946,6 +6946,7 @@ class HuaweiOLT {
     
     /**
      * Get comprehensive ONU status including optical, details, WAN, LAN, history, MACs
+     * Tries GenieACS first for instant data, falls back to OLT CLI
      */
     public function getONUFullStatus(int $onuDbId): array {
         $onu = $this->getONU($onuDbId);
@@ -6971,10 +6972,39 @@ class HuaweiOLT {
             'lan' => null,
             'history' => null,
             'mac' => null,
-            'raw' => []
+            'raw' => [],
+            'source' => 'olt'
         ];
         
-        // Combined command - all queries in one session for speed
+        // Try GenieACS first (instant) for WAN/LAN/device info
+        $genieData = $this->getONUStatusFromGenieACS($onu['sn']);
+        if ($genieData['success']) {
+            $status['wan'] = $genieData['wan'] ?? null;
+            $status['lan'] = $genieData['lan'] ?? null;
+            $status['details'] = $genieData['details'] ?? null;
+            $status['source'] = 'tr069';
+            
+            // Still get optical from OLT (quick single command)
+            $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\nquit";
+            $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+            if ($opticalResult['success']) {
+                $status['optical'] = $this->parseOpticalStatus($opticalResult['output']);
+            }
+            
+            // Use database values for optical if available
+            if (!$status['optical'] && $onu['rx_power']) {
+                $status['optical'] = [
+                    'rx_power' => $onu['rx_power'],
+                    'tx_power' => $onu['tx_power'],
+                    'temperature' => null,
+                    'olt_rx_power' => null
+                ];
+            }
+            
+            return ['success' => true, 'status' => $status];
+        }
+        
+        // Fallback: Combined OLT command - all queries in one session
         $combinedCmd = "interface gpon {$frame}/{$slot}\r\n" .
             "display ont optical-info {$port} {$onuId}\r\n" .
             "display ont info {$port} {$onuId}\r\n" .
@@ -6998,6 +7028,116 @@ class HuaweiOLT {
         }
         
         return ['success' => true, 'status' => $status];
+    }
+    
+    /**
+     * Get ONU status from GenieACS (instant)
+     */
+    private function getONUStatusFromGenieACS(string $serial): array {
+        try {
+            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
+            $genieUrl = $stmt->fetchColumn();
+            
+            if (!$genieUrl) {
+                return ['success' => false, 'error' => 'GenieACS not configured'];
+            }
+            
+            $genieacs = new \App\GenieACS($this->db);
+            $result = $genieacs->getDeviceBySerial($serial);
+            
+            if (!$result['success'] || empty($result['device'])) {
+                return ['success' => false, 'error' => 'Device not found in GenieACS'];
+            }
+            
+            $device = $result['device'];
+            $data = ['success' => true];
+            
+            // Extract WAN info
+            $data['wan'] = [];
+            $wanPaths = [
+                'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1',
+                'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1'
+            ];
+            
+            foreach ($wanPaths as $idx => $basePath) {
+                $ip = $this->extractTR069Value($device, "{$basePath}.ExternalIPAddress");
+                if ($ip) {
+                    $data['wan'][] = [
+                        'index' => $idx + 1,
+                        'name' => $idx == 0 ? 'WAN_IP' : 'WAN_PPPoE',
+                        'ipv4_address' => $ip,
+                        'ipv4_status' => $this->extractTR069Value($device, "{$basePath}.ConnectionStatus") ?? 'Unknown',
+                        'ipv4_access_type' => $idx == 0 ? 'DHCP' : 'PPPoE',
+                        'mac_address' => $this->extractTR069Value($device, "{$basePath}.MACAddress"),
+                        'default_gateway' => $this->extractTR069Value($device, "{$basePath}.DefaultGateway"),
+                    ];
+                }
+            }
+            
+            // Extract LAN port info
+            $data['lan'] = [];
+            for ($i = 1; $i <= 4; $i++) {
+                $basePath = "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}";
+                $status = $this->extractTR069Value($device, "{$basePath}.Status");
+                if ($status !== null) {
+                    $data['lan'][] = [
+                        'port' => $i,
+                        'type' => 'ETH',
+                        'link_state' => strtolower($status) === 'up' ? 'up' : 'down',
+                        'speed' => $this->extractTR069Value($device, "{$basePath}.MaxBitRate") ?? '-'
+                    ];
+                }
+            }
+            
+            // Extract device details
+            $uptime = $this->extractTR069Value($device, 'InternetGatewayDevice.DeviceInfo.UpTime');
+            $data['details'] = [
+                'run_state' => 'online',
+                'control_flag' => 'active',
+                'online_duration' => $uptime ? $this->formatUptime((int)$uptime) : null,
+                'memory_occupation' => $this->extractTR069Value($device, 'InternetGatewayDevice.DeviceInfo.MemoryStatus.Free'),
+                'cpu_occupation' => null,
+                'temperature' => null,
+                'last_inform' => $device['_lastInform'] ?? null
+            ];
+            
+            return $data;
+            
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    private function extractTR069Value(array $device, string $path): ?string {
+        $parts = explode('.', $path);
+        $current = $device;
+        
+        foreach ($parts as $part) {
+            if (isset($current[$part])) {
+                $current = $current[$part];
+            } else {
+                return null;
+            }
+        }
+        
+        if (is_array($current) && isset($current['_value'])) {
+            return (string)$current['_value'];
+        }
+        
+        return is_scalar($current) ? (string)$current : null;
+    }
+    
+    private function formatUptime(int $seconds): string {
+        $days = floor($seconds / 86400);
+        $hours = floor(($seconds % 86400) / 3600);
+        $mins = floor(($seconds % 3600) / 60);
+        
+        if ($days > 0) {
+            return "{$days}d {$hours}h {$mins}m";
+        } elseif ($hours > 0) {
+            return "{$hours}h {$mins}m";
+        }
+        return "{$mins}m";
     }
     
     private function parseOpticalStatus(string $output): array {
