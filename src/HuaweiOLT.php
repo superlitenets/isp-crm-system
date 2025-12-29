@@ -6808,7 +6808,7 @@ class HuaweiOLT {
         ];
         
         // 1. Get ONT configuration (ont add, ipconfig, tr069-server-config)
-        $ontCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port}/{$onuId}\r\nquit";
+        $ontCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port} {$onuId}\r\nquit";
         $ontResult = $this->executeCommand($oltId, $ontCmd);
         if ($ontResult['success']) {
             $config['raw']['ont_config'] = $ontResult['output'];
