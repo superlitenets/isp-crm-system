@@ -22,10 +22,24 @@ if (!$input) {
 $type = $input['type'] ?? '';
 $groupId = $input['group_id'] ?? '';
 $discoveries = $input['discoveries'] ?? [];
+$faults = $input['faults'] ?? [];
 
-if (empty($type) || empty($groupId) || empty($discoveries)) {
+if (empty($type) || empty($groupId)) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Missing required fields']);
+    echo json_encode(['success' => false, 'error' => 'Missing required fields (type or group_id)']);
+    exit;
+}
+
+// Validate payload based on notification type
+if ($type === 'new_onu_discovery' && empty($discoveries)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Missing discoveries for new_onu_discovery']);
+    exit;
+}
+
+if ($type === 'onu_fault' && empty($faults)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Missing faults for onu_fault notification']);
     exit;
 }
 
@@ -78,6 +92,52 @@ try {
             'message' => 'Notification sent',
             'group_id' => $groupId,
             'onu_count' => count($discoveries)
+        ]);
+    } elseif ($type === 'onu_fault') {
+        // Handle ONU fault notifications (using $faults extracted above)
+        $oltName = $input['olt_name'] ?? 'Unknown OLT';
+        $oltIp = $input['olt_ip'] ?? '';
+        $branchName = $input['branch_name'] ?? 'Unassigned';
+        
+        if (empty($faults)) {
+            echo json_encode(['success' => true, 'message' => 'No faults to notify']);
+            exit;
+        }
+        
+        $template = $settings->get('wa_template_oms_fault', 
+            "*⚠️ ONU Fault Alert*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\n{fault_count} ONU(s) went offline:\n{fault_list}\n\nDetected at: {detection_time}"
+        );
+        
+        $faultList = [];
+        foreach ($faults as $f) {
+            $customerInfo = !empty($f['customer_name']) ? " - {$f['customer_name']}" : '';
+            $statusIcon = $f['new_status'] === 'los' ? '🔴 LOS' : ($f['new_status'] === 'dying-gasp' ? '⚡ Power' : '❌ Offline');
+            $faultList[] = "• {$statusIcon}: {$f['name']} (0/{$f['slot']}/{$f['port']}/{$f['onu_id']}){$customerInfo}";
+        }
+        
+        $message = str_replace([
+            '{olt_name}',
+            '{olt_ip}',
+            '{branch_name}',
+            '{fault_count}',
+            '{fault_list}',
+            '{detection_time}'
+        ], [
+            $oltName,
+            $oltIp,
+            $branchName,
+            count($faults),
+            implode("\n", $faultList),
+            date('Y-m-d H:i:s')
+        ], $template);
+        
+        $result = $whatsapp->sendGroupMessage($groupId, $message);
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Fault notification sent',
+            'group_id' => $groupId,
+            'fault_count' => count($faults)
         ]);
     } else {
         http_response_code(400);

@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { Pool } = require('pg');
 const snmp = require('net-snmp');
+const axios = require('axios');
 
 class SNMPPollingWorker {
     constructor() {
@@ -10,6 +11,7 @@ class SNMPPollingWorker {
         this.isRunning = false;
         this.cronJob = null;
         this.pollInterval = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
+        this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
 
         this.OIDs = {
             sysUpTime: '1.3.6.1.2.1.1.3.0',
@@ -223,6 +225,7 @@ class SNMPPollingWorker {
         if (statuses.length === 0) return;
 
         const client = await this.pool.connect();
+        const faults = [];
         try {
             await client.query('BEGIN');
             
@@ -237,24 +240,123 @@ class SNMPPollingWorker {
                 const slot = Math.floor((slotPortId - 4294901760) / 256);
                 const port = (slotPortId - 4294901760) % 256;
                 
+                // Check previous status to detect faults
+                const prevResult = await client.query(`
+                    SELECT o.id, o.sn, o.status as prev_status, o.description, o.name,
+                           c.name as customer_name, c.phone as customer_phone, c.id as customer_id
+                    FROM huawei_onus o
+                    LEFT JOIN customers c ON o.customer_id = c.id
+                    WHERE o.olt_id = $1 AND o.slot = $2 AND o.port = $3 AND o.onu_id = $4
+                `, [oltId, slot, port, onuId]);
+                
+                const prevOnu = prevResult.rows[0];
+                
                 const result = await client.query(`
                     UPDATE huawei_onus 
                     SET status = $1, updated_at = CURRENT_TIMESTAMP
                     WHERE olt_id = $2 AND slot = $3 AND port = $4 AND onu_id = $5
                 `, [s.status, oltId, slot, port, onuId]);
                 
-                if (result.rowCount > 0) updated++;
+                if (result.rowCount > 0) {
+                    updated++;
+                    // Detect fault: was online, now offline/los/dying-gasp
+                    if (prevOnu && prevOnu.prev_status === 'online' && 
+                        ['offline', 'los', 'dying-gasp'].includes(s.status)) {
+                        faults.push({
+                            onu_id: prevOnu.id,
+                            sn: prevOnu.sn,
+                            name: prevOnu.name || prevOnu.description || prevOnu.sn,
+                            slot, port, onu_id: onuId,
+                            prev_status: prevOnu.prev_status,
+                            new_status: s.status,
+                            customer_name: prevOnu.customer_name,
+                            customer_phone: prevOnu.customer_phone,
+                            customer_id: prevOnu.customer_id
+                        });
+                    }
+                }
             }
 
             await client.query('COMMIT');
             if (updated > 0) {
                 console.log(`[SNMP] Updated ${updated} ONU statuses for OLT ${oltId}`);
             }
+            
+            // Send fault notifications
+            if (faults.length > 0) {
+                await this.sendFaultNotifications(oltId, faults);
+            }
         } catch (error) {
             await client.query('ROLLBACK');
             console.error(`[SNMP] Failed to update ONU statuses for OLT ${oltId}:`, error.message);
         } finally {
             client.release();
+        }
+    }
+    
+    async sendFaultNotifications(oltId, faults) {
+        try {
+            const provisioningGroup = await this.getProvisioningGroup();
+            if (!provisioningGroup) {
+                console.log(`[SNMP] No provisioning group configured, skipping fault notifications`);
+                return;
+            }
+            
+            // Get OLT info
+            const oltResult = await this.pool.query(`
+                SELECT o.name, o.ip_address, b.name as branch_name, b.code as branch_code
+                FROM huawei_olts o
+                LEFT JOIN branches b ON o.branch_id = b.id
+                WHERE o.id = $1
+            `, [oltId]);
+            const oltInfo = oltResult.rows[0];
+            
+            console.log(`[SNMP] Sending ${faults.length} fault notifications...`);
+            
+            const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+                type: 'onu_fault',
+                group_id: provisioningGroup,
+                olt_name: oltInfo?.name || 'Unknown OLT',
+                olt_ip: oltInfo?.ip_address || '',
+                branch_name: oltInfo?.branch_name || 'Unassigned',
+                branch_code: oltInfo?.branch_code || '',
+                faults: faults
+            });
+            
+            if (response.data && response.data.success) {
+                console.log(`[SNMP] Sent fault notifications for ${faults.length} ONUs`);
+                
+                // Log faults to database
+                for (const fault of faults) {
+                    await this.logFault(oltId, fault);
+                }
+            } else {
+                console.error(`[SNMP] Fault notification failed:`, response.data?.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error(`[SNMP] Error sending fault notifications:`, error.message);
+        }
+    }
+    
+    async getProvisioningGroup() {
+        try {
+            const result = await this.pool.query(`
+                SELECT setting_value FROM settings WHERE setting_key = 'wa_provisioning_group'
+            `);
+            return result.rows[0]?.setting_value || null;
+        } catch (error) {
+            return null;
+        }
+    }
+    
+    async logFault(oltId, fault) {
+        try {
+            await this.pool.query(`
+                INSERT INTO onu_fault_log (olt_id, onu_id, serial_number, prev_status, new_status, customer_id, detected_at)
+                VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+            `, [oltId, fault.onu_id, fault.sn, fault.prev_status, fault.new_status, fault.customer_id]);
+        } catch (error) {
+            // Table might not exist, ignore
         }
     }
 
