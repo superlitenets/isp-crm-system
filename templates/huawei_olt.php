@@ -3070,6 +3070,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? "ONU description updated" : ($result['message'] ?? 'Update failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'update_onu_info':
+                $onuId = (int)$_POST['onu_id'];
+                $updateData = [];
+                if (isset($_POST['name'])) $updateData['name'] = $_POST['name'];
+                if (isset($_POST['description'])) $updateData['description'] = $_POST['description'];
+                if (isset($_POST['zone_id'])) $updateData['zone_id'] = $_POST['zone_id'] ?: null;
+                
+                $result = $huaweiOLT->updateONU($onuId, $updateData);
+                $message = $result['success'] ? "ONU info updated" : ($result['message'] ?? 'Update failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'delete_service_port':
                 $result = $huaweiOLT->deleteServicePort((int)$_POST['olt_id'], (int)$_POST['service_port_index']);
                 $message = $result['success'] ? "Service port deleted" : ($result['message'] ?? 'Delete failed');
@@ -5476,20 +5487,37 @@ try {
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
                     <div class="row">
-                        <!-- Left: Basic Info -->
+                        <!-- Left: Basic Info (Editable) -->
                         <div class="col-md-4 border-end">
-                            <div class="mb-2">
-                                <span class="text-primary">Zone</span><br>
-                                <a href="#" class="text-decoration-none"><?= htmlspecialchars($currentOnu['zone_name'] ?? 'None') ?></a>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">Name</span><br>
-                                <strong><?= htmlspecialchars($currentOnu['name'] ?: '-') ?></strong>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">Address or comment</span><br>
-                                <?= htmlspecialchars($currentOnu['description'] ?: 'None') ?>
-                            </div>
+                            <form method="post" id="onuInfoForm">
+                                <input type="hidden" name="action" value="update_onu_info">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="mb-2">
+                                    <span class="text-primary">Zone</span><br>
+                                    <select name="zone_id" class="form-select form-select-sm" style="max-width: 200px;">
+                                        <option value="">None</option>
+                                        <?php foreach ($zones as $z): ?>
+                                        <option value="<?= $z['id'] ?>" <?= ($currentOnu['zone_id'] == $z['id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($z['name']) ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="text-primary">Name</span><br>
+                                    <input type="text" name="name" class="form-control form-control-sm" style="max-width: 200px;" 
+                                           value="<?= htmlspecialchars($currentOnu['name'] ?? '') ?>" placeholder="Customer name">
+                                </div>
+                                <div class="mb-2">
+                                    <span class="text-primary">Address or comment</span><br>
+                                    <input type="text" name="description" class="form-control form-control-sm" style="max-width: 200px;"
+                                           value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" placeholder="Description">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm mt-1">
+                                    <i class="bi bi-check me-1"></i> Save
+                                </button>
+                            </form>
                             <div class="mb-2">
                                 <span class="text-primary">Customer</span><br>
                                 <?php if ($currentOnu['customer_id']): ?>
@@ -5590,6 +5618,78 @@ try {
                 </div>
             </div>
             
+            <!-- Define JS functions BEFORE buttons use them -->
+            <script>
+            const onuOltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
+            const onuFrame = <?= $currentOnu['frame'] ?? 0 ?>;
+            const onuSlot = <?= $currentOnu['slot'] ?? 'null' ?>;
+            const onuPort = <?= $currentOnu['port'] ?? 'null' ?>;
+            const onuIdVal = <?= $currentOnu['onu_id'] ?? 'null' ?>;
+            const onuSn = '<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>';
+            const onuDbId = <?= $currentOnu['id'] ?>;
+            let liveIntervalId = null;
+            
+            async function fetchLiveOnuData() {
+                if (!onuOltId || onuSlot === null) {
+                    alert('Missing OLT information');
+                    return;
+                }
+                
+                try {
+                    const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${onuOltId}&frame=${onuFrame}&slot=${onuSlot}&port=${onuPort}&onu_id=${onuIdVal}&sn=${encodeURIComponent(onuSn)}`);
+                    const data = await resp.json();
+                    
+                    if (data.success && data.onu) {
+                        const onu = data.onu;
+                        const statusEl = document.querySelector('[data-live-status]');
+                        const rxEl = document.querySelector('[data-live-rx]');
+                        const txEl = document.querySelector('[data-live-tx]');
+                        
+                        if (statusEl) {
+                            const statusClass = {'online': 'success', 'offline': 'secondary', 'los': 'danger'}[onu.status] || 'secondary';
+                            statusEl.className = 'text-' + statusClass + ' fw-bold';
+                            statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
+                        }
+                        if (rxEl && onu.rx_power !== null) {
+                            rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                        }
+                        if (txEl && onu.tx_power !== null) {
+                            txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                        }
+                        
+                        const toast = document.createElement('div');
+                        toast.className = 'position-fixed bottom-0 end-0 p-3';
+                        toast.style.zIndex = '9999';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                    } else {
+                        alert('Could not fetch live data: ' + (data.error || 'ONU not found'));
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Error fetching live data');
+                }
+            }
+            
+            function toggleLiveMode() {
+                const btn = document.getElementById('liveBtn');
+                if (liveIntervalId) {
+                    clearInterval(liveIntervalId);
+                    liveIntervalId = null;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-danger');
+                    btn.innerHTML = '<i class="bi bi-record-circle me-1"></i> LIVE!';
+                } else {
+                    fetchLiveOnuData();
+                    liveIntervalId = setInterval(fetchLiveOnuData, 5000);
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-success');
+                    btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i> STOP';
+                }
+            }
+            </script>
+            
             <!-- Status Action Buttons -->
             <div class="card shadow-sm mb-4">
                 <div class="card-body py-2">
@@ -5609,12 +5709,26 @@ try {
                         <button type="button" class="btn btn-danger btn-sm" id="liveBtn" onclick="toggleLiveMode()">
                             <i class="bi bi-record-circle me-1"></i> LIVE!
                         </button>
-                        <div class="ms-auto">
+                        <div class="ms-auto d-flex gap-1">
                             <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
                                 <input type="hidden" name="action" value="reboot_onu">
                                 <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                 <button type="submit" class="btn btn-warning btn-sm">
                                     <i class="bi bi-arrow-clockwise me-1"></i> Reboot
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('Reset ONU configuration?')">
+                                <input type="hidden" name="action" value="reset_onu_config">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <button type="submit" class="btn btn-outline-warning btn-sm">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU and return to pending?')">
+                                <input type="hidden" name="action" value="delete_onu_olt">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash me-1"></i> Delete
                                 </button>
                             </form>
                         </div>
@@ -6026,113 +6140,6 @@ try {
             }
             </script>
             <style>.spin-animation { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
-            
-            <div class="row">
-                <div class="col-12">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-warning text-dark">
-                            <i class="bi bi-tools me-2"></i>Service Profile & Troubleshooting
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6 class="mb-3"><i class="bi bi-sliders me-2"></i>Service Profile</h6>
-                                    <div class="mb-3">
-                                        <div class="d-flex align-items-center">
-                                            <?php if ($currentOnu['service_profile_id']): ?>
-                                                <?php 
-                                                $currentProfile = null;
-                                                foreach ($profiles as $p) {
-                                                    if ($p['id'] == $currentOnu['service_profile_id']) {
-                                                        $currentProfile = $p;
-                                                        break;
-                                                    }
-                                                }
-                                                ?>
-                                                <span class="badge bg-primary fs-6 me-2">
-                                                    <?= htmlspecialchars($currentProfile['name'] ?? 'Unknown') ?>
-                                                </span>
-                                                <?php if ($currentProfile): ?>
-                                                <small class="text-muted">
-                                                    <?= htmlspecialchars($currentProfile['download_speed'] ?? '') ?>/<?= htmlspecialchars($currentProfile['upload_speed'] ?? '') ?> Mbps
-                                                </small>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="badge bg-secondary fs-6">No Profile Assigned</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                    <form method="post" onsubmit="return confirm('Change service profile? OMCI will be re-applied automatically.')">
-                                        <input type="hidden" name="action" value="change_onu_profile">
-                                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                        <div class="row g-2">
-                                            <div class="col-8">
-                                                <select name="new_profile_id" class="form-select form-select-sm" required>
-                                                    <option value="">-- Select New Profile --</option>
-                                                    <?php foreach ($profiles as $profile): ?>
-                                                    <option value="<?= $profile['id'] ?>" <?= ($currentOnu['service_profile_id'] == $profile['id']) ? 'selected' : '' ?>>
-                                                        <?= htmlspecialchars($profile['name']) ?>
-                                                        (<?= $profile['download_speed'] ?? '?' ?>/<?= $profile['upload_speed'] ?? '?' ?> Mbps)
-                                                    </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-4">
-                                                <button type="submit" class="btn btn-primary btn-sm w-100">Apply</button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                    
-                                    <hr>
-                                    
-                                    <h6 class="mb-3"><i class="bi bi-pencil me-2"></i>Update Description</h6>
-                                    <form method="post" class="row g-2">
-                                        <input type="hidden" name="action" value="update_onu_description">
-                                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                        <div class="col-8">
-                                            <input type="text" name="description" class="form-control form-control-sm" 
-                                                   value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" 
-                                                   placeholder="Customer name or location" maxlength="64">
-                                        </div>
-                                        <div class="col-4">
-                                            <button type="submit" class="btn btn-primary btn-sm w-100">Update</button>
-                                        </div>
-                                    </form>
-                                </div>
-                                
-                                <div class="col-md-6">
-                                    <h6 class="mb-3"><i class="bi bi-wrench me-2"></i>Remote Actions</h6>
-                                    <div class="d-grid gap-2 mb-3">
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU? It will go offline temporarily.')">
-                                            <input type="hidden" name="action" value="reboot_onu">
-                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">
-                                                <i class="bi bi-arrow-clockwise me-2"></i>Reboot ONU
-                                            </button>
-                                        </form>
-                                        
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Reset this ONU configuration? The ONU will temporarily go offline.')">
-                                            <input type="hidden" name="action" value="reset_onu_config">
-                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                            <button type="submit" class="btn btn-outline-warning btn-sm w-100">
-                                                <i class="bi bi-arrow-counterclockwise me-2"></i>Reset Config
-                                            </button>
-                                        </form>
-                                        
-                                        <form method="post" class="d-inline" onsubmit="return confirm('WARNING: Delete this ONU from the OLT and return to pending? Customer will lose connection!')">
-                                            <input type="hidden" name="action" value="delete_onu_olt">
-                                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                            <button type="submit" class="btn btn-outline-danger btn-sm w-100">
-                                                <i class="bi bi-trash me-2"></i>Delete & Return to Pending
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             
             <!-- TR-069 Remote Management Section - Customer-facing CPE Configuration -->
             <?php if ($currentOnu['is_authorized']): ?>
