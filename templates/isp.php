@@ -999,21 +999,33 @@ try {
             if ($filter === 'expired') $filters['expired'] = true;
             if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
             if (!empty($_GET['package_id'])) $filters['package_id'] = (int)$_GET['package_id'];
-            $subscriptions = $radiusBilling->getSubscriptions($filters);
+            
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
             $onlineSubscribers = $radiusBilling->getOnlineSubscribers();
-            
-            // Apply online/offline filter
             $onlineFilter = $_GET['online'] ?? '';
-            if ($onlineFilter === 'online') {
-                $subscriptions = array_filter($subscriptions, fn($s) => in_array($s['id'], $onlineSubscribers));
+            
+            // Add online/offline filter to database query if applicable
+            if ($onlineFilter === 'online' && !empty($onlineSubscribers)) {
+                $filters['subscription_ids'] = $onlineSubscribers;
             } elseif ($onlineFilter === 'offline') {
-                $subscriptions = array_filter($subscriptions, fn($s) => !in_array($s['id'], $onlineSubscribers));
+                $filters['exclude_subscription_ids'] = $onlineSubscribers;
             }
             
+            // Pagination setup
+            $perPage = 25;
+            $currentPage = max(1, (int)($_GET['pg'] ?? 1));
+            $totalCount = $radiusBilling->countSubscriptions($filters);
+            $totalPages = max(1, ceil($totalCount / $perPage));
+            $currentPage = min($currentPage, $totalPages);
+            $offset = ($currentPage - 1) * $perPage;
+            
+            $filters['limit'] = $perPage;
+            $filters['offset'] = $offset;
+            $subscriptions = $radiusBilling->getSubscriptions($filters);
+            
             // Calculate quick stats for this view
-            $totalSubs = count($subscriptions);
+            $totalSubs = $totalCount;
             $onlineCount = count(array_filter($subscriptions, fn($s) => in_array($s['id'], $onlineSubscribers)));
             $activeCount = count(array_filter($subscriptions, fn($s) => $s['status'] === 'active'));
             $expiringSoonCount = count(array_filter($subscriptions, fn($s) => $s['expiry_date'] && strtotime($s['expiry_date']) < strtotime('+7 days') && strtotime($s['expiry_date']) > time()));
@@ -1226,6 +1238,43 @@ try {
                             </tbody>
                         </table>
                     </div>
+                    <?php if ($totalPages > 1): ?>
+                    <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="text-muted small">
+                            Showing <?= $offset + 1 ?>-<?= min($offset + $perPage, $totalCount) ?> of <?= number_format($totalCount) ?> subscribers
+                        </div>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0">
+                                <?php
+                                $queryParams = $_GET;
+                                unset($queryParams['pg']);
+                                $baseUrl = '?' . http_build_query($queryParams);
+                                ?>
+                                <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="<?= $baseUrl ?>&pg=1"><i class="bi bi-chevron-double-left"></i></a>
+                                </li>
+                                <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="<?= $baseUrl ?>&pg=<?= $currentPage - 1 ?>"><i class="bi bi-chevron-left"></i></a>
+                                </li>
+                                <?php
+                                $startPage = max(1, $currentPage - 2);
+                                $endPage = min($totalPages, $currentPage + 2);
+                                for ($p = $startPage; $p <= $endPage; $p++):
+                                ?>
+                                <li class="page-item <?= $p === $currentPage ? 'active' : '' ?>">
+                                    <a class="page-link" href="<?= $baseUrl ?>&pg=<?= $p ?>"><?= $p ?></a>
+                                </li>
+                                <?php endfor; ?>
+                                <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="<?= $baseUrl ?>&pg=<?= $currentPage + 1 ?>"><i class="bi bi-chevron-right"></i></a>
+                                </li>
+                                <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="<?= $baseUrl ?>&pg=<?= $totalPages ?>"><i class="bi bi-chevron-double-right"></i></a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

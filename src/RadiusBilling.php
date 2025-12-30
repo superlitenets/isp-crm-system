@@ -307,16 +307,80 @@ class RadiusBilling {
             $sql .= " AND s.package_id = ?";
             $params[] = (int)$filters['package_id'];
         }
+        if (!empty($filters['subscription_ids']) && is_array($filters['subscription_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['subscription_ids']), '?'));
+            $sql .= " AND s.id IN ($placeholders)";
+            $params = array_merge($params, array_map('intval', $filters['subscription_ids']));
+        }
+        if (isset($filters['exclude_subscription_ids']) && is_array($filters['exclude_subscription_ids'])) {
+            if (!empty($filters['exclude_subscription_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($filters['exclude_subscription_ids']), '?'));
+                $sql .= " AND s.id NOT IN ($placeholders)";
+                $params = array_merge($params, array_map('intval', $filters['exclude_subscription_ids']));
+            }
+        }
         
         $sql .= " ORDER BY s.created_at DESC";
         
         if (!empty($filters['limit'])) {
             $sql .= " LIMIT " . (int)$filters['limit'];
         }
+        if (!empty($filters['offset'])) {
+            $sql .= " OFFSET " . (int)$filters['offset'];
+        }
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function countSubscriptions(array $filters = []): int {
+        $sql = "SELECT COUNT(*) FROM radius_subscriptions s
+                LEFT JOIN customers c ON s.customer_id = c.id
+                WHERE 1=1";
+        $params = [];
+        
+        if (!empty($filters['status'])) {
+            $sql .= " AND s.status = ?";
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['access_type'])) {
+            $sql .= " AND s.access_type = ?";
+            $params[] = $filters['access_type'];
+        }
+        if (!empty($filters['search'])) {
+            $sql .= " AND (s.username ILIKE ? OR c.name ILIKE ? OR c.phone ILIKE ?)";
+            $search = '%' . $filters['search'] . '%';
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
+        }
+        if (!empty($filters['expiring_soon'])) {
+            $sql .= " AND s.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'";
+        }
+        if (!empty($filters['expired'])) {
+            $sql .= " AND s.expiry_date < CURRENT_DATE";
+        }
+        if (!empty($filters['package_id'])) {
+            $sql .= " AND s.package_id = ?";
+            $params[] = (int)$filters['package_id'];
+        }
+        if (!empty($filters['subscription_ids']) && is_array($filters['subscription_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['subscription_ids']), '?'));
+            $sql .= " AND s.id IN ($placeholders)";
+            $params = array_merge($params, array_map('intval', $filters['subscription_ids']));
+        }
+        if (isset($filters['exclude_subscription_ids']) && is_array($filters['exclude_subscription_ids'])) {
+            if (!empty($filters['exclude_subscription_ids'])) {
+                $placeholders = implode(',', array_fill(0, count($filters['exclude_subscription_ids']), '?'));
+                $sql .= " AND s.id NOT IN ($placeholders)";
+                $params = array_merge($params, array_map('intval', $filters['exclude_subscription_ids']));
+            }
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
     }
     
     public function getSubscription(int $id): ?array {
