@@ -832,16 +832,44 @@ class RadiusBilling {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }
         
-        // Check status
-        if ($sub['status'] !== 'active') {
-            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account ' . $sub['status']];
+        // Get expired pool settings
+        $expiredPoolName = $this->getSetting('expired_ip_pool') ?: 'expired-pool';
+        $expiredRateLimit = $this->getSetting('expired_rate_limit') ?: '256k/256k';
+        $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+        
+        // Check status - suspended users get rejected
+        if ($sub['status'] === 'suspended') {
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Account suspended'];
         }
         
-        // Check expiry
-        if ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time()) {
+        // Check if expired
+        $isExpired = false;
+        if ($sub['status'] === 'expired' || ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time())) {
             // Check grace period
-            $graceEnd = strtotime($sub['expiry_date'] . " +{$sub['grace_period_days']} days");
+            $graceDays = $sub['grace_period_days'] ?? 0;
+            $graceEnd = strtotime($sub['expiry_date'] . " +{$graceDays} days");
             if (time() > $graceEnd) {
+                $isExpired = true;
+            }
+        }
+        
+        // Handle expired users
+        if ($isExpired) {
+            if ($useExpiredPool) {
+                // Accept with restricted pool for captive portal
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'expired' => true,
+                    'attributes' => [
+                        'Framed-Pool' => $expiredPoolName,
+                        'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                        'Session-Timeout' => 300, // 5 min sessions to force re-auth
+                        'Acct-Interim-Interval' => 60
+                    ],
+                    'subscription' => $sub
+                ];
+            } else {
                 return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Subscription expired'];
             }
         }
@@ -849,14 +877,34 @@ class RadiusBilling {
         // Check quota
         if ($sub['data_quota_mb'] && $sub['data_used_mb'] >= $sub['data_quota_mb']) {
             if (!$sub['fup_enabled']) {
-                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Data quota exhausted'];
+                if ($useExpiredPool) {
+                    // Put quota-exhausted users in expired pool too
+                    return [
+                        'success' => true,
+                        'reply' => 'Access-Accept',
+                        'quota_exhausted' => true,
+                        'attributes' => [
+                            'Framed-Pool' => $expiredPoolName,
+                            'Mikrotik-Rate-Limit' => $expiredRateLimit,
+                            'Session-Timeout' => 300
+                        ],
+                        'subscription' => $sub
+                    ];
+                } else {
+                    return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Data quota exhausted'];
+                }
             }
         }
         
-        // Build RADIUS attributes
+        // Build RADIUS attributes for active users
         $attributes = [
             'Mikrotik-Rate-Limit' => $this->buildRateLimit($sub),
         ];
+        
+        // Add address pool from package if set
+        if (!empty($sub['address_pool'])) {
+            $attributes['Framed-Pool'] = $sub['address_pool'];
+        }
         
         if ($sub['static_ip']) {
             $attributes['Framed-IP-Address'] = $sub['static_ip'];

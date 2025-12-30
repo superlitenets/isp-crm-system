@@ -3249,24 +3249,70 @@ try {
             </form>
             
             <?php else: ?>
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <div class="card shadow-sm">
-                        <div class="card-header">RADIUS Server Configuration</div>
-                        <div class="card-body">
-                            <p class="text-muted">Configure your RADIUS server settings for MikroTik integration.</p>
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle me-2"></i>
-                                RADIUS server settings are configured in your MikroTik router. Point your NAS devices to this server's IP address.
+            <form method="post">
+                <input type="hidden" name="action" value="save_isp_settings">
+                <input type="hidden" name="category" value="radius">
+                
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-hdd-network me-2"></i>Expired User IP Pool</div>
+                            <div class="card-body">
+                                <p class="text-muted small">Configure how expired/quota-exhausted users are handled. When enabled, they get assigned to a restricted IP pool for captive portal access.</p>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="use_expired_pool" id="use_expired_pool" value="true" <?= $radiusBilling->getSetting('use_expired_pool') === 'true' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="use_expired_pool"><strong>Enable Expired Pool</strong></label>
+                                    </div>
+                                    <small class="text-muted">Accept expired users but assign to restricted pool (instead of rejecting)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Framed-Pool Name</label>
+                                    <input type="text" class="form-control" name="expired_ip_pool" value="<?= htmlspecialchars($radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool') ?>" placeholder="expired-pool">
+                                    <small class="text-muted">MikroTik IP pool name for expired users (create this pool in your router)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Rate Limit for Expired Users</label>
+                                    <input type="text" class="form-control" name="expired_rate_limit" value="<?= htmlspecialchars($radiusBilling->getSetting('expired_rate_limit') ?: '256k/256k') ?>" placeholder="256k/256k">
+                                    <small class="text-muted">Format: upload/download (e.g., 256k/256k)</small>
+                                </div>
+                                
+                                <div class="alert alert-warning small mb-0">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>MikroTik Setup:</strong> Create an IP pool named "<code><?= htmlspecialchars($radiusBilling->getSetting('expired_ip_pool') ?: 'expired-pool') ?></code>" and configure web proxy to redirect to your renewal page. Add the renewal page URL to the walled garden.
+                                </div>
                             </div>
-                            <ul class="list-unstyled">
-                                <li><strong>Auth Port:</strong> 1812/UDP</li>
-                                <li><strong>Acct Port:</strong> 1813/UDP</li>
-                                <li><strong>CoA Port:</strong> 3799/UDP</li>
-                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-info-circle me-2"></i>RADIUS Server Info</div>
+                            <div class="card-body">
+                                <p class="text-muted">Configure your RADIUS server settings for MikroTik integration.</p>
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    RADIUS server settings are configured in your MikroTik router. Point your NAS devices to this server's IP address.
+                                </div>
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Auth Port:</strong> 1812/UDP</li>
+                                    <li><strong>Acct Port:</strong> 1813/UDP</li>
+                                    <li><strong>CoA Port:</strong> 3799/UDP</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
+                
+                <div class="mb-4">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save RADIUS Settings</button>
+                </div>
+            </form>
+            
+            <div class="row g-4">
                 <div class="col-md-6">
                     <div class="card shadow-sm">
                         <div class="card-header">NAS Status</div>
