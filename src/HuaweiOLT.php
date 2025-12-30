@@ -5387,6 +5387,340 @@ class HuaweiOLT {
         ];
     }
     
+    // ==================== STAGED PROVISIONING (SmartOLT-style) ====================
+    
+    /**
+     * STAGE 1: Authorization + Service Ports ONLY
+     * SmartOLT-style provisioning: Authorize ONU first, verify it's online, then proceed
+     */
+    public function authorizeONUStage1(int $onuId, int $profileId, array $options = []): array {
+        $onu = $this->getONU($onuId);
+        
+        if (!$onu) {
+            return ['success' => false, 'stage' => 1, 'message' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $equipmentId = $this->getOnuEquipmentId($onuId);
+        
+        // Get line and service profiles (SmartOLT-style: ONU type as service profile)
+        $lineProfile = $this->getDefaultOltLineProfile($oltId);
+        $lineProfileId = $lineProfile['id'];
+        
+        $srvProfileId = null;
+        $usedProfileName = null;
+        $profileSource = 'unknown';
+        
+        if ($equipmentId) {
+            $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $equipmentId);
+            
+            if (!$oltSrvProfile) {
+                $oltSrvProfile = $this->createOltSrvProfileForOnuType($oltId, $equipmentId);
+            }
+            
+            if ($oltSrvProfile) {
+                $srvProfileId = $oltSrvProfile['id'];
+                $usedProfileName = $oltSrvProfile['name'] ?? $equipmentId;
+                $profileSource = 'olt-matched';
+            }
+        }
+        
+        // Fallback to CRM profile
+        if ($srvProfileId === null && $profileId > 0) {
+            $crmProfile = $this->getServiceProfile($profileId);
+            if ($crmProfile) {
+                $lineProfileId = !empty($crmProfile['line_profile']) ? (int)$crmProfile['line_profile'] : $lineProfileId;
+                $srvProfileId = !empty($crmProfile['srv_profile']) ? (int)$crmProfile['srv_profile'] : null;
+                $usedProfileName = $crmProfile['name'] ?? 'CRM Profile';
+                $profileSource = 'crm-fallback';
+            }
+        }
+        
+        if ($srvProfileId === null) {
+            return ['success' => false, 'stage' => 1, 'message' => "Failed to find/create service profile for ONU type '{$equipmentId}'"];
+        }
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        
+        // Build auth part (SN auth by default)
+        $authPart = "sn-auth {$onu['sn']}";
+        
+        // Description
+        $description = $options['description'] ?? $onu['name'] ?? '';
+        if (empty($description)) {
+            $description = $this->generateNextSNSCode($oltId);
+        }
+        
+        // Find next available ONU ID
+        $assignedOnuId = $onu['onu_id'];
+        if (empty($assignedOnuId)) {
+            $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
+        }
+        
+        // ==== STAGE 1A: AUTHORIZE ONU ====
+        $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
+        
+        $result = $this->executeCommand($oltId, $cliScript);
+        $output = $result['output'] ?? '';
+        
+        // Check for assigned ONU ID in response
+        if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
+            $assignedOnuId = (int)$m[1];
+        }
+        
+        // Check for errors
+        $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output);
+        
+        if (!$result['success'] || $hasError) {
+            $this->addLog([
+                'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
+                'status' => 'failed', 'message' => "Stage 1 failed for {$onu['sn']}",
+                'command_sent' => $cliScript, 'command_response' => $output,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            return ['success' => false, 'stage' => 1, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
+        }
+        
+        // Update ONU record with stage 1 data
+        $this->updateONU($onuId, [
+            'is_authorized' => true,
+            'onu_id' => $assignedOnuId,
+            'line_profile' => $lineProfileId,
+            'srv_profile' => $srvProfileId,
+            'name' => $description,
+            'status' => 'online',
+            'provisioning_stage' => 1
+        ]);
+        
+        // ==== STAGE 1B: CREATE SERVICE-PORT (Internet VLAN) ====
+        $vlanId = $options['vlan_id'] ?? null;
+        $servicePortOutput = '';
+        $servicePortSuccess = false;
+        
+        if ($vlanId && $assignedOnuId !== null) {
+            $gemPort = $options['gem_port'] ?? 1;
+            $inboundIndex = $options['inbound_traffic_index'] ?? 8;
+            $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+            
+            $servicePortCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
+            
+            $spResult = $this->executeCommand($oltId, $servicePortCmd);
+            $servicePortOutput = $spResult['output'] ?? '';
+            $output .= "\n[Service-Port]\n" . $servicePortOutput;
+            
+            $servicePortSuccess = $spResult['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid)/i', $servicePortOutput);
+            
+            if ($servicePortSuccess) {
+                $this->updateONU($onuId, ['vlan_id' => $vlanId]);
+            }
+        }
+        
+        // ==== STAGE 1C: BIND NATIVE VLAN TO ETH PORT (optional) ====
+        if ($vlanId && $assignedOnuId !== null) {
+            $nativeVlanCmd = "interface gpon {$frame}/{$slot}\r\nont port native-vlan {$port} {$assignedOnuId} eth 1 vlan {$vlanId} priority 0\r\nquit";
+            $this->executeCommand($oltId, $nativeVlanCmd);
+        }
+        
+        // Mark discovery log entry as authorized
+        try {
+            $stmt = $this->db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = CURRENT_TIMESTAMP WHERE serial_number = ? AND olt_id = ?");
+            $stmt->execute([$onu['sn'], $oltId]);
+        } catch (\Exception $e) {}
+        
+        $this->addLog([
+            'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
+            'status' => 'success',
+            'message' => "Stage 1 complete: ONU {$onu['sn']} authorized as ID {$assignedOnuId}" . ($vlanId ? ", VLAN {$vlanId}" : ''),
+            'command_sent' => $cliScript, 'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'stage' => 1,
+            'message' => "Stage 1 complete: ONU authorized as ID {$assignedOnuId}" . ($servicePortSuccess ? ", service-port created" : ''),
+            'onu_id' => $assignedOnuId,
+            'description' => $description,
+            'vlan_id' => $vlanId,
+            'service_port_success' => $servicePortSuccess,
+            'output' => $output,
+            'next_stage' => 2
+        ];
+    }
+    
+    /**
+     * STAGE 1 VERIFY: Check ONU is online before proceeding
+     */
+    public function verifyONUOnline(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu || !$onu['is_authorized']) {
+            return ['success' => false, 'online' => false, 'message' => 'ONU not authorized'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        if ($onuId === null) {
+            return ['success' => false, 'online' => false, 'message' => 'ONU ID not assigned'];
+        }
+        
+        // Query ONU info to check status
+        $cmd = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        $result = $this->executeCommand($oltId, $cmd);
+        $output = $result['output'] ?? '';
+        
+        $online = preg_match('/Run state\s*:\s*online/i', $output) || 
+                  preg_match('/Control flag\s*:\s*active/i', $output);
+        
+        return [
+            'success' => true,
+            'online' => $online,
+            'message' => $online ? 'ONU is online' : 'ONU is offline - wait for it to come online before proceeding',
+            'output' => $output
+        ];
+    }
+    
+    /**
+     * STAGE 2: TR-069 Configuration
+     * Only run after Stage 1 is complete and ONU is verified online
+     */
+    public function configureONUStage2TR069(int $onuDbId, array $options = []): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'stage' => 2, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'stage' => 2, 'message' => 'Complete Stage 1 first (ONU must be authorized)'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        // Get TR-069 VLAN
+        $tr069Vlan = $options['tr069_vlan'] ?? $this->getTR069VlanForOlt($oltId);
+        if (!$tr069Vlan) {
+            return ['success' => false, 'stage' => 2, 'message' => 'No TR-069 VLAN configured. Mark a VLAN as TR-069 in OLT VLANs.'];
+        }
+        
+        // Get ACS URL
+        $acsUrl = $options['acs_url'] ?? $this->getTR069AcsUrl();
+        $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
+        
+        $output = '';
+        $errors = [];
+        
+        // Helper to check for real errors
+        $hasRealError = function($output) {
+            if (empty($output)) return false;
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+                return false;
+            }
+            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+        };
+        
+        // Step 1: Configure IPHOST/WAN with DHCP on TR-069 VLAN
+        $tr069Priority = $options['tr069_priority'] ?? 2;
+        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd1 .= "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority {$tr069Priority}\r\n";
+        $cmd1 .= "quit";
+        $result1 = $this->executeCommand($oltId, $cmd1);
+        $output .= "[TR-069 WAN DHCP]\n" . ($result1['output'] ?? '') . "\n";
+        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
+            $errors[] = "WAN DHCP config failed";
+        }
+        
+        // Step 2: Configure TR-069 server (profile or URL)
+        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        if ($tr069ProfileId) {
+            $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+        } elseif ($acsUrl) {
+            $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}\r\n";
+            $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval 300\r\n";
+        }
+        $cmd2 .= "quit";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= "[TR-069 Server Config]\n" . ($result2['output'] ?? '') . "\n";
+        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
+            $errors[] = "TR-069 server config failed";
+        }
+        
+        // Step 3: Create service-port for TR-069 VLAN
+        $tr069GemPort = $options['tr069_gem_port'] ?? 2;
+        $tr069TrafficIndex = $options['tr069_traffic_index'] ?? 7;
+        $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$tr069GemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index {$tr069TrafficIndex} outbound traffic-table index {$tr069TrafficIndex}";
+        $result3 = $this->executeCommand($oltId, $cmd3);
+        $output .= "[TR-069 Service-Port]\n" . ($result3['output'] ?? '') . "\n";
+        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
+            $errors[] = "TR-069 service-port failed";
+        }
+        
+        $success = empty($errors);
+        
+        if ($success) {
+            $this->updateONU($onuDbId, [
+                'tr069_status' => 'configured',
+                'provisioning_stage' => 2
+            ]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId, 'onu_id' => $onuDbId, 'action' => 'configure_stage2_tr069',
+            'status' => $success ? 'success' : 'failed',
+            'message' => $success ? "Stage 2 complete: TR-069 configured on VLAN {$tr069Vlan}" : 'Stage 2 failed: ' . implode(', ', $errors),
+            'command_sent' => $cmd1 . "\n" . $cmd2 . "\n" . $cmd3,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'stage' => 2,
+            'message' => $success ? "Stage 2 complete: TR-069 configured (VLAN {$tr069Vlan})" : 'Stage 2 failed: ' . implode(', ', $errors),
+            'tr069_vlan' => $tr069Vlan,
+            'acs_url' => $acsUrl,
+            'errors' => $errors,
+            'output' => $output,
+            'next_stage' => $success ? 3 : null
+        ];
+    }
+    
+    /**
+     * Get current provisioning stage for an ONU
+     */
+    public function getONUProvisioningStage(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['stage' => 0, 'description' => 'ONU not found'];
+        }
+        
+        $stage = (int)($onu['provisioning_stage'] ?? 0);
+        
+        $stages = [
+            0 => ['name' => 'Pending', 'description' => 'Not authorized', 'next_action' => 'Authorize ONU'],
+            1 => ['name' => 'Authorized', 'description' => 'ONU authorized, service-port created', 'next_action' => 'Configure TR-069'],
+            2 => ['name' => 'TR-069 Ready', 'description' => 'TR-069 configured, waiting for device connection', 'next_action' => 'Configure WAN via GenieACS'],
+            3 => ['name' => 'WAN Configured', 'description' => 'WAN/PPPoE configured via TR-069', 'next_action' => 'Configure WiFi'],
+            4 => ['name' => 'Complete', 'description' => 'Fully provisioned', 'next_action' => null]
+        ];
+        
+        return [
+            'stage' => $stage,
+            'is_authorized' => $onu['is_authorized'] ?? false,
+            'onu_id' => $onu['onu_id'],
+            'tr069_status' => $onu['tr069_status'] ?? 'pending',
+            ...$stages[$stage] ?? $stages[0]
+        ];
+    }
+    
     /**
      * Manually configure TR-069 for an already-authorized ONU (fallback method)
      */
