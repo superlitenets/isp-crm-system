@@ -303,6 +303,10 @@ class RadiusBilling {
         if (!empty($filters['expired'])) {
             $sql .= " AND s.expiry_date < CURRENT_DATE";
         }
+        if (!empty($filters['package_id'])) {
+            $sql .= " AND s.package_id = ?";
+            $params[] = (int)$filters['package_id'];
+        }
         
         $sql .= " ORDER BY s.created_at DESC";
         
@@ -667,6 +671,32 @@ class RadiusBilling {
         // Monthly revenue
         $stmt = $this->db->query("SELECT COALESCE(SUM(amount), 0) FROM radius_billing WHERE status = 'paid' AND created_at >= DATE_TRUNC('month', CURRENT_DATE)");
         $stats['monthly_revenue'] = $stmt->fetchColumn();
+        
+        // ARPU (Average Revenue Per User) - monthly revenue / active subscribers
+        $stats['arpu'] = $stats['active_subscriptions'] > 0 
+            ? round($stats['monthly_revenue'] / $stats['active_subscriptions'], 2) 
+            : 0;
+        
+        // Last month revenue for comparison
+        $stmt = $this->db->query("SELECT COALESCE(SUM(amount), 0) FROM radius_billing WHERE status = 'paid' AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', CURRENT_DATE)");
+        $stats['last_month_revenue'] = $stmt->fetchColumn();
+        
+        // Revenue growth percentage
+        $stats['revenue_growth'] = $stats['last_month_revenue'] > 0 
+            ? round((($stats['monthly_revenue'] - $stats['last_month_revenue']) / $stats['last_month_revenue']) * 100, 1)
+            : 0;
+        
+        // Total subscribers
+        $stmt = $this->db->query("SELECT COUNT(*) FROM radius_subscriptions");
+        $stats['total_subscriptions'] = $stmt->fetchColumn();
+        
+        // New subscribers this month
+        $stmt = $this->db->query("SELECT COUNT(*) FROM radius_subscriptions WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)");
+        $stats['new_this_month'] = $stmt->fetchColumn();
+        
+        // Online subscribers (active sessions count)
+        $stmt = $this->db->query("SELECT COUNT(DISTINCT subscription_id) FROM radius_sessions WHERE session_end IS NULL");
+        $stats['online_now'] = $stmt->fetchColumn();
         
         // Today's data usage (GB)
         $stmt = $this->db->query("SELECT COALESCE(SUM(download_mb + upload_mb), 0) / 1024 FROM radius_usage_logs WHERE log_date = CURRENT_DATE");

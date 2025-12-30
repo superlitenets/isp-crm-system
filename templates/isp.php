@@ -261,6 +261,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = $result['success'] ? "Generated {$result['count']} vouchers (Batch: {$result['batch_id']})" : 'Error: ' . ($result['error'] ?? 'Unknown error');
             $messageType = $result['success'] ? 'success' : 'danger';
             break;
+            
+        case 'bulk_activate':
+            $ids = array_filter(array_map('intval', explode(',', $_POST['bulk_ids'] ?? '')));
+            $success = 0;
+            foreach ($ids as $id) {
+                $result = $radiusBilling->activateSubscription($id);
+                if ($result['success']) $success++;
+            }
+            $message = "Activated {$success} of " . count($ids) . " subscriber(s)";
+            $messageType = $success > 0 ? 'success' : 'warning';
+            break;
+            
+        case 'bulk_suspend':
+            $ids = array_filter(array_map('intval', explode(',', $_POST['bulk_ids'] ?? '')));
+            $success = 0;
+            foreach ($ids as $id) {
+                $result = $radiusBilling->suspendSubscription($id, 'Bulk suspension');
+                if ($result['success']) $success++;
+            }
+            $message = "Suspended {$success} of " . count($ids) . " subscriber(s)";
+            $messageType = $success > 0 ? 'success' : 'warning';
+            break;
+            
+        case 'bulk_renew':
+            $ids = array_filter(array_map('intval', explode(',', $_POST['bulk_ids'] ?? '')));
+            $success = 0;
+            foreach ($ids as $id) {
+                $result = $radiusBilling->renewSubscription($id);
+                if ($result['success']) $success++;
+            }
+            $message = "Renewed {$success} of " . count($ids) . " subscriber(s)";
+            $messageType = $success > 0 ? 'success' : 'warning';
+            break;
+            
+        case 'bulk_send_sms':
+            $ids = array_filter(array_map('intval', explode(',', $_POST['bulk_ids'] ?? '')));
+            $message = "SMS feature: Selected " . count($ids) . " subscriber(s). Please use the SMS module for bulk messaging.";
+            $messageType = 'info';
+            break;
     }
     
     // Handle redirect after action
@@ -769,57 +808,96 @@ try {
                 </div>
             </div>
             
-            <div class="row g-4 mb-4">
-                <div class="col-md-2">
-                    <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-hdd-network fs-3 text-primary"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['nas_devices'] ?></h4>
-                            <small class="text-muted">NAS Devices</small>
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-wifi fs-4 text-success"></i>
+                            <h4 class="mb-0 mt-1"><?= number_format($stats['online_now'] ?? 0) ?></h4>
+                            <small class="text-muted">Online Now</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-box fs-3 text-success"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['packages'] ?></h4>
-                            <small class="text-muted">Packages</small>
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-person-plus fs-4 text-primary"></i>
+                            <h4 class="mb-0 mt-1"><?= number_format($stats['new_this_month'] ?? 0) ?></h4>
+                            <small class="text-muted">New This Month</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-pause-circle fs-3 text-warning"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['suspended_subscriptions'] ?></h4>
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-graph-up-arrow fs-4 text-info"></i>
+                            <h4 class="mb-0 mt-1">KES <?= number_format($stats['arpu'] ?? 0) ?></h4>
+                            <small class="text-muted">ARPU</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-arrow-<?= ($stats['revenue_growth'] ?? 0) >= 0 ? 'up' : 'down' ?>-circle fs-4 <?= ($stats['revenue_growth'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>"></i>
+                            <h4 class="mb-0 mt-1 <?= ($stats['revenue_growth'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>"><?= ($stats['revenue_growth'] ?? 0) >= 0 ? '+' : '' ?><?= $stats['revenue_growth'] ?? 0 ?>%</h4>
+                            <small class="text-muted">Revenue Growth</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-pause-circle fs-4 text-warning"></i>
+                            <h4 class="mb-0 mt-1"><?= $stats['suspended_subscriptions'] ?></h4>
                             <small class="text-muted">Suspended</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-x-circle fs-3 text-danger"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['expired_subscriptions'] ?></h4>
+                <div class="col-6 col-lg-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-x-circle fs-4 text-danger"></i>
+                            <h4 class="mb-0 mt-1"><?= $stats['expired_subscriptions'] ?></h4>
                             <small class="text-muted">Expired</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
+            </div>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
                     <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-ticket fs-3 text-info"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['unused_vouchers'] ?></h4>
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-hdd-network fs-4 text-primary"></i>
+                            <h5 class="mb-0 mt-1"><?= $stats['nas_devices'] ?></h5>
+                            <small class="text-muted">NAS Devices</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-box fs-4 text-success"></i>
+                            <h5 class="mb-0 mt-1"><?= $stats['packages'] ?></h5>
+                            <small class="text-muted">Packages</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-ticket fs-4 text-info"></i>
+                            <h5 class="mb-0 mt-1"><?= $stats['unused_vouchers'] ?></h5>
                             <small class="text-muted">Vouchers</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-6 col-md-3">
                     <div class="card shadow-sm">
-                        <div class="card-body text-center">
-                            <i class="bi bi-download fs-3 text-secondary"></i>
-                            <h4 class="mb-0 mt-2"><?= $stats['today_data_gb'] ?> GB</h4>
+                        <div class="card-body text-center py-3">
+                            <i class="bi bi-download fs-4 text-secondary"></i>
+                            <h5 class="mb-0 mt-1"><?= $stats['today_data_gb'] ?> GB</h5>
                             <small class="text-muted">Today's Usage</small>
                         </div>
                     </div>
@@ -920,6 +998,7 @@ try {
             if ($filter === 'expiring') $filters['expiring_soon'] = true;
             if ($filter === 'expired') $filters['expired'] = true;
             if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
+            if (!empty($_GET['package_id'])) $filters['package_id'] = (int)$_GET['package_id'];
             $subscriptions = $radiusBilling->getSubscriptions($filters);
             $packages = $radiusBilling->getPackages();
             $nasDevices = $radiusBilling->getNASDevices();
@@ -932,24 +1011,74 @@ try {
             } elseif ($onlineFilter === 'offline') {
                 $subscriptions = array_filter($subscriptions, fn($s) => !in_array($s['id'], $onlineSubscribers));
             }
+            
+            // Calculate quick stats for this view
+            $totalSubs = count($subscriptions);
+            $onlineCount = count(array_filter($subscriptions, fn($s) => in_array($s['id'], $onlineSubscribers)));
+            $activeCount = count(array_filter($subscriptions, fn($s) => $s['status'] === 'active'));
+            $expiringSoonCount = count(array_filter($subscriptions, fn($s) => $s['expiry_date'] && strtotime($s['expiry_date']) < strtotime('+7 days') && strtotime($s['expiry_date']) > time()));
             ?>
             
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="page-title mb-0"><i class="bi bi-people"></i> Subscribers</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubscriptionModal">
-                    <i class="bi bi-plus-lg me-1"></i> New Subscriber
-                </button>
+            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                <div>
+                    <h4 class="page-title mb-1"><i class="bi bi-people"></i> Subscribers</h4>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <small class="text-muted"><i class="bi bi-people-fill me-1"></i><?= $totalSubs ?> total</small>
+                        <small class="text-success"><i class="bi bi-wifi me-1"></i><?= $onlineCount ?> online</small>
+                        <small class="text-primary"><i class="bi bi-check-circle me-1"></i><?= $activeCount ?> active</small>
+                        <?php if ($expiringSoonCount > 0): ?>
+                        <small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= $expiringSoonCount ?> expiring soon</small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#bulkActionsPanel">
+                        <i class="bi bi-check2-square me-1"></i> Bulk Actions
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubscriptionModal">
+                        <i class="bi bi-plus-lg me-1"></i> New Subscriber
+                    </button>
+                </div>
+            </div>
+            
+            <div class="collapse mb-3" id="bulkActionsPanel">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2">
+                        <form method="post" id="bulkActionForm" class="d-flex align-items-center gap-2 flex-wrap">
+                            <input type="hidden" name="action" id="bulkActionType" value="">
+                            <input type="hidden" name="bulk_ids" id="bulkIds" value="">
+                            <span class="text-muted me-2"><span id="selectedCount">0</span> selected</span>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="bulkAction('activate')">
+                                <i class="bi bi-play-fill"></i> Activate
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="bulkAction('suspend')">
+                                <i class="bi bi-pause-fill"></i> Suspend
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="bulkAction('send_sms')">
+                                <i class="bi bi-chat-dots"></i> Send SMS
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="bulkAction('renew')">
+                                <i class="bi bi-arrow-clockwise"></i> Renew All
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
             
             <div class="card shadow-sm">
-                <div class="card-body">
-                    <form method="get" class="row g-2 mb-3">
+                <div class="card-header bg-white py-3">
+                    <form method="get" class="row g-2 align-items-end">
                         <input type="hidden" name="page" value="isp">
                         <input type="hidden" name="view" value="subscriptions">
-                        <div class="col-md-4">
-                            <input type="text" name="search" class="form-control" placeholder="Search username, customer, phone..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label small text-muted mb-1">Search</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                                <input type="text" name="search" class="form-control" placeholder="Username, customer, phone..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                            </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-lg-2 col-md-3">
+                            <label class="form-label small text-muted mb-1">Status</label>
                             <select name="status" class="form-select">
                                 <option value="">All Status</option>
                                 <option value="active" <?= ($_GET['status'] ?? '') === 'active' ? 'selected' : '' ?>>Active</option>
@@ -957,75 +1086,140 @@ try {
                                 <option value="expired" <?= ($_GET['status'] ?? '') === 'expired' ? 'selected' : '' ?>>Expired</option>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <select name="online" class="form-select">
-                                <option value="">All (Online/Offline)</option>
-                                <option value="online" <?= ($_GET['online'] ?? '') === 'online' ? 'selected' : '' ?>>Online Only</option>
-                                <option value="offline" <?= ($_GET['online'] ?? '') === 'offline' ? 'selected' : '' ?>>Offline Only</option>
+                        <div class="col-lg-2 col-md-3">
+                            <label class="form-label small text-muted mb-1">Package</label>
+                            <select name="package_id" class="form-select">
+                                <option value="">All Packages</option>
+                                <?php foreach ($packages as $pkg): ?>
+                                <option value="<?= $pkg['id'] ?>" <?= ((int)($_GET['package_id'] ?? 0)) === $pkg['id'] ? 'selected' : '' ?>><?= htmlspecialchars($pkg['name']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-secondary w-100">Filter</button>
+                        <div class="col-lg-2 col-md-3">
+                            <label class="form-label small text-muted mb-1">Connection</label>
+                            <select name="online" class="form-select">
+                                <option value="">All</option>
+                                <option value="online" <?= ($_GET['online'] ?? '') === 'online' ? 'selected' : '' ?>>Online</option>
+                                <option value="offline" <?= ($_GET['online'] ?? '') === 'offline' ? 'selected' : '' ?>>Offline</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3">
+                            <label class="form-label small text-muted mb-1">Filter</label>
+                            <select name="filter" class="form-select">
+                                <option value="">All Subscribers</option>
+                                <option value="expiring" <?= ($filter) === 'expiring' ? 'selected' : '' ?>>Expiring Soon</option>
+                                <option value="expired" <?= ($filter) === 'expired' ? 'selected' : '' ?>>Expired Only</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-1 col-md-3">
+                            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i></button>
                         </div>
                     </form>
-                    
+                </div>
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                        <table class="table table-hover mb-0" id="subscribersTable">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Username</th>
-                                    <th>Customer</th>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input" id="selectAllSubs" onchange="toggleSelectAll(this)">
+                                    </th>
+                                    <th>Subscriber</th>
                                     <th>Package</th>
-                                    <th>Type</th>
-                                    <th>Online</th>
-                                    <th>Status</th>
+                                    <th class="text-center">Status</th>
                                     <th>Expiry</th>
-                                    <th>Data Used</th>
-                                    <th>Actions</th>
+                                    <th class="text-end">Usage</th>
+                                    <th class="text-center" style="width: 180px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($subscriptions as $sub): ?>
-                                <?php $isOnline = in_array($sub['id'], $onlineSubscribers); ?>
+                                <?php 
+                                $isOnline = in_array($sub['id'], $onlineSubscribers); 
+                                $statusClass = match($sub['status']) {
+                                    'active' => 'success',
+                                    'suspended' => 'warning',
+                                    'expired' => 'danger',
+                                    default => 'secondary'
+                                };
+                                $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
+                                $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+                                ?>
                                 <tr>
-                                    <td><strong><?= htmlspecialchars($sub['username']) ?></strong></td>
-                                    <td><?= htmlspecialchars($sub['customer_name'] ?? '-') ?></td>
                                     <td>
-                                        <?= htmlspecialchars($sub['package_name']) ?>
+                                        <input type="checkbox" class="form-check-input sub-checkbox" value="<?= $sub['id'] ?>" onchange="updateBulkCount()">
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-2">
+                                                <?php if ($isOnline): ?>
+                                                <span class="badge rounded-pill bg-success p-2"><i class="bi bi-wifi"></i></span>
+                                                <?php else: ?>
+                                                <span class="badge rounded-pill bg-secondary p-2"><i class="bi bi-wifi-off"></i></span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div>
+                                                <strong><?= htmlspecialchars($sub['username']) ?></strong>
+                                                <br><small class="text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></small>
+                                                <?php if (!empty($sub['customer_phone'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-telephone"></i> <?= htmlspecialchars($sub['customer_phone']) ?></small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($sub['package_name']) ?></span>
                                         <br><small class="text-muted"><?= $sub['download_speed'] ?>/<?= $sub['upload_speed'] ?></small>
                                     </td>
-                                    <td><span class="badge bg-secondary"><?= strtoupper($sub['access_type']) ?></span></td>
-                                    <td>
-                                        <?php if ($isOnline): ?>
-                                        <span class="badge bg-success"><i class="bi bi-wifi me-1"></i>Online</span>
-                                        <?php else: ?>
-                                        <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        $statusClass = match($sub['status']) {
-                                            'active' => 'success',
-                                            'suspended' => 'warning',
-                                            'expired' => 'danger',
-                                            default => 'secondary'
-                                        };
-                                        ?>
+                                    <td class="text-center">
                                         <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($sub['status']) ?></span>
+                                        <br><small class="badge bg-light text-dark"><?= strtoupper($sub['access_type']) ?></small>
                                     </td>
                                     <td>
-                                        <?= $sub['expiry_date'] ? date('M j, Y', strtotime($sub['expiry_date'])) : '-' ?>
-                                        <?php if ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time()): ?>
-                                        <span class="badge bg-danger">Expired</span>
-                                        <?php elseif ($sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days')): ?>
-                                        <span class="badge bg-warning">Soon</span>
+                                        <?php if ($sub['expiry_date']): ?>
+                                            <?= date('M j, Y', strtotime($sub['expiry_date'])) ?>
+                                            <?php if ($isExpired): ?>
+                                            <br><span class="badge bg-danger"><i class="bi bi-x-circle"></i> Expired</span>
+                                            <?php elseif ($isExpiringSoon): ?>
+                                            <br><span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Soon</span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= number_format($sub['data_used_mb'] / 1024, 2) ?> GB</td>
-                                    <td>
-                                        <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-sm btn-primary" title="View Details">
-                                            <i class="bi bi-eye me-1"></i> View
-                                        </a>
+                                    <td class="text-end">
+                                        <strong><?= number_format($sub['data_used_mb'] / 1024, 2) ?></strong> GB
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="btn btn-outline-primary" title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <?php if ($sub['status'] === 'active'): ?>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="suspend_subscription">
+                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
+                                                <button type="submit" class="btn btn-outline-warning" title="Suspend" onclick="return confirm('Suspend this subscriber?')">
+                                                    <i class="bi bi-pause-fill"></i>
+                                                </button>
+                                            </form>
+                                            <?php else: ?>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="activate_subscription">
+                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
+                                                <button type="submit" class="btn btn-outline-success" title="Activate">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </button>
+                                            </form>
+                                            <?php endif; ?>
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="action" value="renew_subscription">
+                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
+                                                <button type="submit" class="btn btn-outline-info" title="Renew" onclick="return confirm('Renew this subscription for another period?')">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -1270,6 +1464,30 @@ try {
                     <button type="button" class="btn btn-info" onclick="pingSubscriber(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>')">
                         <i class="bi bi-lightning me-1"></i> Ping
                     </button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <?php if ($customer): ?>
+                            <li><a class="dropdown-item" href="?page=tickets&action=create&customer_id=<?= $customer['id'] ?>"><i class="bi bi-ticket-perforated me-2"></i>Create Ticket</a></li>
+                            <li><a class="dropdown-item" href="?page=customers&action=view&id=<?= $customer['id'] ?>"><i class="bi bi-person me-2"></i>View Customer</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <?php endif; ?>
+                            <?php if (!empty($customer['phone'])): ?>
+                            <li><a class="dropdown-item" href="#" onclick="sendQuickSMS('<?= htmlspecialchars($customer['phone']) ?>', '<?= htmlspecialchars($customer['name']) ?>')"><i class="bi bi-chat-dots me-2"></i>Send SMS</a></li>
+                            <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <?php endif; ?>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addCreditModal"><i class="bi bi-plus-circle me-2"></i>Add Credit</a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="if(confirm('Reset data usage to 0?')) document.getElementById('resetDataForm').submit()"><i class="bi bi-arrow-counterclockwise me-2"></i>Reset Data Usage</a></li>
+                        </ul>
+                    </div>
+                    <form id="resetDataForm" method="post" style="display:none;">
+                        <input type="hidden" name="action" value="reset_data_usage">
+                        <input type="hidden" name="id" value="<?= $subId ?>">
+                        <input type="hidden" name="return_to" value="subscriber">
+                    </form>
                 </div>
             </div>
             
@@ -2895,6 +3113,71 @@ try {
             newCustomerName.removeAttribute('required');
             newCustomerPhone.removeAttribute('required');
         }
+    }
+    
+    function toggleSelectAll(checkbox) {
+        const checkboxes = document.querySelectorAll('.sub-checkbox');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+        updateBulkCount();
+    }
+    
+    function updateBulkCount() {
+        const checked = document.querySelectorAll('.sub-checkbox:checked');
+        document.getElementById('selectedCount').textContent = checked.length;
+    }
+    
+    function sendQuickSMS(phone, name) {
+        const message = prompt(`Send SMS to ${name} (${phone}):\n\nEnter message:`);
+        if (message && message.trim()) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '?page=sms&action=quick_send';
+            
+            const phoneInput = document.createElement('input');
+            phoneInput.type = 'hidden';
+            phoneInput.name = 'phone';
+            phoneInput.value = phone;
+            form.appendChild(phoneInput);
+            
+            const messageInput = document.createElement('input');
+            messageInput.type = 'hidden';
+            messageInput.name = 'message';
+            messageInput.value = message;
+            form.appendChild(messageInput);
+            
+            const returnInput = document.createElement('input');
+            returnInput.type = 'hidden';
+            returnInput.name = 'return_url';
+            returnInput.value = window.location.href;
+            form.appendChild(returnInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    function bulkAction(action) {
+        const checked = document.querySelectorAll('.sub-checkbox:checked');
+        if (checked.length === 0) {
+            alert('Please select at least one subscriber');
+            return;
+        }
+        
+        const ids = Array.from(checked).map(cb => cb.value);
+        const confirmMessages = {
+            'activate': `Activate ${ids.length} subscriber(s)?`,
+            'suspend': `Suspend ${ids.length} subscriber(s)?`,
+            'renew': `Renew ${ids.length} subscriber(s) for another period?`,
+            'send_sms': `Send SMS to ${ids.length} subscriber(s)?`
+        };
+        
+        if (!confirm(confirmMessages[action] || `Perform ${action} on ${ids.length} subscriber(s)?`)) {
+            return;
+        }
+        
+        document.getElementById('bulkActionType').value = 'bulk_' + action;
+        document.getElementById('bulkIds').value = ids.join(',');
+        document.getElementById('bulkActionForm').submit();
     }
     
     function pingSubscriber(subId, username) {
