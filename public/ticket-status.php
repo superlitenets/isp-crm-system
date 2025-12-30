@@ -4,6 +4,8 @@ require_once __DIR__ . '/../src/TicketStatusLink.php';
 require_once __DIR__ . '/../src/Ticket.php';
 require_once __DIR__ . '/../src/ActivityLog.php';
 
+$pdo = Database::getConnection();
+
 $tokenParam = $_GET['t'] ?? $_POST['token'] ?? '';
 $message = '';
 $messageType = '';
