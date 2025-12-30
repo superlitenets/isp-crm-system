@@ -860,7 +860,7 @@ class HuaweiOLT {
     }
     
     public function getONUDistanceViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -5569,8 +5569,8 @@ class HuaweiOLT {
             return ['success' => false, 'online' => false, 'message' => 'ONU ID not assigned'];
         }
         
-        // Query ONU info to check status
-        $cmd = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        // Query ONU info to check status (syntax: display ont info frame/slot port ont-id)
+        $cmd = "display ont info {$frame}/{$slot} {$port} {$onuId}";
         $result = $this->executeCommand($oltId, $cmd);
         $output = $result['output'] ?? '';
         
@@ -7220,7 +7220,7 @@ class HuaweiOLT {
     }
     
     public function getONUSingleInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
         return $this->executeCommand($oltId, $command);
     }
     
