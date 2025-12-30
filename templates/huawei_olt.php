@@ -2855,7 +2855,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'update_dba_profile':
                 $onuId = (int)$_POST['onu_id'];
                 $dbaProfileId = (int)$_POST['dba_profile_id'];
-                $stmt = $pdo->prepare("UPDATE huawei_onus SET dba_profile_id = ? WHERE id = ?");
+                $stmt = $db->prepare("UPDATE huawei_onus SET dba_profile_id = ? WHERE id = ?");
                 if ($stmt->execute([$dbaProfileId, $onuId])) {
                     $message = 'DBA/Speed profile updated successfully';
                     $messageType = 'success';
@@ -5595,7 +5595,7 @@ try {
                             // Get DBA profile info if available
                             $dbaProfile = null;
                             if (!empty($currentOnu['dba_profile_id'])) {
-                                $dbaStmt = $pdo->prepare("SELECT * FROM huawei_dba_profiles WHERE id = ?");
+                                $dbaStmt = $db->prepare("SELECT * FROM huawei_dba_profiles WHERE id = ?");
                                 $dbaStmt->execute([$currentOnu['dba_profile_id']]);
                                 $dbaProfile = $dbaStmt->fetch(PDO::FETCH_ASSOC);
                             }
@@ -12113,7 +12113,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <select name="dba_profile_id" class="form-select" required>
                                 <option value="">-- Select DBA Profile --</option>
                                 <?php
-                                $dbaProfiles = $pdo->query("SELECT * FROM huawei_dba_profiles ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+                                $dbaProfiles = $db->query("SELECT * FROM huawei_dba_profiles ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
                                 foreach ($dbaProfiles as $dba): ?>
                                 <option value="<?= $dba['id'] ?>">
                                     <?= htmlspecialchars($dba['name']) ?>

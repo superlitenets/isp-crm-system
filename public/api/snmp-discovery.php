@@ -12,6 +12,7 @@ if ($oltId <= 0) {
 }
 
 try {
+    $db = Database::getConnection();
     $huaweiOLT = new \App\HuaweiOLT($db);
     
     $result = $huaweiOLT->getONUListViaSNMP($oltId);
