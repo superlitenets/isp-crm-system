@@ -737,4 +737,309 @@ class GenieACS {
         
         return $this->setParameterValues($deviceId, $params);
     }
+    
+    /**
+     * SmartOLT-style Internet WAN configuration via TR-069
+     * Creates and configures Internet WAN connection (PPPoE or IPoE/DHCP)
+     */
+    public function configureInternetWAN(string $deviceId, array $config): array {
+        $results = [];
+        $errors = [];
+        
+        $connectionType = $config['connection_type'] ?? 'pppoe'; // pppoe, dhcp, static
+        $serviceVlan = (int)($config['service_vlan'] ?? 0);
+        $wanIndex = (int)($config['wan_index'] ?? 2); // WANConnectionDevice index (1 is usually management)
+        $connIndex = 1; // Connection index within the device
+        
+        $wanDeviceBase = "InternetGatewayDevice.WANDevice.1";
+        $wanConnDeviceBase = "{$wanDeviceBase}.WANConnectionDevice.{$wanIndex}";
+        
+        // Step 1: Add WANConnectionDevice if needed (only for new connections)
+        if (!empty($config['create_wan_device'])) {
+            $addResult = $this->addObject($deviceId, "{$wanDeviceBase}.WANConnectionDevice");
+            $results['add_wan_device'] = $addResult;
+            if (!$addResult['success']) {
+                // Device may already exist, continue anyway
+            }
+        }
+        
+        // Step 2: Configure based on connection type
+        if ($connectionType === 'pppoe') {
+            $pppBase = "{$wanConnDeviceBase}.WANPPPConnection.{$connIndex}";
+            
+            // Add PPP connection first
+            if (!empty($config['create_ppp_connection'])) {
+                $addPppResult = $this->addObject($deviceId, "{$wanConnDeviceBase}.WANPPPConnection");
+                $results['add_ppp_connection'] = $addPppResult;
+            }
+            
+            // Configure PPPoE settings
+            $pppParams = [];
+            
+            // Enable the connection
+            $pppParams[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
+            
+            // Connection name
+            $connectionName = $config['connection_name'] ?? 'Internet_PPPoE';
+            $pppParams[] = ["{$pppBase}.Name", $connectionName, 'xsd:string'];
+            
+            // PPPoE credentials
+            if (!empty($config['pppoe_username'])) {
+                $pppParams[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
+            }
+            if (!empty($config['pppoe_password'])) {
+                $pppParams[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
+            }
+            
+            // VLAN configuration (Huawei-specific)
+            if ($serviceVlan > 0) {
+                $pppParams[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            
+            // NAT enabled
+            $pppParams[] = ["{$pppBase}.NATEnabled", true, 'xsd:boolean'];
+            
+            // LCP Echo settings (keep-alive)
+            $pppParams[] = ["{$pppBase}.X_HW_LcpEchoReqCheck", true, 'xsd:boolean'];
+            $pppParams[] = ["{$pppBase}.PPPLCPEcho", 10, 'xsd:unsignedInt'];
+            
+            $pppResult = $this->setParameterValues($deviceId, $pppParams);
+            $results['ppp_config'] = $pppResult;
+            if (!$pppResult['success']) {
+                $errors[] = 'Failed to configure PPPoE: ' . ($pppResult['error'] ?? 'Unknown');
+            }
+            
+            // Set WAN name for policy routing
+            $wanName = "wan{$wanIndex}.{$connIndex}.ppp{$connIndex}";
+            
+        } else {
+            // DHCP or Static IP (IPoE)
+            $ipBase = "{$wanConnDeviceBase}.WANIPConnection.{$connIndex}";
+            
+            // Add IP connection first
+            if (!empty($config['create_ip_connection'])) {
+                $addIpResult = $this->addObject($deviceId, "{$wanConnDeviceBase}.WANIPConnection");
+                $results['add_ip_connection'] = $addIpResult;
+            }
+            
+            $ipParams = [];
+            $ipParams[] = ["{$ipBase}.Enable", true, 'xsd:boolean'];
+            
+            $connectionName = $config['connection_name'] ?? 'Internet_DHCP';
+            $ipParams[] = ["{$ipBase}.Name", $connectionName, 'xsd:string'];
+            
+            if ($connectionType === 'dhcp') {
+                $ipParams[] = ["{$ipBase}.AddressingType", 'DHCP', 'xsd:string'];
+            } else {
+                $ipParams[] = ["{$ipBase}.AddressingType", 'Static', 'xsd:string'];
+                if (!empty($config['static_ip'])) {
+                    $ipParams[] = ["{$ipBase}.ExternalIPAddress", $config['static_ip'], 'xsd:string'];
+                }
+                if (!empty($config['static_mask'])) {
+                    $ipParams[] = ["{$ipBase}.SubnetMask", $config['static_mask'], 'xsd:string'];
+                }
+                if (!empty($config['static_gateway'])) {
+                    $ipParams[] = ["{$ipBase}.DefaultGateway", $config['static_gateway'], 'xsd:string'];
+                }
+            }
+            
+            // VLAN
+            if ($serviceVlan > 0) {
+                $ipParams[] = ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            
+            // NAT
+            $ipParams[] = ["{$ipBase}.NATEnabled", true, 'xsd:boolean'];
+            
+            $ipResult = $this->setParameterValues($deviceId, $ipParams);
+            $results['ip_config'] = $ipResult;
+            if (!$ipResult['success']) {
+                $errors[] = 'Failed to configure IP connection: ' . ($ipResult['error'] ?? 'Unknown');
+            }
+            
+            $wanName = "wan{$wanIndex}.{$connIndex}.ip{$connIndex}";
+        }
+        
+        // Step 3: Set provisioning code (SmartOLT uses this to identify configuration source)
+        $provCode = $config['provisioning_code'] ?? 'CRM.r' . strtoupper(substr($connectionType, 0, 3));
+        $provResult = $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', $provCode, 'xsd:string']
+        ]);
+        $results['provisioning_code'] = $provResult;
+        
+        // Step 4: Set default WAN connection
+        $wanName = $wanName ?? "wan{$wanIndex}.{$connIndex}.ppp{$connIndex}";
+        $defaultWanResult = $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
+        ]);
+        $results['default_wan'] = $defaultWanResult;
+        
+        // Step 5: Configure policy routes to bind LAN ports and WiFi to WAN
+        if (!empty($config['bind_ports']) || !empty($config['auto_bind_ports'])) {
+            // Add policy route entry
+            $addRouteResult = $this->addObject($deviceId, 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route');
+            $results['add_policy_route'] = $addRouteResult;
+            
+            // Get the new route index
+            $routeIndex = 1;
+            if ($addRouteResult['success'] && isset($addRouteResult['data']['InstanceNumber'])) {
+                $routeIndex = $addRouteResult['data']['InstanceNumber'];
+            }
+            
+            // Configure policy route
+            $portNames = $config['bind_ports'] ?? 'LAN1,LAN2,LAN3,LAN4,SSID1';
+            $routeParams = [
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", $portNames, 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string']
+            ];
+            
+            $routeConfigResult = $this->setParameterValues($deviceId, $routeParams);
+            $results['policy_route_config'] = $routeConfigResult;
+        }
+        
+        // Step 6: Authorization notification (like SmartOLT)
+        $this->logTR069Action($deviceId, 'internet_wan_config', [
+            'connection_type' => $connectionType,
+            'service_vlan' => $serviceVlan,
+            'wan_name' => $wanName,
+            'success' => empty($errors)
+        ]);
+        
+        return [
+            'success' => empty($errors),
+            'message' => empty($errors) ? 'Internet WAN configured successfully' : 'Some errors occurred',
+            'errors' => $errors,
+            'results' => $results,
+            'wan_name' => $wanName
+        ];
+    }
+    
+    /**
+     * Add an object instance via TR-069 (e.g., new WANConnectionDevice)
+     */
+    public function addObject(string $deviceId, string $objectPath): array {
+        $encodedId = urlencode($deviceId);
+        
+        // GenieACS uses tasks to add objects
+        $task = [
+            'name' => 'addObject',
+            'objectName' => $objectPath
+        ];
+        
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
+        
+        return $result;
+    }
+    
+    /**
+     * Delete an object instance via TR-069
+     */
+    public function deleteObject(string $deviceId, string $objectPath): array {
+        $encodedId = urlencode($deviceId);
+        
+        $task = [
+            'name' => 'deleteObject',
+            'objectName' => $objectPath
+        ];
+        
+        return $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
+    }
+    
+    /**
+     * Log TR-069 action to database
+     */
+    private function logTR069Action(string $deviceId, string $action, array $data): void {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_logs (olt_id, onu_id, action, status, message, command_sent, command_response, created_at)
+                VALUES (NULL, NULL, :action, :status, :message, :command, :response, CURRENT_TIMESTAMP)
+            ");
+            $stmt->execute([
+                ':action' => 'tr069_' . $action,
+                ':status' => ($data['success'] ?? true) ? 'success' : 'failed',
+                ':message' => "TR-069 {$action} for device {$deviceId}",
+                ':command' => json_encode($data),
+                ':response' => json_encode($data)
+            ]);
+        } catch (\Exception $e) {
+            // Silently fail logging
+        }
+    }
+    
+    /**
+     * Get current WAN connection status
+     */
+    public function getWANStatus(string $deviceId): array {
+        $result = $this->getDevice($deviceId);
+        
+        if (!$result['success'] || empty($result['data'])) {
+            return ['success' => false, 'error' => 'Device not found'];
+        }
+        
+        $device = $result['data'];
+        $wanInfo = [];
+        
+        // Check WANConnectionDevice instances
+        for ($i = 1; $i <= 4; $i++) {
+            $wanBase = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$i}";
+            
+            // Check PPPoE connections
+            for ($j = 1; $j <= 4; $j++) {
+                $pppPath = "{$wanBase}.WANPPPConnection.{$j}";
+                $enable = $this->extractValue($device, "{$pppPath}.Enable");
+                $status = $this->extractValue($device, "{$pppPath}.ConnectionStatus");
+                $name = $this->extractValue($device, "{$pppPath}.Name");
+                $vlan = $this->extractValue($device, "{$pppPath}.X_HW_VLAN");
+                $ip = $this->extractValue($device, "{$pppPath}.ExternalIPAddress");
+                $username = $this->extractValue($device, "{$pppPath}.Username");
+                
+                if ($enable !== null || $name !== null) {
+                    $wanInfo[] = [
+                        'type' => 'PPPoE',
+                        'path' => $pppPath,
+                        'index' => "{$i}.{$j}",
+                        'name' => $name,
+                        'enabled' => $enable,
+                        'status' => $status,
+                        'vlan' => $vlan,
+                        'ip' => $ip,
+                        'username' => $username
+                    ];
+                }
+            }
+            
+            // Check IP connections
+            for ($j = 1; $j <= 4; $j++) {
+                $ipPath = "{$wanBase}.WANIPConnection.{$j}";
+                $enable = $this->extractValue($device, "{$ipPath}.Enable");
+                $status = $this->extractValue($device, "{$ipPath}.ConnectionStatus");
+                $name = $this->extractValue($device, "{$ipPath}.Name");
+                $vlan = $this->extractValue($device, "{$ipPath}.X_HW_VLAN");
+                $ip = $this->extractValue($device, "{$ipPath}.ExternalIPAddress");
+                
+                if ($enable !== null || $name !== null) {
+                    $wanInfo[] = [
+                        'type' => 'IPoE',
+                        'path' => $ipPath,
+                        'index' => "{$i}.{$j}",
+                        'name' => $name,
+                        'enabled' => $enable,
+                        'status' => $status,
+                        'vlan' => $vlan,
+                        'ip' => $ip
+                    ];
+                }
+            }
+        }
+        
+        // Get default WAN
+        $defaultWan = $this->extractValue($device, 'InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName');
+        
+        return [
+            'success' => true,
+            'wan_connections' => $wanInfo,
+            'default_wan' => $defaultWan
+        ];
+    }
 }
