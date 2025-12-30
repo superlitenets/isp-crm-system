@@ -5800,7 +5800,18 @@ try {
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
                 })
-                .then(r => r.json())
+                .then(async r => {
+                    const text = await r.text();
+                    if (!text || text.trim() === '') {
+                        throw new Error('Empty response from server');
+                    }
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('Invalid JSON response:', text);
+                        throw new Error('Invalid response from TR-069 service');
+                    }
+                })
                 .then(data => {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
