@@ -931,6 +931,170 @@ class RadiusBilling {
         return "{$upload}/{$download}";
     }
     
+    // ==================== MAC Authentication (Hotspot) ====================
+    
+    public function authenticateByMAC(string $mac, string $nasIp = ''): array {
+        // Normalize MAC address
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        if (strlen($mac) !== 12) {
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid MAC format'];
+        }
+        $macFormatted = implode(':', str_split($mac, 2));
+        
+        // Check if MAC auth is enabled
+        if ($this->getSetting('hotspot_mac_auth') !== 'true') {
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC auth disabled'];
+        }
+        
+        // Find subscription by MAC
+        $stmt = $this->db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
+                   p.name as package_name, p.download_speed, p.upload_speed, p.address_pool,
+                   p.data_quota_mb, p.fup_enabled, p.fup_quota_mb, p.fup_download_speed, p.fup_upload_speed
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE s.mac_address = ? AND s.status = 'active'
+            LIMIT 1
+        ");
+        $stmt->execute([$macFormatted]);
+        $sub = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$sub) {
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC not registered'];
+        }
+        
+        // Check expiry
+        if ($sub['expiry_date'] && strtotime($sub['expiry_date']) < time()) {
+            $useExpiredPool = $this->getSetting('use_expired_pool') === 'true';
+            if ($useExpiredPool) {
+                return [
+                    'success' => true,
+                    'reply' => 'Access-Accept',
+                    'expired' => true,
+                    'mac_auth' => true,
+                    'attributes' => [
+                        'Framed-Pool' => $this->getSetting('expired_ip_pool') ?: 'expired-pool',
+                        'Mikrotik-Rate-Limit' => $this->getSetting('expired_rate_limit') ?: '256k/256k',
+                        'Session-Timeout' => 300
+                    ],
+                    'subscription' => $sub
+                ];
+            }
+            return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Subscription expired'];
+        }
+        
+        // Build attributes
+        $attributes = [
+            'Mikrotik-Rate-Limit' => $this->buildRateLimit($sub),
+        ];
+        
+        if (!empty($sub['address_pool'])) {
+            $attributes['Framed-Pool'] = $sub['address_pool'];
+        }
+        
+        if ($sub['static_ip']) {
+            $attributes['Framed-IP-Address'] = $sub['static_ip'];
+        }
+        
+        return [
+            'success' => true,
+            'reply' => 'Access-Accept',
+            'mac_auth' => true,
+            'attributes' => $attributes,
+            'subscription' => $sub
+        ];
+    }
+    
+    public function authenticateVoucher(string $code): array {
+        $code = strtoupper(trim($code));
+        
+        $stmt = $this->db->prepare("
+            SELECT v.*, p.name as package_name, p.download_speed, p.upload_speed, 
+                   p.validity_days, p.data_quota_mb, p.address_pool
+            FROM radius_vouchers v
+            LEFT JOIN radius_packages p ON v.package_id = p.id
+            WHERE v.code = ? AND v.status = 'unused'
+            LIMIT 1
+        ");
+        $stmt->execute([$code]);
+        $voucher = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$voucher) {
+            return ['success' => false, 'error' => 'Invalid or already used voucher'];
+        }
+        
+        // Mark voucher as used
+        $this->db->prepare("
+            UPDATE radius_vouchers SET status = 'used', used_at = CURRENT_TIMESTAMP WHERE id = ?
+        ")->execute([$voucher['id']]);
+        
+        // Calculate expiry
+        $expiryDate = date('Y-m-d H:i:s', strtotime("+{$voucher['validity_days']} days"));
+        
+        // Build attributes
+        $attributes = [
+            'Mikrotik-Rate-Limit' => "{$voucher['upload_speed']}/{$voucher['download_speed']}",
+            'Session-Timeout' => $voucher['validity_days'] * 86400,
+        ];
+        
+        if (!empty($voucher['address_pool'])) {
+            $attributes['Framed-Pool'] = $voucher['address_pool'];
+        }
+        
+        return [
+            'success' => true,
+            'reply' => 'Access-Accept',
+            'voucher' => true,
+            'voucher_id' => $voucher['id'],
+            'expiry' => $expiryDate,
+            'attributes' => $attributes,
+            'package' => $voucher
+        ];
+    }
+    
+    public function getSubscriptionByPhone(string $phone): ?array {
+        // Normalize phone
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($phone, 0, 1) === '0') {
+            $phone = '254' . substr($phone, 1);
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT s.*, c.name as customer_name, c.phone as customer_phone,
+                   p.name as package_name, p.download_speed, p.upload_speed, p.address_pool,
+                   p.data_quota_mb
+            FROM radius_subscriptions s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN radius_packages p ON s.package_id = p.id
+            WHERE REPLACE(REPLACE(c.phone, '+', ''), ' ', '') = ?
+               OR REPLACE(REPLACE(c.phone, '+', ''), ' ', '') LIKE ?
+            LIMIT 1
+        ");
+        $stmt->execute([$phone, '%' . substr($phone, -9)]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function registerMACForHotspot(int $subscriptionId, string $mac): array {
+        $mac = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $mac));
+        if (strlen($mac) !== 12) {
+            return ['success' => false, 'error' => 'Invalid MAC address'];
+        }
+        $macFormatted = implode(':', str_split($mac, 2));
+        
+        // Check if MAC already registered to another subscription
+        $existing = $this->db->prepare("SELECT id, username FROM radius_subscriptions WHERE mac_address = ? AND id != ?");
+        $existing->execute([$macFormatted, $subscriptionId]);
+        if ($existing->fetch()) {
+            return ['success' => false, 'error' => 'MAC already registered to another account'];
+        }
+        
+        $stmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$macFormatted, $subscriptionId]);
+        
+        return ['success' => true, 'mac' => $macFormatted];
+    }
+    
     // ==================== Automation ====================
     
     public function processExpiredSubscriptions(): array {

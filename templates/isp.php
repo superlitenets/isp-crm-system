@@ -3290,12 +3290,44 @@ try {
                     
                     <div class="col-lg-6">
                         <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-wifi me-2"></i>Hotspot Settings</div>
+                            <div class="card-body">
+                                <p class="text-muted small">Configure hotspot captive portal and MAC authentication.</p>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="hotspot_mac_auth" id="hotspot_mac_auth" value="true" <?= $radiusBilling->getSetting('hotspot_mac_auth') === 'true' ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="hotspot_mac_auth"><strong>Enable MAC Authentication</strong></label>
+                                    </div>
+                                    <small class="text-muted">Auto-login returning users by their device MAC address</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">ISP/Hotspot Name</label>
+                                    <input type="text" class="form-control" name="isp_name" value="<?= htmlspecialchars($radiusBilling->getSetting('isp_name') ?: '') ?>" placeholder="My WiFi Hotspot">
+                                    <small class="text-muted">Displayed on the hotspot login page</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Welcome Message</label>
+                                    <input type="text" class="form-control" name="hotspot_welcome" value="<?= htmlspecialchars($radiusBilling->getSetting('hotspot_welcome') ?: '') ?>" placeholder="Welcome! Please login to access the internet.">
+                                </div>
+                                
+                                <div class="alert alert-info small mb-0">
+                                    <i class="bi bi-link-45deg me-1"></i>
+                                    <strong>Hotspot Login URL:</strong><br>
+                                    <code>/hotspot.php</code>
+                                    <br><small>Point your MikroTik hotspot login page to this URL</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm mt-4">
                             <div class="card-header"><i class="bi bi-info-circle me-2"></i>RADIUS Server Info</div>
                             <div class="card-body">
-                                <p class="text-muted">Configure your RADIUS server settings for MikroTik integration.</p>
                                 <div class="alert alert-info mb-3">
                                     <i class="bi bi-info-circle me-2"></i>
-                                    RADIUS server settings are configured in your MikroTik router. Point your NAS devices to this server's IP address.
+                                    Point your NAS devices to this server's IP address.
                                 </div>
                                 <ul class="list-unstyled mb-0">
                                     <li><strong>Auth Port:</strong> 1812/UDP</li>
