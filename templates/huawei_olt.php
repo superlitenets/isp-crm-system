@@ -5316,14 +5316,14 @@ try {
                                 <?php
                                 $statusColors = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'];
                                 ?>
-                                <span class="text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?> fw-bold">
+                                <span data-live-status class="text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?> fw-bold">
                                     <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
                                 </span>
                             </div>
                             <div class="mb-2">
                                 <span class="text-primary">ONU/OLT Rx signal</span><br>
-                                <span class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 2) : '-' ?> dBm</span>
-                                / <?= $tx !== null ? number_format($tx, 2) : '-' ?> dBm
+                                <span data-live-rx class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 2) : '-' ?> dBm</span>
+                                / <span data-live-tx><?= $tx !== null ? number_format($tx, 2) : '-' ?> dBm</span>
                                 (<?= $distanceDisplay ?>)
                             </div>
                             <div class="mb-2">
@@ -6714,16 +6714,11 @@ try {
             }
             
             async function fetchLiveOnuData() {
-                const btn = document.getElementById('btnFetchLive');
-                const loading = document.getElementById('liveDataLoading');
-                const content = document.getElementById('liveDataContent');
-                const timestamp = document.getElementById('liveDataTimestamp');
-                
                 const oltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
                 const frame = <?= $currentOnu['frame'] ?? 0 ?>;
                 const slot = <?= $currentOnu['slot'] ?? 'null' ?>;
                 const port = <?= $currentOnu['port'] ?? 'null' ?>;
-                const onuId = <?= $currentOnu['onu_id'] ?? 'null' ?>;
+                const onuIdVal = <?= $currentOnu['onu_id'] ?? 'null' ?>;
                 const sn = '<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>';
                 
                 if (!oltId || slot === null) {
@@ -6731,30 +6726,42 @@ try {
                     return;
                 }
                 
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fetching...';
-                loading.classList.remove('d-none');
-                content.style.opacity = '0.5';
-                
                 try {
-                    const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${oltId}&frame=${frame}&slot=${slot}&port=${port}&onu_id=${onuId}&sn=${encodeURIComponent(sn)}`);
+                    const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${oltId}&frame=${frame}&slot=${slot}&port=${port}&onu_id=${onuIdVal}&sn=${encodeURIComponent(sn)}`);
                     const data = await resp.json();
                     
                     if (data.success && data.onu) {
-                        updateLiveDisplay(data.onu);
-                        timestamp.classList.remove('d-none');
-                        document.getElementById('liveTimestamp').textContent = new Date().toLocaleTimeString();
+                        // Update status display on page
+                        const onu = data.onu;
+                        const statusEl = document.querySelector('[data-live-status]');
+                        const rxEl = document.querySelector('[data-live-rx]');
+                        const txEl = document.querySelector('[data-live-tx]');
+                        
+                        if (statusEl) {
+                            const statusClass = {'online': 'success', 'offline': 'secondary', 'los': 'danger'}[onu.status] || 'secondary';
+                            statusEl.className = 'text-' + statusClass + ' fw-bold';
+                            statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
+                        }
+                        if (rxEl && onu.rx_power !== null) {
+                            rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                        }
+                        if (txEl && onu.tx_power !== null) {
+                            txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                        }
+                        
+                        // Show toast notification
+                        const toast = document.createElement('div');
+                        toast.className = 'position-fixed bottom-0 end-0 p-3';
+                        toast.style.zIndex = '9999';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Live status updated: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
                     } else {
                         alert('Could not fetch live data: ' + (data.error || 'ONU not found'));
                     }
                 } catch (e) {
                     console.error(e);
                     alert('Error fetching live data');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Fetch Live';
-                    loading.classList.add('d-none');
-                    content.style.opacity = '1';
                 }
             }
             
