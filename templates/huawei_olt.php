@@ -1075,6 +1075,139 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
+            
+            case 'authorize_onu_simple':
+                // SIMPLIFIED AUTHORIZATION: Name, Zone, Address, Service VLAN
+                // Auto-configures TR-069 WAN in background and redirects to ONU config page
+                $message = '';
+                $messageType = 'danger';
+                
+                $onuId = (int)$_POST['onu_id'];
+                $zoneId = !empty($_POST['zone_id']) ? (int)$_POST['zone_id'] : null;
+                $zone = $_POST['zone'] ?? '';
+                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+                $name = trim($_POST['name'] ?? '');
+                $address = trim($_POST['address'] ?? '');
+                $sn = trim($_POST['sn'] ?? '');
+                $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
+                $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
+                
+                // Ensure ONU exists in database
+                $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
+                
+                // If no ONU ID but we have SN, check discovery log or create new ONU
+                if (!$onu && !empty($sn)) {
+                    $existingStmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                    $existingStmt->execute([$sn]);
+                    $existingOnuId = $existingStmt->fetchColumn();
+                    
+                    if ($existingOnuId) {
+                        $onuId = (int)$existingOnuId;
+                        $onu = $huaweiOLT->getONU($onuId);
+                    } else {
+                        $discStmt = $db->prepare("SELECT * FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
+                        $discStmt->execute([$sn]);
+                        $discoveredOnu = $discStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($discoveredOnu || (!empty($oltIdInput) && !empty($frameSlotPort))) {
+                            $frame = 0; $slot = 0; $port = 0;
+                            $fsp = $discoveredOnu['frame_slot_port'] ?? $frameSlotPort;
+                            if (preg_match('/(\d+)\/(\d+)\/(\d+)/', $fsp, $fspMatch)) {
+                                $frame = (int)$fspMatch[1];
+                                $slot = (int)$fspMatch[2];
+                                $port = (int)$fspMatch[3];
+                            }
+                            
+                            $oltIdForOnu = $discoveredOnu['olt_id'] ?? $oltIdInput;
+                            $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
+                            
+                            $insertStmt = $db->prepare("
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                RETURNING id
+                            ");
+                            $insertStmt->execute([
+                                $oltIdForOnu, $sn, $name ?: $sn, $frame, $slot, $port,
+                                $onuTypeIdForOnu, $discoveredOnu['equipment_id'] ?? null
+                            ]);
+                            $onuId = (int)$insertStmt->fetchColumn();
+                            $onu = $huaweiOLT->getONU($onuId);
+                        }
+                    }
+                }
+                
+                if (!$onu) {
+                    header('Location: ?page=huawei-olt&view=onus&unconfigured=1&msg=' . urlencode('ONU record not found.') . '&msg_type=warning');
+                    exit;
+                }
+                
+                // Update ONU record with name, zone, address
+                $updateFields = ['name' => $name ?: $sn];
+                if (!empty($zone)) $updateFields['zone'] = $zone;
+                if ($zoneId) $updateFields['zone_id'] = $zoneId;
+                if (!empty($address)) $updateFields['description'] = $address;
+                $huaweiOLT->updateONU($onuId, $updateFields);
+                
+                // Get default profile
+                $defaultProfile = $huaweiOLT->getDefaultServiceProfile();
+                if (!$defaultProfile) {
+                    $defaultProfileId = $huaweiOLT->addServiceProfile([
+                        'name' => 'Default Internet', 'line_profile' => 1, 'srv_profile' => 1,
+                        'download_speed' => 100, 'upload_speed' => 50, 'is_default' => true, 'is_active' => true
+                    ]);
+                    $defaultProfile = $huaweiOLT->getServiceProfile($defaultProfileId);
+                }
+                
+                $authMessages = [];
+                $hasError = false;
+                
+                // Step 1: Authorize ONU on OLT with service VLAN
+                try {
+                    $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
+                        'description' => $name ?: $sn,
+                        'vlan_id' => $vlanId
+                    ]);
+                    
+                    if ($result['success']) {
+                        $authMessages[] = "ONU authorized as ID {$result['onu_id']}";
+                        if ($result['service_port_success']) {
+                            $authMessages[] = "Service VLAN {$vlanId} configured";
+                        }
+                    } else {
+                        $authMessages[] = "Authorization warning: " . ($result['message'] ?? 'See OLT');
+                    }
+                } catch (Exception $e) {
+                    $authMessages[] = "Authorization failed: " . $e->getMessage();
+                    $hasError = true;
+                }
+                
+                // Step 2: Auto-configure TR-069 WAN (IPHOST on VLAN 69 with DHCP)
+                if (!$hasError) {
+                    try {
+                        $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
+                            'tr069_vlan' => 69,
+                            'tr069_gem_port' => 2
+                        ]);
+                        
+                        if ($tr069Result['success']) {
+                            $authMessages[] = "TR-069 WAN configured on VLAN 69";
+                        } else {
+                            $authMessages[] = "TR-069 config info: " . ($tr069Result['message'] ?? 'Pending');
+                        }
+                    } catch (Exception $e) {
+                        $authMessages[] = "TR-069 setup: " . $e->getMessage();
+                    }
+                }
+                
+                // Build final message
+                $message = implode('. ', $authMessages) . '.';
+                $messageType = $hasError ? 'warning' : 'success';
+                
+                // Redirect to ONU configuration page
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
                 
             case 'configure_stage2_tr069':
                 // STAGE 2: TR-069 Configuration (after authorization)
@@ -11376,19 +11509,19 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         <input type="hidden" name="id" id="actionId">
     </form>
     
-    <!-- Stage 1: Authorization Modal (SmartOLT-style staged provisioning) -->
+    <!-- Authorization Modal (Simplified - SmartOLT style) -->
     <div class="modal fade" id="authModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="post">
-                    <input type="hidden" name="action" value="authorize_stage1">
+                <form method="post" id="authForm">
+                    <input type="hidden" name="action" value="authorize_onu_simple">
                     <input type="hidden" name="onu_id" id="authOnuId">
                     <input type="hidden" name="olt_id" id="authOltId">
                     <input type="hidden" name="sn" id="authSnInput">
                     <input type="hidden" name="frame_slot_port" id="authFsp">
                     <input type="hidden" name="onu_type_id" id="authOnuType">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-1-circle me-2"></i>Stage 1: Authorize ONU</h5>
+                        <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize ONU</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -11403,55 +11536,48 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </div>
                         </div>
                         
-                        <div class="alert alert-secondary small mb-3">
-                            <i class="bi bi-info-circle me-2"></i>
-                            <strong>Staged Provisioning:</strong> This authorizes the ONU and creates service-ports only. 
-                            TR-069, WAN, and WiFi are configured in subsequent stages from the ONU detail page.
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Zone <span class="text-danger">*</span></label>
-                                <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
-                                    <option value="">-- Select Zone --</option>
-                                    <?php
-                                    $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
-                                    while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                    <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
-                                        <?= htmlspecialchars($zone['name']) ?>
-                                    </option>
-                                    <?php endwhile; ?>
-                                </select>
-                                <input type="hidden" name="zone" id="authZoneName">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
-                                <select name="vlan_id" id="authVlanId" class="form-select" required>
-                                    <option value="">-- Loading VLANs --</option>
-                                </select>
-                            </div>
-                        </div>
                         <div class="mb-3">
-                            <label class="form-label">Customer / Description</label>
-                            <input type="text" name="description" id="authDescription" class="form-control" placeholder="e.g., John_Apt5">
-                            <small class="text-muted">Auto-generated if left blank</small>
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="authName" class="form-control" placeholder="e.g., John Doe" required>
                         </div>
                         
-                        <div class="card bg-light mt-3">
-                            <div class="card-body py-2">
-                                <small class="text-muted">
-                                    <strong>Next steps after authorization:</strong><br>
-                                    <span class="badge bg-secondary me-1">2</span> Configure TR-069<br>
-                                    <span class="badge bg-secondary me-1">3</span> Configure WAN/PPPoE (via GenieACS)<br>
-                                    <span class="badge bg-secondary me-1">4</span> Configure WiFi (via GenieACS)
-                                </small>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Zone <span class="text-danger">*</span></label>
+                            <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
+                                <option value="">-- Select Zone --</option>
+                                <?php
+                                $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
+                                while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
+                                    <?= htmlspecialchars($zone['name']) ?>
+                                </option>
+                                <?php endwhile; ?>
+                            </select>
+                            <input type="hidden" name="zone" id="authZoneName">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="address" id="authAddress" class="form-control" placeholder="e.g., 123 Main St, Apt 5">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
+                            <select name="vlan_id" id="authVlanId" class="form-select" required>
+                                <option value="">-- Loading VLANs --</option>
+                            </select>
+                            <small class="text-muted">Internet VLAN for the customer</small>
+                        </div>
+                        
+                        <div class="alert alert-secondary small mb-0">
+                            <i class="bi bi-gear me-2"></i>
+                            <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured after authorization.
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle me-1"></i> Authorize (Stage 1)
+                        <button type="submit" class="btn btn-success" id="authSubmitBtn">
+                            <i class="bi bi-check-circle me-1"></i> Authorize & Configure
                         </button>
                     </div>
                 </form>
