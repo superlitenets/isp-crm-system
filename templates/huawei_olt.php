@@ -8553,9 +8553,23 @@ try {
             </div>
 
             <script>
-            document.getElementById('isOltSite').addEventListener('change', function() {
-                document.getElementById('oltSelectDiv').style.display = this.checked ? 'block' : 'none';
-            });
+            (function() {
+                const isOltSiteEl = document.getElementById('isOltSite');
+                const oltSelectDivEl = document.getElementById('oltSelectDiv');
+                if (isOltSiteEl && oltSelectDivEl) {
+                    isOltSiteEl.addEventListener('change', function() {
+                        oltSelectDivEl.style.display = this.checked ? 'block' : 'none';
+                    });
+                }
+                
+                const editIsOltSiteEl = document.getElementById('editIsOltSite');
+                const editOltSelectDivEl = document.getElementById('editOltSelectDiv');
+                if (editIsOltSiteEl && editOltSelectDivEl) {
+                    editIsOltSiteEl.addEventListener('change', function() {
+                        editOltSelectDivEl.style.display = this.checked ? 'block' : 'none';
+                    });
+                }
+            })();
 
             function viewServerConfig(serverId) {
                 fetch(`?page=huawei-olt&view=vpn&action=get_server_config&server_id=${serverId}`)

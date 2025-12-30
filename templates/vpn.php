@@ -724,7 +724,13 @@ function downloadConfig() {
     URL.revokeObjectURL(url);
 }
 
-document.getElementById('is_olt_site')?.addEventListener('change', function() {
-    document.getElementById('oltSelectDiv').style.display = this.checked ? 'block' : 'none';
-});
+(function() {
+    const isOltSiteEl = document.getElementById('is_olt_site');
+    const oltSelectDivEl = document.getElementById('oltSelectDiv');
+    if (isOltSiteEl && oltSelectDivEl) {
+        isOltSiteEl.addEventListener('change', function() {
+            oltSelectDivEl.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+})();
 </script>
