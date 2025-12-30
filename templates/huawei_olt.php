@@ -4678,102 +4678,41 @@ try {
                         </table>
                     </div>
                     <?php else: ?>
-                    <!-- Bulk Action Toolbar -->
-                    <div id="bulkActionBar" class="bg-primary text-white p-3 d-none">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <span id="selectedCount">0</span> ONUs selected
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-light btn-sm" onclick="bulkReboot()">
-                                    <i class="bi bi-arrow-clockwise me-1"></i> Reboot Selected
-                                </button>
-                                <button class="btn btn-warning btn-sm" onclick="bulkRefreshSignal()">
-                                    <i class="bi bi-reception-4 me-1"></i> Refresh Signal
-                                </button>
-                                <button class="btn btn-danger btn-sm" onclick="bulkDelete()">
-                                    <i class="bi bi-trash me-1"></i> Delete Selected
-                                </button>
-                                <button class="btn btn-outline-light btn-sm" onclick="clearSelection()">
-                                    <i class="bi bi-x-lg me-1"></i> Clear
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0" id="onuTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 40px;"><input type="checkbox" id="selectAllOnus" class="form-check-input" title="Select All"></th>
                                     <th>Serial Number</th>
-                                    <th>ONU Type</th>
-                                    <th>Name / Description</th>
-                                    <th>OLT / Port</th>
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Distance</th>
-                                    <th>Customer</th>
-                                    <th>Actions</th>
+                                    <th style="width: 100px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($onus as $onu): ?>
                                 <tr data-onu-id="<?= $onu['id'] ?>">
-                                    <td><input type="checkbox" class="form-check-input onu-checkbox" value="<?= $onu['id'] ?>"></td>
                                     <td>
-                                        <code><?= htmlspecialchars($onu['sn']) ?></code>
-                                        <?php if (!empty($onu['discovered_eqid'])): ?>
-                                        <br><small class="text-muted"><?= htmlspecialchars($onu['discovered_eqid']) ?></small>
+                                        <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="text-decoration-none">
+                                            <code class="fs-6"><?= htmlspecialchars($onu['sn']) ?></code>
+                                        </a>
+                                        <?php if (!empty($onu['name'])): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($onu['name']) ?></small>
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                        $typeId = $onu['onu_type_id'] ?? $onu['discovered_onu_type_id'] ?? null;
-                                        $typeName = $onu['onu_type_model'] ?? null;
-                                        $rawType = $onu['onu_type'] ?? $onu['discovered_eqid'] ?? null;
-                                        if ($typeName): ?>
-                                            <span class="badge bg-info" title="<?= htmlspecialchars($onu['onu_type_name'] ?? '') ?>">
-                                                <i class="bi bi-router me-1"></i><?= htmlspecialchars($typeName) ?>
-                                            </span>
-                                            <?php if ($onu['type_wifi']): ?>
-                                            <i class="bi bi-wifi text-success ms-1" title="WiFi"></i>
-                                            <?php endif; ?>
-                                        <?php elseif ($rawType): ?>
-                                            <span class="badge bg-secondary" title="Equipment ID from OLT">
-                                                <i class="bi bi-cpu me-1"></i><?= htmlspecialchars($rawType) ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <strong><?= htmlspecialchars($onu['name'] ?: '-') ?></strong>
-                                        <?php if (!empty($onu['description'])): ?>
-                                        <br><small class="text-muted"><?= htmlspecialchars($onu['description']) ?></small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <span class="text-muted"><?= htmlspecialchars($onu['olt_name'] ?? '-') ?></span>
-                                        <br><small><?= $onu['frame'] ?>/<?= $onu['slot'] ?>/<?= $onu['port'] ?> : <?= $onu['onu_id'] ?? '-' ?></small>
                                     </td>
                                     <td>
                                         <?php
                                         $statusConfig = [
-                                            'online' => ['class' => 'success', 'icon' => 'check-circle-fill', 'label' => 'Online'],
-                                            'offline' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
-                                            'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill', 'label' => 'LOS'],
-                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
-                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
+                                            'online' => ['class' => 'success', 'icon' => 'check-circle-fill'],
+                                            'offline' => ['class' => 'secondary', 'icon' => 'circle'],
+                                            'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill'],
+                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill'],
+                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill'],
                                         ];
                                         $status = strtolower($onu['status'] ?? 'offline');
-                                        $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle', 'label' => ucfirst($status)];
+                                        $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle'];
                                         ?>
-                                        <span class="badge bg-<?= $cfg['class'] ?>">
-                                            <i class="bi bi-<?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?>
-                                        </span>
-                                        <?php if (!$onu['is_authorized']): ?>
-                                        <br><span class="badge bg-warning text-dark" style="font-size: 0.7em;"><i class="bi bi-hourglass-split me-1"></i>Pending Auth</span>
-                                        <?php endif; ?>
+                                        <i class="bi bi-<?= $cfg['icon'] ?> text-<?= $cfg['class'] ?>" title="<?= ucfirst($status) ?>"></i>
                                     </td>
                                     <td>
                                         <?php
@@ -4785,11 +4724,8 @@ try {
                                             elseif ($rx <= -25) $rxClass = 'warning';
                                         }
                                         ?>
-                                        <span class="signal-<?= $rxClass ?>" title="RX Power"><?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
-                                        / <span title="TX Power"><?= $tx !== null ? number_format($tx, 1) : '-' ?></span> dBm
-                                        <?php if (!empty($onu['optical_updated_at'])): ?>
-                                        <br><small class="text-muted"><?= date('M j H:i', strtotime($onu['optical_updated_at'])) ?></small>
-                                        <?php endif; ?>
+                                        <span class="signal-<?= $rxClass ?>"><?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
+                                        / <?= $tx !== null ? number_format($tx, 1) : '-' ?> dBm
                                     </td>
                                     <td>
                                         <?php 
@@ -4804,43 +4740,10 @@ try {
                                             -
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= htmlspecialchars($onu['customer_name'] ?? '-') ?></td>
                                     <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <?php if (!$onu['is_authorized']): ?>
-                                            <?php 
-                                            $discoveredTypeId = $onu['discovered_onu_type_id'] ?? $onu['onu_type_id'] ?? 'null';
-                                            $discoveredEqid = htmlspecialchars($onu['discovered_eqid'] ?? '', ENT_QUOTES);
-                                            $defaultMode = htmlspecialchars($onu['type_default_mode'] ?? 'bridge', ENT_QUOTES);
-                                            ?>
-                                            <button class="btn btn-success" onclick="authorizeOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>', <?= isset($onu['slot']) && $onu['slot'] !== null ? $onu['slot'] : 'null' ?>, <?= isset($onu['port']) && $onu['port'] !== null ? $onu['port'] : 'null' ?>, <?= $discoveredTypeId ?>, '<?= $discoveredEqid ?>', '<?= $defaultMode ?>')" title="Authorize">
-                                                <i class="bi bi-check-circle"></i>
-                                            </button>
-                                            <?php else: ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="refresh_onu_optical">
-                                                <input type="hidden" name="onu_id" value="<?= $onu['id'] ?>">
-                                                <button type="submit" class="btn btn-outline-info" title="Refresh Optical Power">
-                                                    <i class="bi bi-reception-4"></i>
-                                                </button>
-                                            </form>
-                                            <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <button class="btn btn-outline-success" onclick="showPPPoEWanModal(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Add Internet Service">
-                                                <i class="bi bi-globe"></i>
-                                            </button>
-                                            <?php endif; ?>
-                                            <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="btn btn-outline-info" title="Configure">
-                                                <i class="bi bi-gear"></i>
-                                            </a>
-                                            <button class="btn btn-outline-secondary" onclick="refreshOptical(<?= $onu['id'] ?>)" title="Refresh Signal">
-                                                <i class="bi bi-reception-4"></i>
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn']) ?>')" title="Delete">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot ONU">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
