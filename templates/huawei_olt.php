@@ -274,15 +274,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'signal_history') {
     header('Content-Type: application/json');
     $onuId = (int)($_GET['onu_id'] ?? 0);
-    $hours = (int)($_GET['hours'] ?? 24);
+    $days = (int)($_GET['days'] ?? 7);
+    $hours = $days * 24;
     
     if (!$onuId) {
         echo json_encode(['success' => false, 'error' => 'ONU ID required']);
         exit;
     }
     
-    $history = $huaweiOLT->getSignalHistory($onuId, $hours);
-    echo json_encode(['success' => true, 'history' => $history]);
+    try {
+        $history = $huaweiOLT->getSignalHistory($onuId, $hours);
+        echo json_encode(['success' => true, 'history' => $history]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage(), 'history' => []]);
+    }
     exit;
 }
 
@@ -13485,6 +13490,49 @@ echo "# ================================================\n";
     }
     
     let liveInterval = null;
+    
+    async function fetchLiveOnuData() {
+        if (typeof onuOltId === 'undefined' || typeof onuSlot === 'undefined' || onuOltId === null || onuSlot === null) {
+            console.error('Missing ONU context for live data');
+            return;
+        }
+        
+        try {
+            const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${onuOltId}&frame=${onuFrame}&slot=${onuSlot}&port=${onuPort}&onu_id=${onuIdVal}&sn=${encodeURIComponent(onuSn)}`);
+            const data = await resp.json();
+            
+            if (data.success && data.onu) {
+                const onu = data.onu;
+                const statusEl = document.querySelector('[data-live-status]');
+                const rxEl = document.querySelector('[data-live-rx]');
+                const txEl = document.querySelector('[data-live-tx]');
+                
+                if (statusEl) {
+                    const statusClass = {'online': 'success', 'offline': 'secondary', 'los': 'danger'}[onu.status] || 'secondary';
+                    statusEl.className = 'text-' + statusClass + ' fw-bold';
+                    statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
+                }
+                if (rxEl && onu.rx_power !== null) {
+                    rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
+                }
+                if (txEl && onu.tx_power !== null) {
+                    txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
+                }
+                
+                const toast = document.createElement('div');
+                toast.className = 'position-fixed bottom-0 end-0 p-3';
+                toast.style.zIndex = '9999';
+                toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>Status: ' + (onu.status || 'Unknown') + ', RX: ' + (onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A') + '</div></div>';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            } else {
+                console.error('Could not fetch live data:', data.error || 'ONU not found');
+            }
+        } catch (e) {
+            console.error('Error fetching live data:', e);
+        }
+    }
+    
     function toggleLiveMode() {
         const btn = document.getElementById('liveBtn');
         if (liveInterval) {
