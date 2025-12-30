@@ -946,6 +946,144 @@ try {
                 </div>
             </div>
             
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="card-body py-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-6 mb-3 mb-md-0">
+                                    <h5 class="text-white mb-1"><i class="bi bi-lightning-fill me-2"></i>Quick Actions</h5>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="?page=isp&view=subscriptions" class="btn btn-light btn-sm">
+                                            <i class="bi bi-person-plus me-1"></i>Add Subscriber
+                                        </a>
+                                        <a href="?page=isp&view=vouchers" class="btn btn-light btn-sm">
+                                            <i class="bi bi-ticket me-1"></i>Generate Vouchers
+                                        </a>
+                                        <a href="?page=isp&view=expiring" class="btn btn-warning btn-sm">
+                                            <i class="bi bi-clock-history me-1"></i>Expiring (<?= $stats['expiring_soon'] ?>)
+                                        </a>
+                                        <a href="?page=isp&view=sessions" class="btn btn-success btn-sm">
+                                            <i class="bi bi-broadcast me-1"></i>Live Sessions
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-white-50 mb-1"><i class="bi bi-globe me-2"></i>Public Portals</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="/hotspot.php" target="_blank" class="btn btn-outline-light btn-sm">
+                                            <i class="bi bi-wifi me-1"></i>Hotspot Login
+                                        </a>
+                                        <a href="/expired.php" target="_blank" class="btn btn-outline-light btn-sm">
+                                            <i class="bi bi-arrow-clockwise me-1"></i>Renewal Page
+                                        </a>
+                                        <a href="/portal" target="_blank" class="btn btn-outline-light btn-sm">
+                                            <i class="bi bi-person-circle me-1"></i>Customer Portal
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-hdd-network me-2 text-primary"></i>NAS Status</h6></div>
+                        <div class="card-body p-0">
+                            <?php $nasDevices = $radiusBilling->getNASDevices(); ?>
+                            <?php if (empty($nasDevices)): ?>
+                            <div class="p-3 text-center text-muted">
+                                <i class="bi bi-hdd-network fs-3 d-block mb-2"></i>
+                                No NAS devices configured
+                                <br><a href="?page=isp&view=nas" class="btn btn-sm btn-primary mt-2">Add NAS</a>
+                            </div>
+                            <?php else: ?>
+                            <ul class="list-group list-group-flush">
+                                <?php foreach (array_slice($nasDevices, 0, 4) as $nas): ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <div>
+                                        <strong class="small"><?= htmlspecialchars($nas['name']) ?></strong>
+                                        <br><code class="small"><?= htmlspecialchars($nas['ip_address']) ?></code>
+                                    </div>
+                                    <span class="badge <?= $nas['enabled'] ? 'bg-success' : 'bg-secondary' ?>"><?= $nas['enabled'] ? 'Active' : 'Off' ?></span>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-box me-2 text-success"></i>Popular Packages</h6></div>
+                        <div class="card-body p-0">
+                            <?php
+                            $pkgStats = $db->query("
+                                SELECT p.name, p.price, COUNT(s.id) as sub_count 
+                                FROM radius_packages p 
+                                LEFT JOIN radius_subscriptions s ON s.package_id = p.id AND s.status = 'active'
+                                WHERE p.status = 'active'
+                                GROUP BY p.id, p.name, p.price 
+                                ORDER BY sub_count DESC 
+                                LIMIT 4
+                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            ?>
+                            <?php if (empty($pkgStats)): ?>
+                            <div class="p-3 text-center text-muted">No packages</div>
+                            <?php else: ?>
+                            <ul class="list-group list-group-flush">
+                                <?php foreach ($pkgStats as $pkg): ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <span class="small"><?= htmlspecialchars($pkg['name']) ?></span>
+                                    <div>
+                                        <span class="badge bg-primary"><?= $pkg['sub_count'] ?> subs</span>
+                                        <span class="badge bg-success ms-1">KES <?= number_format($pkg['price']) ?></span>
+                                    </div>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-cash-coin me-2 text-info"></i>Recent Payments</h6></div>
+                        <div class="card-body p-0">
+                            <?php
+                            $recentPayments = $db->query("
+                                SELECT b.amount, b.payment_date, s.username, c.name as customer_name
+                                FROM radius_billing b
+                                LEFT JOIN radius_subscriptions s ON b.subscription_id = s.id
+                                LEFT JOIN customers c ON s.customer_id = c.id
+                                WHERE b.status = 'paid'
+                                ORDER BY b.payment_date DESC
+                                LIMIT 4
+                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            ?>
+                            <?php if (empty($recentPayments)): ?>
+                            <div class="p-3 text-center text-muted">No recent payments</div>
+                            <?php else: ?>
+                            <ul class="list-group list-group-flush">
+                                <?php foreach ($recentPayments as $pmt): ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <div>
+                                        <span class="small"><?= htmlspecialchars($pmt['customer_name'] ?? $pmt['username']) ?></span>
+                                        <br><small class="text-muted"><?= date('M j, H:i', strtotime($pmt['payment_date'])) ?></small>
+                                    </div>
+                                    <span class="badge bg-success">KES <?= number_format($pmt['amount']) ?></span>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="row">
                 <div class="col-lg-6">
                     <div class="card shadow-sm mb-4">
