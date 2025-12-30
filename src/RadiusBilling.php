@@ -1790,4 +1790,159 @@ class RadiusBilling {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+    
+    // ==================== ISP Settings Management ====================
+    
+    public function getSettings(?string $category = null): array {
+        $sql = "SELECT * FROM isp_settings";
+        $params = [];
+        
+        if ($category) {
+            $sql .= " WHERE category = ?";
+            $params[] = $category;
+        }
+        
+        $sql .= " ORDER BY category, setting_key";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getSetting(string $key, $default = null) {
+        $stmt = $this->db->prepare("SELECT setting_value, setting_type FROM isp_settings WHERE setting_key = ?");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$row) return $default;
+        
+        $value = $row['setting_value'];
+        
+        if ($row['setting_type'] === 'boolean') {
+            return $value === 'true' || $value === '1';
+        }
+        if ($row['setting_type'] === 'number') {
+            return (int)$value;
+        }
+        
+        return $value;
+    }
+    
+    public function saveSetting(string $key, $value): bool {
+        $stmt = $this->db->prepare("
+            INSERT INTO isp_settings (setting_key, setting_value, updated_at)
+            VALUES (?, ?, NOW())
+            ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = NOW()
+        ");
+        return $stmt->execute([$key, is_bool($value) ? ($value ? 'true' : 'false') : (string)$value]);
+    }
+    
+    public function saveSettings(array $settings): bool {
+        try {
+            $this->db->beginTransaction();
+            foreach ($settings as $key => $value) {
+                $this->saveSetting($key, $value);
+            }
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return false;
+        }
+    }
+    
+    public function getMessageTemplates(): array {
+        return $this->getSettings('templates');
+    }
+    
+    public function processTemplate(string $templateKey, array $variables): string {
+        $template = $this->getSetting($templateKey, '');
+        
+        foreach ($variables as $key => $value) {
+            $template = str_replace('{' . $key . '}', $value, $template);
+        }
+        
+        return $template;
+    }
+    
+    public function sendExpiryReminders(): array {
+        $results = ['sent' => 0, 'failed' => 0, 'errors' => []];
+        
+        if (!$this->getSetting('expiry_reminder_enabled', false)) {
+            return $results;
+        }
+        
+        $reminderDays = array_map('intval', explode(',', $this->getSetting('expiry_reminder_days', '3,1,0')));
+        $channel = $this->getSetting('expiry_reminder_channel', 'sms');
+        $sms = new \App\SMS();
+        
+        foreach ($reminderDays as $days) {
+            $expiring = $this->getExpiringSubscriptions($days);
+            
+            foreach ($expiring as $sub) {
+                if (empty($sub['customer_phone'])) continue;
+                
+                $templateKey = $days === 0 ? 'template_expiry_today' : 'template_expiry_warning';
+                $message = $this->processTemplate($templateKey, [
+                    'customer_name' => $sub['customer_name'],
+                    'package_name' => $sub['package_name'],
+                    'days_remaining' => $days,
+                    'package_price' => number_format($sub['package_price']),
+                    'expiry_date' => date('M j, Y', strtotime($sub['expiry_date'])),
+                    'paybill' => $this->getSetting('mpesa_paybill', '')
+                ]);
+                
+                if ($channel === 'sms' || $channel === 'both') {
+                    $result = $sms->send($sub['customer_phone'], $message);
+                    if ($result['success']) {
+                        $results['sent']++;
+                    } else {
+                        $results['failed']++;
+                        $results['errors'][] = $sub['username'] . ': ' . ($result['error'] ?? 'Unknown error');
+                    }
+                }
+            }
+        }
+        
+        return $results;
+    }
+    
+    public function sendPaymentConfirmation(int $subscriptionId, float $amount, string $transactionId): bool {
+        if (!$this->getSetting('payment_confirmation_enabled', false)) {
+            return false;
+        }
+        
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub || empty($sub['customer_phone'])) return false;
+        
+        $message = $this->processTemplate('template_payment_received', [
+            'customer_name' => $sub['customer_name'],
+            'amount' => number_format($amount),
+            'transaction_id' => $transactionId,
+            'expiry_date' => date('M j, Y', strtotime($sub['expiry_date'])),
+            'package_name' => $sub['package_name']
+        ]);
+        
+        $sms = new \App\SMS();
+        $result = $sms->send($sub['customer_phone'], $message);
+        return $result['success'] ?? false;
+    }
+    
+    public function sendRenewalConfirmation(int $subscriptionId): bool {
+        if (!$this->getSetting('renewal_confirmation_enabled', false)) {
+            return false;
+        }
+        
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub || empty($sub['customer_phone'])) return false;
+        
+        $message = $this->processTemplate('template_renewal_success', [
+            'customer_name' => $sub['customer_name'],
+            'package_name' => $sub['package_name'],
+            'expiry_date' => date('M j, Y', strtotime($sub['expiry_date']))
+        ]);
+        
+        $sms = new \App\SMS();
+        $result = $sms->send($sub['customer_phone'], $message);
+        return $result['success'] ?? false;
+    }
 }

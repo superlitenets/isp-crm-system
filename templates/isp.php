@@ -300,6 +300,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "SMS feature: Selected " . count($ids) . " subscriber(s). Please use the SMS module for bulk messaging.";
             $messageType = 'info';
             break;
+            
+        case 'save_isp_settings':
+            $settingsToSave = [];
+            $category = $_POST['category'] ?? 'general';
+            
+            // Collect settings based on category
+            foreach ($_POST as $key => $value) {
+                if (in_array($key, ['action', 'category'])) continue;
+                
+                // Handle checkboxes (unchecked checkboxes don't appear in POST)
+                if (strpos($key, 'enabled') !== false || $key === 'auto_suspend_expired' || $key === 'postpaid_enabled') {
+                    $settingsToSave[$key] = $value === 'true' ? 'true' : 'false';
+                } else {
+                    $settingsToSave[$key] = $value;
+                }
+            }
+            
+            // Handle unchecked checkboxes explicitly
+            $checkboxFields = ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled', 'postpaid_enabled', 'auto_suspend_expired'];
+            foreach ($checkboxFields as $field) {
+                if (!isset($_POST[$field]) && $category === 'notifications' && in_array($field, ['expiry_reminder_enabled', 'payment_confirmation_enabled', 'renewal_confirmation_enabled'])) {
+                    $settingsToSave[$field] = 'false';
+                }
+                if (!isset($_POST[$field]) && $category === 'billing' && in_array($field, ['postpaid_enabled', 'auto_suspend_expired'])) {
+                    $settingsToSave[$field] = 'false';
+                }
+            }
+            
+            if ($radiusBilling->saveSettings($settingsToSave)) {
+                $message = 'Settings saved successfully';
+                $messageType = 'success';
+            } else {
+                $message = 'Error saving settings';
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'test_expiry_reminders':
+            $result = $radiusBilling->sendExpiryReminders();
+            $message = "Expiry reminders: Sent {$result['sent']}, Failed {$result['failed']}";
+            $messageType = $result['failed'] > 0 ? 'warning' : 'success';
+            break;
     }
     
     // Handle redirect after action
@@ -2977,10 +3019,236 @@ try {
             </div>
 
             <?php elseif ($view === 'settings'): ?>
+            <?php
+            $settingsTab = $_GET['tab'] ?? 'notifications';
+            ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-gear"></i> ISP Settings</h4>
+                <button type="button" class="btn btn-outline-primary" onclick="testExpiryReminders()">
+                    <i class="bi bi-envelope me-1"></i> Test Reminders
+                </button>
             </div>
             
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'notifications' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=notifications">
+                        <i class="bi bi-bell me-1"></i> Notifications
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'templates' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=templates">
+                        <i class="bi bi-file-text me-1"></i> Message Templates
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'billing' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=billing">
+                        <i class="bi bi-credit-card me-1"></i> Billing
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'radius' ? 'active' : '' ?>" href="?page=isp&view=settings&tab=radius">
+                        <i class="bi bi-hdd-network me-1"></i> RADIUS
+                    </a>
+                </li>
+            </ul>
+            
+            <?php if ($settingsTab === 'notifications'): ?>
+            <form method="post">
+                <input type="hidden" name="action" value="save_isp_settings">
+                <input type="hidden" name="category" value="notifications">
+                
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-clock-history me-2"></i>Expiry Reminders</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="expiry_reminder_enabled" id="expiry_reminder_enabled" value="true" <?= $radiusBilling->getSetting('expiry_reminder_enabled') ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="expiry_reminder_enabled"><strong>Enable Expiry Reminders</strong></label>
+                                    </div>
+                                    <small class="text-muted">Automatically send reminders before subscriptions expire</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Reminder Days</label>
+                                    <input type="text" class="form-control" name="expiry_reminder_days" value="<?= htmlspecialchars($radiusBilling->getSetting('expiry_reminder_days', '3,1,0')) ?>" placeholder="3,1,0">
+                                    <small class="text-muted">Days before expiry to send reminders (comma-separated). E.g., "3,1,0" sends at 3 days, 1 day, and on expiry day.</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Reminder Channel</label>
+                                    <select name="expiry_reminder_channel" class="form-select">
+                                        <option value="sms" <?= $radiusBilling->getSetting('expiry_reminder_channel') === 'sms' ? 'selected' : '' ?>>SMS Only</option>
+                                        <option value="whatsapp" <?= $radiusBilling->getSetting('expiry_reminder_channel') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp Only</option>
+                                        <option value="both" <?= $radiusBilling->getSetting('expiry_reminder_channel') === 'both' ? 'selected' : '' ?>>Both SMS & WhatsApp</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-check-circle me-2"></i>Confirmation Messages</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="payment_confirmation_enabled" id="payment_confirmation_enabled" value="true" <?= $radiusBilling->getSetting('payment_confirmation_enabled') ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="payment_confirmation_enabled"><strong>Payment Confirmations</strong></label>
+                                    </div>
+                                    <small class="text-muted">Send confirmation when payment is received</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="renewal_confirmation_enabled" id="renewal_confirmation_enabled" value="true" <?= $radiusBilling->getSetting('renewal_confirmation_enabled') ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="renewal_confirmation_enabled"><strong>Renewal Confirmations</strong></label>
+                                    </div>
+                                    <small class="text-muted">Send confirmation when subscription is renewed</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Notification Settings</button>
+                </div>
+            </form>
+            
+            <?php elseif ($settingsTab === 'templates'): ?>
+            <form method="post">
+                <input type="hidden" name="action" value="save_isp_settings">
+                <input type="hidden" name="category" value="templates">
+                
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Available Variables:</strong> {customer_name}, {package_name}, {days_remaining}, {package_price}, {expiry_date}, {amount}, {transaction_id}, {paybill}, {balance}
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-warning bg-opacity-10"><i class="bi bi-exclamation-triangle me-2"></i>Expiry Warning (Days Before)</div>
+                            <div class="card-body">
+                                <textarea name="template_expiry_warning" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_expiry_warning', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-danger bg-opacity-10"><i class="bi bi-clock me-2"></i>Expiry Today</div>
+                            <div class="card-body">
+                                <textarea name="template_expiry_today" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_expiry_today', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-danger bg-opacity-25"><i class="bi bi-x-circle me-2"></i>Expired Notification</div>
+                            <div class="card-body">
+                                <textarea name="template_expired" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_expired', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-success bg-opacity-10"><i class="bi bi-cash-coin me-2"></i>Payment Received</div>
+                            <div class="card-body">
+                                <textarea name="template_payment_received" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_payment_received', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary bg-opacity-10"><i class="bi bi-arrow-clockwise me-2"></i>Renewal Success</div>
+                            <div class="card-body">
+                                <textarea name="template_renewal_success" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_renewal_success', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-info bg-opacity-10"><i class="bi bi-wallet2 me-2"></i>Low Balance (Postpaid)</div>
+                            <div class="card-body">
+                                <textarea name="template_low_balance" class="form-control" rows="4"><?= htmlspecialchars($radiusBilling->getSetting('template_low_balance', '')) ?></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Message Templates</button>
+                </div>
+            </form>
+            
+            <?php elseif ($settingsTab === 'billing'): ?>
+            <form method="post">
+                <input type="hidden" name="action" value="save_isp_settings">
+                <input type="hidden" name="category" value="billing">
+                
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-wallet me-2"></i>Postpaid Settings</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="postpaid_enabled" id="postpaid_enabled" value="true" <?= $radiusBilling->getSetting('postpaid_enabled') ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="postpaid_enabled"><strong>Enable Postpaid Accounts</strong></label>
+                                    </div>
+                                    <small class="text-muted">Allow customers to use service first and pay later</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Grace Period (Days)</label>
+                                    <input type="number" class="form-control" name="postpaid_grace_days" value="<?= $radiusBilling->getSetting('postpaid_grace_days', 7) ?>" min="0" max="30">
+                                    <small class="text-muted">Days to continue service after expiry for postpaid accounts</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Default Credit Limit (KES)</label>
+                                    <input type="number" class="form-control" name="postpaid_credit_limit" value="<?= $radiusBilling->getSetting('postpaid_credit_limit', 0) ?>" min="0">
+                                    <small class="text-muted">Maximum outstanding balance allowed (0 = unlimited)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header"><i class="bi bi-gear me-2"></i>Subscription Settings</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" name="auto_suspend_expired" id="auto_suspend_expired" value="true" <?= $radiusBilling->getSetting('auto_suspend_expired', true) ? 'checked' : '' ?>>
+                                        <label class="form-check-label" for="auto_suspend_expired"><strong>Auto-Suspend Expired</strong></label>
+                                    </div>
+                                    <small class="text-muted">Automatically suspend prepaid subscriptions when they expire</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">M-Pesa Paybill/Till Number</label>
+                                    <input type="text" class="form-control" name="mpesa_paybill" value="<?= htmlspecialchars($radiusBilling->getSetting('mpesa_paybill', '')) ?>" placeholder="e.g., 123456">
+                                    <small class="text-muted">Displayed in payment reminder messages</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Billing Settings</button>
+                </div>
+            </form>
+            
+            <?php else: ?>
             <div class="row g-4">
                 <div class="col-md-6">
                     <div class="card shadow-sm">
@@ -3030,6 +3298,7 @@ try {
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
             
             <?php endif; ?>
         </div>
@@ -3093,6 +3362,23 @@ try {
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
+    }
+    
+    function testExpiryReminders() {
+        if (!confirm('Send expiry reminders to all eligible subscribers now?')) return;
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '?page=isp&view=settings&tab=notifications';
+        
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'test_expiry_reminders';
+        form.appendChild(actionInput);
+        
+        document.body.appendChild(form);
+        form.submit();
     }
     
     function testNAS(nasId, ipAddress) {
