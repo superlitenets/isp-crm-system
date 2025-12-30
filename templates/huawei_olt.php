@@ -5631,7 +5631,7 @@ try {
             const onuPort = <?= $currentOnu['port'] ?? 'null' ?>;
             const onuIdVal = <?= $currentOnu['onu_id'] ?? 'null' ?>;
             const onuSn = '<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>';
-            const onuDbId = <?= $currentOnu['id'] ?>;
+            const onuDbId = <?= $currentOnu['id'] ?? 'null' ?>;
             let liveIntervalId = null;
             
             async function fetchLiveOnuData() {
