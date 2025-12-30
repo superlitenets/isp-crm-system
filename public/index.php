@@ -6359,7 +6359,7 @@ $csrfToken = \App\Auth::generateToken();
                     <i class="bi bi-router"></i> <?= htmlspecialchars($sidebarCompanyName) ?>
                 <?php endif; ?>
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body p-0">
             <ul class="nav flex-column">
@@ -6412,7 +6412,7 @@ $csrfToken = \App\Auth::generateToken();
                 <?php endif; ?>
                 <?php if (\App\Auth::can('settings.view')): ?>
                 <li class="nav-item">
-                    <a class="nav-link" href="?page=huawei-olt">
+                    <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
                         <i class="bi bi-router text-primary"></i> OMS
                     </a>
                 </li>
@@ -6560,7 +6560,7 @@ $csrfToken = \App\Auth::generateToken();
             <?php endif; ?>
             <?php if (\App\Auth::can('settings.view')): ?>
             <li class="nav-item">
-                <a class="nav-link" href="?page=huawei-olt">
+                <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
                     <i class="bi bi-router text-primary"></i> OMS
                 </a>
             </li>
