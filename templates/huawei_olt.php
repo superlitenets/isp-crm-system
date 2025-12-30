@@ -2325,6 +2325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($result);
                 exit;
             case 'configure_pppoe':
+                // SmartOLT-style Internet WAN configuration via TR-069
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
                 $serial = $_POST['serial'] ?? '';
@@ -2338,58 +2339,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 $deviceId = $deviceResult['device']['_id'];
-                $params = [];
                 
-                $wanBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1';
+                // Use SmartOLT-style configureInternetWAN function
+                $config = [
+                    'connection_type' => $connType,
+                    'service_vlan' => (int)($_POST['vlan_id'] ?? 0),
+                    'wan_index' => 2, // WAN device 1 is management, 2 is internet
+                    'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
+                    'auto_bind_ports' => true, // Bind LAN1-4 and SSID1 to this WAN
+                ];
                 
                 if ($connType === 'pppoe') {
-                    $pppPath = "{$wanBasePath}.WANPPPConnection.1";
-                    $params[] = ["{$pppPath}.Enable", true, 'xsd:boolean'];
-                    $params[] = ["{$pppPath}.ConnectionType", 'IP_Routed', 'xsd:string'];
-                    if (!empty($_POST['pppoe_username'])) {
-                        $params[] = ["{$pppPath}.Username", $_POST['pppoe_username'], 'xsd:string'];
-                    }
-                    if (!empty($_POST['pppoe_password'])) {
-                        $params[] = ["{$pppPath}.Password", $_POST['pppoe_password'], 'xsd:string'];
-                    }
-                } elseif ($connType === 'dhcp') {
-                    $ipPath = "{$wanBasePath}.WANIPConnection.1";
-                    $params[] = ["{$ipPath}.Enable", true, 'xsd:boolean'];
-                    $params[] = ["{$ipPath}.AddressingType", 'DHCP', 'xsd:string'];
+                    $config['pppoe_username'] = $_POST['pppoe_username'] ?? '';
+                    $config['pppoe_password'] = $_POST['pppoe_password'] ?? '';
                 } elseif ($connType === 'static') {
-                    $ipPath = "{$wanBasePath}.WANIPConnection.1";
-                    $params[] = ["{$ipPath}.Enable", true, 'xsd:boolean'];
-                    $params[] = ["{$ipPath}.AddressingType", 'Static', 'xsd:string'];
-                    if (!empty($_POST['static_ip'])) {
-                        $params[] = ["{$ipPath}.ExternalIPAddress", $_POST['static_ip'], 'xsd:string'];
-                    }
-                    if (!empty($_POST['subnet_mask'])) {
-                        $params[] = ["{$ipPath}.SubnetMask", $_POST['subnet_mask'], 'xsd:string'];
-                    }
-                    if (!empty($_POST['gateway'])) {
-                        $params[] = ["{$ipPath}.DefaultGateway", $_POST['gateway'], 'xsd:string'];
-                    }
-                    if (!empty($_POST['dns'])) {
-                        $params[] = ["{$ipPath}.DNSServers", $_POST['dns'], 'xsd:string'];
-                    }
+                    $config['static_ip'] = $_POST['static_ip'] ?? '';
+                    $config['static_mask'] = $_POST['subnet_mask'] ?? '255.255.255.0';
+                    $config['static_gateway'] = $_POST['gateway'] ?? '';
                 }
                 
-                if (!empty($params)) {
-                    $result = $genieacs->setParameterValues($deviceId, $params);
-                    if ($result['success']) {
-                        $message = 'WAN configuration sent successfully. Changes may take a moment to apply.';
-                        $messageType = 'success';
-                    } else {
-                        $message = 'Failed to configure WAN: ' . ($result['error'] ?? 'Unknown error');
-                        $messageType = 'danger';
-                    }
+                $result = $genieacs->configureInternetWAN($deviceId, $config);
+                
+                if ($result['success']) {
+                    $message = 'Internet WAN configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
+                    $messageType = 'success';
                 } else {
-                    $message = 'No configuration changes to apply';
-                    $messageType = 'warning';
+                    $message = 'Failed to configure WAN: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                    $messageType = 'danger';
                 }
                 break;
             case 'configure_pppoe_wan':
+                // SmartOLT-style: Configure Internet WAN via TR-069, not OMCI
+                require_once __DIR__ . '/../src/GenieACS.php';
                 require_once __DIR__ . '/../src/HuaweiOLT.php';
+                $genieacs = new \App\GenieACS($db);
                 $huaweiOLT = new \App\HuaweiOLT($db);
                 $onuDbId = (int)($_POST['onu_db_id'] ?? 0);
                 
@@ -2399,18 +2382,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
                 
+                // Get ONU info to find its serial number
+                $onu = $huaweiOLT->getONU($onuDbId);
+                if (!$onu) {
+                    $message = 'ONU not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                // Find device in GenieACS by serial
+                $deviceResult = $genieacs->getDeviceBySerial($onu['sn']);
+                if (!$deviceResult['success']) {
+                    $message = 'ONU not found in GenieACS. Please ensure TR-069 is configured on OLT first.';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $deviceId = $deviceResult['device']['_id'];
+                
+                // Use SmartOLT-style configureInternetWAN function
                 $config = [
-                    'pppoe_vlan' => (int)($_POST['pppoe_vlan'] ?? 902),
+                    'connection_type' => 'pppoe',
+                    'service_vlan' => (int)($_POST['pppoe_vlan'] ?? 902),
+                    'wan_index' => 2,
+                    'connection_name' => 'Internet_PPPoE',
                     'pppoe_username' => $_POST['pppoe_username'] ?? '',
                     'pppoe_password' => $_POST['pppoe_password'] ?? '',
-                    'gemport' => (int)($_POST['gemport'] ?? 1),
-                    'nat_enabled' => isset($_POST['nat_enabled']),
-                    'priority' => (int)($_POST['priority'] ?? 0)
+                    'auto_bind_ports' => true,
                 ];
                 
-                $result = $huaweiOLT->configureWANPPPoE($onuDbId, $config);
-                $message = $result['message'] ?? ($result['success'] ? 'PPPoE configured' : 'Configuration failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
+                $result = $genieacs->configureInternetWAN($deviceId, $config);
+                
+                if ($result['success']) {
+                    $message = 'Internet PPPoE configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to configure PPPoE: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                    $messageType = 'danger';
+                }
                 break;
             case 'tr069_refresh':
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -2801,6 +2810,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'inform_interval' => $interval,
                     'raw_output' => $output
                 ]);
+                exit;
+            case 'get_tr069_wan_status':
+                // Get WAN status via TR-069 (SmartOLT-style)
+                header('Content-Type: application/json');
+                $serial = $_POST['serial'] ?? '';
+                if (empty($serial)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                    exit;
+                }
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if (!$deviceResult['success']) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                    exit;
+                }
+                $deviceId = $deviceResult['device']['_id'];
+                $result = $genieacs->getWANStatus($deviceId);
+                echo json_encode($result);
                 exit;
             case 'get_tr069_wifi':
                 header('Content-Type: application/json');
@@ -12259,7 +12287,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <div class="modal-body">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-1"></i>
-                            This will configure PPPoE WAN on the OLT (via OMCI) and queue credentials for TR-069 push.
+                            SmartOLT-style: This configures Internet WAN via TR-069 (GenieACS). LAN ports and WiFi will be bound to this WAN.
                         </div>
                         <p class="text-muted small">ONU: <strong id="pppoeWanOnuSn"></strong></p>
                         
