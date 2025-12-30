@@ -920,6 +920,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 break;
             case 'configure_wan_pppoe':
+                // SmartOLT-style: Configure Internet WAN via TR-069
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
                 $onuId = (int)($_POST['onu_id'] ?? 0);
                 
                 if (!$onuId) {
@@ -928,27 +931,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
                 
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) {
+                    $message = 'ONU not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $deviceResult = $genieacs->getDeviceBySerial($onu['sn']);
+                if (!$deviceResult['success']) {
+                    $message = 'ONU not found in GenieACS. Please configure TR-069 first.';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $deviceId = $deviceResult['device']['_id'];
+                
                 $config = [
-                    'pppoe_vlan' => !empty($_POST['pppoe_vlan']) ? (int)$_POST['pppoe_vlan'] : 902,
+                    'connection_type' => 'pppoe',
+                    'service_vlan' => !empty($_POST['pppoe_vlan']) ? (int)$_POST['pppoe_vlan'] : 902,
+                    'wan_index' => 2,
+                    'connection_name' => 'Internet_PPPoE',
                     'pppoe_username' => trim($_POST['pppoe_username'] ?? ''),
                     'pppoe_password' => trim($_POST['pppoe_password'] ?? ''),
-                    'gemport' => !empty($_POST['gemport']) ? (int)$_POST['gemport'] : 1,
-                    'nat_enabled' => isset($_POST['nat_enabled']),
-                    'priority' => !empty($_POST['priority']) ? (int)$_POST['priority'] : 0
+                    'auto_bind_ports' => true,
                 ];
                 
-                try {
-                    $result = $huaweiOLT->configureWANPPPoE($onuId, $config);
-                    
-                    if ($result['success']) {
-                        $message = $result['message'];
-                        $messageType = 'success';
-                    } else {
-                        $message = $result['message'];
-                        $messageType = 'warning';
-                    }
-                } catch (Exception $e) {
-                    $message = 'PPPoE WAN configuration failed: ' . $e->getMessage();
+                $result = $genieacs->configureInternetWAN($deviceId, $config);
+                
+                if ($result['success']) {
+                    $message = 'Internet PPPoE configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to configure PPPoE: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
                     $messageType = 'danger';
                 }
                 break;
@@ -2673,29 +2688,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'tr069_wan_config':
+                // SmartOLT-style Internet WAN configuration via TR-069
                 require_once __DIR__ . '/../src/GenieACS.php';
+                require_once __DIR__ . '/../src/HuaweiOLT.php';
                 $genieacs = new \App\GenieACS($db);
+                $huaweiOLT = new \App\HuaweiOLT($db);
                 $onuId = (int)$_POST['onu_id'];
-                $stmt = $db->prepare("SELECT t.device_id FROM tr069_devices t JOIN huawei_onus o ON t.onu_id = o.id WHERE o.id = ?");
-                $stmt->execute([$onuId]);
-                $tr069Device = $stmt->fetch(\PDO::FETCH_ASSOC);
-                if ($tr069Device && $tr069Device['device_id']) {
-                    $config = [
-                        'connection_type' => $_POST['connection_type'] ?? 'pppoe',
-                        'pppoe_username' => $_POST['pppoe_username'] ?? '',
-                        'pppoe_password' => $_POST['pppoe_password'] ?? '',
-                        'wan_vlan' => (int)($_POST['wan_vlan'] ?? 0),
-                        'wan_priority' => (int)($_POST['wan_priority'] ?? 0),
-                        'nat_enable' => isset($_POST['nat_enable']),
-                        'mtu' => (int)($_POST['mtu'] ?? 1500)
-                    ];
-                    $result = $genieacs->setWANConfig($tr069Device['device_id'], $config);
-                    $message = $result['success'] ? 'WAN configuration sent to device' : ($result['error'] ?? 'WAN config failed');
-                } else {
-                    $message = 'Device not found in TR-069. Please sync devices first.';
-                    $result = ['success' => false];
+                
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) {
+                    $message = 'ONU not found';
+                    $messageType = 'danger';
+                    break;
                 }
-                $messageType = $result['success'] ? 'success' : 'danger';
+                
+                $deviceResult = $genieacs->getDeviceBySerial($onu['sn']);
+                if (!$deviceResult['success']) {
+                    $message = 'Device not found in GenieACS. Please ensure TR-069 is configured.';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $deviceId = $deviceResult['device']['_id'];
+                $connType = $_POST['wan_type'] ?? $_POST['connection_type'] ?? 'pppoe';
+                
+                $config = [
+                    'connection_type' => $connType,
+                    'service_vlan' => (int)($_POST['wan_vlan'] ?? $_POST['vlan_id'] ?? 0),
+                    'wan_index' => 2,
+                    'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
+                    'auto_bind_ports' => true,
+                ];
+                
+                if ($connType === 'pppoe') {
+                    $config['pppoe_username'] = $_POST['pppoe_user'] ?? $_POST['pppoe_username'] ?? '';
+                    $config['pppoe_password'] = $_POST['pppoe_pass'] ?? $_POST['pppoe_password'] ?? '';
+                } elseif ($connType === 'static') {
+                    $config['static_ip'] = $_POST['static_ip'] ?? '';
+                    $config['static_mask'] = $_POST['static_mask'] ?? '255.255.255.0';
+                    $config['static_gateway'] = $_POST['static_gw'] ?? $_POST['gateway'] ?? '';
+                }
+                
+                $result = $genieacs->configureInternetWAN($deviceId, $config);
+                
+                if ($result['success']) {
+                    $message = 'Internet WAN configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to configure WAN: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                    $messageType = 'danger';
+                }
                 break;
             case 'create_vlan':
                 $vlanOptions = [
@@ -6123,73 +6165,37 @@ try {
                     <div class="tab-content" id="tr069TabContent">
                         <!-- WAN Configuration -->
                         <div class="tab-pane fade show active" id="wanConfig" role="tabpanel">
-                            <!-- OMCI PPPoE Setup - Two-step process -->
-                            <div class="alert alert-info mb-4">
-                                <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>PPPoE Setup via OMCI + TR-069</h6>
-                                <p class="mb-2">For PPPoE to work properly, the ONU must first have PPPoE mode configured via OMCI from the OLT, then credentials are pushed via TR-069.</p>
-                                <hr>
-                                <form method="post" class="row g-3" id="omciPppoeForm">
-                                    <input type="hidden" name="action" value="configure_wan_pppoe">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <div class="col-md-2">
-                                        <label class="form-label">PPPoE VLAN</label>
-                                        <input type="number" name="pppoe_vlan" class="form-control" value="902" min="1" max="4094">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">PPPoE Username</label>
-                                        <input type="text" name="pppoe_username" class="form-control" placeholder="username" required>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">PPPoE Password</label>
-                                        <input type="text" name="pppoe_password" class="form-control" placeholder="password" required>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <label class="form-label">GEM Port</label>
-                                        <input type="number" name="gemport" class="form-control" value="1" min="0" max="7">
-                                    </div>
-                                    <div class="col-md-2 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-warning w-100">
-                                            <i class="bi bi-gear me-1"></i> Configure via OMCI
-                                        </button>
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input" name="nat_enabled" id="omciNatEnabled" checked>
-                                            <label class="form-check-label" for="omciNatEnabled">Enable NAT</label>
-                                        </div>
-                                        <small class="text-muted">This will: 1) Configure PPPoE WAN mode on OLT via OMCI, 2) Create service-port, 3) Queue credentials for TR-069 push when device connects to ACS</small>
-                                    </div>
-                                </form>
+                            <!-- SmartOLT-style TR-069 WAN Configuration -->
+                            <div class="alert alert-success mb-4">
+                                <h6 class="alert-heading"><i class="bi bi-cloud-check me-2"></i>SmartOLT-style Internet WAN Configuration</h6>
+                                <p class="mb-0 small">Internet WAN is configured via TR-069 (GenieACS). This creates the WAN connection, sets credentials, configures policy routes to bind LAN ports and WiFi to the WAN, and sets it as default.</p>
                             </div>
                             
-                            <h6 class="text-muted mb-3"><i class="bi bi-cloud me-2"></i>TR-069 Only WAN Configuration</h6>
-                            <p class="text-muted small mb-3">Use this if PPPoE WAN mode is already configured on the ONU (via OMCI or factory default).</p>
-                            
                             <form method="post" id="wanConfigForm">
-                                <input type="hidden" name="action" value="tr069_wan_config">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <input type="hidden" name="action" value="configure_pppoe">
+                                <input type="hidden" name="serial" value="<?= htmlspecialchars($currentOnu['sn'] ?? '') ?>">
                                 
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <h6 class="text-muted mb-3">WAN Connection Settings</h6>
+                                        <h6 class="text-muted mb-3"><i class="bi bi-globe me-1"></i> WAN Connection Settings</h6>
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Connection Type</label>
-                                            <select name="wan_type" class="form-select" id="wanType" onchange="toggleWanFields()">
-                                                <option value="dhcp">DHCP (Automatic)</option>
+                                            <select name="connection_type" class="form-select" id="wanType" onchange="toggleWanFields()">
+                                                <option value="pppoe">PPPoE (Router Mode)</option>
+                                                <option value="dhcp">DHCP (IPoE)</option>
                                                 <option value="static">Static IP</option>
-                                                <option value="pppoe">PPPoE</option>
                                             </select>
                                         </div>
                                         
-                                        <div id="pppoeFields" style="display:none;">
+                                        <div id="pppoeFields">
                                             <div class="mb-3">
-                                                <label class="form-label">PPPoE Username</label>
-                                                <input type="text" name="pppoe_user" class="form-control" placeholder="username@isp.com">
+                                                <label class="form-label">PPPoE Username <span class="text-danger">*</span></label>
+                                                <input type="text" name="pppoe_username" class="form-control" placeholder="username@isp.com">
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">PPPoE Password</label>
-                                                <input type="password" name="pppoe_pass" class="form-control">
+                                                <label class="form-label">PPPoE Password <span class="text-danger">*</span></label>
+                                                <input type="text" name="pppoe_password" class="form-control" placeholder="password">
                                             </div>
                                         </div>
                                         
@@ -6201,65 +6207,39 @@ try {
                                             <div class="row">
                                                 <div class="col-6 mb-3">
                                                     <label class="form-label">Subnet Mask</label>
-                                                    <input type="text" name="static_mask" class="form-control" value="255.255.255.0">
+                                                    <input type="text" name="subnet_mask" class="form-control" value="255.255.255.0">
                                                 </div>
                                                 <div class="col-6 mb-3">
                                                     <label class="form-label">Gateway</label>
-                                                    <input type="text" name="static_gw" class="form-control" placeholder="192.168.1.1">
-                                                </div>
-                                            </div>
-                                            <div class="row">
-                                                <div class="col-6 mb-3">
-                                                    <label class="form-label">Primary DNS</label>
-                                                    <input type="text" name="dns1" class="form-control" value="8.8.8.8">
-                                                </div>
-                                                <div class="col-6 mb-3">
-                                                    <label class="form-label">Secondary DNS</label>
-                                                    <input type="text" name="dns2" class="form-control" value="8.8.4.4">
+                                                    <input type="text" name="gateway" class="form-control" placeholder="192.168.1.1">
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     
                                     <div class="col-md-6">
-                                        <h6 class="text-muted mb-3">VLAN & Priority Settings</h6>
-                                        
-                                        <div class="row">
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">WAN VLAN ID</label>
-                                                <input type="number" name="wan_vlan" class="form-control" placeholder="Auto" min="1" max="4094">
-                                            </div>
-                                            <div class="col-6 mb-3">
-                                                <label class="form-label">802.1p Priority</label>
-                                                <select name="wan_priority" class="form-select">
-                                                    <option value="0">0 (Best Effort)</option>
-                                                    <option value="1">1</option>
-                                                    <option value="2">2</option>
-                                                    <option value="3">3</option>
-                                                    <option value="4">4</option>
-                                                    <option value="5">5</option>
-                                                    <option value="6">6 (Voice)</option>
-                                                    <option value="7">7 (Network Control)</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                                        <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Service VLAN</h6>
                                         
                                         <div class="mb-3">
-                                            <div class="form-check">
-                                                <input type="checkbox" class="form-check-input" name="nat_enable" id="natEnable" checked>
-                                                <label class="form-check-label" for="natEnable">Enable NAT</label>
-                                            </div>
+                                            <label class="form-label">Service VLAN ID</label>
+                                            <input type="number" name="vlan_id" class="form-control" placeholder="e.g. 902" min="1" max="4094" value="<?= htmlspecialchars($currentOnu['vlan_id'] ?? '') ?>">
+                                            <small class="text-muted">Internet service VLAN (leave empty to use existing)</small>
                                         </div>
                                         
-                                        <div class="mb-3">
-                                            <label class="form-label">MTU Size</label>
-                                            <input type="number" name="mtu" class="form-control" value="1500" min="576" max="1500">
+                                        <div class="alert alert-light small">
+                                            <strong>What happens:</strong>
+                                            <ul class="mb-0 ps-3">
+                                                <li>Creates WAN connection on WANDevice.2</li>
+                                                <li>Sets PPPoE/DHCP credentials and VLAN</li>
+                                                <li>Binds LAN1-4 and WiFi (SSID1) to this WAN</li>
+                                                <li>Sets as default internet connection</li>
+                                            </ul>
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-check-lg me-1"></i> Apply WAN Settings
+                                    <i class="bi bi-cloud-upload me-1"></i> Configure via TR-069
                                 </button>
                             </form>
                         </div>
