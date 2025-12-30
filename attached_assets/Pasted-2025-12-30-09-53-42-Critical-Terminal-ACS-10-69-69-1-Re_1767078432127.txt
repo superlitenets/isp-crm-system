@@ -1,0 +1,68 @@
+2025-12-30 09:53:42 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-30 09:53:32 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:16 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:45 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:16 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:41 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:41 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:41 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:41 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:16 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:48 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:16 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:46 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:16 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:43 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:00:44 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+2025-12-17 11:49:59 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:49:55 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.WLANConfiguration:1.1,SSID:Princess
+2025-12-17 11:49:54 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,LANDevice.WLANConfiguration.PreSharedKey:1.1.1,KeyPassphrase:-
+2025-12-17 11:49:52 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:49:34 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:49:27 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:47:40 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:47:34 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2025-12-17 11:47:32 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:1,PhyPortName:LAN1,LAN2,LAN3,LAN4,SSID1,PolicyRouteType:SourcePhyPort,WanName:wan1.2.ppp1
+2025-12-17 11:47:30 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:
+2025-12-17 11:47:25 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.Layer3Forwarding:,DefaultConnectionService:...,X_HW_WanDefaultWanName:wan1.2.ppp1
+2025-12-17 11:47:25 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.DeviceInfo:,ProvisioningCode:sOLT.rPPP
+2025-12-17 11:47:23 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANPPPConnection:1.2.1,X_HW_VLAN:902,Name:Internet_PPPoE
+2025-12-17 11:47:19 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANPPPConnection:1.2.1,Username:SNS001617,Password:-,NATEnabled:1,X_HW_LcpEchoReqCheck:1,PPPLCPEcho:10
+2025-12-17 11:47:15 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,WANDevice.WANConnectionDevice.WANPPPConnection:1.2
+2025-12-17 11:47:11 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.WANDevice.WANConnectionDevice:1

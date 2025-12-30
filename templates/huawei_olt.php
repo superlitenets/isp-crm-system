@@ -3724,6 +3724,11 @@ try {
         @media (max-width: 767.98px) {
             .form-control, .form-select, .btn {
                 min-height: 44px;
+                touch-action: manipulation;
+            }
+            .btn {
+                -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+                cursor: pointer;
             }
             .modal-dialog {
                 margin: 0.5rem;
@@ -3734,6 +3739,13 @@ try {
             .table td, .table th {
                 padding: 0.5rem;
                 font-size: 0.875rem;
+            }
+            .nav-link {
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: rgba(0,0,0,0.1);
             }
         }
         
