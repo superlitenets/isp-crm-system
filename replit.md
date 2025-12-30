@@ -26,6 +26,11 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **Huawei OLT Module**: Standalone direct management module for Huawei OLT devices (Telnet/SSH/SNMP). Features include device management, ONU inventory and status monitoring, service profile management, auto-provisioning, ONU operations, and a CLI terminal.
   - **Persistent Session Manager**: Node.js service for persistent Telnet sessions, command queuing, auto-reconnection, and HTTP API integration.
   - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP protocol with GenieACS ACS server integration for WiFi configuration, admin password change, device reboots, factory resets, and firmware upgrades. WiFi interfaces are dynamically detected from TR-069 data - single-band ONUs show only 2.4GHz tab, dual-band show both. Ethernet port configuration is done via OMCI through the OLT.
+  - **SmartOLT-style Internet WAN Configuration**: Internet WAN (PPPoE/DHCP/Static) is configured via TR-069/GenieACS instead of OMCI. This follows SmartOLT's approach where:
+    - **OMCI** handles service VLAN configuration only (service-ports, native VLAN on ETH)
+    - **TR-069** handles Internet WAN setup (PPPoE credentials, IPoE/DHCP, policy routes)
+    - Configuration sequence: Create WANConnectionDevice → Add WANPPPConnection/WANIPConnection → Set credentials and VLAN → Configure policy routes (bind LAN ports and WiFi to WAN) → Set default WAN
+    - Management WAN (VLAN 69) uses DHCP for TR-069 connectivity; Internet WAN (service VLAN) uses PPPoE/IPoE
   - **TR-069 Auto-Provisioning via OMCI**: Automatic TR-069 configuration during ONU authorization. Auto-detects TR-069 VLAN, configures native VLAN on ETH port, sets DHCP mode, pushes ACS URL via OMCI, and enables periodic inform. Provides detailed success/failure notifications with manual fallback option.
   - **OLT Profile Sync**: Sync line profiles and service profiles directly from OLT with caching in database for quick access.
   - **SmartOLT Migration**: Toolkit for migrating from SmartOLT to direct OLT management.
