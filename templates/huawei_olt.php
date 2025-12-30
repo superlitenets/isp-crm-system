@@ -4683,10 +4683,14 @@ try {
                             <thead class="table-light">
                                 <tr>
                                     <th>Serial Number</th>
+                                    <th>ONU Type</th>
+                                    <th>Name</th>
+                                    <th>Zone</th>
+                                    <th>VLAN</th>
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Distance</th>
-                                    <th style="width: 100px;">Actions</th>
+                                    <th style="width: 80px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -4694,25 +4698,45 @@ try {
                                 <tr data-onu-id="<?= $onu['id'] ?>">
                                     <td>
                                         <a href="?page=huawei-olt&view=onu_detail&onu_id=<?= $onu['id'] ?>" class="text-decoration-none">
-                                            <code class="fs-6"><?= htmlspecialchars($onu['sn']) ?></code>
+                                            <code><?= htmlspecialchars($onu['sn']) ?></code>
                                         </a>
-                                        <?php if (!empty($onu['name'])): ?>
-                                        <br><small class="text-muted"><?= htmlspecialchars($onu['name']) ?></small>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $typeName = $onu['onu_type_model'] ?? null;
+                                        $rawType = $onu['onu_type'] ?? $onu['discovered_eqid'] ?? null;
+                                        if ($typeName): ?>
+                                            <span class="badge bg-info"><?= htmlspecialchars($typeName) ?></span>
+                                        <?php elseif ($rawType): ?>
+                                            <span class="badge bg-secondary"><?= htmlspecialchars($rawType) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($onu['name'] ?: '-') ?></td>
+                                    <td><?= htmlspecialchars($onu['zone_name'] ?? '-') ?></td>
+                                    <td>
+                                        <?php if (!empty($onu['vlan_id'])): ?>
+                                            <span class="badge bg-primary"><?= $onu['vlan_id'] ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php
                                         $statusConfig = [
-                                            'online' => ['class' => 'success', 'icon' => 'check-circle-fill'],
-                                            'offline' => ['class' => 'secondary', 'icon' => 'circle'],
-                                            'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill'],
-                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill'],
-                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill'],
+                                            'online' => ['class' => 'success', 'icon' => 'check-circle-fill', 'label' => 'Online'],
+                                            'offline' => ['class' => 'secondary', 'icon' => 'circle', 'label' => 'Offline'],
+                                            'los' => ['class' => 'danger', 'icon' => 'exclamation-triangle-fill', 'label' => 'LOS'],
+                                            'power_fail' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Power Fail'],
+                                            'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
                                         ];
                                         $status = strtolower($onu['status'] ?? 'offline');
-                                        $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle'];
+                                        $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle', 'label' => ucfirst($status)];
                                         ?>
-                                        <i class="bi bi-<?= $cfg['icon'] ?> text-<?= $cfg['class'] ?>" title="<?= ucfirst($status) ?>"></i>
+                                        <span class="badge bg-<?= $cfg['class'] ?>">
+                                            <i class="bi bi-<?= $cfg['icon'] ?> me-1"></i><?= $cfg['label'] ?>
+                                        </span>
                                     </td>
                                     <td>
                                         <?php
