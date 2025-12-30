@@ -2669,6 +2669,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'raw_output' => $output
                 ]);
                 exit;
+            case 'get_tr069_wifi':
+                header('Content-Type: application/json');
+                $serial = $_POST['serial'] ?? '';
+                if (empty($serial)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                    exit;
+                }
+                try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new GenieACS();
+                    $device = $genieacs->findDeviceBySerial($serial);
+                    if (!$device) {
+                        echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
+                        exit;
+                    }
+                    $wifiInterfaces = [];
+                    $wifiPaths = [
+                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1' => '2.4GHz',
+                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2' => '5GHz',
+                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3' => '2.4GHz Guest',
+                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4' => '5GHz Guest'
+                    ];
+                    foreach ($wifiPaths as $path => $band) {
+                        $ssid = $genieacs->getParameterValue($device, $path . '.SSID');
+                        if ($ssid !== null) {
+                            $enabled = $genieacs->getParameterValue($device, $path . '.Enable');
+                            $wifiInterfaces[] = [
+                                'band' => $band,
+                                'ssid' => $ssid,
+                                'enabled' => $enabled === true || $enabled === 'true' || $enabled === '1' || $enabled === 1,
+                                'mode' => 'LAN',
+                                'path' => $path
+                            ];
+                        }
+                    }
+                    echo json_encode(['success' => true, 'interfaces' => $wifiInterfaces]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
             case 'refresh_tr069_ip':
                 $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
                 if ($result['success']) {
@@ -5447,17 +5487,26 @@ try {
                 </div>
             </div>
             
-            <!-- WiFi Section -->
+            <!-- WiFi Section - Dynamically loads from TR-069 -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
                     <strong>WiFi</strong>
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" id="wifiEnabled" checked>
-                        <label class="form-check-label" for="wifiEnabled">Enable</label>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadWiFiFromTR069()" id="wifiRefreshBtn">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh from TR-069
+                        </button>
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-sm table-hover mb-0">
+                    <div id="wifiLoadingIndicator" class="text-center py-3 d-none">
+                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                        <span class="text-muted">Loading WiFi data from TR-069...</span>
+                    </div>
+                    <div id="wifiNotConnected" class="text-center py-3 <?= empty($currentOnu['tr069_ip']) ? '' : 'd-none' ?>">
+                        <i class="bi bi-wifi-off text-muted fs-4 d-block mb-2"></i>
+                        <span class="text-muted">Device not connected to TR-069. WiFi data will be available when the device connects to the ACS.</span>
+                    </div>
+                    <table class="table table-sm table-hover mb-0 <?= empty($currentOnu['tr069_ip']) ? 'd-none' : '' ?>" id="wifiTable">
                         <thead class="table-light">
                             <tr>
                                 <th>Port</th>
@@ -5469,32 +5518,86 @@ try {
                             </tr>
                         </thead>
                         <tbody id="wifiPortsTable">
-                            <?php if ($currentOnu['type_wifi'] ?? true): ?>
                             <tr>
-                                <td>wifi_0/1</td>
-                                <td><span class="text-success">Enabled</span></td>
-                                <td>LAN</td>
-                                <td><span class="text-muted">-</span></td>
-                                <td>No control</td>
-                                <td><a href="#" class="text-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['sn']) ?>')">Configure</a></td>
+                                <td colspan="6" class="text-muted text-center">
+                                    <span class="spinner-border spinner-border-sm me-1"></span> Loading...
+                                </td>
                             </tr>
-                            <tr>
-                                <td>wifi_0/2</td>
-                                <td><span class="text-success">Enabled</span></td>
-                                <td>Access VLAN: <?= $currentOnu['vlan_id'] ?? '16' ?></td>
-                                <td><span class="text-muted">-</span></td>
-                                <td>No control</td>
-                                <td><a href="#" class="text-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['sn']) ?>')">Configure</a></td>
-                            </tr>
-                            <?php else: ?>
-                            <tr>
-                                <td colspan="6" class="text-muted text-center">This ONU type does not support WiFi</td>
-                            </tr>
-                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
+            
+            <script>
+            const onuSerial = '<?= htmlspecialchars($currentOnu['sn']) ?>';
+            const onuId = <?= $currentOnu['id'] ?>;
+            const hasTR069 = <?= !empty($currentOnu['tr069_ip']) ? 'true' : 'false' ?>;
+            
+            function loadWiFiFromTR069() {
+                if (!hasTR069) return;
+                
+                const tbody = document.getElementById('wifiPortsTable');
+                const loading = document.getElementById('wifiLoadingIndicator');
+                const table = document.getElementById('wifiTable');
+                const notConnected = document.getElementById('wifiNotConnected');
+                const refreshBtn = document.getElementById('wifiRefreshBtn');
+                
+                loading.classList.remove('d-none');
+                refreshBtn.disabled = true;
+                
+                fetch('?page=huawei-olt', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    loading.classList.add('d-none');
+                    refreshBtn.disabled = false;
+                    
+                    if (!data.success) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-warning text-center">' + (data.error || 'Failed to load WiFi data') + '</td></tr>';
+                        return;
+                    }
+                    
+                    if (!data.interfaces || data.interfaces.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No WiFi interfaces found on this device</td></tr>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    data.interfaces.forEach((iface, idx) => {
+                        const band = iface.band || (idx === 0 ? '2.4GHz' : '5GHz');
+                        const enabled = iface.enabled ? '<span class="text-success">Enabled</span>' : '<span class="text-danger">Disabled</span>';
+                        const ssid = iface.ssid || '<span class="text-muted">-</span>';
+                        const mode = iface.mode || 'LAN';
+                        
+                        html += '<tr>';
+                        html += '<td>wifi_0/' + (idx + 1) + ' <small class="text-muted">(' + band + ')</small></td>';
+                        html += '<td>' + enabled + '</td>';
+                        html += '<td>' + mode + '</td>';
+                        html += '<td><strong>' + ssid + '</strong></td>';
+                        html += '<td>No control</td>';
+                        html += '<td><a href="#" class="text-primary" onclick="openTR069WiFiConfig(\'' + onuSerial + '\')">Configure</a></td>';
+                        html += '</tr>';
+                    });
+                    
+                    tbody.innerHTML = html;
+                    table.classList.remove('d-none');
+                    notConnected.classList.add('d-none');
+                })
+                .catch(err => {
+                    loading.classList.add('d-none');
+                    refreshBtn.disabled = false;
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center">Error: ' + err.message + '</td></tr>';
+                });
+            }
+            
+            // Auto-load if TR-069 is connected
+            if (hasTR069) {
+                loadWiFiFromTR069();
+            }
+            </script>
             
             <!-- Signal History Chart -->
             <div class="row">
