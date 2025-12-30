@@ -2719,6 +2719,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'warning';
                 }
                 break;
+            case 'update_dba_profile':
+                $onuId = (int)$_POST['onu_id'];
+                $dbaProfileId = (int)$_POST['dba_profile_id'];
+                $stmt = $pdo->prepare("UPDATE huawei_onus SET dba_profile_id = ? WHERE id = ?");
+                if ($stmt->execute([$dbaProfileId, $onuId])) {
+                    $message = 'DBA/Speed profile updated successfully';
+                    $messageType = 'success';
+                } else {
+                    $message = 'Failed to update DBA profile';
+                    $messageType = 'danger';
+                }
+                break;
             case 'refresh_all_optical':
             case 'refresh_all_optical_cli':
                 $result = $huaweiOLT->refreshAllONUOpticalViaCLI((int)$_POST['olt_id']);
@@ -5281,11 +5293,19 @@ try {
                             </div>
                         </div>
                         
-                        <!-- Center: ONU Image -->
+                        <!-- Center: ONU Image & Service Profile -->
                         <div class="col-md-2 text-center d-flex align-items-center justify-content-center">
                             <div>
                                 <i class="bi bi-router text-secondary" style="font-size: 4rem;"></i>
-                                <div class="small text-muted mt-2"><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'ONU') ?></div>
+                                <div class="small mt-2">
+                                    <span class="text-primary">Service Profile</span><br>
+                                    <strong><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'ONU') ?></strong>
+                                </div>
+                                <?php if (!empty($currentOnu['line_profile_name'])): ?>
+                                <div class="small text-muted mt-1">
+                                    Line: <?= htmlspecialchars($currentOnu['line_profile_name']) ?>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                         
@@ -5418,10 +5438,11 @@ try {
                 </div>
             </div>
             
-            <!-- Speed Profiles / Service-ports Table -->
+            <!-- Speed Profiles (DBA) / Service-ports Table -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-light py-2">
-                    <strong>Speed profiles</strong>
+                <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                    <strong>Speed profiles (DBA)</strong>
+                    <small class="text-muted">Dynamic Bandwidth Allocation</small>
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-sm table-hover mb-0">
@@ -5429,6 +5450,7 @@ try {
                             <tr>
                                 <th>Service-port ID</th>
                                 <th>User-VLAN</th>
+                                <th>DBA Profile</th>
                                 <th>Download</th>
                                 <th>Upload</th>
                                 <th>Action</th>
@@ -5436,16 +5458,29 @@ try {
                         </thead>
                         <tbody id="servicePortsTable">
                             <?php if (!empty($currentOnu['vlan_id'])): ?>
+                            <?php
+                            // Get DBA profile info if available
+                            $dbaProfile = null;
+                            if (!empty($currentOnu['dba_profile_id'])) {
+                                $dbaStmt = $pdo->prepare("SELECT * FROM huawei_dba_profiles WHERE id = ?");
+                                $dbaStmt->execute([$currentOnu['dba_profile_id']]);
+                                $dbaProfile = $dbaStmt->fetch(PDO::FETCH_ASSOC);
+                            }
+                            $downloadSpeed = $dbaProfile['assured_bandwidth'] ?? ($currentOnu['download_speed'] ?? '1G');
+                            $uploadSpeed = $dbaProfile['max_bandwidth'] ?? ($currentOnu['upload_speed'] ?? '1G');
+                            $dbaName = $dbaProfile['name'] ?? 'Default';
+                            ?>
                             <tr>
                                 <td><?= $currentOnu['onu_id'] ?? '-' ?></td>
-                                <td><?= $currentOnu['vlan_id'] ?></td>
-                                <td>1G</td>
-                                <td>1G</td>
-                                <td><a href="#" class="text-primary" onclick="configureServicePort(<?= $currentOnu['id'] ?>, <?= $currentOnu['vlan_id'] ?>)">Configure</a></td>
+                                <td><span class="badge bg-primary"><?= $currentOnu['vlan_id'] ?></span></td>
+                                <td><span class="badge bg-info"><?= htmlspecialchars($dbaName) ?></span></td>
+                                <td><?= is_numeric($downloadSpeed) ? number_format($downloadSpeed/1000).' Mbps' : $downloadSpeed ?></td>
+                                <td><?= is_numeric($uploadSpeed) ? number_format($uploadSpeed/1000).' Mbps' : $uploadSpeed ?></td>
+                                <td><a href="#" class="text-primary" onclick="configureSpeedProfile(<?= $currentOnu['id'] ?>, <?= $currentOnu['vlan_id'] ?>)">Configure</a></td>
                             </tr>
                             <?php else: ?>
                             <tr>
-                                <td colspan="5" class="text-muted text-center">No service ports configured</td>
+                                <td colspan="6" class="text-muted text-center">No service ports configured</td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
@@ -11906,7 +11941,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header bg-warning">
-                    <h5 class="modal-title"><i class="bi bi-clipboard-data me-2"></i>ONU Full Status</h5>
+                    <h5 class="modal-title" id="onuFullStatusTitle"><i class="bi bi-clipboard-data me-2"></i>ONU Full Status</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="onuFullStatusBody">
@@ -11918,6 +11953,51 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="dbaProfileModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-speedometer2 me-2"></i>Configure Speed Profile (DBA)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="?page=huawei-olt">
+                    <input type="hidden" name="action" value="update_dba_profile">
+                    <input type="hidden" name="onu_id" id="dbaOnuId">
+                    <input type="hidden" name="vlan_id" id="dbaVlanId">
+                    <div class="modal-body">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Speed Profile (DBA)</strong> controls bandwidth allocation for this ONU.
+                            This is different from <strong>Service Profile</strong> which corresponds to the ONU type/model.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">DBA Profile</label>
+                            <select name="dba_profile_id" class="form-select" required>
+                                <option value="">-- Select DBA Profile --</option>
+                                <?php
+                                $dbaProfiles = $pdo->query("SELECT * FROM huawei_dba_profiles ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+                                foreach ($dbaProfiles as $dba): ?>
+                                <option value="<?= $dba['id'] ?>">
+                                    <?= htmlspecialchars($dba['name']) ?>
+                                    (<?= isset($dba['max_bandwidth']) ? number_format($dba['max_bandwidth']/1000).' Mbps' : 'N/A' ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">DBA = Dynamic Bandwidth Allocation (controls download/upload speeds)</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-check-lg me-1"></i> Apply DBA Profile
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -13251,8 +13331,12 @@ echo "# ================================================\n";
         }
     }
     
-    function configureServicePort(onuId, vlanId) {
-        alert('Service port configuration for VLAN ' + vlanId + ' - Coming soon');
+    function configureSpeedProfile(onuId, vlanId) {
+        // Open DBA profile configuration modal
+        const modal = new bootstrap.Modal(document.getElementById('dbaProfileModal'));
+        document.getElementById('dbaOnuId').value = onuId;
+        document.getElementById('dbaVlanId').value = vlanId;
+        modal.show();
     }
     
     function configureEthPort(onuId, portNum) {
