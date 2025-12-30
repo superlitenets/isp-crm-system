@@ -166,7 +166,7 @@ class RadiusBilling {
     
     // ==================== Package Management ====================
     
-    public function getPackages(string $type = null): array {
+    public function getPackages(?string $type = null): array {
         $sql = "SELECT * FROM radius_packages WHERE 1=1";
         $params = [];
         
@@ -453,7 +453,7 @@ class RadiusBilling {
         }
     }
     
-    public function renewSubscription(int $id, int $packageId = null): array {
+    public function renewSubscription(int $id, ?int $packageId = null): array {
         try {
             $sub = $this->getSubscription($id);
             if (!$sub) {
@@ -796,7 +796,7 @@ class RadiusBilling {
         $stmt->execute([$subscriptionId, $packageId, $amount, $type, $start, $end, $invoiceNumber]);
     }
     
-    public function getBillingHistory(int $subscriptionId = null, int $limit = 50): array {
+    public function getBillingHistory(?int $subscriptionId = null, int $limit = 50): array {
         $sql = "SELECT b.*, s.username, c.name as customer_name, p.name as package_name
                 FROM radius_billing b
                 LEFT JOIN radius_subscriptions s ON b.subscription_id = s.id
