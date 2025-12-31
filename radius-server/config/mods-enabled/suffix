@@ -1,4 +1,0 @@
-realm suffix {
-    format = suffix
-    delimiter = "@"
-}
