@@ -118,11 +118,10 @@ class RadiusBilling {
     public function getNASWithVPN(int $id): ?array {
         $stmt = $this->db->prepare("
             SELECT n.*, n.secret,
-                   wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
-                   wp.public_key as vpn_peer_pubkey, wp.preshared_key as vpn_psk,
-                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
-                   ws.public_key as vpn_server_pubkey, ws.listen_port as vpn_server_port,
-                   ws.dns_servers as vpn_dns
+                   wp.id as wireguard_peer_id, wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
+                   wp.public_key as vpn_peer_pubkey,
+                   ws.id as vpn_server_id, ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
+                   ws.public_key as vpn_server_pubkey, ws.listen_port as vpn_server_port
             FROM radius_nas n
             LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
             LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
