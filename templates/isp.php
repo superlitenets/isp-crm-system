@@ -61,16 +61,26 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         echo json_encode(['online' => false, 'error' => 'Invalid IP']);
         exit;
     }
-    // Use fsockopen to check MikroTik API port (8728) instead of ping (exec disabled in Docker)
-    $port = isset($_GET['port']) ? (int)$_GET['port'] : 8728;
-    $timeout = 2;
+    // Use OLT Service to ping (exec disabled in Docker PHP container)
+    $oltServiceUrl = $_ENV['OLT_SERVICE_URL'] ?? 'http://olt-service:3456';
+    $ch = curl_init("{$oltServiceUrl}/ping");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['ip' => $ip, 'count' => 1, 'timeout' => 2]),
+        CURLOPT_TIMEOUT => 5
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
     $online = false;
-    $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
-    if ($fp) {
-        $online = true;
-        fclose($fp);
+    if ($httpCode === 200 && $response) {
+        $result = json_decode($response, true);
+        $online = !empty($result['success']) && $result['reachable'] === true;
     }
-    echo json_encode(['online' => $online, 'ip' => $ip, 'port' => $port]);
+    echo json_encode(['online' => $online, 'ip' => $ip]);
     exit;
 }
 
