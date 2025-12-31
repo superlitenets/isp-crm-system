@@ -56,7 +56,6 @@ server default {
 
     preacct {
         preprocess
-        acct_unique
         suffix
         files
     }
