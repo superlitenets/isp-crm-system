@@ -166,6 +166,7 @@ services:
     ports:
       - "1812:1812/udp"
       - "1813:1813/udp"
+      - "3799:3799/udp"
     environment:
       - POSTGRES_HOST=isp_crm_db
       - POSTGRES_PORT=5432

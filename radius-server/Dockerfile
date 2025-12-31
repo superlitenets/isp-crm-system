@@ -23,6 +23,6 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh && \
     chown -R freerad:freerad /etc/freeradius/
 
-EXPOSE 1812/udp 1813/udp
+EXPOSE 1812/udp 1813/udp 3799/udp
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
