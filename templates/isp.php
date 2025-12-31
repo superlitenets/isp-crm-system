@@ -61,8 +61,16 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         echo json_encode(['online' => false, 'error' => 'Invalid IP']);
         exit;
     }
-    $pingResult = @exec("ping -c 1 -W 2 " . escapeshellarg($ip) . " 2>&1", $output, $returnCode);
-    echo json_encode(['online' => $returnCode === 0, 'ip' => $ip]);
+    // Use fsockopen to check MikroTik API port (8728) instead of ping (exec disabled in Docker)
+    $port = isset($_GET['port']) ? (int)$_GET['port'] : 8728;
+    $timeout = 2;
+    $online = false;
+    $fp = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+    if ($fp) {
+        $online = true;
+        fclose($fp);
+    }
+    echo json_encode(['online' => $online, 'ip' => $ip, 'port' => $port]);
     exit;
 }
 
