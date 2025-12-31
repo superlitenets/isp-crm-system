@@ -1,0 +1,32 @@
+root@superlitecrm:~/isp# docker logs isp_crm_freeradius 2>&1 | grep -i "client\|sql\|nas"
+including configuration file /etc/freeradius/clients.conf
+including configuration file /etc/freeradius/mods-enabled/dynamic_clients
+        postauth_client_lost = no
+radiusd: #### Loading Clients ####
+ client localhost {
+        nas_type = "other"
+ client localhost_ipv6 {
+        check_with_nas = yes
+        check_with_nas = yes
+  # Loaded module rlm_dynamic_clients
+  # Loading module "dynamic_clients" from file /etc/freeradius/mods-enabled/dynamic_clients
+        require_client_cert = no
+        require_client_cert = no
+Ignoring "sql" (see raddb/mods-available/README.rst)
+Compiling Post-Auth-Type Client-Lost for attr Post-Auth-Type
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 57915 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 57915 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 57915 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 35428 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 35428 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 35428 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 37789 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 37789 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 37789 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 53173 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 53173 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 53173 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 38921 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 38921 proto udp
+Ignoring request to auth address * port 1812 bound to server default from unknown client 10.200.0.5 port 38921 proto udp
+root@superlitecrm:~/isp#
