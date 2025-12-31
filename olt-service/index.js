@@ -1,7 +1,4 @@
 const express = require('express');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
 const OLTSessionManager = require('./OLTSessionManager');
 const DiscoveryWorker = require('./DiscoveryWorker');
 const SNMPPollingWorker = require('./SNMPPollingWorker');
@@ -115,96 +112,9 @@ app.get('/snmp/status', async (req, res) => {
     }
 });
 
-// ==================== RADIUS CoA/Disconnect ====================
-
-app.post('/radius/disconnect', async (req, res) => {
-    try {
-        const { nasIp, nasSecret, sessionId, username } = req.body;
-        
-        if (!nasIp || !nasSecret) {
-            return res.status(400).json({ success: false, error: 'Missing nasIp or nasSecret' });
-        }
-        
-        if (!sessionId && !username) {
-            return res.status(400).json({ success: false, error: 'Missing sessionId or username' });
-        }
-        
-        // Build attributes
-        const attrs = [];
-        if (sessionId) attrs.push(`Acct-Session-Id=${sessionId}`);
-        if (username) attrs.push(`User-Name=${username}`);
-        
-        const attrString = attrs.join('\\n');
-        // Use docker exec to run radclient from FreeRADIUS container
-        const command = `docker exec isp_crm_freeradius bash -c 'echo -e "${attrString}" | radclient -x ${nasIp}:3799 disconnect ${nasSecret}' 2>&1`;
-        
-        console.log(`[RADIUS] Sending disconnect to ${nasIp}: ${attrs.join(', ')}`);
-        
-        const { stdout, stderr } = await execAsync(command, { timeout: 10000 }).catch(e => ({ 
-            stdout: e.stdout || '', 
-            stderr: e.stderr || e.message 
-        }));
-        
-        const output = stdout || stderr;
-        const success = output.includes('Disconnect-ACK');
-        
-        console.log(`[RADIUS] Disconnect result: ${success ? 'ACK' : 'FAILED'}`);
-        
-        res.json({ 
-            success, 
-            output,
-            message: success ? 'User disconnected successfully' : 'Disconnect failed or no response'
-        });
-    } catch (error) {
-        console.error('[RADIUS] Disconnect error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.post('/radius/coa', async (req, res) => {
-    try {
-        const { nasIp, nasSecret, username, attributes } = req.body;
-        
-        if (!nasIp || !nasSecret || !username) {
-            return res.status(400).json({ success: false, error: 'Missing nasIp, nasSecret, or username' });
-        }
-        
-        // Build attributes
-        const attrs = [`User-Name=${username}`];
-        if (attributes && typeof attributes === 'object') {
-            for (const [key, value] of Object.entries(attributes)) {
-                attrs.push(`${key}=${value}`);
-            }
-        }
-        
-        const attrString = attrs.join('\\n');
-        // Use docker exec to run radclient from FreeRADIUS container
-        const command = `docker exec isp_crm_freeradius bash -c 'echo -e "${attrString}" | radclient -x ${nasIp}:3799 coa ${nasSecret}' 2>&1`;
-        
-        console.log(`[RADIUS] Sending CoA to ${nasIp}: ${attrs.join(', ')}`);
-        
-        const { stdout, stderr } = await execAsync(command, { timeout: 10000 }).catch(e => ({ 
-            stdout: e.stdout || '', 
-            stderr: e.stderr || e.message 
-        }));
-        
-        const output = stdout || stderr;
-        const success = output.includes('CoA-ACK');
-        
-        console.log(`[RADIUS] CoA result: ${success ? 'ACK' : 'FAILED'}`);
-        
-        res.json({ 
-            success, 
-            output,
-            message: success ? 'CoA applied successfully' : 'CoA failed or no response'
-        });
-    } catch (error) {
-        console.error('[RADIUS] CoA error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// ==================== Ping ====================
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 app.post('/ping', async (req, res) => {
     try {
@@ -214,7 +124,7 @@ app.post('/ping', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid IP address' });
         }
         
-        const { stdout, stderr } = await execAsync(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '', stderr: e.stderr || e.message }));
+        const { stdout, stderr } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '', stderr: e.stderr || e.message }));
         const output = stdout || stderr;
         
         const result = {
@@ -263,7 +173,7 @@ app.post('/ping-batch', async (req, res) => {
             }
             
             try {
-                const { stdout } = await execAsync(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '' }));
+                const { stdout } = await execPromise(`ping -c ${count} -W ${timeout} ${ip} 2>&1`).catch(e => ({ stdout: e.stdout || '' }));
                 
                 const packetsMatch = stdout.match(/(\d+) packets transmitted, (\d+) (?:packets )?received/);
                 const latencyMatch = stdout.match(/min\/avg\/max.*= ([\d.]+)\/([\d.]+)\/([\d.]+)/);
@@ -303,16 +213,16 @@ app.post('/wireguard/apply', async (req, res) => {
         
         // Try docker cp to WireGuard container
         try {
-            await execAsync(`docker cp ${configPath} ${containerName}:/config/wg_confs/wg0.conf 2>&1`);
+            await execPromise(`docker cp ${configPath} ${containerName}:/config/wg_confs/wg0.conf 2>&1`);
             
             // Try to apply via wg syncconf
             try {
-                await execAsync(`docker exec ${containerName} wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1`);
+                await execPromise(`docker exec ${containerName} wg syncconf wg0 /config/wg_confs/wg0.conf 2>&1`);
                 results.configApplied = true;
                 results.configMessage = 'Config applied via wg syncconf';
             } catch (syncErr) {
                 // Fallback to container restart
-                await execAsync(`docker restart ${containerName} 2>&1`);
+                await execPromise(`docker restart ${containerName} 2>&1`);
                 await new Promise(r => setTimeout(r, 3000)); // Wait for container
                 results.configApplied = true;
                 results.configMessage = 'Config applied via container restart';
@@ -329,7 +239,7 @@ app.post('/wireguard/apply', async (req, res) => {
         if (subnets && Array.isArray(subnets)) {
             try {
                 // Get current routes on HOST (wg0 is a host interface)
-                const { stdout } = await execAsync(`ip route show dev wg0 2>/dev/null`).catch(() => ({ stdout: '' }));
+                const { stdout } = await execPromise(`ip route show dev wg0 2>/dev/null`).catch(() => ({ stdout: '' }));
                 const currentRoutes = [];
                 stdout.split('\n').forEach(line => {
                     const match = line.match(/^([\d.]+\/\d+)/);
@@ -341,7 +251,7 @@ app.post('/wireguard/apply', async (req, res) => {
                     if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/.test(subnet)) continue;
                     if (!currentRoutes.includes(subnet)) {
                         try {
-                            await execAsync(`ip route add ${subnet} dev wg0 2>&1`);
+                            await execPromise(`ip route add ${subnet} dev wg0 2>&1`);
                             results.routesAdded.push(subnet);
                         } catch (e) {
                             if (!e.message.includes('File exists')) {
@@ -356,7 +266,7 @@ app.post('/wireguard/apply', async (req, res) => {
                     if (route.startsWith('10.200.0.')) continue; // Skip tunnel network
                     if (!subnets.includes(route)) {
                         try {
-                            await execAsync(`ip route del ${route} 2>&1`);
+                            await execPromise(`ip route del ${route} 2>&1`);
                             results.routesRemoved.push(route);
                         } catch (e) {
                             if (!e.message.includes('No such process')) {
