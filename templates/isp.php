@@ -5,6 +5,15 @@ $radiusBilling = new \App\RadiusBilling($db);
 // Handle AJAX API actions
 $action = $_GET['action'] ?? '';
 
+if ($action === 'get_mikrotik_script' && isset($_GET['peer_id'])) {
+    header('Content-Type: application/json');
+    require_once __DIR__ . '/../src/WireGuardService.php';
+    $wgService = new \App\WireGuardService($db);
+    $script = $wgService->getMikroTikScript((int)$_GET['peer_id']);
+    echo json_encode(['success' => !empty($script), 'script' => $script]);
+    exit;
+}
+
 if ($action === 'ping_nas' && isset($_GET['ip'])) {
     header('Content-Type: application/json');
     $ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
@@ -3821,7 +3830,7 @@ try {
         
         if (nas.wireguard_peer_id) {
             // Fetch existing MikroTik script from WireGuard service
-            fetch('/index.php?page=huawei-olt&view=vpn&action=get_mikrotik_script&peer_id=' + nas.wireguard_peer_id)
+            fetch('/index.php?page=isp&action=get_mikrotik_script&peer_id=' + nas.wireguard_peer_id)
                 .then(r => r.json())
                 .then(data => {
                     if (data.success && data.script) {
