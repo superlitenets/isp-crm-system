@@ -129,6 +129,55 @@ if (strpos($contentType, 'text/html') !== false) {
         },
         $body
     );
+    
+    $proxyScript = '<script>
+(function(){
+    var baseUrl = ' . json_encode($baseUrl) . ';
+    var basePath = ' . json_encode($basePath) . ';
+    
+    function proxyUrl(url) {
+        if (!url || url.startsWith("data:") || url.startsWith("javascript:") || url === "#") return url;
+        if (url.startsWith("/router-proxy.php")) return url;
+        if (url.startsWith("//")) url = "http:" + url;
+        if (/^https?:\/\//.test(url)) return "/router-proxy.php?url=" + encodeURIComponent(url);
+        if (url.startsWith("/")) return "/router-proxy.php?url=" + encodeURIComponent(baseUrl + url);
+        return "/router-proxy.php?url=" + encodeURIComponent(baseUrl + basePath + "/" + url);
+    }
+    
+    var origXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+        return origXHROpen.call(this, method, proxyUrl(url), async !== false, user, pass);
+    };
+    
+    if (window.fetch) {
+        var origFetch = window.fetch;
+        window.fetch = function(input, init) {
+            if (typeof input === "string") {
+                input = proxyUrl(input);
+            } else if (input && input.url) {
+                input = new Request(proxyUrl(input.url), input);
+            }
+            return origFetch.call(this, input, init);
+        };
+    }
+    
+    var origImage = window.Image;
+    window.Image = function(w, h) {
+        var img = new origImage(w, h);
+        var origSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+        Object.defineProperty(img, "src", {
+            set: function(v) { origSrc.set.call(this, proxyUrl(v)); },
+            get: function() { return origSrc.get.call(this); }
+        });
+        return img;
+    };
+})();
+</script>';
+    
+    $body = preg_replace('/(<head[^>]*>)/i', '$1' . $proxyScript, $body, 1);
+    if (strpos($body, $proxyScript) === false) {
+        $body = $proxyScript . $body;
+    }
 }
 
 if (strpos($contentType, 'text/css') !== false) {
