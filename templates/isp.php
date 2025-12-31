@@ -764,12 +764,6 @@ try {
                 <a class="nav-link <?= $view === 'subscriptions' ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
                     <i class="bi bi-people me-2"></i> Subscribers
                 </a>
-                <a class="nav-link <?= $view === 'sessions' ? 'active' : '' ?>" href="?page=isp&view=sessions">
-                    <i class="bi bi-broadcast me-2"></i> Active Sessions
-                    <?php if ($stats['active_sessions'] > 0): ?>
-                    <span class="badge bg-success ms-auto"><?= $stats['active_sessions'] ?></span>
-                    <?php endif; ?>
-                </a>
                 <a class="nav-link <?= $view === 'packages' ? 'active' : '' ?>" href="?page=isp&view=packages">
                     <i class="bi bi-box me-2"></i> Packages
                 </a>
@@ -830,12 +824,6 @@ try {
                 </a>
                 <a class="nav-link <?= $view === 'subscriptions' ? 'active' : '' ?>" href="?page=isp&view=subscriptions">
                     <i class="bi bi-people me-2"></i> Subscribers
-                </a>
-                <a class="nav-link <?= $view === 'sessions' ? 'active' : '' ?>" href="?page=isp&view=sessions">
-                    <i class="bi bi-broadcast me-2"></i> Active Sessions
-                    <?php if ($stats['active_sessions'] > 0): ?>
-                    <span class="badge bg-success ms-auto"><?= $stats['active_sessions'] ?></span>
-                    <?php endif; ?>
                 </a>
                 <a class="nav-link <?= $view === 'packages' ? 'active' : '' ?>" href="?page=isp&view=packages">
                     <i class="bi bi-box me-2"></i> Packages
@@ -916,11 +904,11 @@ try {
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="stat-icon bg-info bg-opacity-10 text-info">
-                                    <i class="bi bi-broadcast"></i>
+                                    <i class="bi bi-wifi"></i>
                                 </div>
                             </div>
-                            <div class="stat-value"><?= number_format($stats['active_sessions']) ?></div>
-                            <div class="stat-label">Active Sessions</div>
+                            <div class="stat-value"><?= number_format($stats['online_now'] ?? 0) ?></div>
+                            <div class="stat-label">Online Now</div>
                         </div>
                     </div>
                 </div>
@@ -953,15 +941,6 @@ try {
             </div>
             
             <div class="row g-3 mb-4">
-                <div class="col-6 col-lg-2">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-body text-center py-3">
-                            <i class="bi bi-wifi fs-4 text-success"></i>
-                            <h4 class="mb-0 mt-1"><?= number_format($stats['online_now'] ?? 0) ?></h4>
-                            <small class="text-muted">Online Now</small>
-                        </div>
-                    </div>
-                </div>
                 <div class="col-6 col-lg-2">
                     <div class="card shadow-sm h-100">
                         <div class="card-body text-center py-3">
