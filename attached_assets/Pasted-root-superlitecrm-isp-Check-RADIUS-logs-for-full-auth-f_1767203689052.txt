@@ -1,0 +1,58 @@
+root@superlitecrm:~/isp# # Check RADIUS logs for full auth flow
+docker logs isp_crm_freeradius 2>&1 | tail -40
+
+# Check if session was recorded
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT * FROM radius_sessions ORDER BY id DESC LIMIT 5;"
+
+# Check radpostauth for auth history
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT * FROM radpostauth ORDER BY id DESC LIMIT 5;"
+(31) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+(31) suffix: No such realm "NULL"
+(31)     [suffix] = noop
+(31)     [files] = noop
+(31)   } # preacct = ok
+(31) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+(31)   accounting {
+(31) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+(31) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20251231
+(31) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20251231
+(31) detail: EXPAND %t
+(31) detail:    --> Wed Dec 31 17:53:06 2025
+(31)     [detail] = ok
+(31)     [unix] = ok
+(31) sql: EXPAND .query
+(31) sql:    --> .query
+(31) sql: WARNING: No such configuration item .query
+(31)     [sql] = noop
+(31)     [exec] = noop
+(31) attr_filter.accounting_response: EXPAND %{User-Name}
+(31) attr_filter.accounting_response:    --> SFL001
+(31) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+(31)     [attr_filter.accounting_response] = updated
+(31)   } # accounting = updated
+(31) Sent Accounting-Response Id 245 from 172.18.0.5:1813 to 10.200.0.5:35459 length 20
+(31) Finished request
+(31) Cleaning up request packet ID 245 with timestamp +69 due to done
+Waking up in 0.8 seconds.
+(25) Cleaning up request packet ID 239 with timestamp +60 due to cleanup_delay was reached
+Waking up in 1.9 seconds.
+(22) Cleaning up request packet ID 236 with timestamp +52 due to cleanup_delay was reached
+Waking up in 0.2 seconds.
+(26) Cleaning up request packet ID 240 with timestamp +62 due to cleanup_delay was reached
+Waking up in 1.7 seconds.
+(29) Cleaning up request packet ID 243 with timestamp +69 due to cleanup_delay was reached
+Waking up in 0.5 seconds.
+(27) Cleaning up request packet ID 241 with timestamp +64 due to cleanup_delay was reached
+Waking up in 2.2 seconds.
+(28) Cleaning up request packet ID 242 with timestamp +67 due to cleanup_delay was reached
+Ready to process requests
+ id | subscription_id | acct_session_id | nas_id | nas_ip_address | nas_port_id | framed_ip_address | mac_address | session_start | session_end | session_duration | input_octets | output_octets | input_packets | output_packets | terminate_cause | status | created_at | started_at | stopped_at | username
+----+-----------------+-----------------+--------+----------------+-------------+-------------------+-------------+---------------+-------------+------------------+--------------+---------------+---------------+----------------+-----------------+--------+------------+------------+------------+----------
+(0 rows)
+
+ id | username |  pass  |     reply     |          authdate          | nasipaddress | calledstationid | callingstationid
+----+----------+--------+---------------+----------------------------+--------------+-----------------+-------------------
+  1 | SFL001   | SFL001 | Access-Accept | 2025-12-31 17:53:06.393347 | 10.200.0.5   | TEST            | D8:32:14:2C:B5:00
+(1 row)
+
+root@superlitecrm:~/isp#
