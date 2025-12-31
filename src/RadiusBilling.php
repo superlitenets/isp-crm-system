@@ -1410,21 +1410,21 @@ class RadiusBilling {
         
         // Send Disconnect-Request directly to NAS (MikroTik) on port 3799
         // Using docker exec to run radclient from the freeradius container
-        $attrString = implode("\n", $attrs);
-        $command = sprintf(
+        $attrString = \implode("\n", $attrs);
+        $command = \sprintf(
             'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            escapeshellarg(sprintf(
+            \escapeshellarg(\sprintf(
                 'echo -e "%s" | radclient -x %s:3799 disconnect %s',
-                addslashes($attrString),
+                \addslashes($attrString),
                 $nasIp,
                 $nasSecret
             ))
         );
         
-        exec($command, $output, $returnCode);
-        $outputStr = implode("\n", $output);
+        \exec($command, $output, $returnCode);
+        $outputStr = \implode("\n", $output);
         
-        if ($returnCode === 0 && strpos($outputStr, 'Disconnect-ACK') !== false) {
+        if ($returnCode === 0 && \strpos($outputStr, 'Disconnect-ACK') !== false) {
             return ['success' => true, 'output' => $outputStr];
         }
         
@@ -1453,21 +1453,21 @@ class RadiusBilling {
         }
         
         // Send CoA directly to NAS on port 3799
-        $attrString = implode("\n", $attrs);
-        $command = sprintf(
+        $attrString = \implode("\n", $attrs);
+        $command = \sprintf(
             'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            escapeshellarg(sprintf(
+            \escapeshellarg(\sprintf(
                 'echo -e "%s" | radclient -x %s:3799 coa %s',
-                addslashes($attrString),
+                \addslashes($attrString),
                 $nas['ip_address'],
                 $nas['secret']
             ))
         );
         
-        exec($command, $output, $returnCode);
-        $outputStr = implode("\n", $output);
+        \exec($command, $output, $returnCode);
+        $outputStr = \implode("\n", $output);
         
-        if ($returnCode === 0 && strpos($outputStr, 'CoA-ACK') !== false) {
+        if ($returnCode === 0 && \strpos($outputStr, 'CoA-ACK') !== false) {
             return ['success' => true, 'output' => $outputStr];
         }
         
