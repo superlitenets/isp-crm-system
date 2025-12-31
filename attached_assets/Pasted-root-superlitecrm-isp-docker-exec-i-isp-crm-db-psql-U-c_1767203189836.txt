@@ -1,0 +1,37 @@
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "\d radius_packages"
+                                              Table "public.radius_packages"
+        Column         |            Type             | Collation | Nullable |                   Default
+-----------------------+-----------------------------+-----------+----------+---------------------------------------------
+ id                    | integer                     |           | not null | nextval('radius_packages_id_seq'::regclass)
+ name                  | character varying(100)      |           | not null |
+ description           | text                        |           |          |
+ package_type          | character varying(20)       |           |          | 'pppoe'::character varying
+ billing_type          | character varying(20)       |           |          | 'monthly'::character varying
+ price                 | numeric(10,2)               |           | not null | 0
+ validity_days         | integer                     |           |          | 30
+ data_quota_mb         | bigint                      |           |          |
+ download_speed        | character varying(20)       |           |          |
+ upload_speed          | character varying(20)       |           |          |
+ burst_download        | character varying(20)       |           |          |
+ burst_upload          | character varying(20)       |           |          |
+ burst_threshold       | character varying(20)       |           |          |
+ burst_time            | character varying(20)       |           |          |
+ priority              | integer                     |           |          | 8
+ address_pool          | character varying(100)      |           |          |
+ ip_binding            | boolean                     |           |          | false
+ simultaneous_sessions | integer                     |           |          | 1
+ fup_enabled           | boolean                     |           |          | false
+ fup_quota_mb          | bigint                      |           |          |
+ fup_download_speed    | character varying(20)       |           |          |
+ fup_upload_speed      | character varying(20)       |           |          |
+ is_active             | boolean                     |           |          | true
+ created_at            | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ updated_at            | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "radius_packages_pkey" PRIMARY KEY, btree (id)
+Referenced by:
+    TABLE "radius_billing" CONSTRAINT "radius_billing_package_id_fkey" FOREIGN KEY (package_id) REFERENCES radius_packages(id)
+    TABLE "radius_subscriptions" CONSTRAINT "radius_subscriptions_package_id_fkey" FOREIGN KEY (package_id) REFERENCES radius_packages(id)
+    TABLE "radius_vouchers" CONSTRAINT "radius_vouchers_package_id_fkey" FOREIGN KEY (package_id) REFERENCES radius_packages(id)
+
+root@superlitecrm:~/isp#
