@@ -1421,14 +1421,13 @@ class RadiusBilling {
             ))
         );
         
-        \exec($command, $output, $returnCode);
-        $outputStr = \implode("\n", $output);
+        $outputStr = \shell_exec($command) ?? '';
         
-        if ($returnCode === 0 && \strpos($outputStr, 'Disconnect-ACK') !== false) {
+        if (\strpos($outputStr, 'Disconnect-ACK') !== false) {
             return ['success' => true, 'output' => $outputStr];
         }
         
-        return ['success' => false, 'error' => $outputStr ?: 'Disconnect failed', 'return_code' => $returnCode];
+        return ['success' => false, 'error' => $outputStr ?: 'Disconnect failed'];
     }
     
     public function sendCoA(int $subscriptionId, array $attributes): array {
@@ -1464,14 +1463,13 @@ class RadiusBilling {
             ))
         );
         
-        \exec($command, $output, $returnCode);
-        $outputStr = \implode("\n", $output);
+        $outputStr = \shell_exec($command) ?? '';
         
-        if ($returnCode === 0 && \strpos($outputStr, 'CoA-ACK') !== false) {
+        if (\strpos($outputStr, 'CoA-ACK') !== false) {
             return ['success' => true, 'output' => $outputStr];
         }
         
-        return ['success' => false, 'error' => $outputStr ?: 'CoA failed', 'return_code' => $returnCode];
+        return ['success' => false, 'error' => $outputStr ?: 'CoA failed'];
     }
     
     // ==================== Reports ====================
