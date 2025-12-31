@@ -1354,43 +1354,124 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get active sessions
+        // Get active sessions with subscription username
         $stmt = $this->db->prepare("
-            SELECT rs.*, rn.ip_address as nas_ip, rn.secret as nas_secret
+            SELECT rs.acct_session_id, rs.framed_ip_address, rs.mac_address,
+                   sub.username, rn.ip_address as nas_ip, rn.secret as nas_secret
             FROM radius_sessions rs
             LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+            LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
             WHERE rs.subscription_id = ? AND rs.session_end IS NULL
         ");
         $stmt->execute([$subscriptionId]);
         $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         $disconnected = 0;
+        $errors = [];
         foreach ($sessions as $session) {
-            if ($this->sendCoADisconnect($session)) {
+            $result = $this->sendCoADisconnect($session);
+            if ($result['success']) {
                 $disconnected++;
+            } else {
+                $errors[] = $result['error'];
             }
         }
         
-        return ['success' => true, 'disconnected' => $disconnected];
+        return [
+            'success' => true, 
+            'disconnected' => $disconnected,
+            'total_sessions' => count($sessions),
+            'errors' => $errors
+        ];
     }
     
-    private function sendCoADisconnect(array $session): bool {
+    public function sendCoADisconnect(array $session): array {
         if (empty($session['nas_ip']) || empty($session['nas_secret'])) {
-            return false;
+            return ['success' => false, 'error' => 'Missing NAS IP or secret'];
         }
         
-        // Build CoA Disconnect-Request packet
-        // This requires radclient or custom RADIUS implementation
+        $nasIp = $session['nas_ip'];
+        $nasSecret = $session['nas_secret'];
+        $sessionId = $session['acct_session_id'] ?? '';
+        $username = $session['username'] ?? '';
+        
+        if (empty($sessionId) && empty($username)) {
+            return ['success' => false, 'error' => 'Missing session ID and username'];
+        }
+        
+        // Build attributes for radclient
+        $attrs = [];
+        if (!empty($sessionId)) {
+            $attrs[] = "Acct-Session-Id=" . $sessionId;
+        }
+        if (!empty($username)) {
+            $attrs[] = "User-Name=" . $username;
+        }
+        
+        // Send Disconnect-Request directly to NAS (MikroTik) on port 3799
+        // Using docker exec to run radclient from the freeradius container
+        $attrString = implode("\n", $attrs);
         $command = sprintf(
-            'echo "Acct-Session-Id=%s,User-Name=%s" | radclient -x %s:3799 disconnect %s 2>&1',
-            escapeshellarg($session['session_id']),
-            escapeshellarg($session['username'] ?? ''),
-            escapeshellarg($session['nas_ip']),
-            escapeshellarg($session['nas_secret'])
+            'docker exec isp_crm_freeradius bash -c %s 2>&1',
+            escapeshellarg(sprintf(
+                'echo -e "%s" | radclient -x %s:3799 disconnect %s',
+                addslashes($attrString),
+                $nasIp,
+                $nasSecret
+            ))
         );
         
         exec($command, $output, $returnCode);
-        return $returnCode === 0;
+        $outputStr = implode("\n", $output);
+        
+        if ($returnCode === 0 && strpos($outputStr, 'Disconnect-ACK') !== false) {
+            return ['success' => true, 'output' => $outputStr];
+        }
+        
+        return ['success' => false, 'error' => $outputStr ?: 'Disconnect failed', 'return_code' => $returnCode];
+    }
+    
+    public function sendCoA(int $subscriptionId, array $attributes): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        // Get NAS info
+        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+        $stmt->execute([$sub['nas_id']]);
+        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Build CoA attributes
+        $attrs = ["User-Name=" . $sub['username']];
+        foreach ($attributes as $key => $value) {
+            $attrs[] = "$key=$value";
+        }
+        
+        // Send CoA directly to NAS on port 3799
+        $attrString = implode("\n", $attrs);
+        $command = sprintf(
+            'docker exec isp_crm_freeradius bash -c %s 2>&1',
+            escapeshellarg(sprintf(
+                'echo -e "%s" | radclient -x %s:3799 coa %s',
+                addslashes($attrString),
+                $nas['ip_address'],
+                $nas['secret']
+            ))
+        );
+        
+        exec($command, $output, $returnCode);
+        $outputStr = implode("\n", $output);
+        
+        if ($returnCode === 0 && strpos($outputStr, 'CoA-ACK') !== false) {
+            return ['success' => true, 'output' => $outputStr];
+        }
+        
+        return ['success' => false, 'error' => $outputStr ?: 'CoA failed', 'return_code' => $returnCode];
     }
     
     // ==================== Reports ====================

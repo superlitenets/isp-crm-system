@@ -310,9 +310,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'disconnect_session':
             $sessionId = (int)$_POST['session_id'];
             try {
+                // Get session details for CoA
+                $stmt = $db->prepare("
+                    SELECT rs.acct_session_id, rs.framed_ip_address, rs.mac_address,
+                           sub.username, rn.ip_address as nas_ip, rn.secret as nas_secret
+                    FROM radius_sessions rs
+                    LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
+                    LEFT JOIN radius_subscriptions sub ON rs.subscription_id = sub.id
+                    WHERE rs.id = ?
+                ");
+                $stmt->execute([$sessionId]);
+                $session = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($session && !empty($session['nas_ip'])) {
+                    // Send CoA Disconnect to NAS
+                    $coaResult = $radiusBilling->sendCoADisconnect($session);
+                    if ($coaResult['success']) {
+                        $message = 'Session disconnected via CoA';
+                    } else {
+                        $message = 'CoA sent (NAS response: ' . ($coaResult['error'] ?? 'unknown') . ')';
+                    }
+                } else {
+                    $message = 'Session marked as disconnected (no NAS available for CoA)';
+                }
+                
+                // Update database regardless
                 $stmt = $db->prepare("UPDATE radius_sessions SET session_end = CURRENT_TIMESTAMP, terminate_cause = 'Admin-Reset' WHERE id = ?");
                 $stmt->execute([$sessionId]);
-                $message = 'Session disconnected';
                 $messageType = 'success';
             } catch (Exception $e) {
                 $message = 'Error disconnecting session: ' . $e->getMessage();
