@@ -4094,14 +4094,18 @@ try {
     function openRouterPage(ip) {
         const modal = new bootstrap.Modal(document.getElementById('routerBrowserModal'));
         document.getElementById('routerBrowserTitle').textContent = 'Router: ' + ip;
-        document.getElementById('routerBrowserFrame').src = 'http://' + ip;
+        const proxyUrl = '/router-proxy.php?url=' + encodeURIComponent('http://' + ip);
+        document.getElementById('routerBrowserFrame').src = proxyUrl;
         document.getElementById('routerBrowserAddress').value = 'http://' + ip;
+        document.getElementById('routerBrowserAddress').dataset.ip = ip;
         modal.show();
     }
     
     function navigateRouterBrowser() {
-        const url = document.getElementById('routerBrowserAddress').value;
-        document.getElementById('routerBrowserFrame').src = url;
+        const addressBar = document.getElementById('routerBrowserAddress');
+        const url = addressBar.value;
+        const proxyUrl = '/router-proxy.php?url=' + encodeURIComponent(url);
+        document.getElementById('routerBrowserFrame').src = proxyUrl;
     }
     
     function refreshRouterBrowser() {
