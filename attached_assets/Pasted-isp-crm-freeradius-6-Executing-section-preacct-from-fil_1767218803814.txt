@@ -1,0 +1,199 @@
+isp_crm_freeradius      | (6) # Executing section preacct from file /etc/freerad                                                                                        ius/sites-enabled/default
+isp_crm_freeradius      | (6)   preacct {
+isp_crm_freeradius      | (6)     [preprocess] = ok
+isp_crm_freeradius      | (6) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (6) suffix: No '@' in User-Name = "SFL001", looking up                                                                                         realm NULL
+isp_crm_freeradius      | (6) suffix: No such realm "NULL"
+isp_crm_freeradius      | (6)     [suffix] = noop
+isp_crm_freeradius      | (6)     [files] = noop
+isp_crm_freeradius      | (6)   } # preacct = ok
+isp_crm_freeradius      | (6) # Executing section accounting from file /etc/free                                                                                        radius/sites-enabled/default
+isp_crm_freeradius      | (6)   accounting {
+isp_crm_freeradius      | (6) detail: EXPAND /var/log/freeradius/radacct/%{%{Pac                                                                                        ket-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (6) detail:    --> /var/log/freeradius/radacct/10.200.                                                                                        0.5/detail-20251231
+isp_crm_freeradius      | (6) detail: /var/log/freeradius/radacct/%{%{Packet-Src                                                                                        -IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/free                                                                                        radius/radacct/10.200.0.5/detail-20251231
+isp_crm_freeradius      | (6) detail: EXPAND %t
+isp_crm_freeradius      | (6) detail:    --> Wed Dec 31 21:57:36 2025
+isp_crm_freeradius      | (6)     [detail] = ok
+isp_crm_freeradius      | (6)     [unix] = noop
+isp_crm_freeradius      | (6) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.que                                                                                        ry}
+isp_crm_freeradius      | (6) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (6) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (8)
+isp_crm_freeradius      | (6) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name                                                                                        }:-DEFAULT}}
+isp_crm_freeradius      | (6) sql:    --> SFL001
+isp_crm_freeradius      | (6) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (6) sql: EXPAND UPDATE radius_sessions SET input_octet                                                                                        s = '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octet                                                                                        s}:-0}'::bigint, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294                                                                                        967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, framed_ip_address = COALESCE(NUL                                                                                        LIF('%{Framed-IP-Address}', ''), framed_ip_address) WHERE acct_session_id = '%{A                                                                                        cct-Session-Id}' AND session_end IS NULL
+isp_crm_freeradius      | (6) sql:    --> UPDATE radius_sessions SET input_octet                                                                                        s = '0'::bigint * 4294967296 + '2620'::bigint, output_octets = '0'::bigint * 429                                                                                        4967296 + '29295'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.255.255',                                                                                         ''), framed_ip_address) WHERE acct_session_id = '81c002b1' AND session_end IS NU                                                                                        LL
+isp_crm_freeradius      | (6) sql: Executing query: UPDATE radius_sessions SET i                                                                                        nput_octets = '0'::bigint * 4294967296 + '2620'::bigint, output_octets = '0'::bi                                                                                        gint * 4294967296 + '29295'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.                                                                                        255.255', ''), framed_ip_address) WHERE acct_session_id = '81c002b1' AND session                                                                                        _end IS NULL
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (6) sql: SQL query returned: success
+isp_crm_freeradius      | (6) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (8)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (10), 1 o                                                                                        f 28 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbnam                                                                                        e='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server                                                                                         version 150015, protocol version 3, backend PID 1152
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (9) - Hit id                                                                                        le_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing                                                                                         socket
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (7) - Hit id                                                                                        le_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing                                                                                         socket
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (1) - Hit id                                                                                        le_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing                                                                                         socket
+isp_crm_freeradius      | (6)     [sql] = ok
+isp_crm_freeradius      | (6)     [exec] = noop
+isp_crm_freeradius      | (6) attr_filter.accounting_response: EXPAND %{User-Nam                                                                                        e}
+isp_crm_freeradius      | (6) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (6) attr_filter.accounting_response: Matched entry DEF                                                                                        AULT at line 12
+isp_crm_freeradius      | (6)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (6)   } # accounting = updated
+isp_crm_freeradius      | (6) Sent Accounting-Response Id 205 from 172.18.0.4:18                                                                                        13 to 10.200.0.5:44183 length 20
+isp_crm_freeradius      | (6) Finished request
+isp_crm_freeradius      | (6) Cleaning up request packet ID 205 with timestamp +                                                                                        569 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (7) Received Accounting-Request Id 206 from 10.200.0.5                                                                                        :41622 to 172.18.0.4:1813 length 241
+isp_crm_freeradius      | (7)   Service-Type = Framed-User
+isp_crm_freeradius      | (7)   Framed-Protocol = PPP
+isp_crm_freeradius      | (7)   NAS-Port = 15729329
+isp_crm_freeradius      | (7)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (7)   User-Name = "SFL001"
+isp_crm_freeradius      | (7)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (7)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (7)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (7)   Acct-Session-Id = "81c002b1"
+isp_crm_freeradius      | (7)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (7)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (7)   Event-Timestamp = "Dec 31 2025 22:02:35 UTC"
+isp_crm_freeradius      | (7)   Acct-Session-Time = 600
+isp_crm_freeradius      | (7)   Idle-Timeout = 0
+isp_crm_freeradius      | (7)   Session-Timeout = 2592000
+isp_crm_freeradius      | (7)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (7)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (7)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (7)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (7)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (7)   Acct-Input-Octets = 4300
+isp_crm_freeradius      | (7)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (7)   Acct-Input-Packets = 55
+isp_crm_freeradius      | (7)   Acct-Output-Octets = 31407
+isp_crm_freeradius      | (7)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (7)   Acct-Output-Packets = 267
+isp_crm_freeradius      | (7)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (7)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (7)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (7)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (7) # Executing section preacct from file /etc/freerad                                                                                        ius/sites-enabled/default
+isp_crm_freeradius      | (7)   preacct {
+isp_crm_freeradius      | (7)     [preprocess] = ok
+isp_crm_freeradius      | (7) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (7) suffix: No '@' in User-Name = "SFL001", looking up                                                                                         realm NULL
+isp_crm_freeradius      | (7) suffix: No such realm "NULL"
+isp_crm_freeradius      | (7)     [suffix] = noop
+isp_crm_freeradius      | (7)     [files] = noop
+isp_crm_freeradius      | (7)   } # preacct = ok
+isp_crm_freeradius      | (7) # Executing section accounting from file /etc/free                                                                                        radius/sites-enabled/default
+isp_crm_freeradius      | (7)   accounting {
+isp_crm_freeradius      | (7) detail: EXPAND /var/log/freeradius/radacct/%{%{Pac                                                                                        ket-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (7) detail:    --> /var/log/freeradius/radacct/10.200.                                                                                        0.5/detail-20251231
+isp_crm_freeradius      | (7) detail: /var/log/freeradius/radacct/%{%{Packet-Src                                                                                        -IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/free                                                                                        radius/radacct/10.200.0.5/detail-20251231
+isp_crm_freeradius      | (7) detail: EXPAND %t
+isp_crm_freeradius      | (7) detail:    --> Wed Dec 31 22:02:36 2025
+isp_crm_freeradius      | (7)     [detail] = ok
+isp_crm_freeradius      | (7)     [unix] = noop
+isp_crm_freeradius      | (7) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.que                                                                                        ry}
+isp_crm_freeradius      | (7) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (7) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (8)
+isp_crm_freeradius      | (7) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name                                                                                        }:-DEFAULT}}
+isp_crm_freeradius      | (7) sql:    --> SFL001
+isp_crm_freeradius      | (7) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (7) sql: EXPAND UPDATE radius_sessions SET input_octet                                                                                        s = '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octet                                                                                        s}:-0}'::bigint, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294                                                                                        967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, framed_ip_address = COALESCE(NUL                                                                                        LIF('%{Framed-IP-Address}', ''), framed_ip_address) WHERE acct_session_id = '%{A                                                                                        cct-Session-Id}' AND session_end IS NULL
+isp_crm_freeradius      | (7) sql:    --> UPDATE radius_sessions SET input_octet                                                                                        s = '0'::bigint * 4294967296 + '4300'::bigint, output_octets = '0'::bigint * 429                                                                                        4967296 + '31407'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.255.255',                                                                                         ''), framed_ip_address) WHERE acct_session_id = '81c002b1' AND session_end IS NU                                                                                        LL
+isp_crm_freeradius      | (7) sql: Executing query: UPDATE radius_sessions SET i                                                                                        nput_octets = '0'::bigint * 4294967296 + '4300'::bigint, output_octets = '0'::bi                                                                                        gint * 4294967296 + '31407'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.                                                                                        255.255', ''), framed_ip_address) WHERE acct_session_id = '81c002b1' AND session                                                                                        _end IS NULL
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 0
+isp_crm_freeradius      | (7) sql: SQL query returned: success
+isp_crm_freeradius      | (7) sql: 0 record(s) updated
+isp_crm_freeradius      | (7) sql: No additional queries configured
+isp_crm_freeradius      | rlm_sql (sql): Released connection (8)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (11), 1 o                                                                                        f 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbnam                                                                                        e='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server                                                                                         version 150015, protocol version 3, backend PID 1225
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (10) - Hit i                                                                                        dle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing                                                                                         socket
+isp_crm_freeradius      | (7)     [sql] = noop
+isp_crm_freeradius      | (7)     [exec] = noop
+isp_crm_freeradius      | (7) attr_filter.accounting_response: EXPAND %{User-Nam                                                                                        e}
+isp_crm_freeradius      | (7) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (7) attr_filter.accounting_response: Matched entry DEF                                                                                        AULT at line 12
+isp_crm_freeradius      | (7)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (7)   } # accounting = updated
+isp_crm_freeradius      | (7) Sent Accounting-Response Id 206 from 172.18.0.4:18                                                                                        13 to 10.200.0.5:41622 length 20
+isp_crm_freeradius      | (7) Finished request
+isp_crm_freeradius      | (7) Cleaning up request packet ID 206 with timestamp +                                                                                        869 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (8) Received Accounting-Request Id 207 from 10.200.0.5                                                                                        :60122 to 172.18.0.4:1813 length 247
+isp_crm_freeradius      | (8)   Service-Type = Framed-User
+isp_crm_freeradius      | (8)   Framed-Protocol = PPP
+isp_crm_freeradius      | (8)   NAS-Port = 15729329
+isp_crm_freeradius      | (8)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (8)   User-Name = "SFL001"
+isp_crm_freeradius      | (8)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (8)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (8)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (8)   Acct-Session-Id = "81c002b1"
+isp_crm_freeradius      | (8)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (8)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (8)   Event-Timestamp = "Dec 31 2025 22:03:19 UTC"
+isp_crm_freeradius      | (8)   Acct-Session-Time = 643
+isp_crm_freeradius      | (8)   Idle-Timeout = 0
+isp_crm_freeradius      | (8)   Session-Timeout = 2592000
+isp_crm_freeradius      | (8)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (8)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (8)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (8)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (8)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (8)   Acct-Input-Octets = 4552
+isp_crm_freeradius      | (8)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (8)   Acct-Input-Packets = 58
+isp_crm_freeradius      | (8)   Acct-Output-Octets = 31659
+isp_crm_freeradius      | (8)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (8)   Acct-Output-Packets = 270
+isp_crm_freeradius      | (8)   Acct-Status-Type = Stop
+isp_crm_freeradius      | (8)   Acct-Terminate-Cause = User-Request
+isp_crm_freeradius      | (8)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (8)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (8)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (8) # Executing section preacct from file /etc/freerad                                                                                        ius/sites-enabled/default
+isp_crm_freeradius      | (8)   preacct {
+isp_crm_freeradius      | (8)     [preprocess] = ok
+isp_crm_freeradius      | (8) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (8) suffix: No '@' in User-Name = "SFL001", looking up                                                                                         realm NULL
+isp_crm_freeradius      | (8) suffix: No such realm "NULL"
+isp_crm_freeradius      | (8)     [suffix] = noop
+isp_crm_freeradius      | (8)     [files] = noop
+isp_crm_freeradius      | (8)   } # preacct = ok
+isp_crm_freeradius      | (8) # Executing section accounting from file /etc/free                                                                                        radius/sites-enabled/default
+isp_crm_freeradius      | (8)   accounting {
+isp_crm_freeradius      | (8) detail: EXPAND /var/log/freeradius/radacct/%{%{Pac                                                                                        ket-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (8) detail:    --> /var/log/freeradius/radacct/10.200.                                                                                        0.5/detail-20251231
+isp_crm_freeradius      | (8) detail: /var/log/freeradius/radacct/%{%{Packet-Src                                                                                        -IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/free                                                                                        radius/radacct/10.200.0.5/detail-20251231
+isp_crm_freeradius      | (8) detail: EXPAND %t
+isp_crm_freeradius      | (8) detail:    --> Wed Dec 31 22:03:19 2025
+isp_crm_freeradius      | (8)     [detail] = ok
+isp_crm_freeradius      | (8)     [unix] = ok
+isp_crm_freeradius      | (8) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.que                                                                                        ry}
+isp_crm_freeradius      | (8) sql:    --> type.stop.query
+isp_crm_freeradius      | (8) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (8)
+isp_crm_freeradius      | (8) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name                                                                                        }:-DEFAULT}}
+isp_crm_freeradius      | (8) sql:    --> SFL001
+isp_crm_freeradius      | (8) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (8) sql: EXPAND UPDATE radius_sessions SET session_end                                                                                         = NOW(), terminate_cause = '%{Acct-Terminate-Cause}', input_octets = '%{%{Acct-                                                                                        Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigin                                                                                        t, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{                                                                                        Acct-Output-Octets}:-0}'::bigint WHERE acct_session_id = '%{Acct-Session-Id}'
+isp_crm_freeradius      | (8) sql:    --> UPDATE radius_sessions SET session_end                                                                                         = NOW(), terminate_cause = 'User-Request', input_octets = '0'::bigint * 4294967                                                                                        296 + '4552'::bigint, output_octets = '0'::bigint * 4294967296 + '31659'::bigint                                                                                         WHERE acct_session_id = '81c002b1'
+isp_crm_freeradius      | (8) sql: Executing query: UPDATE radius_sessions SET s                                                                                        ession_end = NOW(), terminate_cause = 'User-Request', input_octets = '0'::bigint                                                                                         * 4294967296 + '4552'::bigint, output_octets = '0'::bigint * 4294967296 + '3165                                                                                        9'::bigint WHERE acct_session_id = '81c002b1'
