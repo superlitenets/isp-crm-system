@@ -1,0 +1,23 @@
+root@superlitecrm:~/isp# docker logs isp_crm_freeradius 2>&1 | tail -20
+(24) sql:    --> SELECT rs.id, rs.username, CASE WHEN rp.download_speed > 0 THEN 'Mikrotik-Rate-Limit' ELSE NULL END as attribute, CASE WHEN rp.download_speed > 0 THEN CONCAT(rp.upload_speed::text, 'M/', rp.download_speed::text, 'M') ELSE NULL END as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rp.download_speed > 0 UNION ALL SELECT rs.id, rs.username, 'Session-Timeout' as attribute, CASE WHEN rp.validity_value > 0 THEN (rp.validity_value * CASE rp.validity_unit WHEN 'hours' THEN 3600 WHEN 'days' THEN 86400 WHEN 'weeks' THEN 604800 WHEN 'months' THEN 2592000 ELSE 86400 END )::text ELSE '86400' END as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) UNION ALL SELECT rs.id, rs.username, 'Simultaneous-Use' as attribute, rp.max_sessions::text as value, ':=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rp.max_sessions > 0 UNION ALL SELECT rs.id, rs.username, 'Framed-IP-Address' as attribute, rs.static_ip as value, '=' as op FROM radius_subscriptions rs WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rs.static_ip IS NOT NULL AND rs.static_ip != ''
+(24) sql: Executing select query: SELECT rs.id, rs.username, CASE WHEN rp.download_speed > 0 THEN 'Mikrotik-Rate-Limit' ELSE NULL END as attribute, CASE WHEN rp.download_speed > 0 THEN CONCAT(rp.upload_speed::text, 'M/', rp.download_speed::text, 'M') ELSE NULL END as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rp.download_speed > 0 UNION ALL SELECT rs.id, rs.username, 'Session-Timeout' as attribute, CASE WHEN rp.validity_value > 0 THEN (rp.validity_value * CASE rp.validity_unit WHEN 'hours' THEN 3600 WHEN 'days' THEN 86400 WHEN 'weeks' THEN 604800 WHEN 'months' THEN 2592000 ELSE 86400 END )::text ELSE '86400' END as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) UNION ALL SELECT rs.id, rs.username, 'Simultaneous-Use' as attribute, rp.max_sessions::text as value, ':=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rp.max_sessions > 0 UNION ALL SELECT rs.id, rs.username, 'Framed-IP-Address' as attribute, rs.static_ip as value, '=' as op FROM radius_subscriptions rs WHERE rs.username = 'SFL001' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rs.static_ip IS NOT NULL AND rs.static_ip != ''
+rlm_sql_postgresql: Status: PGRES_FATAL_ERROR
+rlm_sql_postgresql: 42883: UNDEFINED FUNCTION
+(24) sql: ERROR: rlm_sql_postgresql: ERROR:  operator does not exist: character varying > integer
+(24) sql: ERROR: rlm_sql_postgresql: LINE 1: ...T rs.id, rs.username, CASE WHEN rp.download_speed > 0 THEN '...
+(24) sql: ERROR: rlm_sql_postgresql:                                                              ^
+(24) sql: ERROR: rlm_sql_postgresql: HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+(24) sql: ERROR: SQL query error getting reply attributes
+rlm_sql (sql): Released connection (9)
+(24)     [sql] = fail
+(24)   } # authorize = fail
+(24) Invalid user (sql: rlm_sql_postgresql: ERROR:  operator does not exist: character varying > integer): [SFL001/SFL001] (from client vpn_clients port 15731144 cli D8:32:14:2C:B5:00)
+(24) Using Post-Auth-Type Reject
+(24) Post-Auth-Type sub-section not found.  Ignoring.
+(24) # Executing group from file /etc/freeradius/sites-enabled/default
+(24) Login incorrect (sql: rlm_sql_postgresql: ERROR:  operator does not exist: character varying > integer): [SFL001/SFL001] (from client vpn_clients port 15731144 cli D8:32:14:2C:B5:00)
+(24) Delaying response for 1.000000 seconds
+Waking up in 0.3 seconds.
+Waking up in 0.6 seconds.
+root@superlitecrm:~/isp#
+
