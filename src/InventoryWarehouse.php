@@ -57,7 +57,7 @@ class InventoryWarehouse {
     public function createWarehouse(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO inventory_warehouses (name, code, type, address, phone, manager_id, is_active, notes)
-            VALUES (:name, :code, :type, :address, :phone, :manager_id, :is_active, :notes)
+            VALUES (:name, :code, :type, :address, :phone, :manager_id, :is_active::boolean, :notes)
             RETURNING id
         ");
         $stmt->execute([
@@ -67,7 +67,7 @@ class InventoryWarehouse {
             'address' => $data['address'] ?? null,
             'phone' => $data['phone'] ?? null,
             'manager_id' => $data['manager_id'] ?: null,
-            'is_active' => $data['is_active'] ?? true,
+            'is_active' => isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true'),
             'notes' => $data['notes'] ?? null
         ]);
         return (int) $stmt->fetchColumn();
@@ -82,7 +82,7 @@ class InventoryWarehouse {
                 address = :address,
                 phone = :phone,
                 manager_id = :manager_id,
-                is_active = :is_active,
+                is_active = :is_active::boolean,
                 notes = :notes,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
@@ -95,7 +95,7 @@ class InventoryWarehouse {
             'address' => $data['address'] ?? null,
             'phone' => $data['phone'] ?? null,
             'manager_id' => $data['manager_id'] ?: null,
-            'is_active' => $data['is_active'] ?? true,
+            'is_active' => isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true'),
             'notes' => $data['notes'] ?? null
         ]);
     }

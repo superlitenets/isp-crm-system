@@ -227,7 +227,7 @@ class TicketCommission {
     private function createEarning(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO ticket_earnings (ticket_id, employee_id, team_id, category, full_rate, earned_amount, share_count, currency, status, sla_compliant, sla_note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?::boolean, ?)
         ");
         
         $stmt->execute([
@@ -239,7 +239,7 @@ class TicketCommission {
             $data['earned_amount'],
             $data['share_count'],
             $data['currency'],
-            $data['sla_compliant'] ?? true,
+            isset($data['sla_compliant']) && !empty($data['sla_compliant']) ? 'true' : (isset($data['sla_compliant']) ? 'false' : 'true'),
             $data['sla_note'] ?? null
         ]);
         

@@ -161,14 +161,14 @@ class Settings {
     public function createTemplate(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO ticket_templates (name, category, subject, content, is_active, created_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?::boolean, ?)
         ");
         $stmt->execute([
             $data['name'],
             $data['category'] ?? null,
             $data['subject'] ?? null,
             $data['content'],
-            isset($data['is_active']) ? 1 : 1,
+            'true',
             $data['created_by'] ?? null
         ]);
         return (int) $this->db->lastInsertId();
@@ -177,7 +177,7 @@ class Settings {
     public function updateTemplate(int $id, array $data): bool {
         $stmt = $this->db->prepare("
             UPDATE ticket_templates SET 
-                name = ?, category = ?, subject = ?, content = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+                name = ?, category = ?, subject = ?, content = ?, is_active = ?::boolean, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
         return $stmt->execute([
@@ -185,7 +185,7 @@ class Settings {
             $data['category'] ?? null,
             $data['subject'] ?? null,
             $data['content'],
-            isset($data['is_active']) ? 1 : 0,
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : 'false',
             $id
         ]);
     }
@@ -423,7 +423,7 @@ class Settings {
         
         $stmt = $this->db->prepare("
             INSERT INTO service_packages (name, slug, description, speed, speed_unit, price, currency, billing_cycle, features, is_popular, is_active, display_order, badge_text, badge_color, icon)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?::boolean, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['name'],
@@ -435,8 +435,8 @@ class Settings {
             $data['currency'] ?? 'KES',
             $data['billing_cycle'] ?? 'monthly',
             $features,
-            isset($data['is_popular']) ? 1 : 0,
-            isset($data['is_active']) ? 1 : 1,
+            isset($data['is_popular']) && !empty($data['is_popular']) ? 'true' : 'false',
+            'true',
             $data['display_order'] ?? 0,
             $data['badge_text'] ?? null,
             $data['badge_color'] ?? null,
@@ -451,7 +451,7 @@ class Settings {
         $stmt = $this->db->prepare("
             UPDATE service_packages SET
                 name = ?, description = ?, speed = ?, speed_unit = ?, price = ?, currency = ?,
-                billing_cycle = ?, features = ?, is_popular = ?, is_active = ?, display_order = ?,
+                billing_cycle = ?, features = ?, is_popular = ?::boolean, is_active = ?::boolean, display_order = ?,
                 badge_text = ?, badge_color = ?, icon = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
@@ -464,8 +464,8 @@ class Settings {
             $data['currency'] ?? 'KES',
             $data['billing_cycle'] ?? 'monthly',
             $features,
-            isset($data['is_popular']) ? 1 : 0,
-            isset($data['is_active']) ? 1 : 0,
+            isset($data['is_popular']) && !empty($data['is_popular']) ? 'true' : 'false',
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : 'false',
             $data['display_order'] ?? 0,
             $data['badge_text'] ?? null,
             $data['badge_color'] ?? null,

@@ -12,7 +12,7 @@ class Branch {
     public function create(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO branches (name, code, address, phone, email, whatsapp_group, manager_id, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?::boolean)
         ");
         $stmt->execute([
             $data['name'],
@@ -22,7 +22,7 @@ class Branch {
             $data['email'] ?? null,
             $data['whatsapp_group'] ?? null,
             $data['manager_id'] ?? null,
-            isset($data['is_active']) ? ($data['is_active'] ? 1 : 0) : 1
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true')
         ]);
         return (int) $this->db->lastInsertId();
     }
@@ -31,7 +31,7 @@ class Branch {
         $stmt = $this->db->prepare("
             UPDATE branches SET
                 name = ?, code = ?, address = ?, phone = ?, email = ?,
-                whatsapp_group = ?, manager_id = ?, is_active = ?,
+                whatsapp_group = ?, manager_id = ?, is_active = ?::boolean,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
@@ -43,7 +43,7 @@ class Branch {
             $data['email'] ?? null,
             $data['whatsapp_group'] ?? null,
             $data['manager_id'] ?? null,
-            isset($data['is_active']) ? ($data['is_active'] ? 1 : 0) : 1,
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true'),
             $id
         ]);
     }

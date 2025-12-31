@@ -246,13 +246,13 @@ class HRNotification {
     public function updateTemplate(int $id, array $data): bool {
         $stmt = $this->db->prepare("
             UPDATE hr_notification_templates 
-            SET sms_template = ?, is_active = ?, send_sms = ?, updated_at = CURRENT_TIMESTAMP
+            SET sms_template = ?, is_active = ?::boolean, send_sms = ?::boolean, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
         return $stmt->execute([
             $data['sms_template'],
-            !empty($data['is_active']),
-            !empty($data['send_sms']),
+            !empty($data['is_active']) ? 'true' : 'false',
+            !empty($data['send_sms']) ? 'true' : 'false',
             $id
         ]);
     }

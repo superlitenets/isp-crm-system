@@ -49,7 +49,7 @@ class SLA {
     public function createPolicy(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO sla_policies (name, description, priority, response_time_hours, resolution_time_hours, escalation_time_hours, escalation_to, notify_on_breach, is_active, is_default)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?::boolean, ?::boolean, ?::boolean)
         ");
         
         $stmt->execute([
@@ -60,9 +60,9 @@ class SLA {
             (int)$data['resolution_time_hours'],
             !empty($data['escalation_time_hours']) ? (int)$data['escalation_time_hours'] : null,
             !empty($data['escalation_to']) ? (int)$data['escalation_to'] : null,
-            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? true : false,
-            !empty($data['is_active']) && $data['is_active'] !== '0' ? true : false,
-            !empty($data['is_default']) && $data['is_default'] !== '0' ? true : false
+            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? 'true' : 'false',
+            !empty($data['is_active']) && $data['is_active'] !== '0' ? 'true' : 'false',
+            !empty($data['is_default']) && $data['is_default'] !== '0' ? 'true' : 'false'
         ]);
         
         return (int)$this->db->lastInsertId();
@@ -74,7 +74,7 @@ class SLA {
                 name = ?, description = ?, priority = ?, 
                 response_time_hours = ?, resolution_time_hours = ?, 
                 escalation_time_hours = ?, escalation_to = ?, 
-                notify_on_breach = ?, is_active = ?, is_default = ?,
+                notify_on_breach = ?::boolean, is_active = ?::boolean, is_default = ?::boolean,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
@@ -87,9 +87,9 @@ class SLA {
             (int)$data['resolution_time_hours'],
             !empty($data['escalation_time_hours']) ? (int)$data['escalation_time_hours'] : null,
             !empty($data['escalation_to']) ? (int)$data['escalation_to'] : null,
-            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? true : false,
-            !empty($data['is_active']) && $data['is_active'] !== '0' ? true : false,
-            !empty($data['is_default']) && $data['is_default'] !== '0' ? true : false,
+            !empty($data['notify_on_breach']) && $data['notify_on_breach'] !== '0' ? 'true' : 'false',
+            !empty($data['is_active']) && $data['is_active'] !== '0' ? 'true' : 'false',
+            !empty($data['is_default']) && $data['is_default'] !== '0' ? 'true' : 'false',
             $id
         ]);
     }
@@ -110,7 +110,7 @@ class SLA {
         try {
             $stmt = $this->db->prepare("
                 UPDATE sla_business_hours SET 
-                    start_time = ?, end_time = ?, is_working_day = ?
+                    start_time = ?, end_time = ?, is_working_day = ?::boolean
                 WHERE day_of_week = ?
             ");
             
@@ -118,7 +118,7 @@ class SLA {
                 $stmt->execute([
                     $dayHours['start_time'],
                     $dayHours['end_time'],
-                    (bool)$dayHours['is_working_day'],
+                    !empty($dayHours['is_working_day']) ? 'true' : 'false',
                     (int)$dayHours['day_of_week']
                 ]);
             }

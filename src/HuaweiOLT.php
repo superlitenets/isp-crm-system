@@ -8027,7 +8027,7 @@ class HuaweiOLT {
                 INSERT INTO huawei_service_templates 
                 (name, description, downstream_bandwidth, upstream_bandwidth, bandwidth_unit, 
                  vlan_id, vlan_mode, qos_profile, iptv_enabled, voip_enabled, tr069_enabled, is_default)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?::boolean, ?::boolean, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -8038,10 +8038,10 @@ class HuaweiOLT {
                 $data['vlan_id'] ?? null,
                 $data['vlan_mode'] ?? 'tag',
                 $data['qos_profile'] ?? '',
-                $data['iptv_enabled'] ?? false,
-                $data['voip_enabled'] ?? false,
-                $data['tr069_enabled'] ?? false,
-                $data['is_default'] ?? false
+                !empty($data['iptv_enabled']) ? 'true' : 'false',
+                !empty($data['voip_enabled']) ? 'true' : 'false',
+                !empty($data['tr069_enabled']) ? 'true' : 'false',
+                !empty($data['is_default']) ? 'true' : 'false'
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -8055,7 +8055,7 @@ class HuaweiOLT {
                 UPDATE huawei_service_templates SET
                     name = ?, description = ?, downstream_bandwidth = ?, upstream_bandwidth = ?,
                     bandwidth_unit = ?, vlan_id = ?, vlan_mode = ?, qos_profile = ?,
-                    iptv_enabled = ?, voip_enabled = ?, tr069_enabled = ?, is_default = ?,
+                    iptv_enabled = ?::boolean, voip_enabled = ?::boolean, tr069_enabled = ?::boolean, is_default = ?::boolean,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
@@ -8068,10 +8068,10 @@ class HuaweiOLT {
                 $data['vlan_id'] ?? null,
                 $data['vlan_mode'] ?? 'tag',
                 $data['qos_profile'] ?? '',
-                $data['iptv_enabled'] ?? false,
-                $data['voip_enabled'] ?? false,
-                $data['tr069_enabled'] ?? false,
-                $data['is_default'] ?? false,
+                !empty($data['iptv_enabled']) ? 'true' : 'false',
+                !empty($data['voip_enabled']) ? 'true' : 'false',
+                !empty($data['tr069_enabled']) ? 'true' : 'false',
+                !empty($data['is_default']) ? 'true' : 'false',
                 $id
             ]);
             return ['success' => true];

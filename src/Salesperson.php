@@ -68,7 +68,7 @@ class Salesperson {
     public function create(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO salespersons (employee_id, user_id, name, email, phone, commission_type, commission_value, is_active, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?::boolean, ?)
             RETURNING id
         ");
         $stmt->execute([
@@ -79,7 +79,7 @@ class Salesperson {
             $data['phone'],
             $data['commission_type'] ?? 'percentage',
             $data['commission_value'] ?? 0,
-            isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true'),
             $data['notes'] ?? null
         ]);
         return (int) $stmt->fetchColumn();
@@ -89,7 +89,7 @@ class Salesperson {
         $stmt = $this->db->prepare("
             UPDATE salespersons 
             SET name = ?, email = ?, phone = ?, commission_type = ?, commission_value = ?,
-                employee_id = ?, user_id = ?, is_active = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                employee_id = ?, user_id = ?, is_active = ?::boolean, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
         return $stmt->execute([
@@ -100,7 +100,7 @@ class Salesperson {
             $data['commission_value'] ?? 0,
             $data['employee_id'] ?: null,
             $data['user_id'] ?: null,
-            isset($data['is_active']) ? ($data['is_active'] ? true : false) : true,
+            isset($data['is_active']) && !empty($data['is_active']) ? 'true' : (isset($data['is_active']) ? 'false' : 'true'),
             $data['notes'] ?? null,
             $id
         ]);

@@ -102,10 +102,13 @@ class WireGuardService {
             $defaultPostUp = 'iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE';
             $defaultPostDown = 'iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE';
             
+            $enabled = !empty($data['enabled']) ? 'true' : 'false';
+            if (!isset($data['enabled'])) $enabled = 'true';
+            
             $stmt = $this->db->prepare("
                 INSERT INTO wireguard_servers 
                 (name, interface_name, interface_addr, listen_port, public_key, private_key_encrypted, mtu, dns_servers, post_up_cmd, post_down_cmd, enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean)
                 RETURNING id
             ");
             
@@ -120,7 +123,7 @@ class WireGuardService {
                 $data['dns_servers'] ?? null,
                 $data['post_up_cmd'] ?? $defaultPostUp,
                 $data['post_down_cmd'] ?? $defaultPostDown,
-                $data['enabled'] ?? true
+                $enabled
             ]);
             
             return (int)$stmt->fetchColumn();
@@ -132,6 +135,9 @@ class WireGuardService {
     
     public function updateServer(int $id, array $data): bool {
         try {
+            $enabled = !empty($data['enabled']) ? 'true' : 'false';
+            if (!isset($data['enabled'])) $enabled = 'true';
+            
             $stmt = $this->db->prepare("
                 UPDATE wireguard_servers SET
                     name = ?,
@@ -142,7 +148,7 @@ class WireGuardService {
                     dns_servers = ?,
                     post_up_cmd = ?,
                     post_down_cmd = ?,
-                    enabled = ?,
+                    enabled = ?::boolean,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
@@ -156,7 +162,7 @@ class WireGuardService {
                 $data['dns_servers'] ?? null,
                 $data['post_up_cmd'] ?? null,
                 $data['post_down_cmd'] ?? null,
-                $data['enabled'] ?? true,
+                $enabled,
                 $id
             ]);
         } catch (PDOException $e) {

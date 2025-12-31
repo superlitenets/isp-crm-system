@@ -326,7 +326,7 @@ class Inventory {
             $stmt = $this->db->prepare("
                 INSERT INTO equipment_loans (equipment_id, customer_id, loan_date, expected_return_date, 
                     loaned_by, deposit_amount, deposit_paid, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?)
             ");
             $stmt->execute([
                 $data['equipment_id'],
@@ -335,7 +335,7 @@ class Inventory {
                 $data['expected_return_date'] ?: null,
                 $data['loaned_by'] ?? null,
                 $data['deposit_amount'] ?? 0,
-                $data['deposit_paid'] ?? false,
+                !empty($data['deposit_paid']) ? 'true' : 'false',
                 $data['notes'] ?? null
             ]);
             $loanId = (int) $this->db->lastInsertId();
@@ -960,7 +960,7 @@ class Inventory {
             $stmt = $this->db->prepare("
                 UPDATE inventory_thresholds SET
                     category_id = ?, warehouse_id = ?, min_quantity = ?, max_quantity = ?,
-                    reorder_point = ?, reorder_quantity = ?, notify_on_low = ?, notify_on_excess = ?,
+                    reorder_point = ?, reorder_quantity = ?, notify_on_low = ?::boolean, notify_on_excess = ?::boolean,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
@@ -971,8 +971,8 @@ class Inventory {
                 $data['max_quantity'] ?? 0,
                 $data['reorder_point'] ?? 0,
                 $data['reorder_quantity'] ?? 0,
-                $data['notify_on_low'] ?? true,
-                $data['notify_on_excess'] ?? false,
+                isset($data['notify_on_low']) && !empty($data['notify_on_low']) ? 'true' : (isset($data['notify_on_low']) ? 'false' : 'true'),
+                !empty($data['notify_on_excess']) ? 'true' : 'false',
                 $data['id']
             ]);
             return (int) $data['id'];
@@ -980,7 +980,7 @@ class Inventory {
             $stmt = $this->db->prepare("
                 INSERT INTO inventory_thresholds 
                     (category_id, warehouse_id, min_quantity, max_quantity, reorder_point, reorder_quantity, notify_on_low, notify_on_excess)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?::boolean)
             ");
             $stmt->execute([
                 $data['category_id'] ?: null,
@@ -989,8 +989,8 @@ class Inventory {
                 $data['max_quantity'] ?? 0,
                 $data['reorder_point'] ?? 0,
                 $data['reorder_quantity'] ?? 0,
-                $data['notify_on_low'] ?? true,
-                $data['notify_on_excess'] ?? false
+                isset($data['notify_on_low']) && !empty($data['notify_on_low']) ? 'true' : (isset($data['notify_on_low']) ? 'false' : 'true'),
+                !empty($data['notify_on_excess']) ? 'true' : 'false'
             ]);
             return (int) $this->db->lastInsertId();
         }
