@@ -1044,9 +1044,6 @@ try {
                                         <a href="?page=isp&view=expiring" class="btn btn-warning btn-sm">
                                             <i class="bi bi-clock-history me-1"></i>Expiring (<?= $stats['expiring_soon'] ?>)
                                         </a>
-                                        <a href="?page=isp&view=sessions" class="btn btn-success btn-sm">
-                                            <i class="bi bi-broadcast me-1"></i>Live Sessions
-                                        </a>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
