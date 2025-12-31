@@ -62,7 +62,7 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         exit;
     }
     // Use OLT Service to ping (exec disabled in Docker PHP container)
-    $oltServiceUrl = $_ENV['OLT_SERVICE_URL'] ?? 'http://olt-service:3456';
+    $oltServiceUrl = $_ENV['OLT_SERVICE_URL'] ?? 'http://olt-service:3001';
     $ch = curl_init("{$oltServiceUrl}/ping");
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
