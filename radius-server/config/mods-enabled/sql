@@ -29,7 +29,7 @@ sql {
         idle_timeout = 60
     }
 
-    read_clients = no
+    read_clients = yes
     client_table = "radius_nas"
 
     group_attribute = "SQL-Group"
