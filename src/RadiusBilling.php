@@ -35,6 +35,13 @@ class RadiusBilling {
         return openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
     }
     
+    private function castBoolean($value, bool $default = false): string {
+        if ($value === '' || $value === null) {
+            return $default ? 'true' : 'false';
+        }
+        return !empty($value) ? 'true' : 'false';
+    }
+    
     // ==================== Username Generation ====================
     
     public function getISPPrefix(): string {
@@ -205,7 +212,7 @@ class RadiusBilling {
                     data_quota_mb, download_speed, upload_speed, burst_download, burst_upload,
                     burst_threshold, burst_time, priority, address_pool, ip_binding,
                     simultaneous_sessions, fup_enabled, fup_quota_mb, fup_download_speed, fup_upload_speed, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?, ?::boolean, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -223,13 +230,13 @@ class RadiusBilling {
                 $data['burst_time'] ?? '',
                 $data['priority'] ?? 8,
                 $data['address_pool'] ?? '',
-                $data['ip_binding'] ?? false,
+                $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
-                $data['fup_enabled'] ?? false,
+                $this->castBoolean($data['fup_enabled'] ?? false),
                 $data['fup_quota_mb'] ?: null,
                 $data['fup_download_speed'] ?? '',
                 $data['fup_upload_speed'] ?? '',
-                $data['is_active'] ?? true
+                $this->castBoolean($data['is_active'] ?? true, true)
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -244,9 +251,9 @@ class RadiusBilling {
                     name = ?, description = ?, package_type = ?, billing_type = ?, price = ?,
                     validity_days = ?, data_quota_mb = ?, download_speed = ?, upload_speed = ?,
                     burst_download = ?, burst_upload = ?, burst_threshold = ?, burst_time = ?,
-                    priority = ?, address_pool = ?, ip_binding = ?, simultaneous_sessions = ?,
-                    fup_enabled = ?, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
-                    is_active = ?, updated_at = CURRENT_TIMESTAMP
+                    priority = ?, address_pool = ?, ip_binding = ?::boolean, simultaneous_sessions = ?,
+                    fup_enabled = ?::boolean, fup_quota_mb = ?, fup_download_speed = ?, fup_upload_speed = ?,
+                    is_active = ?::boolean, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -265,13 +272,13 @@ class RadiusBilling {
                 $data['burst_time'] ?? '',
                 $data['priority'] ?? 8,
                 $data['address_pool'] ?? '',
-                $data['ip_binding'] ?? false,
+                $this->castBoolean($data['ip_binding'] ?? false),
                 $data['simultaneous_sessions'] ?? 1,
-                $data['fup_enabled'] ?? false,
+                $this->castBoolean($data['fup_enabled'] ?? false),
                 $data['fup_quota_mb'] ?: null,
                 $data['fup_download_speed'] ?? '',
                 $data['fup_upload_speed'] ?? '',
-                $data['is_active'] ?? true,
+                $this->castBoolean($data['is_active'] ?? true, true),
                 $id
             ]);
             return ['success' => true];
@@ -1493,7 +1500,7 @@ class RadiusBilling {
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_ip_pools (name, start_ip, end_ip, gateway, netmask, dns1, dns2, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -1503,7 +1510,7 @@ class RadiusBilling {
                 $data['netmask'] ?? '255.255.255.0',
                 $data['dns1'] ?? '8.8.8.8',
                 $data['dns2'] ?? '8.8.4.4',
-                $data['is_active'] ?? true
+                $this->castBoolean($data['is_active'] ?? true, true)
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -1784,7 +1791,7 @@ class RadiusBilling {
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO radius_promotions (name, description, package_id, discount_type, discount_value, promo_code, start_date, end_date, max_uses, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -1796,7 +1803,7 @@ class RadiusBilling {
                 $data['start_date'] ?? null,
                 $data['end_date'] ?? null,
                 $data['max_uses'] ?? null,
-                $data['is_active'] ?? true
+                $this->castBoolean($data['is_active'] ?? true, true)
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
