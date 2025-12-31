@@ -2202,6 +2202,25 @@ function runMigrations(PDO $db): void {
         error_log("RADIUS usage logs table error: " . $e->getMessage());
     }
     
+    // Huawei DBA Profiles
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS huawei_dba_profiles (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            profile_id INTEGER,
+            bandwidth_type VARCHAR(50) DEFAULT 'type3',
+            assured_bandwidth INTEGER DEFAULT 0,
+            max_bandwidth INTEGER DEFAULT 0,
+            fixed_bandwidth INTEGER DEFAULT 0,
+            description TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (PDOException $e) {
+        error_log("Huawei DBA profiles table error: " . $e->getMessage());
+    }
+    
     // Huawei ONU Types
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_types (
