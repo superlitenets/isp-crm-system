@@ -61,24 +61,16 @@ if ($action === 'ping_nas' && isset($_GET['ip'])) {
         echo json_encode(['online' => false, 'error' => 'Invalid IP']);
         exit;
     }
-    // Use OLT Service to ping (exec disabled in Docker PHP container)
-    $oltServiceUrl = $_ENV['OLT_SERVICE_URL'] ?? 'http://olt-service:3001';
-    $ch = curl_init("{$oltServiceUrl}/ping");
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode(['ip' => $ip, 'count' => 1, 'timeout' => 2]),
-        CURLOPT_TIMEOUT => 5
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
+    // Use fsockopen to check common ports (same method as test_nas)
     $online = false;
-    if ($httpCode === 200 && $response) {
-        $result = json_decode($response, true);
-        $online = !empty($result['success']) && $result['reachable'] === true;
+    $portsToCheck = [22, 23, 80, 443, 8291, 8728];
+    foreach ($portsToCheck as $port) {
+        $socket = @fsockopen($ip, $port, $errno, $errstr, 1);
+        if ($socket) {
+            fclose($socket);
+            $online = true;
+            break;
+        }
     }
     echo json_encode(['online' => $online, 'ip' => $ip]);
     exit;
