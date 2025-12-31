@@ -42,6 +42,14 @@ class RadiusBilling {
         return !empty($value) ? 'true' : 'false';
     }
     
+    public function encryptPassword(string $password): string {
+        return $this->encrypt($password);
+    }
+    
+    public function decryptPassword(string $encryptedPassword): string {
+        return $this->decrypt($encryptedPassword);
+    }
+    
     // ==================== Username Generation ====================
     
     public function getISPPrefix(): string {

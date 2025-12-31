@@ -124,18 +124,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         expiry_date = ?,
                         static_ip = ?,
                         mac_address = ?,
-                        auto_renew = ?,
+                        auto_renew = ?::boolean,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
                 $stmt->execute([
                     (int)$_POST['package_id'],
                     $_POST['password'],
-                    $radiusBilling->encrypt($_POST['password']),
+                    $radiusBilling->encryptPassword($_POST['password']),
                     $_POST['expiry_date'] ?: null,
                     !empty($_POST['static_ip']) ? $_POST['static_ip'] : null,
                     !empty($_POST['mac_address']) ? $_POST['mac_address'] : null,
-                    isset($_POST['auto_renew']) ? 1 : 0,
+                    isset($_POST['auto_renew']) ? 'true' : 'false',
                     $id
                 ]);
                 $message = 'Subscription updated successfully';
