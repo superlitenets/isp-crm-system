@@ -1965,3 +1965,211 @@ INSERT INTO settings (setting_key, setting_value, setting_group)
 SELECT 'tr069_vlan', '69', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_vlan');
 INSERT INTO settings (setting_key, setting_value, setting_group) 
 SELECT 'tr069_priority', '2', 'TR-069' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'tr069_priority');
+
+-- ============================================================
+-- Missing Tables - Added 2025-12-31
+-- ============================================================
+
+-- ISP Settings table
+CREATE TABLE IF NOT EXISTS isp_settings (
+    id SERIAL PRIMARY KEY,
+    setting_key VARCHAR(100) UNIQUE NOT NULL,
+    setting_value TEXT,
+    setting_type VARCHAR(20) DEFAULT 'string',
+    category VARCHAR(50),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_isp_settings_category ON isp_settings(category);
+CREATE INDEX IF NOT EXISTS idx_isp_settings_key ON isp_settings(setting_key);
+
+-- RADIUS NAS Devices
+CREATE TABLE IF NOT EXISTS radius_nas (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    secret VARCHAR(100) NOT NULL,
+    type VARCHAR(50) DEFAULT 'mikrotik',
+    coa_port INTEGER DEFAULT 3799,
+    api_enabled BOOLEAN DEFAULT FALSE,
+    api_port INTEGER DEFAULT 8728,
+    api_username VARCHAR(100),
+    api_password_encrypted TEXT,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RADIUS Packages
+CREATE TABLE IF NOT EXISTS radius_packages (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    download_speed INTEGER,
+    upload_speed INTEGER,
+    data_quota BIGINT,
+    fup_download_speed INTEGER,
+    fup_upload_speed INTEGER,
+    validity_days INTEGER DEFAULT 30,
+    billing_cycle VARCHAR(20) DEFAULT 'monthly',
+    price DECIMAL(10,2) NOT NULL,
+    simultaneous_sessions INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RADIUS Subscriptions
+CREATE TABLE IF NOT EXISTS radius_subscriptions (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+    package_id INTEGER REFERENCES radius_packages(id) ON DELETE SET NULL,
+    nas_id INTEGER REFERENCES radius_nas(id) ON DELETE SET NULL,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_encrypted TEXT NOT NULL,
+    access_type VARCHAR(20) DEFAULT 'pppoe',
+    static_ip VARCHAR(45),
+    mac_address VARCHAR(17),
+    ip_pool VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'active',
+    start_date DATE,
+    expiry_date DATE,
+    data_used BIGINT DEFAULT 0,
+    is_postpaid BOOLEAN DEFAULT FALSE,
+    auto_renew BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_radius_subscriptions_username ON radius_subscriptions(username);
+CREATE INDEX IF NOT EXISTS idx_radius_subscriptions_status ON radius_subscriptions(status);
+
+-- RADIUS Sessions
+CREATE TABLE IF NOT EXISTS radius_sessions (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    nas_id INTEGER REFERENCES radius_nas(id) ON DELETE SET NULL,
+    session_id VARCHAR(100),
+    username VARCHAR(100),
+    framed_ip VARCHAR(45),
+    calling_station_id VARCHAR(50),
+    called_station_id VARCHAR(50),
+    start_time TIMESTAMP,
+    stop_time TIMESTAMP,
+    session_time INTEGER DEFAULT 0,
+    input_octets BIGINT DEFAULT 0,
+    output_octets BIGINT DEFAULT 0,
+    terminate_cause VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_radius_sessions_username ON radius_sessions(username);
+CREATE INDEX IF NOT EXISTS idx_radius_sessions_active ON radius_sessions(is_active);
+
+-- RADIUS Vouchers
+CREATE TABLE IF NOT EXISTS radius_vouchers (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    package_id INTEGER REFERENCES radius_packages(id) ON DELETE SET NULL,
+    batch_id VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'unused',
+    used_by INTEGER,
+    used_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_radius_vouchers_code ON radius_vouchers(code);
+CREATE INDEX IF NOT EXISTS idx_radius_vouchers_status ON radius_vouchers(status);
+
+-- RADIUS Invoices
+CREATE TABLE IF NOT EXISTS radius_invoices (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    payment_method VARCHAR(50),
+    payment_reference VARCHAR(100),
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RADIUS IP Pools
+CREATE TABLE IF NOT EXISTS radius_ip_pools (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    start_ip VARCHAR(45) NOT NULL,
+    end_ip VARCHAR(45) NOT NULL,
+    subnet_mask VARCHAR(45) DEFAULT '255.255.255.0',
+    gateway VARCHAR(45),
+    dns_primary VARCHAR(45),
+    dns_secondary VARCHAR(45),
+    nas_id INTEGER REFERENCES radius_nas(id) ON DELETE SET NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RADIUS Billing
+CREATE TABLE IF NOT EXISTS radius_billing (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    payment_method VARCHAR(50),
+    reference VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- RADIUS Usage Logs
+CREATE TABLE IF NOT EXISTS radius_usage_logs (
+    id SERIAL PRIMARY KEY,
+    subscription_id INTEGER REFERENCES radius_subscriptions(id) ON DELETE SET NULL,
+    date DATE NOT NULL,
+    upload_bytes BIGINT DEFAULT 0,
+    download_bytes BIGINT DEFAULT 0,
+    session_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(subscription_id, date)
+);
+
+-- Huawei ONU Types
+CREATE TABLE IF NOT EXISTS huawei_onu_types (
+    id SERIAL PRIMARY KEY,
+    type_name VARCHAR(100) UNIQUE NOT NULL,
+    vendor VARCHAR(100),
+    model VARCHAR(100),
+    ports_eth INTEGER DEFAULT 1,
+    ports_pots INTEGER DEFAULT 0,
+    ports_wifi BOOLEAN DEFAULT FALSE,
+    tr069_support BOOLEAN DEFAULT FALSE,
+    default_service_profile VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Service Fee Types
+CREATE TABLE IF NOT EXISTS service_fee_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    default_amount DECIMAL(10,2) DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'KES',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Ticket Service Fees
+CREATE TABLE IF NOT EXISTS ticket_service_fees (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER REFERENCES tickets(id) ON DELETE CASCADE,
+    fee_type_id INTEGER REFERENCES service_fee_types(id),
+    fee_name VARCHAR(100) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by INTEGER
+);
+
+SELECT 'All tables created/updated successfully!' as result;
