@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy to /etc/freeradius/ (without 3.0) - the actual config location
 COPY config/mods-enabled/ /etc/freeradius/mods-enabled/
-COPY config/mods-enabled/sql.template /etc/freeradius/mods-enabled/sql.template
+COPY config/sql.template /etc/freeradius/sql.template
 COPY config/mods-config/ /etc/freeradius/mods-config/
 COPY config/sites-enabled/ /etc/freeradius/sites-enabled/
 COPY config/policy.d/ /etc/freeradius/policy.d/
