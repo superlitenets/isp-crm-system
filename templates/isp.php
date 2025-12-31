@@ -1433,7 +1433,7 @@ try {
                                             <div>
                                                 <strong><?= htmlspecialchars($sub['username']) ?></strong>
                                                 <?php if ($isOnline && !empty($onlineInfo['ip'])): ?>
-                                                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Connected IP"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></span>
+                                                <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($onlineInfo['ip']) ?>')" class="badge bg-success-subtle text-success border border-success-subtle ms-1 text-decoration-none" title="Click to open router page"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></a>
                                                 <?php endif; ?>
                                                 <br><small class="text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></small>
                                                 <?php if (!empty($sub['customer_phone'])): ?>
@@ -4114,6 +4114,44 @@ try {
                 `;
             });
     }
+    
+    function openRouterPage(ip) {
+        const modal = new bootstrap.Modal(document.getElementById('routerBrowserModal'));
+        document.getElementById('routerBrowserTitle').textContent = 'Router: ' + ip;
+        document.getElementById('routerBrowserFrame').src = 'http://' + ip;
+        document.getElementById('routerBrowserAddress').value = 'http://' + ip;
+        modal.show();
+    }
+    
+    function navigateRouterBrowser() {
+        const url = document.getElementById('routerBrowserAddress').value;
+        document.getElementById('routerBrowserFrame').src = url;
+    }
+    
+    function refreshRouterBrowser() {
+        const frame = document.getElementById('routerBrowserFrame');
+        frame.src = frame.src;
+    }
     </script>
+    
+    <div class="modal fade" id="routerBrowserModal" tabindex="-1" aria-labelledby="routerBrowserTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title" id="routerBrowserTitle"><i class="bi bi-globe me-2"></i>Router</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="input-group border-bottom">
+                        <span class="input-group-text bg-light border-0 rounded-0"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control border-0 rounded-0" id="routerBrowserAddress" placeholder="http://..." onkeypress="if(event.key==='Enter')navigateRouterBrowser()">
+                        <button class="btn btn-outline-secondary border-0 rounded-0" type="button" onclick="navigateRouterBrowser()"><i class="bi bi-arrow-right"></i></button>
+                        <button class="btn btn-outline-secondary border-0 rounded-0" type="button" onclick="refreshRouterBrowser()"><i class="bi bi-arrow-clockwise"></i></button>
+                    </div>
+                    <iframe id="routerBrowserFrame" src="about:blank" style="width: 100%; height: 70vh; border: none;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
