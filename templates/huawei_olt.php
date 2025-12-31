@@ -3844,6 +3844,8 @@ try {
             }
         }
     </style>
+    <!-- Load Bootstrap JS early for mobile offcanvas and all modals -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
     <!-- Loading Overlay for OLT Operations -->
@@ -8551,9 +8553,6 @@ try {
                     </div>
                 </div>
             </div>
-
-            <!-- Bootstrap must load before VPN scripts that use bootstrap.Modal -->
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
             
             <script>
             (function() {
@@ -12746,7 +12745,6 @@ echo "# ================================================\n";
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     // Loading overlay for OLT sync operations
     const loadingMessages = {
