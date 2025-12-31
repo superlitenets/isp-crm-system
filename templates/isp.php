@@ -14,6 +14,46 @@ if ($action === 'get_mikrotik_script' && isset($_GET['peer_id'])) {
     exit;
 }
 
+if ($action === 'get_nas_config' && isset($_GET['id'])) {
+    header('Content-Type: application/json');
+    $nasData = $radiusBilling->getNASWithVPN((int)$_GET['id']);
+    
+    if (!$nasData) {
+        echo json_encode(['success' => false, 'error' => 'NAS not found']);
+        exit;
+    }
+    
+    $response = [
+        'success' => true,
+        'secret' => $nasData['secret'] ?? '',
+        'radius_server' => $_ENV['RADIUS_SERVER_IP'] ?? '',
+        'vpn_script' => null
+    ];
+    
+    // If VPN peer is linked, get VPN server IP as RADIUS server and VPN script
+    if (!empty($nasData['wireguard_peer_id'])) {
+        require_once __DIR__ . '/../src/WireGuardService.php';
+        $wgService = new \App\WireGuardService($db);
+        $peer = $wgService->getPeer((int)$nasData['wireguard_peer_id']);
+        
+        if ($peer) {
+            $server = $wgService->getServer((int)$peer['server_id']);
+            if ($server) {
+                // Use the VPN server's interface IP (without CIDR) as RADIUS server
+                $vpnServerIp = preg_replace('/\/\d+$/', '', $server['interface_addr'] ?? '');
+                if ($vpnServerIp) {
+                    $response['radius_server'] = $vpnServerIp;
+                }
+            }
+            // Get MikroTik VPN script
+            $response['vpn_script'] = $wgService->getMikroTikScript((int)$nasData['wireguard_peer_id']);
+        }
+    }
+    
+    echo json_encode($response);
+    exit;
+}
+
 if ($action === 'ping_nas' && isset($_GET['ip'])) {
     header('Content-Type: application/json');
     $ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
@@ -3803,17 +3843,34 @@ try {
     }
     
     function showMikroTikScript(nas) {
-        const radiusServer = '<?= $_ENV['RADIUS_SERVER_IP'] ?? gethostbyname(gethostname()) ?>';
         const radiusSecret = nas.secret || 'YOUR_SECRET_HERE';
+        // Use VPN server address if linked, otherwise use env or fallback
+        let radiusServer = '<?= $_ENV['RADIUS_SERVER_IP'] ?? '' ?>';
         
-        let radiusScript = `# RADIUS Configuration for ${nas.name}
+        // Default script while loading
+        let radiusScript = '# Loading RADIUS configuration...';
+        let vpnScript = '# No VPN configured for this NAS device\n# Link a VPN peer to this NAS to generate WireGuard configuration';
+        
+        document.getElementById('radiusScript').textContent = radiusScript;
+        document.getElementById('vpnScript').textContent = vpnScript;
+        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+        
+        // Fetch NAS data with VPN info to get proper RADIUS server IP
+        fetch('/index.php?page=isp&action=get_nas_config&id=' + nas.id)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    radiusServer = data.radius_server || radiusServer || '<?= gethostbyname(gethostname()) ?>';
+                    const secret = data.secret || radiusSecret;
+                    
+                    radiusScript = `# RADIUS Configuration for ${nas.name}
 # Generated: ${new Date().toLocaleString()}
 
 # Add RADIUS server for authentication
-/radius add service=ppp address=${radiusServer} secret="${radiusSecret}" timeout=3000ms
+/radius add service=ppp address=${radiusServer} secret="${secret}" timeout=3000ms
 
 # Add RADIUS server for hotspot (if needed)
-/radius add service=hotspot address=${radiusServer} secret="${radiusSecret}" timeout=3000ms
+/radius add service=hotspot address=${radiusServer} secret="${secret}" timeout=3000ms
 
 # Enable RADIUS for PPPoE
 /ppp aaa set use-radius=yes accounting=yes interim-update=5m
@@ -3821,28 +3878,30 @@ try {
 # Optional: Set NAS identifier
 /system identity set name="${nas.name}"
 `;
-
-        let vpnScript = '# No VPN configured for this NAS device\n# Link a VPN peer to this NAS to generate WireGuard configuration';
-        
-        document.getElementById('radiusScript').textContent = radiusScript;
-        document.getElementById('vpnScript').textContent = vpnScript;
-        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
-        
-        if (nas.wireguard_peer_id) {
-            // Fetch existing MikroTik script from WireGuard service
-            fetch('/index.php?page=isp&action=get_mikrotik_script&peer_id=' + nas.wireguard_peer_id)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && data.script) {
-                        vpnScript = data.script;
+                    document.getElementById('radiusScript').textContent = radiusScript;
+                    document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+                    
+                    // If VPN script is available, update full script
+                    if (data.vpn_script) {
+                        vpnScript = data.vpn_script;
                         document.getElementById('vpnScript').textContent = vpnScript;
                         document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
                     }
-                })
-                .catch(err => {
-                    console.error('Failed to fetch VPN script:', err);
-                });
-        }
+                }
+            })
+            .catch(err => {
+                console.error('Failed to fetch NAS config:', err);
+                // Fallback to basic script
+                radiusScript = `# RADIUS Configuration for ${nas.name}
+# Generated: ${new Date().toLocaleString()}
+# Note: Could not fetch full config, using defaults
+
+/radius add service=ppp address=${radiusServer || 'RADIUS_SERVER_IP'} secret="${radiusSecret}" timeout=3000ms
+/ppp aaa set use-radius=yes accounting=yes interim-update=5m
+`;
+                document.getElementById('radiusScript').textContent = radiusScript;
+                document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+            });
         
         new bootstrap.Modal(document.getElementById('mikrotikScriptModal')).show();
     }
