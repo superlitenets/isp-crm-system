@@ -47,12 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                 }
                 
                 $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
-                $logStmt = $pdo->prepare("
-                    INSERT INTO activity_logs (entity_type, entity_id, action, description, user_id, created_at)
-                    VALUES ('ticket', ?, 'status_updated_via_link', ?, ?, NOW())
-                ");
                 $logDescription = "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : "");
-                $logStmt->execute([$tokenRecord['ticket_id'], $logDescription, $tokenRecord['employee_id']]);
+                try {
+                    $logStmt = $pdo->prepare("
+                        INSERT INTO activity_logs (user_id, action_type, entity_type, entity_id, details, created_at)
+                        VALUES (?, 'status_updated_via_link', 'ticket', ?, ?, NOW())
+                    ");
+                    $logStmt->execute([$tokenRecord['employee_id'], $tokenRecord['ticket_id'], $logDescription]);
+                } catch (Exception $logEx) {
+                    // Activity log is optional, don't fail if it doesn't work
+                }
                 
                 if (!empty($comment)) {
                     $stmt = $pdo->prepare("
