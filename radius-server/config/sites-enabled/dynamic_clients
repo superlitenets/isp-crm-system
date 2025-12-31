@@ -1,0 +1,19 @@
+server dynamic_clients {
+    authorize {
+        update control {
+            &FreeRADIUS-Client-IP-Address = "%{Packet-Src-IP-Address}"
+            &FreeRADIUS-Client-Require-MA = no
+        }
+
+        if ("%{sql: SELECT COUNT(*) FROM radius_nas WHERE ip_address = '%{Packet-Src-IP-Address}' AND is_active = true}" > 0) {
+            update control {
+                &FreeRADIUS-Client-Secret = "%{sql: SELECT secret FROM radius_nas WHERE ip_address = '%{Packet-Src-IP-Address}' AND is_active = true LIMIT 1}"
+                &FreeRADIUS-Client-Shortname = "%{sql: SELECT name FROM radius_nas WHERE ip_address = '%{Packet-Src-IP-Address}' AND is_active = true LIMIT 1}"
+            }
+            ok
+        }
+        else {
+            reject
+        }
+    }
+}
