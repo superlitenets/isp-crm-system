@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
             $messageType = 'error';
         } else {
             try {
-                $ticket = new Ticket($pdo);
+                $ticket = new \App\Ticket();
                 $updateData = ['status' => $newStatus];
                 $ticket->update($tokenRecord['ticket_id'], $updateData);
                 
@@ -49,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     $statusLink->invalidateToken($tokenRecord['id']);
                 }
                 
-                if (class_exists('ActivityLog')) {
-                    $activityLog = new ActivityLog($pdo);
+                if (class_exists('\App\ActivityLog')) {
+                    $activityLog = new \App\ActivityLog();
                     $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
                     $activityLog->log(
                         'ticket',

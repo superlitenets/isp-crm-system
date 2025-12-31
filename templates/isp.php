@@ -1021,15 +1021,23 @@ try {
                         <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-box me-2 text-success"></i>Popular Packages</h6></div>
                         <div class="card-body p-0">
                             <?php
-                            $pkgStats = $db->query("
-                                SELECT p.name, p.price, COUNT(s.id) as sub_count 
-                                FROM radius_packages p 
-                                LEFT JOIN radius_subscriptions s ON s.package_id = p.id AND s.status = 'active'
-                                WHERE p.status = 'active'
-                                GROUP BY p.id, p.name, p.price 
-                                ORDER BY sub_count DESC 
-                                LIMIT 4
-                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            $pkgStats = [];
+                            try {
+                                $stmt = $db->query("
+                                    SELECT p.name, p.price, COUNT(s.id) as sub_count 
+                                    FROM radius_packages p 
+                                    LEFT JOIN radius_subscriptions s ON s.package_id = p.id AND s.status = 'active'
+                                    WHERE p.status = 'active'
+                                    GROUP BY p.id, p.name, p.price 
+                                    ORDER BY sub_count DESC 
+                                    LIMIT 4
+                                ");
+                                if ($stmt) {
+                                    $pkgStats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                }
+                            } catch (Exception $e) {
+                                $pkgStats = [];
+                            }
                             ?>
                             <?php if (empty($pkgStats)): ?>
                             <div class="p-3 text-center text-muted">No packages</div>
@@ -1054,15 +1062,23 @@ try {
                         <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-cash-coin me-2 text-info"></i>Recent Payments</h6></div>
                         <div class="card-body p-0">
                             <?php
-                            $recentPayments = $db->query("
-                                SELECT b.amount, b.payment_date, s.username, c.name as customer_name
-                                FROM radius_billing b
-                                LEFT JOIN radius_subscriptions s ON b.subscription_id = s.id
-                                LEFT JOIN customers c ON s.customer_id = c.id
-                                WHERE b.status = 'paid'
-                                ORDER BY b.payment_date DESC
-                                LIMIT 4
-                            ")->fetchAll(PDO::FETCH_ASSOC);
+                            $recentPayments = [];
+                            try {
+                                $stmt = $db->query("
+                                    SELECT b.amount, b.payment_date, s.username, c.name as customer_name
+                                    FROM radius_billing b
+                                    LEFT JOIN radius_subscriptions s ON b.subscription_id = s.id
+                                    LEFT JOIN customers c ON s.customer_id = c.id
+                                    WHERE b.status = 'paid'
+                                    ORDER BY b.payment_date DESC
+                                    LIMIT 4
+                                ");
+                                if ($stmt) {
+                                    $recentPayments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                                }
+                            } catch (Exception $e) {
+                                $recentPayments = [];
+                            }
                             ?>
                             <?php if (empty($recentPayments)): ?>
                             <div class="p-3 text-center text-muted">No recent payments</div>
