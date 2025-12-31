@@ -1,8 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../src/TicketStatusLink.php';
-require_once __DIR__ . '/../src/Ticket.php';
-require_once __DIR__ . '/../src/ActivityLog.php';
 
 $pdo = Database::getConnection();
 
@@ -39,9 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
             $messageType = 'error';
         } else {
             try {
-                $ticket = new \App\Ticket();
-                $updateData = ['status' => $newStatus];
-                $ticket->update($tokenRecord['ticket_id'], $updateData);
+                $stmt = $pdo->prepare("UPDATE tickets SET status = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$newStatus, $tokenRecord['ticket_id']]);
                 
                 $statusLink->useToken($tokenRecord['id']);
                 
@@ -49,17 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
                     $statusLink->invalidateToken($tokenRecord['id']);
                 }
                 
-                if (class_exists('\App\ActivityLog')) {
-                    $activityLog = new \App\ActivityLog();
-                    $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
-                    $activityLog->log(
-                        'ticket',
-                        $tokenRecord['ticket_id'],
-                        'status_updated_via_link',
-                        "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : ""),
-                        $tokenRecord['employee_id']
-                    );
-                }
+                $techName = $tokenRecord['assigned_to_name'] ?? 'Technician';
+                $logStmt = $pdo->prepare("
+                    INSERT INTO activity_logs (entity_type, entity_id, action, description, user_id, created_at)
+                    VALUES ('ticket', ?, 'status_updated_via_link', ?, ?, NOW())
+                ");
+                $logDescription = "Status changed to '{$newStatus}' via quick link by {$techName}" . ($comment ? ". Note: {$comment}" : "");
+                $logStmt->execute([$tokenRecord['ticket_id'], $logDescription, $tokenRecord['employee_id']]);
                 
                 if (!empty($comment)) {
                     $stmt = $pdo->prepare("
