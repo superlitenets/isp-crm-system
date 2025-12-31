@@ -1,0 +1,50 @@
+cat ~/isp/radius-server/config/mods-enabled/sql | grep read_clients
+
+# Then rebuild
+docker compose build freeradius --no-cache && docker compose up -d freeradius
+sleep 3
+docker exec isp_crm_freeradius cat /etc/freeradius/mods-enabled/sql | grep read_clients
+    read_clients = no
+    read_clients = no
+[+] Building 15.7s (23/23) FINISHED
+ => [internal] load local bake definitions                                                                                                                                                      0.0s
+ => => reading from stdin 530B                                                                                                                                                                  0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                                            0.0s
+ => => transferring dockerfile: 1.08kB                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/freeradius/freeradius-server:3.2.3                                                                                                                   0.8s
+ => [internal] load .dockerignore                                                                                                                                                               0.0s
+ => => transferring context: 2B                                                                                                                                                                 0.0s
+ => [internal] load build context                                                                                                                                                               0.0s
+ => => transferring context: 1.51kB                                                                                                                                                             0.0s
+ => CACHED [ 1/16] FROM docker.io/freeradius/freeradius-server:3.2.3@sha256:1ca67fbd54c319029750051671341f5ea96b9bb5ea76198e81548593b4d41a70                                                    0.0s
+ => => resolve docker.io/freeradius/freeradius-server:3.2.3@sha256:1ca67fbd54c319029750051671341f5ea96b9bb5ea76198e81548593b4d41a70                                                             0.0s
+ => [ 2/16] RUN apt-get update && apt-get install -y     freeradius-postgresql     gettext-base     && rm -rf /var/lib/apt/lists/*                                                             11.1s
+ => [ 3/16] COPY config/mods-enabled/ /etc/freeradius/mods-enabled/                                                                                                                             0.1s
+ => [ 4/16] COPY config/sql.template /etc/freeradius/sql.template                                                                                                                               0.0s
+ => [ 5/16] COPY config/mods-config/ /etc/freeradius/mods-config/                                                                                                                               0.0s
+ => [ 6/16] COPY config/sites-enabled/ /etc/freeradius/sites-enabled/                                                                                                                           0.0s
+ => [ 7/16] COPY config/policy.d/ /etc/freeradius/policy.d/                                                                                                                                     0.0s
+ => [ 8/16] COPY config/clients.conf /etc/freeradius/clients.conf                                                                                                                               0.0s
+ => [ 9/16] COPY config/radiusd.conf /etc/freeradius/radiusd.conf                                                                                                                               0.0s
+ => [10/16] COPY config/proxy.conf /etc/freeradius/proxy.conf                                                                                                                                   0.0s
+ => [11/16] COPY config/huntgroups /etc/freeradius/huntgroups                                                                                                                                   0.0s
+ => [12/16] COPY config/hints /etc/freeradius/hints                                                                                                                                             0.0s
+ => [13/16] COPY config/users /etc/freeradius/users                                                                                                                                             0.0s
+ => [14/16] COPY config/acct_users /etc/freeradius/acct_users                                                                                                                                   0.1s
+ => [15/16] COPY docker-entrypoint.sh /docker-entrypoint.sh                                                                                                                                     0.0s
+ => [16/16] RUN chmod +x /docker-entrypoint.sh &&     chown -R freerad:freerad /etc/freeradius/                                                                                                 1.0s
+ => exporting to image                                                                                                                                                                          1.4s
+ => => exporting layers                                                                                                                                                                         0.7s
+ => => exporting manifest sha256:9aa59a7b8add745d9b7ce9de82849c032b3990290951acb38ea1fb30704672de                                                                                               0.0s
+ => => exporting config sha256:07aa290bbc3c089aefb5b533e346cc095bb01553584987d716abc037df5be8fb                                                                                                 0.0s
+ => => exporting attestation manifest sha256:526765eff213f8e24b5520ce0cec06b1b9685a70d791f241cdcf839a26ddc92e                                                                                   0.0s
+ => => exporting manifest list sha256:bc71b5d221000012a7e16b575bbfb37b1f208bef6aa0ad2a94a5e24688de84cd                                                                                          0.0s
+ => => naming to docker.io/library/isp-freeradius:latest                                                                                                                                        0.0s
+ => => unpacking to docker.io/library/isp-freeradius:latest                                                                                                                                     0.5s
+ => resolving provenance for metadata file                                                                                                                                                      0.0s
+[+] build 1/1
+ ✔ Image isp-freeradius Built                                                                                                                                                                  15.8s
+[+] up 2/2
+    read_clients = yes
+root@superlitecrm:~/isp# radius Recreated                                                                                                                                                       0.9s
+
