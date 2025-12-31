@@ -1,0 +1,38 @@
+root@superlitecrm:~/isp# docker logs isp_crm_freeradius 2>&1 | tail -30
+# Check sessions table
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, subscription_id, acct_session_id, framed_ip_address, mac_address, session_start FROM radius_sessions ORDER BY id DESC LIMIT 5;"
+(9)     [unix] = ok
+(9) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+(9) sql:    --> type.start.query
+(9) sql: Using query template 'query'
+rlm_sql (sql): Reserved connection (9)
+(9) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+(9) sql:    --> SFL001
+(9) sql: SQL-User-Name set to 'SFL001'
+(9) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, session_id, nas_ip, nas_port, framed_ip, mac_address, started_at, input_octets, output_octets) SELECT rs.id, rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW(), 0, 0 FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}'
+(9) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, session_id, nas_ip, nas_port, framed_ip, mac_address, started_at, input_octets, output_octets) SELECT rs.id, rn.id, '81b00adb', '10.200.0.5', '15731419', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW(), 0, 0 FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001'
+(9) sql: Executing query: INSERT INTO radius_sessions (subscription_id, nas_id, session_id, nas_ip, nas_port, framed_ip, mac_address, started_at, input_octets, output_octets) SELECT rs.id, rn.id, '81b00adb', '10.200.0.5', '15731419', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW(), 0, 0 FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001'
+rlm_sql_postgresql: Status: PGRES_FATAL_ERROR
+rlm_sql_postgresql: 42703: UNDEFINED COLUMN
+(9) sql: ERROR: rlm_sql_postgresql: ERROR:  column "session_id" of relation "radius_sessions" does not exist
+(9) sql: ERROR: rlm_sql_postgresql: LINE 1: ...RT INTO radius_sessions (subscription_id, nas_id, session_id...
+(9) sql: ERROR: rlm_sql_postgresql:                                                              ^
+(9) sql: SQL query returned: server error
+rlm_sql (sql): Released connection (9)
+Need more connections to reach 10 spares
+rlm_sql (sql): Opening additional connection (12), 1 of 24 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 3057
+(9)     [sql] = fail
+(9)   } # accounting = fail
+(9) Not sending reply to client.
+(9) Finished request
+(9) Cleaning up request packet ID 4 with timestamp +206 due to done
+Waking up in 2.5 seconds.
+(5) Cleaning up request packet ID 3 with timestamp +203 due to cleanup_delay was reached
+Ready to process requests
+ id | subscription_id | acct_session_id | framed_ip_address | mac_address | session_start
+----+-----------------+-----------------+-------------------+-------------+---------------
+(0 rows)
+
+root@superlitecrm:~/isp#
