@@ -1399,35 +1399,40 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Missing session ID and username'];
         }
         
-        // Build attributes for radclient
-        $attrs = [];
-        if (!empty($sessionId)) {
-            $attrs[] = "Acct-Session-Id=" . $sessionId;
+        // Call OLT service to send disconnect via radclient
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3001';
+        
+        $payload = \json_encode([
+            'nasIp' => $nasIp,
+            'nasSecret' => $nasSecret,
+            'sessionId' => $sessionId,
+            'username' => $username
+        ]);
+        
+        $ch = \curl_init($oltServiceUrl . '/radius/disconnect');
+        \curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15
+        ]);
+        
+        $response = \curl_exec($ch);
+        $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = \curl_error($ch);
+        \curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => 'OLT service error: ' . $error];
         }
-        if (!empty($username)) {
-            $attrs[] = "User-Name=" . $username;
+        
+        $result = \json_decode($response, true);
+        if ($httpCode === 200 && !empty($result['success'])) {
+            return ['success' => true, 'output' => $result['output'] ?? '', 'message' => $result['message'] ?? ''];
         }
         
-        // Send Disconnect-Request directly to NAS (MikroTik) on port 3799
-        // Using docker exec to run radclient from the freeradius container
-        $attrString = \implode("\n", $attrs);
-        $command = \sprintf(
-            'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            \escapeshellarg(\sprintf(
-                'echo -e "%s" | radclient -x %s:3799 disconnect %s',
-                \addslashes($attrString),
-                $nasIp,
-                $nasSecret
-            ))
-        );
-        
-        $outputStr = \shell_exec($command) ?? '';
-        
-        if (\strpos($outputStr, 'Disconnect-ACK') !== false) {
-            return ['success' => true, 'output' => $outputStr];
-        }
-        
-        return ['success' => false, 'error' => $outputStr ?: 'Disconnect failed'];
+        return ['success' => false, 'error' => $result['error'] ?? $result['output'] ?? 'Disconnect failed'];
     }
     
     public function sendCoA(int $subscriptionId, array $attributes): array {
@@ -1445,31 +1450,40 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'NAS not found'];
         }
         
-        // Build CoA attributes
-        $attrs = ["User-Name=" . $sub['username']];
-        foreach ($attributes as $key => $value) {
-            $attrs[] = "$key=$value";
+        // Call OLT service to send CoA via radclient
+        $oltServiceUrl = \getenv('OLT_SERVICE_URL') ?: 'http://localhost:3001';
+        
+        $payload = \json_encode([
+            'nasIp' => $nas['ip_address'],
+            'nasSecret' => $nas['secret'],
+            'username' => $sub['username'],
+            'attributes' => $attributes
+        ]);
+        
+        $ch = \curl_init($oltServiceUrl . '/radius/coa');
+        \curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15
+        ]);
+        
+        $response = \curl_exec($ch);
+        $httpCode = \curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = \curl_error($ch);
+        \curl_close($ch);
+        
+        if ($error) {
+            return ['success' => false, 'error' => 'OLT service error: ' . $error];
         }
         
-        // Send CoA directly to NAS on port 3799
-        $attrString = \implode("\n", $attrs);
-        $command = \sprintf(
-            'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            \escapeshellarg(\sprintf(
-                'echo -e "%s" | radclient -x %s:3799 coa %s',
-                \addslashes($attrString),
-                $nas['ip_address'],
-                $nas['secret']
-            ))
-        );
-        
-        $outputStr = \shell_exec($command) ?? '';
-        
-        if (\strpos($outputStr, 'CoA-ACK') !== false) {
-            return ['success' => true, 'output' => $outputStr];
+        $result = \json_decode($response, true);
+        if ($httpCode === 200 && !empty($result['success'])) {
+            return ['success' => true, 'output' => $result['output'] ?? '', 'message' => $result['message'] ?? ''];
         }
         
-        return ['success' => false, 'error' => $outputStr ?: 'CoA failed'];
+        return ['success' => false, 'error' => $result['error'] ?? $result['output'] ?? 'CoA failed'];
     }
     
     // ==================== Reports ====================
