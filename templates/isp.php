@@ -3813,47 +3813,27 @@ try {
 /system identity set name="${nas.name}"
 `;
 
-        let vpnScript = '# No VPN configured for this NAS device';
-        
-        if (nas.wireguard_peer_id) {
-            fetch('/index.php?page=isp&action=get_nas_vpn&id=' + nas.id)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && data.vpn) {
-                        const v = data.vpn;
-                        vpnScript = `# WireGuard VPN Configuration for ${nas.name}
-# Generated: ${new Date().toLocaleString()}
-
-# Install WireGuard package if not present
-/system package print where name=wireguard
-
-# Create WireGuard interface
-/interface wireguard add name=wg-crm listen-port=51820 private-key="${v.peer_private_key || 'GENERATE_ON_ROUTER'}"
-
-# Add server peer
-/interface wireguard peers add interface=wg-crm \\
-    public-key="${v.server_pubkey}" \\
-    endpoint-address="${v.server_endpoint}" \\
-    endpoint-port=${v.server_port || 51820} \\
-    allowed-address=${v.server_addr} \\
-    persistent-keepalive=25s ${v.psk ? `\\
-    preshared-key="${v.psk}"` : ''}
-
-# Assign IP to WireGuard interface
-/ip address add address=${v.peer_addr} interface=wg-crm
-
-# Add route to CRM network via VPN
-/ip route add dst-address=${v.server_network || '10.200.0.0/24'} gateway=wg-crm
-`;
-                        document.getElementById('vpnScript').textContent = vpnScript;
-                        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
-                    }
-                });
-        }
+        let vpnScript = '# No VPN configured for this NAS device\n# Link a VPN peer to this NAS to generate WireGuard configuration';
         
         document.getElementById('radiusScript').textContent = radiusScript;
         document.getElementById('vpnScript').textContent = vpnScript;
         document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+        
+        if (nas.wireguard_peer_id) {
+            // Fetch existing MikroTik script from WireGuard service
+            fetch('/index.php?page=huawei-olt&view=vpn&action=get_mikrotik_script&peer_id=' + nas.wireguard_peer_id)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.script) {
+                        vpnScript = data.script;
+                        document.getElementById('vpnScript').textContent = vpnScript;
+                        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to fetch VPN script:', err);
+                });
+        }
         
         new bootstrap.Modal(document.getElementById('mikrotikScriptModal')).show();
     }
