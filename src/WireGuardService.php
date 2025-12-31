@@ -235,14 +235,14 @@ class WireGuardService {
             $keys = $this->generateKeyPair();
             $psk = $this->generatePresharedKey();
             
-            $isActive = isset($data['is_active']) && $data['is_active'] !== '' ? (bool)$data['is_active'] : true;
-            $isOltSite = isset($data['is_olt_site']) && $data['is_olt_site'] !== '' ? (bool)$data['is_olt_site'] : false;
+            $isActive = !empty($data['is_active']) ? true : false;
+            $isOltSite = !empty($data['is_olt_site']) ? true : false;
             $oltId = !empty($data['olt_id']) ? (int)$data['olt_id'] : null;
             
             $stmt = $this->db->prepare("
                 INSERT INTO wireguard_peers 
                 (server_id, name, description, public_key, private_key_encrypted, preshared_key_encrypted, allowed_ips, endpoint, persistent_keepalive, is_active, is_olt_site, olt_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::boolean, ?::boolean, ?)
                 RETURNING id
             ");
             
@@ -256,8 +256,8 @@ class WireGuardService {
                 $data['allowed_ips'],
                 $data['endpoint'] ?? null,
                 $data['persistent_keepalive'] ?? 25,
-                $isActive,
-                $isOltSite,
+                $isActive ? 'true' : 'false',
+                $isOltSite ? 'true' : 'false',
                 $oltId
             ]);
             
@@ -270,8 +270,8 @@ class WireGuardService {
     
     public function updatePeer(int $id, array $data): bool {
         try {
-            $isActive = isset($data['is_active']) && $data['is_active'] !== '' ? (bool)$data['is_active'] : true;
-            $isOltSite = isset($data['is_olt_site']) && $data['is_olt_site'] !== '' ? (bool)$data['is_olt_site'] : false;
+            $isActive = !empty($data['is_active']) ? true : false;
+            $isOltSite = !empty($data['is_olt_site']) ? true : false;
             $oltId = !empty($data['olt_id']) ? (int)$data['olt_id'] : null;
             
             $stmt = $this->db->prepare("
@@ -281,8 +281,8 @@ class WireGuardService {
                     allowed_ips = ?,
                     endpoint = ?,
                     persistent_keepalive = ?,
-                    is_active = ?,
-                    is_olt_site = ?,
+                    is_active = ?::boolean,
+                    is_olt_site = ?::boolean,
                     olt_id = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
@@ -294,8 +294,8 @@ class WireGuardService {
                 $data['allowed_ips'],
                 $data['endpoint'] ?? null,
                 $data['persistent_keepalive'] ?? 25,
-                $isActive,
-                $isOltSite,
+                $isActive ? 'true' : 'false',
+                $isOltSite ? 'true' : 'false',
                 $oltId,
                 $id
             ]);
