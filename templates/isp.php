@@ -1247,46 +1247,6 @@ try {
                     </div>
                 </div>
                 
-                <div class="col-lg-6">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-broadcast me-2 text-success"></i>Active Sessions</h5>
-                            <a href="?page=isp&view=sessions" class="btn btn-sm btn-outline-success">View All</a>
-                        </div>
-                        <div class="card-body p-0">
-                            <?php $sessions = $radiusBilling->getActiveSessions(); ?>
-                            <?php if (empty($sessions)): ?>
-                            <div class="p-4 text-center text-muted">No active sessions</div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Username</th>
-                                            <th>IP Address</th>
-                                            <th>NAS</th>
-                                            <th>Duration</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach (array_slice($sessions, 0, 5) as $session): ?>
-                                        <tr>
-                                            <td><?= htmlspecialchars($session['username']) ?></td>
-                                            <td><code><?= htmlspecialchars($session['framed_ip_address']) ?></code></td>
-                                            <td><?= htmlspecialchars($session['nas_name'] ?? '-') ?></td>
-                                            <td><?php 
-                                                $dur = time() - strtotime($session['session_start']);
-                                                echo floor($dur/3600) . 'h ' . floor(($dur%3600)/60) . 'm';
-                                            ?></td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <?php elseif ($view === 'subscriptions'): ?>
@@ -1304,10 +1264,11 @@ try {
             $onlineFilter = $_GET['online'] ?? '';
             
             // Add online/offline filter to database query if applicable
-            if ($onlineFilter === 'online' && !empty($onlineSubscribers)) {
-                $filters['subscription_ids'] = $onlineSubscribers;
+            $onlineSubIds = array_keys($onlineSubscribers);
+            if ($onlineFilter === 'online' && !empty($onlineSubIds)) {
+                $filters['subscription_ids'] = $onlineSubIds;
             } elseif ($onlineFilter === 'offline') {
-                $filters['exclude_subscription_ids'] = $onlineSubscribers;
+                $filters['exclude_subscription_ids'] = $onlineSubIds;
             }
             
             // Pagination setup
@@ -1324,7 +1285,7 @@ try {
             
             // Calculate quick stats for this view
             $totalSubs = $totalCount;
-            $onlineCount = count(array_filter($subscriptions, fn($s) => in_array($s['id'], $onlineSubscribers)));
+            $onlineCount = count(array_filter($subscriptions, fn($s) => isset($onlineSubscribers[$s['id']])));
             $activeCount = count(array_filter($subscriptions, fn($s) => $s['status'] === 'active'));
             $expiringSoonCount = count(array_filter($subscriptions, fn($s) => $s['expiry_date'] && strtotime($s['expiry_date']) < strtotime('+7 days') && strtotime($s['expiry_date']) > time()));
             ?>
@@ -1445,7 +1406,8 @@ try {
                             <tbody>
                                 <?php foreach ($subscriptions as $sub): ?>
                                 <?php 
-                                $isOnline = in_array($sub['id'], $onlineSubscribers); 
+                                $isOnline = isset($onlineSubscribers[$sub['id']]);
+                                $onlineInfo = $isOnline ? $onlineSubscribers[$sub['id']] : null;
                                 $statusClass = match($sub['status']) {
                                     'active' => 'success',
                                     'suspended' => 'warning',
@@ -1470,6 +1432,9 @@ try {
                                             </div>
                                             <div>
                                                 <strong><?= htmlspecialchars($sub['username']) ?></strong>
+                                                <?php if ($isOnline && !empty($onlineInfo['ip'])): ?>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Connected IP"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></span>
+                                                <?php endif; ?>
                                                 <br><small class="text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></small>
                                                 <?php if (!empty($sub['customer_phone'])): ?>
                                                 <br><small class="text-muted"><i class="bi bi-telephone"></i> <?= htmlspecialchars($sub['customer_phone']) ?></small>

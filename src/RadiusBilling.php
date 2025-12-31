@@ -1200,10 +1200,21 @@ class RadiusBilling {
     
     public function getOnlineSubscribers(): array {
         $stmt = $this->db->query("
-            SELECT DISTINCT subscription_id FROM radius_sessions 
+            SELECT subscription_id, framed_ip_address, mac_address, session_start
+            FROM radius_sessions 
             WHERE session_end IS NULL
+            ORDER BY session_start DESC
         ");
-        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'subscription_id');
+        $sessions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $result = [];
+        foreach ($sessions as $s) {
+            $result[$s['subscription_id']] = [
+                'ip' => $s['framed_ip_address'],
+                'mac' => $s['mac_address'],
+                'start' => $s['session_start']
+            ];
+        }
+        return $result;
     }
     
     public function processAutoRenewals(): array {
