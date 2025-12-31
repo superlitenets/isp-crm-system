@@ -100,10 +100,13 @@ class RadiusBilling {
     
     public function createNAS(array $data): array {
         try {
+            $apiEnabled = !empty($data['api_enabled']) ? 'true' : 'false';
+            $isActive = isset($data['is_active']) ? (!empty($data['is_active']) ? 'true' : 'false') : 'true';
+            
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
                                         api_enabled, api_port, api_username, api_password_encrypted, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
             ");
             $stmt->execute([
                 $data['name'],
@@ -112,11 +115,11 @@ class RadiusBilling {
                 $data['nas_type'] ?? 'mikrotik',
                 $data['ports'] ?? 1812,
                 $data['description'] ?? '',
-                $data['api_enabled'] ?? false,
+                $apiEnabled,
                 $data['api_port'] ?? 8728,
                 $data['api_username'] ?? '',
                 !empty($data['api_password']) ? $this->encrypt($data['api_password']) : '',
-                $data['is_active'] ?? true
+                $isActive
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -127,7 +130,8 @@ class RadiusBilling {
     public function updateNAS(int $id, array $data): array {
         try {
             $fields = ['name', 'ip_address', 'secret', 'nas_type', 'ports', 'description', 
-                       'api_enabled', 'api_port', 'api_username', 'is_active'];
+                       'api_port', 'api_username'];
+            $boolFields = ['api_enabled', 'is_active'];
             $updates = [];
             $params = [];
             
@@ -135,6 +139,13 @@ class RadiusBilling {
                 if (isset($data[$field])) {
                     $updates[] = "$field = ?";
                     $params[] = $data[$field];
+                }
+            }
+            
+            foreach ($boolFields as $field) {
+                if (isset($data[$field])) {
+                    $updates[] = "$field = ?::boolean";
+                    $params[] = !empty($data[$field]) ? 'true' : 'false';
                 }
             }
             
