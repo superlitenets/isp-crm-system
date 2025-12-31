@@ -4,6 +4,19 @@ $radiusBilling = new \App\RadiusBilling($db);
 
 // Handle AJAX API actions
 $action = $_GET['action'] ?? '';
+
+if ($action === 'ping_nas' && isset($_GET['ip'])) {
+    header('Content-Type: application/json');
+    $ip = filter_var($_GET['ip'], FILTER_VALIDATE_IP);
+    if (!$ip) {
+        echo json_encode(['online' => false, 'error' => 'Invalid IP']);
+        exit;
+    }
+    $pingResult = @exec("ping -c 1 -W 2 " . escapeshellarg($ip) . " 2>&1", $output, $returnCode);
+    echo json_encode(['online' => $returnCode === 0, 'ip' => $ip]);
+    exit;
+}
+
 if ($action === 'get_nas_vpn' && isset($_GET['id'])) {
     header('Content-Type: application/json');
     $nasData = $radiusBilling->getNASWithVPN((int)$_GET['id']);
@@ -2559,6 +2572,7 @@ try {
                                     <th>RADIUS Port</th>
                                     <th>API</th>
                                     <th>VPN</th>
+                                    <th>Online</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -2590,6 +2604,11 @@ try {
                                         <?php else: ?>
                                         <span class="badge bg-secondary">None</span>
                                         <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="nas-online-status" data-ip="<?= htmlspecialchars($nas['ip_address']) ?>">
+                                            <span class="spinner-border spinner-border-sm text-secondary" role="status"></span>
+                                        </span>
                                     </td>
                                     <td>
                                         <?php if ($nas['is_active']): ?>
@@ -3847,6 +3866,33 @@ try {
             btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
             setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
         });
+    }
+    
+    function checkNASOnlineStatus() {
+        document.querySelectorAll('.nas-online-status').forEach(el => {
+            const ip = el.dataset.ip;
+            if (!ip) return;
+            
+            fetch('/index.php?page=isp&action=ping_nas&ip=' + encodeURIComponent(ip))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.online) {
+                        el.innerHTML = '<span class="badge bg-success"><i class="bi bi-circle-fill me-1"></i>Online</span>';
+                    } else {
+                        el.innerHTML = '<span class="badge bg-danger"><i class="bi bi-circle-fill me-1"></i>Offline</span>';
+                    }
+                })
+                .catch(() => {
+                    el.innerHTML = '<span class="badge bg-warning"><i class="bi bi-question-circle me-1"></i>Unknown</span>';
+                });
+        });
+    }
+    
+    // Check NAS status on page load for NAS view
+    if (document.querySelector('.nas-online-status')) {
+        checkNASOnlineStatus();
+        // Refresh every 30 seconds
+        setInterval(checkNASOnlineStatus, 30000);
     }
     
     function testExpiryReminders() {
