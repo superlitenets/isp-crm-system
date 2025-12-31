@@ -103,8 +103,33 @@ class RadiusBilling {
     // ==================== NAS Management ====================
     
     public function getNASDevices(): array {
-        $stmt = $this->db->query("SELECT * FROM radius_nas ORDER BY name");
+        $stmt = $this->db->query("
+            SELECT n.*, 
+                   wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
+                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr
+            FROM radius_nas n
+            LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
+            LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
+            ORDER BY n.name
+        ");
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+    
+    public function getNASWithVPN(int $id): ?array {
+        $stmt = $this->db->prepare("
+            SELECT n.*, n.secret,
+                   wp.name as vpn_peer_name, wp.allowed_ips as vpn_allowed_ips,
+                   wp.public_key as vpn_peer_pubkey, wp.preshared_key as vpn_psk,
+                   ws.name as vpn_server_name, ws.interface_addr as vpn_server_addr,
+                   ws.public_key as vpn_server_pubkey, ws.listen_port as vpn_server_port,
+                   ws.dns_servers as vpn_dns
+            FROM radius_nas n
+            LEFT JOIN wireguard_peers wp ON n.wireguard_peer_id = wp.id
+            LEFT JOIN wireguard_servers ws ON wp.server_id = ws.id
+            WHERE n.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
     
     public function getNAS(int $id): ?array {
@@ -120,8 +145,8 @@ class RadiusBilling {
             
             $stmt = $this->db->prepare("
                 INSERT INTO radius_nas (name, ip_address, secret, nas_type, ports, description, 
-                                        api_enabled, api_port, api_username, api_password_encrypted, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean)
+                                        api_enabled, api_port, api_username, api_password_encrypted, is_active, wireguard_peer_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?::boolean, ?, ?, ?, ?::boolean, ?)
             ");
             $stmt->execute([
                 $data['name'],
@@ -134,7 +159,8 @@ class RadiusBilling {
                 $data['api_port'] ?? 8728,
                 $data['api_username'] ?? '',
                 !empty($data['api_password']) ? $this->encrypt($data['api_password']) : '',
-                $isActive
+                $isActive,
+                !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null
             ]);
             return ['success' => true, 'id' => $this->db->lastInsertId()];
         } catch (\Exception $e) {
@@ -167,6 +193,11 @@ class RadiusBilling {
             if (!empty($data['api_password'])) {
                 $updates[] = "api_password_encrypted = ?";
                 $params[] = $this->encrypt($data['api_password']);
+            }
+            
+            if (array_key_exists('wireguard_peer_id', $data)) {
+                $updates[] = "wireguard_peer_id = ?";
+                $params[] = !empty($data['wireguard_peer_id']) ? (int)$data['wireguard_peer_id'] : null;
             }
             
             $updates[] = "updated_at = CURRENT_TIMESTAMP";

@@ -2,6 +2,36 @@
 require_once __DIR__ . '/../src/RadiusBilling.php';
 $radiusBilling = new \App\RadiusBilling($db);
 
+// Handle AJAX API actions
+$action = $_GET['action'] ?? '';
+if ($action === 'get_nas_vpn' && isset($_GET['id'])) {
+    header('Content-Type: application/json');
+    $nasData = $radiusBilling->getNASWithVPN((int)$_GET['id']);
+    if ($nasData && $nasData['wireguard_peer_id']) {
+        require_once __DIR__ . '/../src/WireGuardService.php';
+        $wgService = new \App\WireGuardService($db);
+        $peer = $wgService->getPeer((int)$nasData['wireguard_peer_id']);
+        $server = $peer ? $wgService->getServer((int)$peer['server_id']) : null;
+        
+        echo json_encode([
+            'success' => true,
+            'vpn' => [
+                'peer_addr' => $peer['allowed_ips'] ?? '',
+                'peer_private_key' => $peer['private_key'] ?? '',
+                'server_pubkey' => $server['public_key'] ?? '',
+                'server_endpoint' => $server['endpoint'] ?? gethostbyname(gethostname()),
+                'server_port' => $server['listen_port'] ?? 51820,
+                'server_addr' => $server['interface_addr'] ?? '',
+                'server_network' => $server['interface_addr'] ? preg_replace('/\.\d+\//', '.0/', $server['interface_addr']) : '10.200.0.0/24',
+                'psk' => $peer['preshared_key'] ?? ''
+            ]
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'No VPN configured']);
+    }
+    exit;
+}
+
 $view = $_GET['view'] ?? 'dashboard';
 $message = '';
 $messageType = 'info';
@@ -2498,7 +2528,11 @@ try {
             </div>
 
             <?php elseif ($view === 'nas'): ?>
-            <?php $nasDevices = $radiusBilling->getNASDevices(); ?>
+            <?php 
+            $nasDevices = $radiusBilling->getNASDevices();
+            $wireguardService = new \App\WireGuardService($db);
+            $vpnPeers = $wireguardService->getAllPeers();
+            ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="page-title mb-0"><i class="bi bi-hdd-network"></i> NAS Devices (MikroTik Routers)</h4>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNASModal">
@@ -2524,6 +2558,7 @@ try {
                                     <th>Type</th>
                                     <th>RADIUS Port</th>
                                     <th>API</th>
+                                    <th>VPN</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -2548,6 +2583,15 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php if ($nas['vpn_peer_name']): ?>
+                                        <span class="badge bg-info" title="<?= htmlspecialchars($nas['vpn_allowed_ips'] ?? '') ?>">
+                                            <i class="bi bi-shield-lock me-1"></i><?= htmlspecialchars($nas['vpn_peer_name']) ?>
+                                        </span>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary">None</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
                                         <?php if ($nas['is_active']): ?>
                                         <span class="badge bg-success">Active</span>
                                         <?php else: ?>
@@ -2556,6 +2600,9 @@ try {
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-info" onclick="showMikroTikScript(<?= htmlspecialchars(json_encode($nas)) ?>)" title="MikroTik Script">
+                                                <i class="bi bi-terminal"></i>
+                                            </button>
                                             <button type="button" class="btn btn-outline-success" onclick="testNAS(<?= $nas['id'] ?>, '<?= htmlspecialchars($nas['ip_address']) ?>')" title="Test Connectivity">
                                                 <i class="bi bi-lightning"></i>
                                             </button>
@@ -2604,11 +2651,32 @@ try {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">RADIUS Secret</label>
-                                    <input type="password" name="secret" class="form-control" required>
+                                    <div class="input-group">
+                                        <input type="password" name="secret" id="add_nas_secret" class="form-control" required>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleSecretVisibility('add_nas_secret', this)" title="Show/Hide">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="generateSecret('add_nas_secret')" title="Generate Secret">
+                                            <i class="bi bi-shuffle"></i> Generate
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Use the same secret on your MikroTik router</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
                                     <textarea name="description" class="form-control" rows="2"></textarea>
+                                </div>
+                                <hr>
+                                <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN (Optional)</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">VPN Peer</label>
+                                    <select name="wireguard_peer_id" class="form-select">
+                                        <option value="">-- No VPN --</option>
+                                        <?php foreach ($vpnPeers as $peer): ?>
+                                        <option value="<?= $peer['id'] ?>"><?= htmlspecialchars($peer['name']) ?> (<?= htmlspecialchars($peer['allowed_ips']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="text-muted">Link to a VPN peer for remote site access</small>
                                 </div>
                                 <hr>
                                 <h6>MikroTik API (Optional)</h6>
@@ -2667,7 +2735,15 @@ try {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">RADIUS Secret</label>
-                                    <input type="password" name="secret" id="edit_nas_secret" class="form-control" placeholder="Leave blank to keep current">
+                                    <div class="input-group">
+                                        <input type="password" name="secret" id="edit_nas_secret" class="form-control" placeholder="Leave blank to keep current">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleSecretVisibility('edit_nas_secret', this)" title="Show/Hide">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="generateSecret('edit_nas_secret')" title="Generate Secret">
+                                            <i class="bi bi-shuffle"></i> Generate
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
@@ -2676,6 +2752,17 @@ try {
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" name="is_active" id="edit_nas_active" value="1">
                                     <label class="form-check-label" for="edit_nas_active">Active</label>
+                                </div>
+                                <hr>
+                                <h6><i class="bi bi-shield-lock me-1"></i> WireGuard VPN</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">VPN Peer</label>
+                                    <select name="wireguard_peer_id" id="edit_nas_vpn_peer" class="form-select">
+                                        <option value="">-- No VPN --</option>
+                                        <?php foreach ($vpnPeers as $peer): ?>
+                                        <option value="<?= $peer['id'] ?>"><?= htmlspecialchars($peer['name']) ?> (<?= htmlspecialchars($peer['allowed_ips']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                                 <hr>
                                 <h6>MikroTik API (Optional)</h6>
@@ -2719,6 +2806,63 @@ try {
                                 <span class="visually-hidden">Testing...</span>
                             </div>
                             <p class="mt-2">Testing connectivity...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal fade" id="mikrotikScriptModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="bi bi-terminal me-2"></i>MikroTik Configuration Script</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <ul class="nav nav-tabs mb-3" id="scriptTabs">
+                                <li class="nav-item">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#radiusTab">RADIUS Config</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#vpnTab">WireGuard VPN</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fullTab">Full Script</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content">
+                                <div class="tab-pane fade show active" id="radiusTab">
+                                    <p class="text-muted small">RADIUS configuration for PPPoE/Hotspot authentication:</p>
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="radiusScript" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('radiusScript')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="vpnTab">
+                                    <p class="text-muted small">WireGuard VPN configuration for secure site-to-site connectivity:</p>
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="vpnScript" style="max-height: 300px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('vpnScript')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="fullTab">
+                                    <p class="text-muted small">Complete configuration script (RADIUS + VPN):</p>
+                                    <div class="position-relative">
+                                        <pre class="bg-dark text-light p-3 rounded" id="fullScript" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
+                                        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyScript('fullScript')">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <small class="text-muted me-auto">Paste this script into MikroTik terminal (Winbox > New Terminal)</small>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
@@ -3593,7 +3737,116 @@ try {
         document.getElementById('edit_api_enabled').checked = nas.api_enabled == 1;
         document.getElementById('edit_api_port').value = nas.api_port || 8728;
         document.getElementById('edit_api_username').value = nas.api_username || '';
+        document.getElementById('edit_nas_vpn_peer').value = nas.wireguard_peer_id || '';
         new bootstrap.Modal(document.getElementById('editNASModal')).show();
+    }
+    
+    function generateSecret(inputId) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+        let secret = '';
+        for (let i = 0; i < 16; i++) {
+            secret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const input = document.getElementById(inputId);
+        input.value = secret;
+        input.type = 'text';
+        const btn = input.nextElementSibling;
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            }
+        }
+    }
+    
+    function toggleSecretVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+    
+    function showMikroTikScript(nas) {
+        const radiusServer = '<?= $_ENV['RADIUS_SERVER_IP'] ?? gethostbyname(gethostname()) ?>';
+        const radiusSecret = nas.secret || 'YOUR_SECRET_HERE';
+        
+        let radiusScript = `# RADIUS Configuration for ${nas.name}
+# Generated: ${new Date().toLocaleString()}
+
+# Add RADIUS server for authentication
+/radius add service=ppp address=${radiusServer} secret="${radiusSecret}" timeout=3000ms
+
+# Add RADIUS server for hotspot (if needed)
+/radius add service=hotspot address=${radiusServer} secret="${radiusSecret}" timeout=3000ms
+
+# Enable RADIUS for PPPoE
+/ppp aaa set use-radius=yes accounting=yes interim-update=5m
+
+# Optional: Set NAS identifier
+/system identity set name="${nas.name}"
+`;
+
+        let vpnScript = '# No VPN configured for this NAS device';
+        
+        if (nas.wireguard_peer_id) {
+            fetch('/index.php?page=isp&action=get_nas_vpn&id=' + nas.id)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.vpn) {
+                        const v = data.vpn;
+                        vpnScript = `# WireGuard VPN Configuration for ${nas.name}
+# Generated: ${new Date().toLocaleString()}
+
+# Install WireGuard package if not present
+/system package print where name=wireguard
+
+# Create WireGuard interface
+/interface wireguard add name=wg-crm listen-port=51820 private-key="${v.peer_private_key || 'GENERATE_ON_ROUTER'}"
+
+# Add server peer
+/interface wireguard peers add interface=wg-crm \\
+    public-key="${v.server_pubkey}" \\
+    endpoint-address="${v.server_endpoint}" \\
+    endpoint-port=${v.server_port || 51820} \\
+    allowed-address=${v.server_addr} \\
+    persistent-keepalive=25s ${v.psk ? `\\
+    preshared-key="${v.psk}"` : ''}
+
+# Assign IP to WireGuard interface
+/ip address add address=${v.peer_addr} interface=wg-crm
+
+# Add route to CRM network via VPN
+/ip route add dst-address=${v.server_network || '10.200.0.0/24'} gateway=wg-crm
+`;
+                        document.getElementById('vpnScript').textContent = vpnScript;
+                        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+                    }
+                });
+        }
+        
+        document.getElementById('radiusScript').textContent = radiusScript;
+        document.getElementById('vpnScript').textContent = vpnScript;
+        document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
+        
+        new bootstrap.Modal(document.getElementById('mikrotikScriptModal')).show();
+    }
+    
+    function copyScript(elementId) {
+        const text = document.getElementById(elementId).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target.closest('button');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+        });
     }
     
     function testExpiryReminders() {
