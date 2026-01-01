@@ -407,6 +407,7 @@ class Ticket {
             'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
             'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.',
+            'sms_template_team_assigned' => 'ISP Support - Your ticket #{ticket_number} has been assigned to {team_name}. Team Lead: {team_leader_name} ({team_leader_phone}). We will contact you shortly.',
             'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}',
             'wa_template_branch_ticket_assigned' => "🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n🕐 *Created:* {created_at}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Email: {customer_email}\n• Account: {customer_account}\n• Username: {customer_username}\n• Address: {customer_address}\n• Location: {customer_location}\n• GPS: {customer_coordinates}\n• Plan: {service_plan}\n\n👷 *{assignment_info}*\n📞 Tech Phone: {technician_phone}\n👥 Team: {team_name}\n👥 Members: {team_members}\n\n🏢 Branch: {branch_name}",
         ];
@@ -414,6 +415,7 @@ class Ticket {
         $waToSmsMapping = [
             'wa_template_ticket_created' => 'sms_template_ticket_created',
             'wa_template_ticket_assigned' => 'sms_template_ticket_assigned',
+            'wa_template_team_assigned' => 'sms_template_team_assigned',
             'wa_template_technician_assigned' => 'sms_template_technician_assigned',
             'wa_template_status_update' => 'sms_template_ticket_updated',
             'wa_template_resolved' => 'sms_template_ticket_resolved',
@@ -1025,7 +1027,26 @@ class Ticket {
         $ticket = $this->find($ticketId);
         $members = $this->getTeamMembers($teamId);
         $customer = (new Customer())->find($ticket['customer_id']);
+        $team = $this->getTeam($teamId);
+        
+        // Get team leader info
+        $leaderName = '';
+        $leaderPhone = '';
+        if (!empty($team['leader_id'])) {
+            $leader = $this->getUser($team['leader_id']);
+            if ($leader) {
+                $leaderName = $leader['name'] ?? '';
+                $leaderPhone = $leader['phone'] ?? '';
+            }
+        }
+        
+        // If no leader set, use first team member as contact
+        if (empty($leaderName) && !empty($members)) {
+            $leaderName = $members[0]['user_name'] ?? $members[0]['name'] ?? 'Team Support';
+            $leaderPhone = $members[0]['phone'] ?? '';
+        }
 
+        // Notify team members
         foreach ($members as $member) {
             if ($member['phone'] && $customer) {
                 $statusLink = '';
@@ -1053,6 +1074,51 @@ class Ticket {
                 }
                 $result = $this->sms->send($member['phone'], $message);
                 $this->sms->logSMS($ticketId, $member['phone'], 'team_member', 'Team assignment notification', $result['success'] ? 'sent' : 'failed');
+            }
+        }
+        
+        // Notify customer about team assignment
+        if ($customer && !empty($customer['phone'])) {
+            $teamName = $team['name'] ?? 'Support Team';
+            
+            $customerPlaceholders = [
+                '{ticket_number}' => $ticket['ticket_number'],
+                '{subject}' => $ticket['subject'] ?? '',
+                '{description}' => substr($ticket['description'] ?? '', 0, 100),
+                '{category}' => ucfirst($ticket['category'] ?? ''),
+                '{priority}' => ucfirst($ticket['priority'] ?? 'medium'),
+                '{customer_name}' => $customer['name'] ?? 'Customer',
+                '{customer_phone}' => $customer['phone'] ?? '',
+                '{team_name}' => $teamName,
+                '{team_leader_name}' => $leaderName,
+                '{team_leader_phone}' => $leaderPhone,
+                '{technician_name}' => $leaderName ?: $teamName,
+                '{technician_phone}' => $leaderPhone
+            ];
+            
+            // Use team-specific template or fall back to standard ticket assigned template
+            $customerMessage = $this->buildSMSFromTemplate('sms_template_team_assigned', $customerPlaceholders);
+            if (strpos($customerMessage, '{team_name}') !== false || empty(trim($customerMessage))) {
+                // Template not set, use default
+                $customerMessage = "ISP Support - Your ticket #{$ticket['ticket_number']} has been assigned to {$teamName}. Contact: {$leaderName} ({$leaderPhone}).";
+            }
+            
+            $customerResult = $this->sms->send($customer['phone'], $customerMessage);
+            $this->sms->logSMS($ticketId, $customer['phone'], 'customer', 'Team assignment notification', $customerResult['success'] ? 'sent' : 'failed');
+            
+            // Send WhatsApp notification to customer
+            $waCustomerMessage = $this->buildSMSFromTemplate('wa_template_team_assigned', $customerPlaceholders);
+            if (strpos($waCustomerMessage, '{team_name}') !== false || empty(trim($waCustomerMessage))) {
+                $waCustomerMessage = $customerMessage;
+            }
+            
+            try {
+                $waResult = $this->whatsapp->send($customer['phone'], $waCustomerMessage);
+                if ($waResult['success']) {
+                    $this->whatsapp->logMessage($ticketId, null, null, $customer['phone'], 'customer', $waCustomerMessage, 'sent', 'team_assigned');
+                }
+            } catch (\Throwable $e) {
+                error_log("WhatsApp notification failed for customer on team assignment ticket $ticketId: " . $e->getMessage());
             }
         }
     }
