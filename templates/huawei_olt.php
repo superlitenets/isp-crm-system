@@ -5846,10 +5846,10 @@ try {
             ?>
             
             <style>
-            .onu-hero { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius: 1rem; color: white; }
-            .onu-hero .stat-card { background: rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; backdrop-filter: blur(10px); }
-            .onu-hero .stat-value { font-size: 1.5rem; font-weight: 700; }
-            .onu-hero .stat-label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; letter-spacing: 0.5px; }
+            .onu-hero { background: #fff; border-radius: 1rem; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+            .onu-hero .stat-card { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; border: 1px solid #e2e8f0; }
+            .onu-hero .stat-value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+            .onu-hero .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
             .quick-action-card { transition: all 0.2s ease; border: 2px solid transparent; }
             .quick-action-card:hover { transform: translateY(-2px); border-color: var(--oms-accent); box-shadow: 0 8px 25px rgba(59,130,246,0.15); }
             .quick-action-card .icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
@@ -5892,13 +5892,13 @@ try {
             <!-- Hero Status Card -->
             <div class="onu-hero p-4 mb-4">
                 <div class="row align-items-center">
-                    <div class="col-md-3 text-center border-end border-light border-opacity-25 mb-3 mb-md-0">
+                    <div class="col-md-3 text-center border-end mb-3 mb-md-0">
                         <div class="rounded-circle d-inline-flex align-items-center justify-content-center <?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?>" 
                              style="width: 80px; height: 80px; background: <?= $currentOnu['status'] === 'online' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)' ?>">
                             <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>" style="font-size: 2.5rem;"></i>
                         </div>
                         <h5 data-live-status class="mt-2 mb-0 text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>"><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></h5>
-                        <small class="text-white-50">Device Status</small>
+                        <small class="text-muted">Device Status</small>
                     </div>
                     <div class="col-md-9">
                         <div class="row g-3">
