@@ -359,6 +359,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'clear_mac':
+            $id = (int)$_POST['id'];
+            try {
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET mac_address = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$id]);
+                $message = 'MAC binding cleared. MAC will be auto-captured on next connection.';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error clearing MAC: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'add_credit':
             $subId = (int)$_POST['subscription_id'];
             $amount = (float)$_POST['amount'];
@@ -1918,25 +1931,20 @@ try {
                                 <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
                                 <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
                                 <tr><td class="text-muted">MAC Address</td><td>
-                                    <code><?= $subscriber['mac_address'] ?: '-' ?></code>
-                                    <?php 
-                                    // Check for active session MAC
-                                    $activeSessionMac = $db->prepare("SELECT mac_address FROM radius_sessions WHERE subscription_id = ? AND status = 'active' AND mac_address IS NOT NULL AND mac_address != '' ORDER BY session_start DESC LIMIT 1");
-                                    $activeSessionMac->execute([$subscriber['id']]);
-                                    $sessionMac = $activeSessionMac->fetchColumn();
-                                    ?>
-                                    <?php if ($sessionMac && $sessionMac !== $subscriber['mac_address']): ?>
+                                    <?php if ($subscriber['mac_address']): ?>
+                                    <code><?= htmlspecialchars($subscriber['mac_address']) ?></code>
+                                    <span class="badge bg-success ms-1" title="User locked to this MAC"><i class="bi bi-lock-fill"></i> Bound</span>
                                     <form method="post" class="d-inline ms-2">
-                                        <input type="hidden" name="action" value="capture_mac">
+                                        <input type="hidden" name="action" value="clear_mac">
                                         <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
-                                        <input type="hidden" name="mac" value="<?= htmlspecialchars($sessionMac) ?>">
                                         <input type="hidden" name="return_to" value="subscriber">
-                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Capture MAC from active session: <?= htmlspecialchars($sessionMac) ?>">
-                                            <i class="bi bi-download"></i> Capture
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Clear MAC binding" onclick="return confirm('Clear MAC binding? User will be able to connect from any device.')">
+                                            <i class="bi bi-unlock"></i>
                                         </button>
                                     </form>
-                                    <?php elseif (!$subscriber['mac_address']): ?>
-                                    <span class="text-muted small ms-2">(Connect to capture)</span>
+                                    <?php else: ?>
+                                    <span class="text-muted">-</span>
+                                    <span class="badge bg-secondary ms-1"><i class="bi bi-unlock"></i> Auto-capture pending</span>
                                     <?php endif; ?>
                                 </td></tr>
                                 <tr><td class="text-muted">Start Date</td><td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td></tr>

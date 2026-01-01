@@ -599,6 +599,8 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Subscription not found'];
             }
             
+            $sessionMac = $data['mac_address'] ?? '';
+            
             $stmt = $this->db->prepare("
                 INSERT INTO radius_sessions (subscription_id, acct_session_id, nas_id, nas_ip_address,
                     nas_port_id, framed_ip_address, mac_address, session_start, status)
@@ -611,8 +613,14 @@ class RadiusBilling {
                 $data['nas_ip_address'] ?? '',
                 $data['nas_port_id'] ?? '',
                 $data['framed_ip_address'] ?? '',
-                $data['mac_address'] ?? ''
+                $sessionMac
             ]);
+            
+            // Auto-capture MAC if subscription doesn't have one yet
+            if (empty($sub['mac_address']) && !empty($sessionMac)) {
+                $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    ->execute([$sessionMac, $sub['id']]);
+            }
             
             // Update subscription last session
             $this->db->prepare("UPDATE radius_subscriptions SET last_session_start = CURRENT_TIMESTAMP WHERE id = ?")->execute([$sub['id']]);
@@ -876,7 +884,7 @@ class RadiusBilling {
     
     // ==================== RADIUS Authentication (for integration) ====================
     
-    public function authenticate(string $username, string $password, string $nasIp = ''): array {
+    public function authenticate(string $username, string $password, string $nasIp = '', string $callingStationId = ''): array {
         $sub = $this->getSubscriptionByUsername($username);
         
         if (!$sub) {
@@ -886,6 +894,15 @@ class RadiusBilling {
         // Check password
         if ($this->decrypt($sub['password_encrypted']) !== $password) {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
+        }
+        
+        // Check MAC binding if enabled and MAC is set on subscription
+        if (!empty($sub['mac_address']) && !empty($callingStationId)) {
+            $normalizedSubMac = strtoupper(str_replace(['-', '.'], ':', $sub['mac_address']));
+            $normalizedCallingMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
+            if ($normalizedSubMac !== $normalizedCallingMac) {
+                return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'MAC address mismatch'];
+            }
         }
         
         // Get expired pool settings

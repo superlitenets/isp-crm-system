@@ -65,6 +65,17 @@ switch (strtolower($acctStatusType)) {
                 $subscriptionId, $sessionId, $nasId, $nasIP, $nasPort,
                 $framedIP, $macAddress, $username
             ]);
+            
+            // Auto-capture MAC if subscription doesn't have one yet
+            if (!empty($macAddress)) {
+                $stmt = $db->prepare("SELECT mac_address FROM radius_subscriptions WHERE id = ?");
+                $stmt->execute([$subscriptionId]);
+                $currentMac = $stmt->fetchColumn();
+                if (empty($currentMac)) {
+                    $db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = NOW() WHERE id = ?")
+                       ->execute([$macAddress, $subscriptionId]);
+                }
+            }
         }
         
         $db->prepare("UPDATE radius_subscriptions SET last_session_start = NOW() WHERE id = ?")
