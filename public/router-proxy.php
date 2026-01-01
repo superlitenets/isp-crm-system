@@ -235,6 +235,65 @@ if (strpos($contentType, 'text/html') !== false) {
         }
         return el;
     };
+    
+    document.addEventListener("click", function(e) {
+        var target = e.target.closest("a");
+        if (target && target.href && !target.href.startsWith("javascript:")) {
+            var href = target.getAttribute("href");
+            if (href && !href.startsWith("/router-proxy.php") && !href.startsWith("#") && !href.startsWith("javascript:")) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = proxyUrl(href);
+                return false;
+            }
+        }
+    }, true);
+    
+    document.addEventListener("submit", function(e) {
+        var form = e.target;
+        if (form.tagName === "FORM") {
+            var action = form.getAttribute("action") || window.location.href;
+            if (!action.startsWith("/router-proxy.php")) {
+                form.action = proxyUrl(action);
+            }
+        }
+    }, true);
+    
+    var origAssign = window.location.assign;
+    if (origAssign) {
+        window.location.assign = function(url) {
+            return origAssign.call(this, proxyUrl(url));
+        };
+    }
+    
+    var origReplace = window.location.replace;
+    if (origReplace) {
+        window.location.replace = function(url) {
+            return origReplace.call(this, proxyUrl(url));
+        };
+    }
+    
+    try {
+        Object.defineProperty(window.location, "href", {
+            set: function(url) {
+                window.location.assign(proxyUrl(url));
+            }
+        });
+    } catch(e) {}
+    
+    if (window.frames && window.frames.length > 0) {
+        for (var i = 0; i < window.frames.length; i++) {
+            try {
+                var frame = window.frames[i];
+                if (frame.location && frame.location.href) {
+                    var frameUrl = frame.location.href;
+                    if (!frameUrl.includes("/router-proxy.php")) {
+                        frame.location.href = proxyUrl(frameUrl);
+                    }
+                }
+            } catch(e) {}
+        }
+    }
 })();
 </script>';
     
