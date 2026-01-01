@@ -4850,8 +4850,22 @@ class HuaweiOLT {
     }
     
     public function isOLTServiceAvailable(): bool {
-        $result = $this->callOLTService('/health', [], 'GET');
-        return isset($result['status']) && $result['status'] === 'ok';
+        // Use fast timeout check - don't wait long if service is down
+        $url = $this->getOLTServiceUrl() . '/health';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);       // 1 second max
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1); // 1 second connect
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($response && $httpCode === 200) {
+            $result = json_decode($response, true);
+            return isset($result['status']) && $result['status'] === 'ok';
+        }
+        return false;
     }
     
     public function connectToOLTSession(int $oltId): array {
