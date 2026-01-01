@@ -6022,11 +6022,24 @@ try {
                                 (<?= $distanceDisplay ?>)
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">Attached VLANs</span><br>
-                                <?php if (!empty($currentOnu['vlan_id'])): ?>
-                                <span class="badge bg-primary"><?= $currentOnu['vlan_id'] ?></span>
-                                <?php else: ?>
-                                None
+                                <span class="text-primary">Attached VLANs</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" data-bs-toggle="modal" data-bs-target="#attachedVlansModal" title="Edit Attached VLANs">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <br>
+                                <?php 
+                                $attachedVlans = [];
+                                if (!empty($currentOnu['attached_vlans'])) {
+                                    $attachedVlans = json_decode($currentOnu['attached_vlans'], true) ?: [];
+                                } elseif (!empty($currentOnu['vlan_id'])) {
+                                    $attachedVlans = [(int)$currentOnu['vlan_id']];
+                                }
+                                if (!empty($attachedVlans)): 
+                                    foreach ($attachedVlans as $vid): ?>
+                                <span class="badge bg-primary me-1"><?= htmlspecialchars($vid) ?></span>
+                                <?php endforeach; 
+                                else: ?>
+                                <span class="text-muted">None</span>
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
@@ -6914,22 +6927,21 @@ try {
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label">Service VLAN</label>
-                                    <select name="service_vlan" class="form-select" required>
-                                        <?php
-                                        $serviceVlans = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = FALSE AND is_active = TRUE ORDER BY vlan_id");
-                                        $serviceVlans->execute([$currentOnu['olt_id']]);
-                                        $vlans = $serviceVlans->fetchAll(PDO::FETCH_ASSOC);
-                                        foreach ($vlans as $vlan):
-                                        ?>
-                                        <option value="<?= $vlan['vlan_id'] ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vlan['vlan_id'] ? 'selected' : '' ?>>
-                                            <?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'Service VLAN') ?>
+                                    <label class="form-label">Service VLAN <small class="text-muted">(from attached VLANs)</small></label>
+                                    <select name="service_vlan" id="serviceVlanSelect" class="form-select" required>
+                                        <?php if (empty($attachedVlans)): ?>
+                                        <option value="">-- No VLANs attached - Add VLANs first --</option>
+                                        <?php else: 
+                                            foreach ($attachedVlans as $vid): ?>
+                                        <option value="<?= $vid ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vid ? 'selected' : '' ?>>
+                                            <?= $vid ?>
                                         </option>
-                                        <?php endforeach; ?>
-                                        <?php if (empty($vlans) && !empty($currentOnu['vlan_id'])): ?>
-                                        <option value="<?= $currentOnu['vlan_id'] ?>" selected><?= $currentOnu['vlan_id'] ?></option>
-                                        <?php endif; ?>
+                                        <?php endforeach; 
+                                        endif; ?>
                                     </select>
+                                    <?php if (empty($attachedVlans)): ?>
+                                    <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Attach VLANs to this ONU first before configuring WAN.</div>
+                                    <?php endif; ?>
                                 </div>
                                 
                                 <div id="pppoeFields" style="display: none;">
@@ -6977,7 +6989,7 @@ try {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary" id="btnConfigWan" <?= empty($currentOnu['tr069_ip']) ? 'disabled' : '' ?>>
+                                <button type="submit" class="btn btn-primary" id="btnConfigWan" <?= (empty($currentOnu['tr069_ip']) || empty($attachedVlans)) ? 'disabled' : '' ?>>
                                     <i class="bi bi-check-circle me-1"></i> Apply Configuration
                                 </button>
                             </div>
@@ -6985,6 +6997,229 @@ try {
                     </div>
                 </div>
             </div>
+            
+            <!-- Attached VLANs Modal -->
+            <div class="modal fade" id="attachedVlansModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title"><i class="bi bi-tags me-2"></i>Manage Attached VLANs</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="attachedVlansOnuId" value="<?= $currentOnu['id'] ?>">
+                            
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Attached VLANs create service-port entries on the OLT for this ONU. Only attached VLANs can be used as service VLANs for WAN configuration.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Current Attached VLANs</label>
+                                <div id="currentVlansList" class="d-flex flex-wrap gap-2 mb-2">
+                                    <?php if (!empty($attachedVlans)): 
+                                        foreach ($attachedVlans as $vid): ?>
+                                    <span class="badge bg-primary d-flex align-items-center" data-vlan="<?= $vid ?>">
+                                        <?= $vid ?>
+                                        <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeAttachedVlan(<?= $vid ?>)" title="Remove"></button>
+                                    </span>
+                                    <?php endforeach; 
+                                    else: ?>
+                                    <span class="text-muted" id="noVlansMsg">No VLANs attached</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Add VLAN</label>
+                                <div class="input-group">
+                                    <select id="addVlanSelect" class="form-select">
+                                        <option value="">-- Select VLAN --</option>
+                                        <?php
+                                        $availableVlans = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = FALSE AND is_active = TRUE ORDER BY vlan_id");
+                                        $availableVlans->execute([$currentOnu['olt_id']]);
+                                        $oltVlans = $availableVlans->fetchAll(PDO::FETCH_ASSOC);
+                                        foreach ($oltVlans as $vlan):
+                                            if (!in_array((int)$vlan['vlan_id'], $attachedVlans)):
+                                        ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>"><?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'Service VLAN') ?></option>
+                                        <?php endif; endforeach; ?>
+                                    </select>
+                                    <button type="button" class="btn btn-success" onclick="addAttachedVlan()">
+                                        <i class="bi bi-plus-lg"></i> Add
+                                    </button>
+                                </div>
+                                <div class="form-text">Or enter a custom VLAN ID:</div>
+                                <div class="input-group mt-2">
+                                    <input type="number" id="customVlanInput" class="form-control" min="1" max="4094" placeholder="VLAN ID (1-4094)">
+                                    <button type="button" class="btn btn-outline-success" onclick="addCustomVlan()">
+                                        <i class="bi bi-plus-lg"></i> Add Custom
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="vlanOperationLog" class="mt-3" style="display: none;">
+                                <label class="form-label">Operation Log</label>
+                                <pre class="bg-dark text-light p-2 small" style="max-height: 150px; overflow-y: auto;" id="vlanLogContent"></pre>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            let currentAttachedVlans = <?= json_encode($attachedVlans) ?>;
+            
+            async function addAttachedVlan() {
+                const select = document.getElementById('addVlanSelect');
+                const vlanId = parseInt(select.value);
+                if (!vlanId) {
+                    alert('Please select a VLAN');
+                    return;
+                }
+                await attachVlanToOnu(vlanId);
+            }
+            
+            async function addCustomVlan() {
+                const input = document.getElementById('customVlanInput');
+                const vlanId = parseInt(input.value);
+                if (!vlanId || vlanId < 1 || vlanId > 4094) {
+                    alert('Please enter a valid VLAN ID (1-4094)');
+                    return;
+                }
+                if (currentAttachedVlans.includes(vlanId)) {
+                    alert('VLAN ' + vlanId + ' is already attached');
+                    return;
+                }
+                await attachVlanToOnu(vlanId);
+                input.value = '';
+            }
+            
+            async function attachVlanToOnu(vlanId) {
+                const onuId = document.getElementById('attachedVlansOnuId').value;
+                const logDiv = document.getElementById('vlanOperationLog');
+                const logContent = document.getElementById('vlanLogContent');
+                
+                logDiv.style.display = 'block';
+                logContent.textContent = 'Attaching VLAN ' + vlanId + '...\n';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('onu_id', onuId);
+                    formData.append('vlan_id', vlanId);
+                    formData.append('action', 'attach');
+                    
+                    const resp = await fetch('?page=api&action=manage_onu_vlan', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        logContent.textContent += 'SUCCESS: ' + data.message + '\n';
+                        if (data.olt_output) {
+                            logContent.textContent += '\nOLT Commands:\n' + data.olt_output;
+                        }
+                        currentAttachedVlans.push(vlanId);
+                        updateVlanDisplay();
+                    } else {
+                        logContent.textContent += 'ERROR: ' + (data.error || 'Unknown error') + '\n';
+                        alert('Failed to attach VLAN: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    logContent.textContent += 'NETWORK ERROR: ' + err.message + '\n';
+                    alert('Network error: ' + err.message);
+                }
+            }
+            
+            async function removeAttachedVlan(vlanId) {
+                if (!confirm('Remove VLAN ' + vlanId + ' from this ONU? This will delete the service-port on the OLT.')) {
+                    return;
+                }
+                
+                const onuId = document.getElementById('attachedVlansOnuId').value;
+                const logDiv = document.getElementById('vlanOperationLog');
+                const logContent = document.getElementById('vlanLogContent');
+                
+                logDiv.style.display = 'block';
+                logContent.textContent = 'Removing VLAN ' + vlanId + '...\n';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('onu_id', onuId);
+                    formData.append('vlan_id', vlanId);
+                    formData.append('action', 'detach');
+                    
+                    const resp = await fetch('?page=api&action=manage_onu_vlan', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        logContent.textContent += 'SUCCESS: ' + data.message + '\n';
+                        if (data.olt_output) {
+                            logContent.textContent += '\nOLT Commands:\n' + data.olt_output;
+                        }
+                        currentAttachedVlans = currentAttachedVlans.filter(v => v !== vlanId);
+                        updateVlanDisplay();
+                    } else {
+                        logContent.textContent += 'ERROR: ' + (data.error || 'Unknown error') + '\n';
+                        alert('Failed to remove VLAN: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    logContent.textContent += 'NETWORK ERROR: ' + err.message + '\n';
+                    alert('Network error: ' + err.message);
+                }
+            }
+            
+            function updateVlanDisplay() {
+                const container = document.getElementById('currentVlansList');
+                if (currentAttachedVlans.length === 0) {
+                    container.innerHTML = '<span class="text-muted" id="noVlansMsg">No VLANs attached</span>';
+                } else {
+                    container.innerHTML = currentAttachedVlans.map(v => 
+                        `<span class="badge bg-primary d-flex align-items-center" data-vlan="${v}">
+                            ${v}
+                            <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeAttachedVlan(${v})" title="Remove"></button>
+                        </span>`
+                    ).join('');
+                }
+                
+                // Update the service VLAN dropdown in WAN config modal
+                const serviceVlanSelect = document.getElementById('serviceVlanSelect');
+                if (serviceVlanSelect) {
+                    if (currentAttachedVlans.length === 0) {
+                        serviceVlanSelect.innerHTML = '<option value="">-- No VLANs attached - Add VLANs first --</option>';
+                        document.getElementById('btnConfigWan').disabled = true;
+                    } else {
+                        serviceVlanSelect.innerHTML = currentAttachedVlans.map(v => 
+                            `<option value="${v}">${v}</option>`
+                        ).join('');
+                        // Re-enable button if TR-069 is configured
+                        const hasTr069 = <?= !empty($currentOnu['tr069_ip']) ? 'true' : 'false' ?>;
+                        document.getElementById('btnConfigWan').disabled = !hasTr069;
+                    }
+                }
+                
+                // Update add VLAN dropdown to remove already attached
+                const addSelect = document.getElementById('addVlanSelect');
+                if (addSelect) {
+                    Array.from(addSelect.options).forEach(opt => {
+                        if (opt.value && currentAttachedVlans.includes(parseInt(opt.value))) {
+                            opt.style.display = 'none';
+                        } else {
+                            opt.style.display = '';
+                        }
+                    });
+                }
+            }
+            </script>
             
             <script>
             function toggleWanFields() {

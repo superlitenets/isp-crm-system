@@ -983,6 +983,41 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
     exit;
 }
 
+// Manage ONU VLAN (attach/detach) - creates service-port on OLT
+if ($page === 'api' && $action === 'manage_onu_vlan') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_POST['onu_id']) ? (int)$_POST['onu_id'] : 0;
+    $vlanId = isset($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : 0;
+    $vlanAction = $_POST['action'] ?? '';
+    
+    if (!$onuId || !$vlanId || !in_array($vlanAction, ['attach', 'detach'])) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID, VLAN ID and action (attach/detach) required']);
+        exit;
+    }
+    
+    try {
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        
+        if ($vlanAction === 'attach') {
+            $result = $huaweiOLT->attachVlanToONU($onuId, $vlanId);
+        } else {
+            $result = $huaweiOLT->detachVlanFromONU($onuId, $vlanId);
+        }
+        
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Web Dashboard Clock In/Out API
 if ($page === 'api' && $action === 'clock_in') {
     while (ob_get_level()) ob_end_clean();

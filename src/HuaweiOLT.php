@@ -6228,6 +6228,206 @@ class HuaweiOLT {
         ];
     }
     
+    /**
+     * Attach a VLAN to an ONU - creates service-port on OLT
+     */
+    public function attachVlanToONU(int $onuDbId, int $vlanId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'error' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        // Get current attached VLANs
+        $attachedVlans = [];
+        if (!empty($onu['attached_vlans'])) {
+            $attachedVlans = json_decode($onu['attached_vlans'], true) ?: [];
+        } elseif (!empty($onu['vlan_id'])) {
+            $attachedVlans = [(int)$onu['vlan_id']];
+        }
+        
+        // Check if already attached
+        if (in_array($vlanId, $attachedVlans)) {
+            return ['success' => false, 'error' => "VLAN {$vlanId} is already attached to this ONU"];
+        }
+        
+        $output = '';
+        $errors = [];
+        
+        // Determine GEM port based on number of attached VLANs
+        $gemPort = count($attachedVlans) + 1;
+        
+        // Create service-port command
+        // service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate
+        $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9";
+        
+        $result = $this->executeCommand($oltId, $cmd);
+        $output .= "[Service Port Creation]\n" . ($result['output'] ?? '') . "\n";
+        
+        // Check for real errors (ignore "already exists")
+        $resultOutput = $result['output'] ?? '';
+        if (preg_match('/Failure|Error:|failed|Invalid parameter|Unknown command/i', $resultOutput) && 
+            !preg_match('/already exist|Make configuration repeatedly/i', $resultOutput)) {
+            $errors[] = "Failed to create service-port";
+        }
+        
+        // Update attached_vlans in database
+        $attachedVlans[] = $vlanId;
+        $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([json_encode($attachedVlans), $onuDbId]);
+        
+        // If this is the first VLAN, also set it as the primary vlan_id
+        if (count($attachedVlans) === 1) {
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET vlan_id = ? WHERE id = ?");
+            $stmt->execute([$vlanId, $onuDbId]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'attach_vlan',
+            'status' => empty($errors) ? 'success' : 'error',
+            'message' => empty($errors) 
+                ? "Attached VLAN {$vlanId} to ONU (GEM port {$gemPort})"
+                : "Failed to attach VLAN: " . implode(', ', $errors),
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        if (empty($errors)) {
+            return [
+                'success' => true,
+                'message' => "VLAN {$vlanId} attached successfully (GEM port {$gemPort})",
+                'olt_output' => $output,
+                'attached_vlans' => $attachedVlans
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => implode('; ', $errors),
+            'olt_output' => $output
+        ];
+    }
+    
+    /**
+     * Detach a VLAN from an ONU - removes service-port on OLT
+     */
+    public function detachVlanFromONU(int $onuDbId, int $vlanId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'error' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        // Get current attached VLANs
+        $attachedVlans = [];
+        if (!empty($onu['attached_vlans'])) {
+            $attachedVlans = json_decode($onu['attached_vlans'], true) ?: [];
+        } elseif (!empty($onu['vlan_id'])) {
+            $attachedVlans = [(int)$onu['vlan_id']];
+        }
+        
+        // Check if attached
+        if (!in_array($vlanId, $attachedVlans)) {
+            return ['success' => false, 'error' => "VLAN {$vlanId} is not attached to this ONU"];
+        }
+        
+        $output = '';
+        $errors = [];
+        
+        // First, find the service-port index for this VLAN
+        // display service-port port gpon {frame}/{slot}/{port} ont {onu_id}
+        $displayCmd = "display service-port port gpon {$frame}/{$slot}/{$port} ont {$onuId}";
+        $displayResult = $this->executeCommand($oltId, $displayCmd);
+        $displayOutput = $displayResult['output'] ?? '';
+        $output .= "[Finding Service Port]\n{$displayOutput}\n";
+        
+        // Parse service-port index for this VLAN
+        // Format: "123  normal  gpon  0/1/0     1   902  common  902..."
+        $servicePortIndex = null;
+        foreach (explode("\n", $displayOutput) as $line) {
+            if (preg_match('/^\s*(\d+)\s+\w+\s+gpon\s+\d+\/\d+\/\d+\s+\d+\s+(\d+)/', $line, $m)) {
+                if ((int)$m[2] === $vlanId) {
+                    $servicePortIndex = (int)$m[1];
+                    break;
+                }
+            }
+        }
+        
+        if ($servicePortIndex !== null) {
+            // Delete service-port by index
+            $undoCmd = "undo service-port {$servicePortIndex}";
+            $undoResult = $this->executeCommand($oltId, $undoCmd);
+            $output .= "[Removing Service Port {$servicePortIndex}]\n" . ($undoResult['output'] ?? '') . "\n";
+            
+            $undoOutput = $undoResult['output'] ?? '';
+            if (preg_match('/Failure|Error:|failed/i', $undoOutput) && 
+                !preg_match('/does not exist|not found/i', $undoOutput)) {
+                $errors[] = "Failed to remove service-port";
+            }
+        } else {
+            $output .= "[Note: Service port for VLAN {$vlanId} not found on OLT - may have been removed]\n";
+        }
+        
+        // Update attached_vlans in database
+        $attachedVlans = array_values(array_filter($attachedVlans, fn($v) => $v !== $vlanId));
+        $stmt = $this->db->prepare("UPDATE huawei_onus SET attached_vlans = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([json_encode($attachedVlans), $onuDbId]);
+        
+        // Update primary vlan_id if this was it
+        if ((int)$onu['vlan_id'] === $vlanId) {
+            $newPrimaryVlan = !empty($attachedVlans) ? $attachedVlans[0] : null;
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET vlan_id = ? WHERE id = ?");
+            $stmt->execute([$newPrimaryVlan, $onuDbId]);
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'detach_vlan',
+            'status' => empty($errors) ? 'success' : 'error',
+            'message' => empty($errors) 
+                ? "Detached VLAN {$vlanId} from ONU"
+                : "Failed to detach VLAN: " . implode(', ', $errors),
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        if (empty($errors)) {
+            return [
+                'success' => true,
+                'message' => "VLAN {$vlanId} detached successfully",
+                'olt_output' => $output,
+                'attached_vlans' => $attachedVlans
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => implode('; ', $errors),
+            'olt_output' => $output
+        ];
+    }
+    
     private function generateNextSNSCode(int $oltId): string {
         // Find highest SNS number for this OLT
         $stmt = $this->db->prepare("
