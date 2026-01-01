@@ -1773,6 +1773,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 break;
+            case 'import_smartolt_csv':
+                $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                if (!$oltId) {
+                    $message = 'Please select an OLT';
+                    $messageType = 'danger';
+                } elseif (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+                    $message = 'Please upload a valid CSV file';
+                    $messageType = 'danger';
+                } else {
+                    $csvFile = $_FILES['csv_file']['tmp_name'];
+                    $handle = fopen($csvFile, 'r');
+                    if (!$handle) {
+                        $message = 'Failed to read CSV file';
+                        $messageType = 'danger';
+                    } else {
+                        fgetcsv($handle, 0, ',', '"', '\\');
+                        
+                        $imported = 0;
+                        $updated = 0;
+                        $skipped = 0;
+                        $errors = [];
+                        
+                        while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+                            $sn = strtoupper(trim($row[2] ?? ''));
+                            if (empty($sn) || strlen($sn) < 12) {
+                                $skipped++;
+                                continue;
+                            }
+                            
+                            $onuType = trim($row[3] ?? '');
+                            $name = trim($row[4] ?? '');
+                            $board = (int)($row[6] ?? 0);
+                            $port = (int)($row[7] ?? 0);
+                            $allocatedOnu = (int)($row[8] ?? 0);
+                            $zone = trim($row[9] ?? '');
+                            $address = trim($row[10] ?? '');
+                            $status = strtolower(trim($row[27] ?? 'offline'));
+                            $rxPower = $row[30] ?? null;
+                            $txPower = $row[29] ?? null;
+                            $distance = $row[31] ?? null;
+                            $serviceVlan = (int)($row[33] ?? 0);
+                            $externalId = trim($row[0] ?? '');
+                            
+                            $rxPowerFloat = is_numeric($rxPower) ? (float)$rxPower : null;
+                            $txPowerFloat = is_numeric($txPower) ? (float)$txPower : null;
+                            $distanceFloat = is_numeric($distance) ? (float)$distance : null;
+                            
+                            $onuTypeId = null;
+                            if ($onuType) {
+                                $stmt = $db->prepare("SELECT id FROM huawei_onu_types WHERE LOWER(name) = LOWER(?) OR LOWER(model) = LOWER(?) LIMIT 1");
+                                $stmt->execute([$onuType, $onuType]);
+                                $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                $onuTypeId = $typeRow['id'] ?? null;
+                            }
+                            
+                            $statusMap = ['online' => 'online', 'offline' => 'offline', 'power fail' => 'offline', 'los' => 'los', 'dying-gasp' => 'offline'];
+                            $mappedStatus = $statusMap[$status] ?? 'offline';
+                            
+                            $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                            $stmt->execute([$sn]);
+                            $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            
+                            try {
+                                if ($existing) {
+                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, zone = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
+                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
+                                    $updated++;
+                                } else {
+                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, is_authorized, zone, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
+                                    $imported++;
+                                }
+                            } catch (\Exception $e) {
+                                $errors[] = "SN {$sn}: " . $e->getMessage();
+                            }
+                        }
+                        fclose($handle);
+                        
+                        $message = "CSV Import complete: {$imported} added, {$updated} updated";
+                        if ($skipped > 0) $message .= ", {$skipped} skipped (continuation rows)";
+                        if (!empty($errors)) $message .= ". Errors: " . count($errors);
+                        $messageType = empty($errors) ? 'success' : 'warning';
+                    }
+                }
+                break;
             case 'bulk_tr069_config':
                 $oltId = isset($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $acsUrl = trim($_POST['acs_url'] ?? '');
@@ -10042,6 +10127,48 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 </button>
                             </form>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- CSV Import from SmartOLT Export -->
+                    <div class="card mt-3">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Import from SmartOLT CSV Export</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Upload a CSV file exported from SmartOLT. This preserves correct ONU IDs and mappings.
+                            </p>
+                            <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Import ONUs from CSV file? This will add new ONUs and update existing ones.')">
+                                <input type="hidden" name="action" value="import_smartolt_csv">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Target OLT</label>
+                                    <select name="olt_id" class="form-select" required>
+                                        <option value="">-- Select OLT --</option>
+                                        <?php foreach ($olts as $o): ?>
+                                        <option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">All ONUs from the CSV will be assigned to this OLT</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">SmartOLT CSV File</label>
+                                    <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                                    <div class="form-text">Export from SmartOLT: OLT &rarr; ONUs &rarr; Export CSV</div>
+                                </div>
+                                
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    <strong>CSV Format:</strong> The CSV should have columns: SN, Onu Type, Name, Board, Port, Allocated ONU, Zone, Address, Status, Signal levels, etc.
+                                    <br><strong>Note:</strong> ONUs are imported as "already authorized" since they exist on the OLT.
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success w-100" onclick="showLoading('Importing ONUs from CSV...')">
+                                    <i class="bi bi-upload me-1"></i> Import from CSV
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
