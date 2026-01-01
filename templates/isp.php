@@ -342,6 +342,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'capture_mac':
+            $id = (int)$_POST['id'];
+            $mac = trim($_POST['mac'] ?? '');
+            try {
+                if (empty($mac)) {
+                    throw new Exception('No MAC address provided');
+                }
+                $stmt = $db->prepare("UPDATE radius_subscriptions SET mac_address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$mac, $id]);
+                $message = 'MAC address captured: ' . $mac;
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error capturing MAC: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'add_credit':
             $subId = (int)$_POST['subscription_id'];
             $amount = (float)$_POST['amount'];
@@ -1900,7 +1917,28 @@ try {
                                 <tr><td class="text-muted">Price</td><td>KES <?= number_format($package['price'] ?? 0) ?></td></tr>
                                 <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
                                 <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
-                                <tr><td class="text-muted">MAC Address</td><td><code><?= $subscriber['mac_address'] ?: '-' ?></code></td></tr>
+                                <tr><td class="text-muted">MAC Address</td><td>
+                                    <code><?= $subscriber['mac_address'] ?: '-' ?></code>
+                                    <?php 
+                                    // Check for active session MAC
+                                    $activeSessionMac = $db->prepare("SELECT mac_address FROM radius_sessions WHERE subscription_id = ? AND status = 'active' AND mac_address IS NOT NULL AND mac_address != '' ORDER BY session_start DESC LIMIT 1");
+                                    $activeSessionMac->execute([$subscriber['id']]);
+                                    $sessionMac = $activeSessionMac->fetchColumn();
+                                    ?>
+                                    <?php if ($sessionMac && $sessionMac !== $subscriber['mac_address']): ?>
+                                    <form method="post" class="d-inline ms-2">
+                                        <input type="hidden" name="action" value="capture_mac">
+                                        <input type="hidden" name="id" value="<?= $subscriber['id'] ?>">
+                                        <input type="hidden" name="mac" value="<?= htmlspecialchars($sessionMac) ?>">
+                                        <input type="hidden" name="return_to" value="subscriber">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Capture MAC from active session: <?= htmlspecialchars($sessionMac) ?>">
+                                            <i class="bi bi-download"></i> Capture
+                                        </button>
+                                    </form>
+                                    <?php elseif (!$subscriber['mac_address']): ?>
+                                    <span class="text-muted small ms-2">(Connect to capture)</span>
+                                    <?php endif; ?>
+                                </td></tr>
                                 <tr><td class="text-muted">Start Date</td><td><?= $subscriber['start_date'] ? date('M j, Y', strtotime($subscriber['start_date'])) : '-' ?></td></tr>
                                 <tr>
                                     <td class="text-muted">Expiry Date</td>
