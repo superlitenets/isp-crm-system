@@ -1042,13 +1042,22 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info
-        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-        $stmt->execute([$sub['nas_id']]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if (!$nas) {
+        // Get NAS info with VPN configuration
+        $nasWithVpn = $this->getNASWithVPN((int)$sub['nas_id']);
+        if (!$nasWithVpn) {
             return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Determine target IP - use VPN peer IP if available
+        $targetIp = $nasWithVpn['ip_address'];
+        $vpnUsed = false;
+        
+        if (!empty($nasWithVpn['vpn_allowed_ips'])) {
+            $vpnIp = preg_replace('/\/\d+$/', '', $nasWithVpn['vpn_allowed_ips']);
+            if (filter_var($vpnIp, FILTER_VALIDATE_IP)) {
+                $targetIp = $vpnIp;
+                $vpnUsed = true;
+            }
         }
         
         // Build CoA with new rate limit
@@ -1059,16 +1068,21 @@ class RadiusBilling {
         ];
         
         try {
-            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
+            $client = new RadiusClient($targetIp, $nasWithVpn['secret'], 3799, 5);
             $result = $client->coa($attrs);
             
-            if ($result['success']) {
-                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK'];
+            $output = $result['response'] ?? 'CoA-ACK';
+            if ($vpnUsed) {
+                $output .= " (via VPN: $targetIp)";
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+            if ($result['success']) {
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $output, 'via_vpn' => $vpnUsed, 'target_ip' => $targetIp];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $targetIp];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $targetIp];
         }
     }
     
@@ -1439,9 +1453,9 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get active sessions with subscription username
+        // Get active sessions with subscription username and NAS ID for VPN lookup
         $stmt = $this->db->prepare("
-            SELECT rs.acct_session_id, rs.framed_ip_address, rs.mac_address,
+            SELECT rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
                    sub.username, rn.ip_address as nas_ip, rn.secret as nas_secret
             FROM radius_sessions rs
             LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
@@ -1475,13 +1489,28 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Missing NAS IP or secret'];
         }
         
-        $nasIp = $session['nas_ip'];
-        $nasSecret = $session['nas_secret'];
         $sessionId = $session['acct_session_id'] ?? '';
         $username = $session['username'] ?? '';
+        $nasSecret = $session['nas_secret'];
         
         if (empty($sessionId) && empty($username)) {
             return ['success' => false, 'error' => 'Missing session ID and username'];
+        }
+        
+        // Get VPN peer IP if configured for this NAS
+        $targetIp = $session['nas_ip'];
+        $vpnUsed = false;
+        
+        if (!empty($session['nas_id'])) {
+            $nasWithVpn = $this->getNASWithVPN((int)$session['nas_id']);
+            if ($nasWithVpn && !empty($nasWithVpn['vpn_allowed_ips'])) {
+                // Extract the peer IP from allowed_ips (format: "10.200.0.2/32")
+                $vpnIp = preg_replace('/\/\d+$/', '', $nasWithVpn['vpn_allowed_ips']);
+                if (filter_var($vpnIp, FILTER_VALIDATE_IP)) {
+                    $targetIp = $vpnIp;
+                    $vpnUsed = true;
+                }
+            }
         }
         
         // Build attributes for RADIUS Disconnect-Request
@@ -1493,18 +1522,23 @@ class RadiusBilling {
             $attrs['User-Name'] = $username;
         }
         
-        // Send Disconnect-Request directly to NAS (MikroTik) on port 3799 via VPN
+        // Send Disconnect-Request to NAS on port 3799 (via VPN tunnel if configured)
         try {
-            $client = new RadiusClient($nasIp, $nasSecret, 3799, 5);
+            $client = new RadiusClient($targetIp, $nasSecret, 3799, 5);
             $result = $client->disconnect($attrs);
             
-            if ($result['success']) {
-                return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK'];
+            $output = $result['response'] ?? 'Disconnect-ACK';
+            if ($vpnUsed) {
+                $output .= " (via VPN: $targetIp)";
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed'];
+            if ($result['success']) {
+                return ['success' => true, 'output' => $output, 'via_vpn' => $vpnUsed, 'target_ip' => $targetIp];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $targetIp];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $targetIp];
         }
     }
     
@@ -1514,13 +1548,22 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info
-        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-        $stmt->execute([$sub['nas_id']]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
-        
-        if (!$nas) {
+        // Get NAS info with VPN configuration
+        $nasWithVpn = $this->getNASWithVPN((int)$sub['nas_id']);
+        if (!$nasWithVpn) {
             return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Determine target IP - use VPN peer IP if available
+        $targetIp = $nasWithVpn['ip_address'];
+        $vpnUsed = false;
+        
+        if (!empty($nasWithVpn['vpn_allowed_ips'])) {
+            $vpnIp = preg_replace('/\/\d+$/', '', $nasWithVpn['vpn_allowed_ips']);
+            if (filter_var($vpnIp, FILTER_VALIDATE_IP)) {
+                $targetIp = $vpnIp;
+                $vpnUsed = true;
+            }
         }
         
         // Build CoA attributes
@@ -1529,18 +1572,23 @@ class RadiusBilling {
             $attrs[$key] = $value;
         }
         
-        // Send CoA directly to NAS on port 3799 via VPN
+        // Send CoA to NAS on port 3799 (via VPN tunnel if configured)
         try {
-            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
+            $client = new RadiusClient($targetIp, $nasWithVpn['secret'], 3799, 5);
             $result = $client->coa($attrs);
             
-            if ($result['success']) {
-                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK'];
+            $output = $result['response'] ?? 'CoA-ACK';
+            if ($vpnUsed) {
+                $output .= " (via VPN: $targetIp)";
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+            if ($result['success']) {
+                return ['success' => true, 'output' => $output, 'via_vpn' => $vpnUsed, 'target_ip' => $targetIp];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $targetIp];
         } catch (\Exception $e) {
-            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $targetIp];
         }
     }
     
