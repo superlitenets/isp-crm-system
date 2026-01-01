@@ -1399,35 +1399,28 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Missing session ID and username'];
         }
         
-        // Build attributes for radclient
+        // Build attributes for RADIUS Disconnect-Request
         $attrs = [];
         if (!empty($sessionId)) {
-            $attrs[] = "Acct-Session-Id=" . $sessionId;
+            $attrs['Acct-Session-Id'] = $sessionId;
         }
         if (!empty($username)) {
-            $attrs[] = "User-Name=" . $username;
+            $attrs['User-Name'] = $username;
         }
         
-        // Send Disconnect-Request directly to NAS (MikroTik) on port 3799
-        // Using docker exec to run radclient from the freeradius container
-        $attrString = \implode("\n", $attrs);
-        $command = \sprintf(
-            'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            \escapeshellarg(\sprintf(
-                'echo -e "%s" | radclient -x %s:3799 disconnect %s',
-                \addslashes($attrString),
-                $nasIp,
-                $nasSecret
-            ))
-        );
-        
-        $outputStr = \shell_exec($command) ?? '';
-        
-        if (\strpos($outputStr, 'Disconnect-ACK') !== false) {
-            return ['success' => true, 'output' => $outputStr];
+        // Send Disconnect-Request directly to NAS (MikroTik) on port 3799 via VPN
+        try {
+            $client = new RadiusClient($nasIp, $nasSecret, 3799, 5);
+            $result = $client->disconnect($attrs);
+            
+            if ($result['success']) {
+                return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
         }
-        
-        return ['success' => false, 'error' => $outputStr ?: 'Disconnect failed'];
     }
     
     public function sendCoA(int $subscriptionId, array $attributes): array {
@@ -1446,30 +1439,24 @@ class RadiusBilling {
         }
         
         // Build CoA attributes
-        $attrs = ["User-Name=" . $sub['username']];
+        $attrs = ['User-Name' => $sub['username']];
         foreach ($attributes as $key => $value) {
-            $attrs[] = "$key=$value";
+            $attrs[$key] = $value;
         }
         
-        // Send CoA directly to NAS on port 3799
-        $attrString = \implode("\n", $attrs);
-        $command = \sprintf(
-            'docker exec isp_crm_freeradius bash -c %s 2>&1',
-            \escapeshellarg(\sprintf(
-                'echo -e "%s" | radclient -x %s:3799 coa %s',
-                \addslashes($attrString),
-                $nas['ip_address'],
-                $nas['secret']
-            ))
-        );
-        
-        $outputStr = \shell_exec($command) ?? '';
-        
-        if (\strpos($outputStr, 'CoA-ACK') !== false) {
-            return ['success' => true, 'output' => $outputStr];
+        // Send CoA directly to NAS on port 3799 via VPN
+        try {
+            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
+            $result = $client->coa($attrs);
+            
+            if ($result['success']) {
+                return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
         }
-        
-        return ['success' => false, 'error' => $outputStr ?: 'CoA failed'];
     }
     
     // ==================== Reports ====================
