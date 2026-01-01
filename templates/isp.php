@@ -104,6 +104,22 @@ if ($action === 'get_nas_vpn' && isset($_GET['id'])) {
     exit;
 }
 
+if ($action === 'get_online_subscribers') {
+    header('Content-Type: application/json');
+    try {
+        $onlineSubs = $radiusBilling->getOnlineSubscribers();
+        $onlineIds = array_keys($onlineSubs);
+        echo json_encode([
+            'success' => true,
+            'count' => count($onlineIds),
+            'online_ids' => $onlineIds
+        ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 $view = $_GET['view'] ?? 'dashboard';
 $message = '';
 $messageType = 'info';
@@ -1867,21 +1883,53 @@ try {
                 };
             ?>
             
+            <?php
+            $totalSessions = count($sessionHistory);
+            $totalDownload = array_sum(array_column($sessionHistory, 'input_octets')) / 1073741824;
+            $totalUpload = array_sum(array_column($sessionHistory, 'output_octets')) / 1073741824;
+            $lastSession = !empty($sessionHistory) ? $sessionHistory[0] : null;
+            $avgSessionDuration = $totalSessions > 0 ? array_sum(array_map(fn($s) => 
+                (($s['session_end'] ? strtotime($s['session_end']) : time()) - strtotime($s['session_start'])), 
+                $sessionHistory)) / $totalSessions / 3600 : 0;
+            ?>
+            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <a href="?page=isp&view=subscriptions" class="btn btn-outline-secondary btn-sm mb-2">
                         <i class="bi bi-arrow-left me-1"></i> Back to Subscribers
                     </a>
-                    <h4 class="page-title mb-0">
-                        <i class="bi bi-person-badge"></i> 
-                        <?= htmlspecialchars($subscriber['username']) ?>
-                        <?php if ($isOnline): ?>
-                        <span class="badge bg-success ms-2"><i class="bi bi-wifi me-1"></i>Online</span>
-                        <?php else: ?>
-                        <span class="badge bg-secondary ms-2"><i class="bi bi-wifi-off me-1"></i>Offline</span>
-                        <?php endif; ?>
-                        <span class="badge bg-<?= $statusClass ?> ms-1"><?= ucfirst($subscriber['status']) ?></span>
-                    </h4>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="position-relative">
+                            <?php if ($isOnline): ?>
+                            <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
+                                <i class="bi bi-wifi text-white fs-4"></i>
+                            </div>
+                            <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 16px; height: 16px;"></span>
+                            <?php else: ?>
+                            <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
+                                <i class="bi bi-wifi-off text-secondary fs-4"></i>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <h4 class="page-title mb-0">
+                                <?= htmlspecialchars($subscriber['username']) ?>
+                                <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
+                            </h4>
+                            <div class="d-flex gap-2 mt-1">
+                                <?php if ($isOnline): ?>
+                                <span class="badge bg-success"><i class="bi bi-wifi me-1"></i>Online</span>
+                                <?php else: ?>
+                                <span class="badge bg-secondary"><i class="bi bi-wifi-off me-1"></i>Offline</span>
+                                <?php endif; ?>
+                                <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($subscriber['status']) ?></span>
+                                <span class="badge bg-light text-dark border"><?= strtoupper($subscriber['access_type']) ?></span>
+                                <?php if ($subscriber['mac_address']): ?>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-lock-fill me-1"></i>MAC Bound</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="btn-group">
                     <?php if ($subscriber['status'] === 'active'): ?>
@@ -1932,6 +1980,41 @@ try {
                 </div>
             </div>
             
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-primary-subtle">
+                        <div class="card-body py-3 text-center">
+                            <div class="fs-4 fw-bold text-primary"><?= $totalSessions ?></div>
+                            <div class="small text-muted">Total Sessions</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-success-subtle">
+                        <div class="card-body py-3 text-center">
+                            <div class="fs-4 fw-bold text-success"><?= number_format($totalDownload, 2) ?> GB</div>
+                            <div class="small text-muted">Total Download</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-info-subtle">
+                        <div class="card-body py-3 text-center">
+                            <div class="fs-4 fw-bold text-info"><?= number_format($totalUpload, 2) ?> GB</div>
+                            <div class="small text-muted">Total Upload</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-warning-subtle">
+                        <div class="card-body py-3 text-center">
+                            <div class="fs-4 fw-bold text-warning"><?= number_format($avgSessionDuration, 1) ?>h</div>
+                            <div class="small text-muted">Avg Session</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="row g-4">
                 <!-- Left Column -->
                 <div class="col-lg-4">
@@ -1968,16 +2051,34 @@ try {
                         </div>
                         <div class="card-body">
                             <table class="table table-sm mb-0">
-                                <tr><td class="text-muted" style="width:40%">Username</td><td><code><?= htmlspecialchars($subscriber['username']) ?></code></td></tr>
+                                <tr><td class="text-muted" style="width:40%">Username</td><td>
+                                    <code><?= htmlspecialchars($subscriber['username']) ?></code>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
+                                </td></tr>
                                 <tr><td class="text-muted">Password</td><td>
                                     <code id="pwdDisplay">••••••••</code>
-                                    <button class="btn btn-sm btn-link p-0 ms-2" onclick="document.getElementById('pwdDisplay').textContent = '<?= htmlspecialchars($subscriber['password'] ?? '••••••••') ?>'">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" id="pwdToggle" onclick="togglePassword()"><i class="bi bi-eye"></i></button>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" onclick="copyToClipboard('<?= htmlspecialchars($subscriber['password'] ?? '') ?>')" title="Copy password"><i class="bi bi-clipboard"></i></button>
+                                    <script>
+                                        function togglePassword() {
+                                            const display = document.getElementById('pwdDisplay');
+                                            const toggle = document.getElementById('pwdToggle').querySelector('i');
+                                            if (display.textContent === '••••••••') {
+                                                display.textContent = '<?= htmlspecialchars($subscriber['password'] ?? '') ?>';
+                                                toggle.className = 'bi bi-eye-slash';
+                                            } else {
+                                                display.textContent = '••••••••';
+                                                toggle.className = 'bi bi-eye';
+                                            }
+                                        }
+                                    </script>
                                 </td></tr>
-                                <tr><td class="text-muted">Package</td><td><strong><?= htmlspecialchars($package['name'] ?? '-') ?></strong></td></tr>
-                                <tr><td class="text-muted">Speed</td><td><?= $package['download_speed'] ?? '-' ?> / <?= $package['upload_speed'] ?? '-' ?></td></tr>
-                                <tr><td class="text-muted">Price</td><td>KES <?= number_format($package['price'] ?? 0) ?></td></tr>
+                                <tr><td class="text-muted">Package</td><td><span class="badge bg-primary-subtle text-primary border border-primary-subtle"><?= htmlspecialchars($package['name'] ?? '-') ?></span></td></tr>
+                                <tr><td class="text-muted">Speed</td><td>
+                                    <i class="bi bi-arrow-down text-success"></i> <?= $package['download_speed'] ?? '-' ?>
+                                    <i class="bi bi-arrow-up text-danger ms-2"></i> <?= $package['upload_speed'] ?? '-' ?>
+                                </td></tr>
+                                <tr><td class="text-muted">Price</td><td><strong>KES <?= number_format($package['price'] ?? 0) ?></strong></td></tr>
                                 <tr><td class="text-muted">Access Type</td><td><span class="badge bg-secondary"><?= strtoupper($subscriber['access_type']) ?></span></td></tr>
                                 <tr><td class="text-muted">Static IP</td><td><?= $subscriber['static_ip'] ?: '<span class="text-muted">Dynamic</span>' ?></td></tr>
                                 <tr><td class="text-muted">MAC Address</td><td>
@@ -2074,6 +2175,48 @@ try {
                         </div>
                     </div>
                     <?php endif; ?>
+                    
+                    <?php if ($customer && !empty($customer['phone'])): ?>
+                    <div class="card shadow-sm mb-4 border-success">
+                        <div class="card-header bg-success-subtle">
+                            <h6 class="mb-0"><i class="bi bi-phone me-2"></i>Quick M-Pesa Payment</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="mpesaQuickPayForm" onsubmit="return submitMpesaQuickPay(event)">
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Phone Number</label>
+                                    <input type="text" class="form-control" id="mpesaPayPhone" value="<?= htmlspecialchars(preg_replace('/[^0-9]/', '', $customer['phone'])) ?>" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Amount (KES)</label>
+                                    <input type="number" class="form-control" id="mpesaPayAmount" value="<?= (int)($package['price'] ?? 0) ?>" min="1">
+                                </div>
+                                <button type="submit" class="btn btn-success w-100" id="mpesaStkBtn">
+                                    <i class="bi bi-lightning-charge me-1"></i> Send STK Push
+                                </button>
+                            </form>
+                            <div id="mpesaPayResult" class="mt-2 text-center small"></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-share me-2"></i>Quick Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyCredentials(<?= $subId ?>, '<?= htmlspecialchars($subscriber['username']) ?>', '<?= htmlspecialchars($subscriber['password'] ?? '') ?>')">
+                                    <i class="bi bi-key me-1"></i> Copy Credentials
+                                </button>
+                                <?php if ($customer && !empty($customer['phone'])): ?>
+                                <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $customer['phone']) ?>?text=<?= urlencode('Hello ' . ($customer['name'] ?? '') . ', your WiFi credentials are:\nUsername: ' . $subscriber['username'] . '\nPassword: ' . ($subscriber['password'] ?? '')) ?>" target="_blank" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-whatsapp me-1"></i> Send Credentials via WhatsApp
+                                </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Right Column -->
@@ -4566,6 +4709,41 @@ try {
             })
             .catch(() => showToast('Failed to refresh status', 'danger'))
             .finally(() => icon.classList.remove('spin'));
+    }
+    
+    function submitMpesaQuickPay(e) {
+        e.preventDefault();
+        const btn = document.getElementById('mpesaStkBtn');
+        const resultDiv = document.getElementById('mpesaPayResult');
+        const phone = document.getElementById('mpesaPayPhone').value;
+        const amount = document.getElementById('mpesaPayAmount').value;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending...';
+        resultDiv.innerHTML = '';
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const subId = urlParams.get('id');
+        
+        fetch(`/index.php?page=api&action=mpesa_stk_push&subscription_id=${subId}&phone=${phone}&amount=${amount}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>STK Push sent! Ask customer to enter PIN.</span>';
+                    showToast('M-Pesa STK Push sent successfully!', 'success');
+                } else {
+                    resultDiv.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${data.error || 'Failed to send STK Push'}</span>`;
+                }
+            })
+            .catch(err => {
+                resultDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Network error</span>';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-lightning-charge me-1"></i> Send STK Push';
+            });
+        
+        return false;
     }
     </script>
     
