@@ -1638,6 +1638,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
                 break;
+            case 'configure_eth_port_omci':
+                $onuId = (int)$_POST['onu_id'];
+                $portNum = (int)$_POST['port_num'];
+                $portConfig = [
+                    $portNum => [
+                        'mode' => $_POST['port_mode'] ?? 'transparent',
+                        'vlan_id' => !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null,
+                        'allowed_vlans' => $_POST['allowed_vlans'] ?? '',
+                        'priority' => (int)($_POST['priority'] ?? 0)
+                    ]
+                ];
+                $result = $huaweiOLT->configureOnuPorts($onuId, $portConfig);
+                if ($result['success']) {
+                    $message = "ETH port {$portNum} configured successfully via OMCI.";
+                    $messageType = 'success';
+                } else {
+                    $message = 'Port configuration failed: ' . ($result['error'] ?? 'Unknown error');
+                    $messageType = 'danger';
+                }
+                header('Location: ?page=huawei-olt&view=onu_detail&onu_id=' . $onuId . '&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+                break;
             case 'move_onu':
                 $onuId = (int)$_POST['onu_id'];
                 $newSlot = (int)$_POST['new_slot'];
@@ -12101,6 +12123,78 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         </div>
     </div>
     
+    <div class="modal fade" id="ethPortModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="ethPortModalLabel"><i class="bi bi-ethernet me-2"></i>Configure ETH Port</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="?page=huawei-olt">
+                    <input type="hidden" name="action" value="configure_eth_port_omci">
+                    <input type="hidden" name="onu_id" id="ethPortOnuId">
+                    <input type="hidden" name="port_num" id="ethPortNum">
+                    <div class="modal-body">
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>OMCI Port Configuration</strong> - These settings are pushed directly to the OLT via Telnet/CLI commands.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Port Mode</label>
+                            <select name="port_mode" class="form-select" id="ethPortMode" onchange="toggleEthPortFields()">
+                                <option value="transparent">Transparent (Bridge)</option>
+                                <option value="access">Access (Untagged)</option>
+                                <option value="trunk">Trunk (Tagged)</option>
+                                <option value="hybrid">Hybrid</option>
+                            </select>
+                            <div class="form-text">Transparent passes all VLANs, Access uses single VLAN untagged</div>
+                        </div>
+                        
+                        <div class="mb-3" id="ethPortVlanField">
+                            <label class="form-label">Native VLAN ID</label>
+                            <input type="number" name="vlan_id" class="form-control" placeholder="e.g. 100" min="1" max="4094">
+                            <div class="form-text">VLAN ID for this port (required for Access/Trunk mode)</div>
+                        </div>
+                        
+                        <div class="mb-3" id="ethPortAllowedField" style="display:none;">
+                            <label class="form-label">Allowed VLANs</label>
+                            <input type="text" name="allowed_vlans" class="form-control" placeholder="e.g. 100-200,300">
+                            <div class="form-text">VLAN range for trunk mode</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Priority (802.1p)</label>
+                            <select name="priority" class="form-select">
+                                <option value="0">0 (Best Effort)</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5 (Video)</option>
+                                <option value="6">6 (Voice)</option>
+                                <option value="7">7 (Network Control)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Apply via OMCI
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function toggleEthPortFields() {
+        const mode = document.getElementById('ethPortMode').value;
+        document.getElementById('ethPortAllowedField').style.display = (mode === 'trunk' || mode === 'hybrid') ? 'block' : 'none';
+    }
+    </script>
+    
     <div class="modal fade" id="onuConfigModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -13514,7 +13608,10 @@ echo "# ================================================\n";
     }
     
     function configureEthPort(onuId, portNum) {
-        alert('Ethernet port ' + portNum + ' configuration - Coming soon');
+        document.getElementById('ethPortOnuId').value = onuId;
+        document.getElementById('ethPortNum').value = portNum;
+        document.getElementById('ethPortModalLabel').textContent = 'Configure ETH Port ' + portNum;
+        new bootstrap.Modal(document.getElementById('ethPortModal')).show();
     }
     
     function tr069Reboot(serialNumber) {
