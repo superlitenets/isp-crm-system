@@ -6333,6 +6333,12 @@ $csrfToken = \App\Auth::generateToken();
     $sidebarCompanyInfo = $sidebarSettings->getCompanyInfo();
     $sidebarLogo = $sidebarCompanyInfo['company_logo'] ?? '';
     $sidebarCompanyName = $sidebarCompanyInfo['company_name'] ?? 'ISP CRM';
+    
+    // Module visibility settings
+    $moduleOmsEnabled = $sidebarSettings->get('module_oms_enabled', '1') === '1';
+    $moduleIspEnabled = $sidebarSettings->get('module_isp_enabled', '1') === '1';
+    $moduleAccountingEnabled = $sidebarSettings->get('module_accounting_enabled', '1') === '1';
+    $moduleInventoryEnabled = $sidebarSettings->get('module_inventory_enabled', '1') === '1';
     ?>
     
     <!-- Mobile Header with Hamburger -->
@@ -6389,7 +6395,7 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('inventory.view')): ?>
+                <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
                         <i class="bi bi-box-seam"></i> Inventory
@@ -6410,12 +6416,14 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view')): ?>
+                <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
                         <i class="bi bi-router text-primary"></i> OMS
                     </a>
                 </li>
+                <?php endif; ?>
+                <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
                         <i class="bi bi-broadcast text-info"></i> ISP
@@ -6429,7 +6437,7 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if (\App\Auth::can('settings.view')): ?>
+                <?php if (\App\Auth::can('settings.view') && $moduleAccountingEnabled): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
                         <i class="bi bi-calculator"></i> Accounting
@@ -6525,7 +6533,7 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
-            <?php if (\App\Auth::can('inventory.view')): ?>
+            <?php if (\App\Auth::can('inventory.view') && $moduleInventoryEnabled): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'inventory' ? 'active' : '' ?>" href="?page=inventory">
                     <i class="bi bi-box-seam"></i> Inventory
@@ -6558,12 +6566,14 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view')): ?>
+            <?php if (\App\Auth::can('settings.view') && $moduleOmsEnabled): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'huawei-olt' ? 'active' : '' ?>" href="?page=huawei-olt">
                     <i class="bi bi-router text-primary"></i> OMS
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('settings.view') && $moduleIspEnabled): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
                     <i class="bi bi-broadcast text-info"></i> ISP
@@ -6577,7 +6587,7 @@ $csrfToken = \App\Auth::generateToken();
                 </a>
             </li>
             <?php endif; ?>
-            <?php if (\App\Auth::can('settings.view')): ?>
+            <?php if (\App\Auth::can('settings.view') && $moduleAccountingEnabled): ?>
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'accounting' ? 'active' : '' ?>" href="?page=accounting">
                     <i class="bi bi-calculator"></i> Accounting

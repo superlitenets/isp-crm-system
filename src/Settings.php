@@ -155,6 +155,13 @@ class Settings {
                 $this->set($field, $data[$field]);
             }
         }
+        
+        // Handle module visibility toggles (checkboxes - save 0 if not set)
+        $moduleFields = ['module_oms_enabled', 'module_isp_enabled', 'module_accounting_enabled', 'module_inventory_enabled'];
+        foreach ($moduleFields as $field) {
+            $this->set($field, isset($data[$field]) ? '1' : '0');
+        }
+        
         return true;
     }
 

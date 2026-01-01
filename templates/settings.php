@@ -307,6 +307,45 @@ if ($action === 'edit_template' && $id) {
                 </div>
             </div>
         </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-eye-slash"></i> Module Visibility</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Toggle modules on/off to show or hide them from the navigation menu.</p>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="module_oms_enabled" id="moduleOmsEnabled" value="1" <?= ($settings->get('module_oms_enabled', '1') === '1') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="moduleOmsEnabled">
+                            <i class="bi bi-router text-primary me-1"></i> OMS (ONU Management System)
+                        </label>
+                        <small class="text-muted d-block">Huawei OLT management, ONU provisioning, TR-069</small>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="module_isp_enabled" id="moduleIspEnabled" value="1" <?= ($settings->get('module_isp_enabled', '1') === '1') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="moduleIspEnabled">
+                            <i class="bi bi-broadcast text-info me-1"></i> ISP (RADIUS Billing)
+                        </label>
+                        <small class="text-muted d-block">Subscriber management, PPPoE, Hotspot, Billing</small>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="module_accounting_enabled" id="moduleAccountingEnabled" value="1" <?= ($settings->get('module_accounting_enabled', '1') === '1') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="moduleAccountingEnabled">
+                            <i class="bi bi-calculator text-success me-1"></i> Accounting
+                        </label>
+                        <small class="text-muted d-block">Invoices, expenses, financial reports</small>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="module_inventory_enabled" id="moduleInventoryEnabled" value="1" <?= ($settings->get('module_inventory_enabled', '1') === '1') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="moduleInventoryEnabled">
+                            <i class="bi bi-box-seam text-warning me-1"></i> Inventory
+                        </label>
+                        <small class="text-muted d-block">Stock management, warehouses, equipment</small>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div class="mt-4">
