@@ -4167,9 +4167,6 @@ try {
                     <?php $mobileTotalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
                     <span id="nonAuthBadgeMobile" class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
                 </a>
-                <a class="nav-link <?= $view === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=onu_types">
-                    <i class="bi bi-cpu me-2"></i> ONU Types
-                </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
                     <i class="bi bi-geo-alt me-2"></i> Locations
                 </a>
@@ -4230,9 +4227,6 @@ try {
                     <i class="bi bi-hourglass-split me-2"></i> Non Auth
                     <?php $totalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
                     <span id="nonAuthBadgeDesktop" class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
-                </a>
-                <a class="nav-link <?= $view === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=onu_types">
-                    <i class="bi bi-cpu me-2"></i> ONU Types
                 </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
                     <i class="bi bi-geo-alt me-2"></i> Locations
