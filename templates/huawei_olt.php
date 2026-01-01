@@ -2323,11 +2323,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 break;
             case 'tr069_reboot':
-                header('Content-Type: application/json');
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
                 $deviceId = $_POST['device_id'] ?? '';
                 $serial = $_POST['serial'] ?? '';
+                $onuId = $_POST['onu_id'] ?? '';
+                
+                // Look up ONU if onu_id provided
+                if (empty($deviceId) && empty($serial) && !empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt->execute([$onuId]);
+                    $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($onuData) {
+                        $deviceId = $onuData['tr069_device_id'] ?? '';
+                        $serial = $onuData['sn'] ?? '';
+                    }
+                }
                 
                 if (empty($deviceId) && !empty($serial)) {
                     $deviceResult = $genieacs->getDeviceBySerial($serial);
@@ -2337,13 +2348,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 if (empty($deviceId)) {
-                    echo json_encode(['success' => false, 'error' => 'Device not found']);
-                    exit;
+                    $message = 'Device not connected to TR-069/GenieACS';
+                    $messageType = 'warning';
+                    break;
                 }
                 
                 $result = $genieacs->rebootDevice($deviceId);
-                echo json_encode($result);
-                exit;
+                $message = $result['success'] ? 'Reboot command sent to device' : ($result['error'] ?? 'Reboot failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
             case 'configure_pppoe':
                 // SmartOLT-style Internet WAN configuration via TR-069
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -2444,8 +2457,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'tr069_refresh':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
-                $result = $genieacs->refreshDevice($_POST['device_id']);
-                $message = $result['success'] ? 'Refresh task created' : ($result['error'] ?? 'Refresh failed');
+                $deviceId = $_POST['device_id'] ?? '';
+                $onuId = $_POST['onu_id'] ?? '';
+                
+                // Look up ONU if onu_id provided
+                if (empty($deviceId) && !empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt->execute([$onuId]);
+                    $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($onuData) {
+                        $deviceId = $onuData['tr069_device_id'] ?? '';
+                        if (empty($deviceId) && !empty($onuData['sn'])) {
+                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
+                            if ($deviceResult['success']) {
+                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                            }
+                        }
+                    }
+                }
+                
+                if (empty($deviceId)) {
+                    $message = 'Device not connected to TR-069/GenieACS';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $result = $genieacs->refreshDevice($deviceId);
+                $message = $result['success'] ? 'Device info refresh requested' : ($result['error'] ?? 'Refresh failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             case 'tr069_wifi':
@@ -2464,8 +2502,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             case 'tr069_factory_reset':
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
-                $result = $genieacs->factoryReset($_POST['device_id']);
-                $message = $result['success'] ? 'Factory reset command sent' : ($result['error'] ?? 'Reset failed');
+                $deviceId = $_POST['device_id'] ?? '';
+                $onuId = $_POST['onu_id'] ?? '';
+                
+                // Look up ONU if onu_id provided
+                if (empty($deviceId) && !empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt->execute([$onuId]);
+                    $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($onuData) {
+                        $deviceId = $onuData['tr069_device_id'] ?? '';
+                        if (empty($deviceId) && !empty($onuData['sn'])) {
+                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
+                            if ($deviceResult['success']) {
+                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                            }
+                        }
+                    }
+                }
+                
+                if (empty($deviceId)) {
+                    $message = 'Device not connected to TR-069/GenieACS';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $result = $genieacs->factoryReset($deviceId);
+                $message = $result['success'] ? 'Factory reset command sent - device will reboot' : ($result['error'] ?? 'Factory reset failed');
+                $messageType = $result['success'] ? 'success' : 'danger';
+                break;
+            
+            case 'tr069_firmware':
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $deviceId = $_POST['device_id'] ?? '';
+                $onuId = $_POST['onu_id'] ?? '';
+                $firmwareUrl = $_POST['firmware_url'] ?? '';
+                
+                if (empty($firmwareUrl)) {
+                    $message = 'Firmware URL is required';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                // Look up ONU if onu_id provided
+                if (empty($deviceId) && !empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt->execute([$onuId]);
+                    $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($onuData) {
+                        $deviceId = $onuData['tr069_device_id'] ?? '';
+                        if (empty($deviceId) && !empty($onuData['sn'])) {
+                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
+                            if ($deviceResult['success']) {
+                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                            }
+                        }
+                    }
+                }
+                
+                if (empty($deviceId)) {
+                    $message = 'Device not connected to TR-069/GenieACS';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                $result = $genieacs->upgradeFirmware($deviceId, $firmwareUrl);
+                $message = $result['success'] ? 'Firmware upgrade initiated - device will download and reboot' : ($result['error'] ?? 'Firmware upgrade failed');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
             

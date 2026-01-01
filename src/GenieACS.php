@@ -187,6 +187,10 @@ class GenieACS {
         ]);
     }
     
+    public function upgradeFirmware(string $deviceId, string $firmwareUrl): array {
+        return $this->downloadFirmware($deviceId, '1 Firmware Upgrade Image', $firmwareUrl);
+    }
+    
     public function getTasks(string $deviceId): array {
         $query = json_encode(['device' => $deviceId]);
         return $this->request('GET', '/tasks', null, ['query' => $query]);
