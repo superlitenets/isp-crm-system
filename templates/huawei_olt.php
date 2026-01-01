@@ -768,6 +768,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'Service profile deleted successfully';
                 $messageType = 'success';
                 break;
+            case 'save_onu_type':
+                $typeId = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+                $typeData = [
+                    'name' => trim($_POST['name'] ?? ''),
+                    'model' => trim($_POST['model'] ?? '') ?: trim($_POST['name'] ?? ''),
+                    'eth_ports' => (int)($_POST['eth_ports'] ?? 4),
+                    'pots_ports' => (int)($_POST['pots_ports'] ?? 0),
+                    'wifi_capable' => isset($_POST['wifi_capable']),
+                    'default_mode' => $_POST['default_mode'] ?? 'bridge'
+                ];
+                if ($typeId) {
+                    $stmt = $db->prepare("UPDATE huawei_onu_types SET name = ?, model = ?, eth_ports = ?, pots_ports = ?, wifi_capable = ?, default_mode = ? WHERE id = ?");
+                    $stmt->execute([$typeData['name'], $typeData['model'], $typeData['eth_ports'], $typeData['pots_ports'], $typeData['wifi_capable'], $typeData['default_mode'], $typeId]);
+                    $message = 'ONU type updated successfully';
+                } else {
+                    $stmt = $db->prepare("INSERT INTO huawei_onu_types (name, model, eth_ports, pots_ports, wifi_capable, default_mode) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$typeData['name'], $typeData['model'], $typeData['eth_ports'], $typeData['pots_ports'], $typeData['wifi_capable'], $typeData['default_mode']]);
+                    $message = 'ONU type added successfully';
+                }
+                $messageType = 'success';
+                break;
+            case 'delete_onu_type':
+                $typeId = (int)$_POST['id'];
+                $checkStmt = $db->prepare("SELECT COUNT(*) FROM huawei_onus WHERE onu_type_id = ?");
+                $checkStmt->execute([$typeId]);
+                if ($checkStmt->fetchColumn() > 0) {
+                    $message = 'Cannot delete ONU type - it is being used by existing ONUs';
+                    $messageType = 'danger';
+                } else {
+                    $db->prepare("DELETE FROM huawei_onu_types WHERE id = ?")->execute([$typeId]);
+                    $message = 'ONU type deleted successfully';
+                    $messageType = 'success';
+                }
+                break;
             // Location Management
             case 'add_zone':
                 $huaweiOLT->addZone($_POST);
@@ -4133,8 +4167,8 @@ try {
                     <?php $mobileTotalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
                     <span id="nonAuthBadgeMobile" class="badge <?= $mobileTotalPending > 0 ? 'bg-warning' : 'bg-secondary' ?> ms-auto"><?= $mobileTotalPending ?> pending</span>
                 </a>
-                <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
-                    <i class="bi bi-sliders me-2"></i> Service Profiles
+                <a class="nav-link <?= $view === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=onu_types">
+                    <i class="bi bi-cpu me-2"></i> ONU Types
                 </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
                     <i class="bi bi-geo-alt me-2"></i> Locations
@@ -4197,8 +4231,8 @@ try {
                     <?php $totalPending = $stats['unconfigured_onus'] + ($stats['discovered_onus'] ?? 0); ?>
                     <span id="nonAuthBadgeDesktop" class="badge <?= $totalPending > 0 ? 'bg-warning badge-pulse' : 'bg-secondary' ?> ms-auto"><?= $totalPending ?> pending</span>
                 </a>
-                <a class="nav-link <?= $view === 'profiles' ? 'active' : '' ?>" href="?page=huawei-olt&view=profiles">
-                    <i class="bi bi-sliders me-2"></i> Service Profiles
+                <a class="nav-link <?= $view === 'onu_types' ? 'active' : '' ?>" href="?page=huawei-olt&view=onu_types">
+                    <i class="bi bi-cpu me-2"></i> ONU Types
                 </a>
                 <a class="nav-link <?= $view === 'locations' ? 'active' : '' ?>" href="?page=huawei-olt&view=locations">
                     <i class="bi bi-geo-alt me-2"></i> Locations
@@ -7463,68 +7497,76 @@ try {
             </script>
             <?php endif; ?>
             
-            <?php elseif ($view === 'profiles'): ?>
+            <?php elseif ($view === 'onu_types'): ?>
+            <?php
+            $onuTypes = $db->query("SELECT * FROM huawei_onu_types ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+            $onuCountsByType = [];
+            $countStmt = $db->query("SELECT onu_type_id, COUNT(*) as cnt FROM huawei_onus WHERE onu_type_id IS NOT NULL GROUP BY onu_type_id");
+            foreach ($countStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $onuCountsByType[$row['onu_type_id']] = $row['cnt'];
+            }
+            ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="mb-0"><i class="bi bi-sliders me-2"></i>Service Profiles</h4>
-                <div class="btn-group">
-                    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#configScriptModal">
-                        <i class="bi bi-terminal me-1"></i> Generate OLT Config
-                    </button>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#profileModal" onclick="resetProfileForm()">
-                        <i class="bi bi-plus-circle me-1"></i> Add Profile
-                    </button>
-                </div>
+                <h4 class="mb-0"><i class="bi bi-cpu me-2"></i>ONU Types</h4>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#onuTypeModal" onclick="resetOnuTypeForm()">
+                    <i class="bi bi-plus-circle me-1"></i> Add ONU Type
+                </button>
             </div>
             
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <?php if (empty($profiles)): ?>
+                    <?php if (empty($onuTypes)): ?>
                     <div class="p-4 text-center text-muted">
-                        <i class="bi bi-sliders fs-1 mb-2 d-block"></i>
-                        No service profiles configured
+                        <i class="bi bi-cpu fs-1 mb-2 d-block"></i>
+                        No ONU types configured
                     </div>
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Type</th>
-                                    <th>VLAN</th>
-                                    <th>Speed (Up/Down)</th>
-                                    <th>Line Profile</th>
-                                    <th>Service Profile</th>
-                                    <th>Status</th>
+                                    <th>Name / Model</th>
+                                    <th>ETH Ports</th>
+                                    <th>POTS</th>
+                                    <th>WiFi</th>
+                                    <th>Default Mode</th>
+                                    <th>ONUs Using</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($profiles as $profile): ?>
+                                <?php foreach ($onuTypes as $type): ?>
                                 <tr>
                                     <td>
-                                        <strong><?= htmlspecialchars($profile['name']) ?></strong>
-                                        <?php if ($profile['is_default']): ?>
-                                        <span class="badge bg-info ms-1">Default</span>
+                                        <strong><?= htmlspecialchars($type['name']) ?></strong>
+                                        <?php if ($type['model'] && $type['model'] !== $type['name']): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($type['model']) ?></small>
                                         <?php endif; ?>
                                     </td>
-                                    <td><span class="badge bg-secondary"><?= ucfirst($profile['profile_type']) ?></span></td>
-                                    <td><?= $profile['vlan_id'] ?: '-' ?></td>
-                                    <td><?= htmlspecialchars($profile['speed_profile_up'] ?: '-') ?> / <?= htmlspecialchars($profile['speed_profile_down'] ?: '-') ?></td>
-                                    <td><code><?= htmlspecialchars($profile['line_profile'] ?: '-') ?></code></td>
-                                    <td><code><?= htmlspecialchars($profile['srv_profile'] ?: '-') ?></code></td>
+                                    <td><span class="badge bg-primary"><?= (int)$type['eth_ports'] ?></span></td>
+                                    <td><span class="badge bg-secondary"><?= (int)$type['pots_ports'] ?></span></td>
                                     <td>
-                                        <?php if ($profile['is_active']): ?>
-                                        <span class="badge bg-success">Active</span>
+                                        <?php if ($type['wifi_capable']): ?>
+                                        <i class="bi bi-wifi text-success"></i> Yes
                                         <?php else: ?>
-                                        <span class="badge bg-secondary">Inactive</span>
+                                        <i class="bi bi-wifi-off text-muted"></i> No
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><span class="badge bg-<?= $type['default_mode'] === 'router' ? 'info' : 'secondary' ?>"><?= ucfirst($type['default_mode'] ?? 'bridge') ?></span></td>
+                                    <td>
+                                        <?php $count = $onuCountsByType[$type['id']] ?? 0; ?>
+                                        <?php if ($count > 0): ?>
+                                        <span class="badge bg-success"><?= $count ?> ONUs</span>
+                                        <?php else: ?>
+                                        <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-secondary" onclick="editProfile(<?= htmlspecialchars(json_encode($profile)) ?>)">
+                                            <button class="btn btn-outline-secondary" onclick="editOnuType(<?= htmlspecialchars(json_encode($type)) ?>)">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button class="btn btn-outline-danger" onclick="deleteProfile(<?= $profile['id'] ?>)">
+                                            <button class="btn btn-outline-danger" onclick="deleteOnuType(<?= $type['id'] ?>)" <?= ($onuCountsByType[$type['id']] ?? 0) > 0 ? 'disabled title="Cannot delete - ONUs are using this type"' : '' ?>>
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -7537,6 +7579,96 @@ try {
                     <?php endif; ?>
                 </div>
             </div>
+            
+            <div class="modal fade" id="onuTypeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST">
+                            <input type="hidden" name="action" value="save_onu_type">
+                            <input type="hidden" name="id" id="onuTypeId">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="onuTypeModalTitle">Add ONU Type</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Name (Equipment ID)</label>
+                                    <input type="text" name="name" id="onuTypeName" class="form-control" required placeholder="e.g. HG8546M">
+                                    <small class="text-muted">This should match the Equipment ID reported by the ONU</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Model</label>
+                                    <input type="text" name="model" id="onuTypeModel" class="form-control" placeholder="e.g. HG8546M">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ETH Ports</label>
+                                        <input type="number" name="eth_ports" id="onuTypeEthPorts" class="form-control" value="4" min="0" max="8">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">POTS Ports</label>
+                                        <input type="number" name="pots_ports" id="onuTypePotsPorts" class="form-control" value="0" min="0" max="4">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="wifi_capable" id="onuTypeWifi" class="form-check-input" value="1">
+                                            <label class="form-check-label" for="onuTypeWifi">WiFi Capable</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Default Mode</label>
+                                        <select name="default_mode" id="onuTypeMode" class="form-select">
+                                            <option value="bridge">Bridge</option>
+                                            <option value="router">Router</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save ONU Type</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function resetOnuTypeForm() {
+                document.getElementById('onuTypeId').value = '';
+                document.getElementById('onuTypeName').value = '';
+                document.getElementById('onuTypeModel').value = '';
+                document.getElementById('onuTypeEthPorts').value = '4';
+                document.getElementById('onuTypePotsPorts').value = '0';
+                document.getElementById('onuTypeWifi').checked = false;
+                document.getElementById('onuTypeMode').value = 'bridge';
+                document.getElementById('onuTypeModalTitle').textContent = 'Add ONU Type';
+            }
+            
+            function editOnuType(type) {
+                document.getElementById('onuTypeId').value = type.id;
+                document.getElementById('onuTypeName').value = type.name || '';
+                document.getElementById('onuTypeModel').value = type.model || '';
+                document.getElementById('onuTypeEthPorts').value = type.eth_ports || 4;
+                document.getElementById('onuTypePotsPorts').value = type.pots_ports || 0;
+                document.getElementById('onuTypeWifi').checked = type.wifi_capable;
+                document.getElementById('onuTypeMode').value = type.default_mode || 'bridge';
+                document.getElementById('onuTypeModalTitle').textContent = 'Edit ONU Type';
+                new bootstrap.Modal(document.getElementById('onuTypeModal')).show();
+            }
+            
+            function deleteOnuType(id) {
+                if (confirm('Are you sure you want to delete this ONU type?')) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.innerHTML = '<input type="hidden" name="action" value="delete_onu_type"><input type="hidden" name="id" value="' + id + '">';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            }
+            </script>
             
             <?php elseif ($view === 'locations'): ?>
             <div class="d-flex justify-content-between align-items-center mb-4">
