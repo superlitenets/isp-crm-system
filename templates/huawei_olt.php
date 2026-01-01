@@ -83,7 +83,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
             // Discover from specific OLT
             $result = $huaweiOLT->discoverUnconfiguredONUs($oltId);
             if ($result['success']) {
-                echo json_encode(['success' => true, 'count' => $result['count'], 'message' => "Found {$result['count']} unconfigured ONUs"]);
+                $method = $result['method'] ?? 'unknown';
+                $methodLabel = $method === 'snmp' ? 'SNMP' : ($method === 'cli' ? 'CLI' : $method);
+                echo json_encode([
+                    'success' => true, 
+                    'count' => $result['count'], 
+                    'method' => $method,
+                    'message' => "Found {$result['count']} unconfigured ONUs via {$methodLabel}"
+                ]);
             } else {
                 echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Discovery failed']);
             }
@@ -91,6 +98,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
             // Discover from all OLTs
             $totalFound = 0;
             $results = [];
+            $methods = [];
             $allOlts = $huaweiOLT->getOLTs(false);
             foreach ($allOlts as $olt) {
                 if ($olt['is_active']) {
@@ -98,7 +106,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
                         $result = $huaweiOLT->discoverUnconfiguredONUs($olt['id']);
                         if ($result['success']) {
                             $totalFound += $result['count'];
-                            $results[] = ['olt' => $olt['name'], 'count' => $result['count'], 'success' => true];
+                            $method = $result['method'] ?? 'unknown';
+                            $methods[] = $method;
+                            $results[] = ['olt' => $olt['name'], 'count' => $result['count'], 'method' => $method, 'success' => true];
                         } else {
                             $results[] = ['olt' => $olt['name'], 'error' => $result['error'] ?? 'failed', 'success' => false];
                         }
@@ -107,7 +117,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'discover_onus') {
                     }
                 }
             }
-            echo json_encode(['success' => true, 'count' => $totalFound, 'details' => $results, 'message' => "Found {$totalFound} unconfigured ONUs"]);
+            $primaryMethod = in_array('snmp', $methods) ? 'SNMP' : (in_array('cli', $methods) ? 'CLI' : 'unknown');
+            echo json_encode([
+                'success' => true, 
+                'count' => $totalFound, 
+                'details' => $results, 
+                'method' => $primaryMethod,
+                'message' => "Found {$totalFound} unconfigured ONUs via {$primaryMethod}"
+            ]);
         }
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
