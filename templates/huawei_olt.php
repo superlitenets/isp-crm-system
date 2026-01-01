@@ -6043,8 +6043,29 @@ try {
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">ONU mode</span><br>
-                                <span class="text-info"><?= $currentOnu['ip_mode'] ?? 'Bridge' ?> <?= !empty($currentOnu['vlan_id']) ? '- WAN vlan: '.$currentOnu['vlan_id'] : '' ?></span>
+                                <span class="text-primary">ONU mode</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" onclick="toggleOnuModeEdit()" title="Edit ONU Mode">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <br>
+                                <span id="onuModeDisplay">
+                                    <span class="badge bg-<?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'secondary' : 'info' ?>"><?= $currentOnu['ip_mode'] ?? 'Bridge' ?></span>
+                                    <?= !empty($currentOnu['vlan_id']) && ($currentOnu['ip_mode'] ?? 'Bridge') !== 'Bridge' ? '- WAN vlan: '.$currentOnu['vlan_id'] : '' ?>
+                                </span>
+                                <div id="onuModeEdit" style="display: none;" class="mt-1">
+                                    <div class="input-group input-group-sm" style="max-width: 250px;">
+                                        <select id="onuModeSelect" class="form-select form-select-sm">
+                                            <option value="Bridge" <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'selected' : '' ?>>Bridge</option>
+                                            <option value="Router" <?= ($currentOnu['ip_mode'] ?? '') === 'Router' ? 'selected' : '' ?>>Router (WAN)</option>
+                                        </select>
+                                        <button type="button" class="btn btn-success btn-sm" onclick="saveOnuMode()">
+                                            <i class="bi bi-check"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnuModeEdit()">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-2">
                                 <span class="text-primary">TR069</span><br>
@@ -6157,6 +6178,51 @@ try {
                     btn.classList.remove('btn-danger');
                     btn.classList.add('btn-success');
                     btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i> STOP';
+                }
+            }
+            
+            function toggleOnuModeEdit() {
+                const display = document.getElementById('onuModeDisplay');
+                const edit = document.getElementById('onuModeEdit');
+                if (edit.style.display === 'none') {
+                    display.style.display = 'none';
+                    edit.style.display = 'block';
+                } else {
+                    display.style.display = 'inline';
+                    edit.style.display = 'none';
+                }
+            }
+            
+            async function saveOnuMode() {
+                const mode = document.getElementById('onuModeSelect').value;
+                const formData = new FormData();
+                formData.append('onu_id', onuDbId);
+                formData.append('ip_mode', mode);
+                
+                try {
+                    const resp = await fetch('?page=api&action=update_onu_mode', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        const display = document.getElementById('onuModeDisplay');
+                        const badgeClass = mode === 'Bridge' ? 'secondary' : 'info';
+                        display.innerHTML = `<span class="badge bg-${badgeClass}">${mode}</span>`;
+                        toggleOnuModeEdit();
+                        
+                        const toast = document.createElement('div');
+                        toast.className = 'position-fixed bottom-0 end-0 p-3';
+                        toast.style.zIndex = '9999';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>ONU mode updated to ' + mode + '</div></div>';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    alert('Network error: ' + err.message);
                 }
             }
             </script>

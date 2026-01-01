@@ -983,6 +983,35 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
     exit;
 }
 
+// Update ONU Mode (Bridge/Router)
+if ($page === 'api' && $action === 'update_onu_mode') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_POST['onu_id']) ? (int)$_POST['onu_id'] : 0;
+    $ipMode = $_POST['ip_mode'] ?? '';
+    
+    if (!$onuId || !in_array($ipMode, ['Bridge', 'Router'])) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID and valid mode (Bridge/Router) required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("UPDATE huawei_onus SET ip_mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$ipMode, $onuId]);
+        
+        echo json_encode(['success' => true, 'message' => "ONU mode updated to {$ipMode}"]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Manage ONU VLAN (attach/detach) - creates service-port on OLT
 if ($page === 'api' && $action === 'manage_onu_vlan') {
     ob_clean();
