@@ -420,4 +420,203 @@ class LateDeductionCalculator {
         
         return $stats;
     }
+    
+    public function getAbsentRule(): ?array {
+        $stmt = $this->db->query("SELECT * FROM absent_deduction_rules WHERE is_active = TRUE LIMIT 1");
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function saveAbsentRule(array $data): bool {
+        $this->db->exec("UPDATE absent_deduction_rules SET is_active = FALSE");
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO absent_deduction_rules (name, deduction_type, deduction_amount, is_active)
+            VALUES (?, ?, ?, TRUE)
+            ON CONFLICT (id) DO UPDATE SET 
+                name = EXCLUDED.name,
+                deduction_type = EXCLUDED.deduction_type,
+                deduction_amount = EXCLUDED.deduction_amount,
+                is_active = TRUE
+        ");
+        return $stmt->execute([
+            $data['name'] ?? 'Default Absent Rule',
+            $data['deduction_type'] ?? 'daily_rate',
+            $data['deduction_amount'] ?? 0
+        ]);
+    }
+    
+    public function getWorkingDaysInMonth(string $month): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        $today = date('Y-m-d');
+        
+        if ($endDate > $today) {
+            $endDate = $today;
+        }
+        
+        $workingDays = [];
+        $current = strtotime($startDate);
+        $end = strtotime($endDate);
+        
+        while ($current <= $end) {
+            $dayOfWeek = date('N', $current);
+            if ($dayOfWeek < 6) {
+                $workingDays[] = date('Y-m-d', $current);
+            }
+            $current = strtotime('+1 day', $current);
+        }
+        
+        return $workingDays;
+    }
+    
+    public function getEmployeeAbsentDays(int $employeeId, string $month): array {
+        $workingDays = $this->getWorkingDaysInMonth($month);
+        
+        if (empty($workingDays)) {
+            return [];
+        }
+        
+        $placeholders = implode(',', array_fill(0, count($workingDays), '?'));
+        $stmt = $this->db->prepare("
+            SELECT DATE(date) as punch_date 
+            FROM attendance 
+            WHERE employee_id = ? AND DATE(date) IN ($placeholders)
+        ");
+        $params = array_merge([$employeeId], $workingDays);
+        $stmt->execute($params);
+        $punchedDays = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $leaveStmt = $this->db->prepare("
+            SELECT generate_series(start_date::date, end_date::date, '1 day'::interval)::date as leave_date
+            FROM leave_requests 
+            WHERE employee_id = ? AND status = 'approved'
+              AND start_date <= ? AND end_date >= ?
+        ");
+        $leaveStmt->execute([$employeeId, end($workingDays), reset($workingDays)]);
+        $leaveDays = $leaveStmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $holidayStmt = $this->db->query("SELECT holiday_date FROM public_holidays WHERE holiday_date BETWEEN '" . reset($workingDays) . "' AND '" . end($workingDays) . "'");
+        $holidays = $holidayStmt->fetchAll(\PDO::FETCH_COLUMN);
+        
+        $absentDays = [];
+        foreach ($workingDays as $day) {
+            if (!in_array($day, $punchedDays) && !in_array($day, $leaveDays) && !in_array($day, $holidays)) {
+                $absentDays[] = $day;
+            }
+        }
+        
+        return $absentDays;
+    }
+    
+    public function calculateAbsentDeductions(int $employeeId, string $month): array {
+        $rule = $this->getAbsentRule();
+        $absentDays = $this->getEmployeeAbsentDays($employeeId, $month);
+        
+        $stmt = $this->db->prepare("SELECT basic_salary FROM employees WHERE id = ?");
+        $stmt->execute([$employeeId]);
+        $employee = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $basicSalary = (float)($employee['basic_salary'] ?? 0);
+        
+        $workingDaysCount = count($this->getWorkingDaysInMonth($month));
+        $dailyRate = $workingDaysCount > 0 ? $basicSalary / $workingDaysCount : 0;
+        
+        $result = [
+            'employee_id' => $employeeId,
+            'month' => $month,
+            'absent_days' => count($absentDays),
+            'absent_dates' => $absentDays,
+            'daily_rate' => $dailyRate,
+            'total_deduction' => 0,
+            'currency' => 'KES'
+        ];
+        
+        if (!$rule || empty($absentDays)) {
+            return $result;
+        }
+        
+        if ($rule['deduction_type'] === 'daily_rate') {
+            $result['total_deduction'] = count($absentDays) * $dailyRate;
+        } elseif ($rule['deduction_type'] === 'fixed_amount') {
+            $result['total_deduction'] = count($absentDays) * (float)$rule['deduction_amount'];
+        } elseif ($rule['deduction_type'] === 'percentage') {
+            $percentAmount = ($basicSalary * (float)$rule['deduction_amount'] / 100) / $workingDaysCount;
+            $result['total_deduction'] = count($absentDays) * $percentAmount;
+        }
+        
+        return $result;
+    }
+    
+    public function applyAbsentDeductionsToPayroll(int $payrollId, int $employeeId, string $month): bool {
+        $deductions = $this->calculateAbsentDeductions($employeeId, $month);
+        
+        if ($deductions['total_deduction'] <= 0) {
+            return true;
+        }
+        
+        $stmt = $this->db->prepare("
+            DELETE FROM payroll_deductions 
+            WHERE payroll_id = ? AND deduction_type = 'absent'
+        ");
+        $stmt->execute([$payrollId]);
+        
+        $stmt = $this->db->prepare("
+            INSERT INTO payroll_deductions (payroll_id, employee_id, deduction_type, description, amount, details)
+            VALUES (?, ?, 'absent', ?, ?, ?)
+        ");
+        
+        $description = "Absent deduction ({$deductions['absent_days']} days without punch)";
+        
+        $stmt->execute([
+            $payrollId,
+            $employeeId,
+            $description,
+            $deductions['total_deduction'],
+            json_encode(['dates' => $deductions['absent_dates'], 'daily_rate' => $deductions['daily_rate']])
+        ]);
+        
+        $updateStmt = $this->db->prepare("
+            UPDATE payroll 
+            SET deductions = deductions + ?,
+                net_pay = net_pay - ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        
+        return $updateStmt->execute([$deductions['total_deduction'], $deductions['total_deduction'], $payrollId]);
+    }
+    
+    public function getMonthlyAbsentReport(string $month, ?int $departmentId = null): array {
+        $startDate = date('Y-m-01', strtotime($month));
+        $endDate = date('Y-m-t', strtotime($month));
+        
+        $sql = "
+            SELECT e.id as employee_id, e.name as employee_name, e.employee_id as employee_code,
+                   e.basic_salary, d.name as department_name
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            WHERE e.employment_status = 'active'
+        ";
+        $params = [];
+        
+        if ($departmentId) {
+            $sql .= " AND e.department_id = ?";
+            $params[] = $departmentId;
+        }
+        
+        $sql .= " ORDER BY e.name";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($employees as &$emp) {
+            $absentData = $this->calculateAbsentDeductions($emp['employee_id'], $month);
+            $emp['absent_days'] = $absentData['absent_days'];
+            $emp['absent_dates'] = $absentData['absent_dates'];
+            $emp['total_deduction'] = $absentData['total_deduction'];
+            $emp['daily_rate'] = $absentData['daily_rate'];
+        }
+        
+        return array_filter($employees, fn($e) => $e['absent_days'] > 0);
+    }
 }

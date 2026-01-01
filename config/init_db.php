@@ -389,6 +389,25 @@ function initializeDatabase(): void {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS absent_deduction_rules (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL DEFAULT 'Default Absent Rule',
+        deduction_type VARCHAR(20) NOT NULL DEFAULT 'daily_rate',
+        deduction_amount DECIMAL(12, 2) DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS public_holidays (
+        id SERIAL PRIMARY KEY,
+        holiday_date DATE NOT NULL UNIQUE,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        is_recurring BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS payroll_deductions (
         id SERIAL PRIMARY KEY,
         payroll_id INTEGER REFERENCES payroll(id) ON DELETE CASCADE,

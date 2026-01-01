@@ -221,23 +221,51 @@ class MobileAPI {
         return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'branch_id');
     }
     
+    public function getEmployeeTeamIds(int $userId): array {
+        $employee = $this->getEmployeeByUserId($userId);
+        if (!$employee) {
+            return [];
+        }
+        
+        $stmt = $this->db->prepare("
+            SELECT team_id FROM team_members WHERE employee_id = ?
+        ");
+        $stmt->execute([$employee['id']]);
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'team_id');
+    }
+    
     public function getTechnicianTickets(int $userId, string $status = '', int $limit = 50): array {
         $branchIds = $this->getEmployeeBranchIds($userId);
+        $teamIds = $this->getEmployeeTeamIds($userId);
         
-        $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
-                       COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings,
-                       COALESCE(tcr.rate, 0) as commission_rate
-                FROM tickets t
-                LEFT JOIN customers c ON t.customer_id = c.id
-                LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
-                WHERE t.assigned_to = ?";
-        $params = [$userId];
+        $conditions = [];
+        $params = [];
+        
+        $conditions[] = "t.assigned_to = ?";
+        $params[] = $userId;
+        
+        if (!empty($teamIds)) {
+            $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+            $conditions[] = "t.team_id IN ($placeholders)";
+            $params = array_merge($params, $teamIds);
+        }
+        
+        $whereClause = "(" . implode(" OR ", $conditions) . ")";
         
         if (!empty($branchIds)) {
             $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
-            $sql .= " AND t.branch_id IN ($placeholders)";
+            $whereClause .= " AND t.branch_id IN ($placeholders)";
             $params = array_merge($params, $branchIds);
         }
+        
+        $sql = "SELECT t.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address,
+                       COALESCE((SELECT SUM(te.earned_amount) FROM ticket_earnings te WHERE te.ticket_id = t.id), 0) as earnings,
+                       COALESCE(tcr.rate, 0) as commission_rate,
+                       CASE WHEN t.team_id IS NOT NULL THEN 'team' ELSE 'personal' END as assignment_type
+                FROM tickets t
+                LEFT JOIN customers c ON t.customer_id = c.id
+                LEFT JOIN ticket_commission_rates tcr ON t.category = tcr.category AND tcr.is_active = true
+                WHERE $whereClause";
         
         if ($status) {
             $sql .= " AND t.status = ?";
@@ -260,14 +288,35 @@ class MobileAPI {
     }
     
     public function getTicketDetails(int $ticketId, int $userId): ?array {
+        $teamIds = $this->getEmployeeTeamIds($userId);
+        $branchIds = $this->getEmployeeBranchIds($userId);
+        
+        $conditions = ["t.assigned_to = ?"];
+        $params = [$ticketId, $userId];
+        
+        if (!empty($teamIds)) {
+            $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+            $conditions[] = "t.team_id IN ($placeholders)";
+            $params = array_merge($params, $teamIds);
+        }
+        
+        $whereClause = "t.id = ? AND (" . implode(" OR ", $conditions) . ")";
+        
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $whereClause .= " AND t.branch_id IN ($placeholders)";
+            $params = array_merge($params, $branchIds);
+        }
+        
         $stmt = $this->db->prepare("
             SELECT t.*, c.name as customer_name, c.phone as customer_phone, 
-                   c.address as customer_address, c.email as customer_email
+                   c.address as customer_address, c.email as customer_email,
+                   CASE WHEN t.team_id IS NOT NULL THEN 'team' ELSE 'personal' END as assignment_type
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
-            WHERE t.id = ? AND t.assigned_to = ?
+            WHERE $whereClause
         ");
-        $stmt->execute([$ticketId, $userId]);
+        $stmt->execute($params);
         $ticket = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         if ($ticket) {
@@ -448,15 +497,36 @@ class MobileAPI {
     }
     
     public function getTechnicianStats(int $userId): array {
+        $teamIds = $this->getEmployeeTeamIds($userId);
+        $branchIds = $this->getEmployeeBranchIds($userId);
+        
+        $conditions = ["assigned_to = ?"];
+        $params = [$userId];
+        
+        if (!empty($teamIds)) {
+            $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+            $conditions[] = "team_id IN ($placeholders)";
+            $params = array_merge($params, $teamIds);
+        }
+        
+        $whereClause = "(" . implode(" OR ", $conditions) . ")";
+        
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $whereClause .= " AND branch_id IN ($placeholders)";
+            $params = array_merge($params, $branchIds);
+        }
+        
         $stmt = $this->db->prepare("
             SELECT 
                 COUNT(*) as total_tickets,
                 COUNT(CASE WHEN status = 'open' THEN 1 END) as open_tickets,
                 COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_tickets,
-                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets
-            FROM tickets WHERE assigned_to = ?
+                COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets,
+                COUNT(CASE WHEN team_id IS NOT NULL THEN 1 END) as team_tickets
+            FROM tickets WHERE $whereClause
         ");
-        $stmt->execute([$userId]);
+        $stmt->execute($params);
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
@@ -1256,11 +1326,28 @@ class MobileAPI {
             return true;
         }
         
-        $stmt = $this->db->prepare("
-            SELECT id FROM tickets 
-            WHERE id = ? AND (assigned_to = ? OR assigned_to IS NULL)
-        ");
-        $stmt->execute([$ticketId, $userId]);
+        $teamIds = $this->getEmployeeTeamIds($userId);
+        $branchIds = $this->getEmployeeBranchIds($userId);
+        
+        $conditions = ["assigned_to = ?"];
+        $params = [$ticketId, $userId];
+        
+        if (!empty($teamIds)) {
+            $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+            $conditions[] = "team_id IN ($placeholders)";
+            $params = array_merge($params, $teamIds);
+        }
+        
+        $whereClause = "id = ? AND (" . implode(" OR ", $conditions) . ")";
+        
+        if (!empty($branchIds)) {
+            $placeholders = implode(',', array_fill(0, count($branchIds), '?'));
+            $whereClause .= " AND branch_id IN ($placeholders)";
+            $params = array_merge($params, $branchIds);
+        }
+        
+        $stmt = $this->db->prepare("SELECT id FROM tickets WHERE $whereClause");
+        $stmt->execute($params);
         return $stmt->fetch() !== false;
     }
     
