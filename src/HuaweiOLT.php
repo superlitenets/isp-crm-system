@@ -6063,6 +6063,171 @@ class HuaweiOLT {
         return ['success' => false, 'message' => 'Could not retrieve TR-069 IP from OLT'];
     }
     
+    /**
+     * Configure WAN via TR-069/GenieACS (SmartOLT-style approach)
+     * Creates WANConnectionDevice and configures PPPoE/DHCP/Static via GenieACS tasks
+     */
+    public function configureWANViaTR069(int $onuDbId, array $config): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $genieacsId = $onu['genieacs_id'] ?? null;
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
+        }
+        
+        $wanMode = $config['wan_mode'] ?? '';
+        $serviceVlan = (int)($config['service_vlan'] ?? 0);
+        $pppoeUsername = $config['pppoe_username'] ?? '';
+        $pppoePassword = $config['pppoe_password'] ?? '';
+        
+        if (empty($wanMode)) {
+            return ['success' => false, 'error' => 'WAN mode is required'];
+        }
+        
+        if ($wanMode === 'pppoe' && (empty($pppoeUsername) || empty($pppoePassword))) {
+            return ['success' => false, 'error' => 'PPPoE username and password are required'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) {
+            return ['success' => false, 'error' => 'GenieACS URL not configured'];
+        }
+        
+        $errors = [];
+        $tasksSent = [];
+        
+        // Build TR-069 parameter values based on WAN mode
+        $paramValues = [];
+        
+        // Common WAN path for most ONUs (InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1)
+        $wanBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1';
+        
+        if ($wanMode === 'pppoe') {
+            // PPPoE configuration
+            $paramValues = [
+                "{$wanBasePath}.WANPPPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
+                "{$wanBasePath}.WANPPPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANPPPConnection.1.Username" => ['value' => $pppoeUsername, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANPPPConnection.1.Password" => ['value' => $pppoePassword, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANPPPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
+            ];
+            
+            // Add VLAN if specified
+            if ($serviceVlan > 0) {
+                $paramValues["{$wanBasePath}.WANPPPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
+            }
+        } elseif ($wanMode === 'dhcp') {
+            // DHCP/IPoE configuration
+            $paramValues = [
+                "{$wanBasePath}.WANIPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
+                "{$wanBasePath}.WANIPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.AddressingType" => ['value' => 'DHCP', 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
+            ];
+            
+            if ($serviceVlan > 0) {
+                $paramValues["{$wanBasePath}.WANIPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
+            }
+        } elseif ($wanMode === 'static') {
+            // Static IP configuration
+            $staticIp = $config['static_ip'] ?? '';
+            $subnetMask = $config['subnet_mask'] ?? '255.255.255.0';
+            $gateway = $config['gateway'] ?? '';
+            $dnsServers = $config['dns_servers'] ?? '8.8.8.8,8.8.4.4';
+            
+            if (empty($staticIp) || empty($gateway)) {
+                return ['success' => false, 'error' => 'Static IP and gateway are required'];
+            }
+            
+            $paramValues = [
+                "{$wanBasePath}.WANIPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
+                "{$wanBasePath}.WANIPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.AddressingType" => ['value' => 'Static', 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.ExternalIPAddress" => ['value' => $staticIp, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.SubnetMask" => ['value' => $subnetMask, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.DefaultGateway" => ['value' => $gateway, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.DNSServers" => ['value' => $dnsServers, 'type' => 'xsd:string'],
+                "{$wanBasePath}.WANIPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
+            ];
+            
+            if ($serviceVlan > 0) {
+                $paramValues["{$wanBasePath}.WANIPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
+            }
+        }
+        
+        // Send setParameterValues task to GenieACS
+        if (!empty($paramValues)) {
+            $task = [
+                'name' => 'setParameterValues',
+                'parameterValues' => []
+            ];
+            
+            foreach ($paramValues as $path => $val) {
+                $task['parameterValues'][] = [$path, $val['value'], $val['type']];
+            }
+            
+            $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($task),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 30
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode >= 200 && $httpCode < 300) {
+                $tasksSent[] = 'WAN Configuration';
+            } else {
+                $errors[] = "Failed to send WAN config task (HTTP $httpCode): $response";
+            }
+        }
+        
+        // Update ONU record with WAN configuration
+        $updateData = [
+            'wan_mode' => $wanMode,
+            'vlan_id' => $serviceVlan ?: ($onu['vlan_id'] ?? null)
+        ];
+        
+        if ($wanMode === 'pppoe') {
+            $updateData['pppoe_username'] = $pppoeUsername;
+            $updateData['pppoe_password'] = $pppoePassword;
+        }
+        
+        $this->updateONU($onuDbId, $updateData);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuDbId,
+            'action' => 'configure_wan_tr069',
+            'status' => empty($errors) ? 'success' : 'partial',
+            'message' => empty($errors) 
+                ? "WAN {$wanMode} configured via TR-069 (VLAN: {$serviceVlan})"
+                : "WAN config partial: " . implode(', ', $errors),
+            'command_response' => json_encode(['tasks' => $tasksSent, 'params' => array_keys($paramValues)]),
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        if (empty($errors)) {
+            return [
+                'success' => true,
+                'message' => "WAN ({$wanMode}) configuration sent via TR-069. The ONU will apply settings on next connection request.",
+                'tasks_sent' => $tasksSent
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => implode('; ', $errors),
+            'tasks_sent' => $tasksSent
+        ];
+    }
+    
     private function generateNextSNSCode(int $oltId): string {
         // Find highest SNS number for this OLT
         $stmt = $this->db->prepare("

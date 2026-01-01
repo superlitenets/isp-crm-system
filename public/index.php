@@ -931,6 +931,58 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
     exit;
 }
 
+// Configure WAN via TR-069 API
+if ($page === 'api' && $action === 'configure_wan_tr069') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_POST['onu_id']) ? (int)$_POST['onu_id'] : 0;
+    $wanMode = $_POST['wan_mode'] ?? '';
+    $serviceVlan = isset($_POST['service_vlan']) ? (int)$_POST['service_vlan'] : 0;
+    
+    if (!$onuId || !$wanMode) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID and WAN mode required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            exit;
+        }
+        
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        
+        $config = [
+            'wan_mode' => $wanMode,
+            'service_vlan' => $serviceVlan,
+            'pppoe_username' => $_POST['pppoe_username'] ?? '',
+            'pppoe_password' => $_POST['pppoe_password'] ?? '',
+            'static_ip' => $_POST['static_ip'] ?? '',
+            'subnet_mask' => $_POST['subnet_mask'] ?? '255.255.255.0',
+            'gateway' => $_POST['gateway'] ?? '',
+            'dns_servers' => $_POST['dns_servers'] ?? '8.8.8.8,8.8.4.4',
+            'bind_lan_ports' => isset($_POST['bind_lan_ports']),
+            'bind_wifi' => isset($_POST['bind_wifi'])
+        ];
+        
+        $result = $huaweiOLT->configureWANViaTR069($onuId, $config);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Web Dashboard Clock In/Out API
 if ($page === 'api' && $action === 'clock_in') {
     while (ob_get_level()) ob_end_clean();

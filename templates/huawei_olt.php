@@ -6052,9 +6052,15 @@ try {
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">WAN setup mode</span><br>
+                                <span class="text-primary">WAN setup mode</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="Configure WAN">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <br>
                                 <?php if (!empty($currentOnu['pppoe_username'])): ?>
-                                <span class="badge bg-info">PPPoE (TR069)</span>
+                                <span class="badge bg-info">PPPoE (TR069)</span> - <?= htmlspecialchars($currentOnu['pppoe_username']) ?>
+                                <?php elseif (!empty($currentOnu['wan_mode'])): ?>
+                                <span class="badge bg-success"><?= strtoupper($currentOnu['wan_mode']) ?></span>
                                 <?php else: ?>
                                 <span class="badge bg-secondary">Not configured</span>
                                 <?php endif; ?>
@@ -6875,6 +6881,151 @@ try {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Pushing...';
             });
+            </script>
+            
+            <!-- WAN Configuration Modal -->
+            <div class="modal fade" id="wanConfigModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-ethernet me-2"></i>Configure Internet WAN</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="wanConfigForm" onsubmit="return submitWanConfig(event)">
+                            <div class="modal-body">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    This configures the Internet WAN connection on the ONU via TR-069/GenieACS.
+                                    <?php if (empty($currentOnu['tr069_ip'])): ?>
+                                    <br><strong class="text-warning">Warning:</strong> TR-069 connection not yet established. Configure TR-069 first.
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">WAN Mode</label>
+                                    <select name="wan_mode" id="wanModeSelect" class="form-select" required onchange="toggleWanFields()">
+                                        <option value="">-- Select Mode --</option>
+                                        <option value="pppoe" <?= ($currentOnu['wan_mode'] ?? '') === 'pppoe' ? 'selected' : '' ?>>PPPoE</option>
+                                        <option value="dhcp" <?= ($currentOnu['wan_mode'] ?? '') === 'dhcp' ? 'selected' : '' ?>>DHCP (IPoE)</option>
+                                        <option value="static" <?= ($currentOnu['wan_mode'] ?? '') === 'static' ? 'selected' : '' ?>>Static IP</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Service VLAN</label>
+                                    <select name="service_vlan" class="form-select" required>
+                                        <?php
+                                        $serviceVlans = $db->prepare("SELECT vlan_id, description FROM huawei_vlans WHERE olt_id = ? AND is_tr069 = FALSE AND is_active = TRUE ORDER BY vlan_id");
+                                        $serviceVlans->execute([$currentOnu['olt_id']]);
+                                        $vlans = $serviceVlans->fetchAll(PDO::FETCH_ASSOC);
+                                        foreach ($vlans as $vlan):
+                                        ?>
+                                        <option value="<?= $vlan['vlan_id'] ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vlan['vlan_id'] ? 'selected' : '' ?>>
+                                            <?= $vlan['vlan_id'] ?> - <?= htmlspecialchars($vlan['description'] ?: 'Service VLAN') ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($vlans) && !empty($currentOnu['vlan_id'])): ?>
+                                        <option value="<?= $currentOnu['vlan_id'] ?>" selected><?= $currentOnu['vlan_id'] ?></option>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+                                
+                                <div id="pppoeFields" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">PPPoE Username</label>
+                                        <input type="text" name="pppoe_username" class="form-control" value="<?= htmlspecialchars($currentOnu['pppoe_username'] ?? '') ?>" placeholder="username@isp.com">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">PPPoE Password</label>
+                                        <input type="text" name="pppoe_password" class="form-control" value="<?= htmlspecialchars($currentOnu['pppoe_password'] ?? '') ?>" placeholder="password">
+                                    </div>
+                                </div>
+                                
+                                <div id="staticFields" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Static IP Address</label>
+                                        <input type="text" name="static_ip" class="form-control" placeholder="192.168.1.100">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Subnet Mask</label>
+                                        <input type="text" name="subnet_mask" class="form-control" value="255.255.255.0" placeholder="255.255.255.0">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Gateway</label>
+                                        <input type="text" name="gateway" class="form-control" placeholder="192.168.1.1">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">DNS Servers</label>
+                                        <input type="text" name="dns_servers" class="form-control" value="8.8.8.8,8.8.4.4" placeholder="8.8.8.8,8.8.4.4">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="bind_lan_ports" id="bindLanPorts" class="form-check-input" checked>
+                                        <label class="form-check-label" for="bindLanPorts">Bind LAN ports to this WAN</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="bind_wifi" id="bindWifi" class="form-check-input" checked>
+                                        <label class="form-check-label" for="bindWifi">Bind WiFi to this WAN</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" id="btnConfigWan" <?= empty($currentOnu['tr069_ip']) ? 'disabled' : '' ?>>
+                                    <i class="bi bi-check-circle me-1"></i> Apply Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function toggleWanFields() {
+                const mode = document.getElementById('wanModeSelect').value;
+                document.getElementById('pppoeFields').style.display = mode === 'pppoe' ? 'block' : 'none';
+                document.getElementById('staticFields').style.display = mode === 'static' ? 'block' : 'none';
+            }
+            toggleWanFields();
+            
+            async function submitWanConfig(e) {
+                e.preventDefault();
+                const form = e.target;
+                const btn = document.getElementById('btnConfigWan');
+                const formData = new FormData(form);
+                
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Configuring...';
+                
+                try {
+                    const resp = await fetch('?page=api&action=configure_wan_tr069', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.success) {
+                        alert('WAN configuration applied successfully!');
+                        bootstrap.Modal.getInstance(document.getElementById('wanConfigModal')).hide();
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    alert('Network error: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Apply Configuration';
+                }
+                
+                return false;
+            }
             </script>
             
             <?php elseif ($view === 'onu_types'): ?>
