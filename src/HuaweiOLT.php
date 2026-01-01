@@ -2585,29 +2585,31 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU location (slot/port) not set'];
         }
         
-        // Try CLI first (faster and works when SNMP is blocked), then SNMP as fallback
-        $optical = $this->getONUOpticalInfoViaCLI(
-            $onu['olt_id'],
-            $frame,
-            $slot,
-            $port,
-            $onuIdNum
-        );
+        // Priority: SNMP first (less OLT load, no session conflicts), CLI as fallback
+        $optical = ['success' => false, 'optical' => ['rx_power' => null, 'tx_power' => null]];
         
-        // If CLI failed or didn't get power data, try SNMP as fallback
+        if (function_exists('snmpget')) {
+            $optical = $this->getONUOpticalInfoViaSNMP(
+                $onu['olt_id'],
+                $frame,
+                $slot,
+                $port,
+                $onuIdNum
+            );
+        }
+        
+        // Fall back to CLI only if SNMP fails or returns no data
         if (!$optical['success'] || 
             ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null)) {
-            if (function_exists('snmpget')) {
-                $snmpOptical = $this->getONUOpticalInfoViaSNMP(
-                    $onu['olt_id'],
-                    $frame,
-                    $slot,
-                    $port,
-                    $onuIdNum
-                );
-                if ($snmpOptical['success']) {
-                    $optical = $snmpOptical;
-                }
+            $cliOptical = $this->getONUOpticalInfoViaCLI(
+                $onu['olt_id'],
+                $frame,
+                $slot,
+                $port,
+                $onuIdNum
+            );
+            if ($cliOptical['success']) {
+                $optical = $cliOptical;
             }
         }
         
@@ -2689,14 +2691,14 @@ class HuaweiOLT {
     }
     
     public function discoverUnconfiguredONUs(int $oltId): array {
-        // Try CLI first (more reliable), then fall back to SNMP
-        $cliResult = $this->discoverUnconfiguredONUsViaCLI($oltId);
-        if ($cliResult['success'] && !empty($cliResult['onus'])) {
-            return $cliResult;
+        // Priority: SNMP first (less OLT load, no session conflicts), CLI as fallback
+        $snmpResult = $this->discoverUnconfiguredONUsViaSNMP($oltId);
+        if ($snmpResult['success'] && !empty($snmpResult['onus'])) {
+            return $snmpResult;
         }
         
-        // Fall back to SNMP
-        return $this->discoverUnconfiguredONUsViaSNMP($oltId);
+        // Fall back to CLI only if SNMP fails (e.g., no SNMP extension, wrong community)
+        return $this->discoverUnconfiguredONUsViaCLI($oltId);
     }
     
     public function discoverUnconfiguredONUsViaCLI(int $oltId): array {
