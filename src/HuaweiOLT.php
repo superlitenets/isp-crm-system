@@ -8624,15 +8624,18 @@ class HuaweiOLT {
     // ==================== OMS Notifications ====================
     
     public function sendNewOnuNotification(array $onu, array $olt): bool {
-        if (empty($olt['branch_whatsapp_group'])) {
-            return false;
-        }
-        
         try {
             require_once __DIR__ . '/WhatsApp.php';
             require_once __DIR__ . '/Settings.php';
             $whatsapp = new \App\WhatsApp($this->db);
             $settings = new \App\Settings();
+            
+            // New ONU notifications go to provisioning group (separate from branch groups)
+            $provisioningGroup = $settings->get('wa_provisioning_group', '');
+            if (empty($provisioningGroup)) {
+                error_log("OMS Notification: No provisioning group configured (wa_provisioning_group)");
+                return false;
+            }
             
             $branchName = $olt['branch_name'] ?? 'Unknown Branch';
             $branchCode = $olt['branch_code'] ?? '';
@@ -8654,7 +8657,7 @@ class HuaweiOLT {
             
             $message = str_replace(array_keys($placeholders), array_values($placeholders), $template);
             
-            $result = $whatsapp->sendToGroup($olt['branch_whatsapp_group'], $message);
+            $result = $whatsapp->sendToGroup($provisioningGroup, $message);
             return $result['success'] ?? false;
         } catch (\Exception $e) {
             error_log("OMS Notification Error (New ONU): " . $e->getMessage());
