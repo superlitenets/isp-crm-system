@@ -6145,8 +6145,9 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         
         // Huawei MA5683T requires interface context for ont reset
+        // Use forceDirectConnection=true to bypass Node.js service and use direct Telnet
         $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\nquit";
-        $result = $this->executeCommand($onu['olt_id'], $command);
+        $result = $this->executeCommand($onu['olt_id'], $command, true);
         
         // Check for success indicators in output
         $output = $result['output'] ?? '';
@@ -6157,13 +6158,18 @@ class HuaweiOLT {
             'onu_id' => $onuId,
             'action' => 'reboot',
             'status' => $success ? 'success' : 'failed',
-            'message' => $success ? "ONU {$onu['sn']} rebooted" : ($result['message'] ?? 'Reboot command failed'),
+            'message' => $success ? "ONU {$onu['sn']} rebooted via direct Telnet" : ($result['message'] ?? 'Reboot command failed'),
             'command_sent' => $command,
             'command_response' => $output,
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        return ['success' => $success, 'message' => $success ? "ONU {$onu['sn']} rebooted successfully" : 'Reboot command failed', 'output' => $output];
+        return [
+            'success' => $success, 
+            'message' => $success ? "ONU {$onu['sn']} rebooted successfully (direct Telnet)" : ('Reboot failed: ' . ($result['message'] ?? 'Unknown error')), 
+            'output' => $output,
+            'command' => $command
+        ];
     }
     
     public function deleteONUFromOLT(int $onuId): array {
