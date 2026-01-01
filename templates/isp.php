@@ -1372,16 +1372,28 @@ try {
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                 <div>
                     <h4 class="page-title mb-1"><i class="bi bi-people"></i> Subscribers</h4>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <small class="text-muted"><i class="bi bi-people-fill me-1"></i><?= $totalSubs ?> total</small>
-                        <small class="text-success"><i class="bi bi-wifi me-1"></i><?= $onlineCount ?> online</small>
-                        <small class="text-primary"><i class="bi bi-check-circle me-1"></i><?= $activeCount ?> active</small>
+                    <div class="d-flex gap-3 flex-wrap align-items-center">
+                        <span class="badge bg-light text-dark border px-3 py-2"><i class="bi bi-people-fill me-1"></i><?= $totalSubs ?> total</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2" id="onlineCountBadge"><i class="bi bi-wifi me-1"></i><span id="onlineCountNum"><?= count($onlineSubscribers) ?></span> online</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2"><i class="bi bi-check-circle me-1"></i><?= $activeCount ?> active</span>
                         <?php if ($expiringSoonCount > 0): ?>
-                        <small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= $expiringSoonCount ?> expiring soon</small>
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="bi bi-exclamation-triangle me-1"></i><?= $expiringSoonCount ?> expiring soon</span>
                         <?php endif; ?>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="refreshOnlineStatus()" title="Refresh online status">
+                            <i class="bi bi-arrow-clockwise" id="refreshIcon"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="d-flex gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-download me-1"></i> Export
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="?page=isp&view=export_subscribers&format=csv"><i class="bi bi-filetype-csv me-2"></i>Export CSV</a></li>
+                            <li><a class="dropdown-item" href="?page=isp&view=export_subscribers&format=excel"><i class="bi bi-file-earmark-excel me-2"></i>Export Excel</a></li>
+                        </ul>
+                    </div>
                     <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#bulkActionsPanel">
                         <i class="bi bi-check2-square me-1"></i> Bulk Actions
                     </button>
@@ -1479,7 +1491,7 @@ try {
                                     <th class="text-center">Status</th>
                                     <th>Expiry</th>
                                     <th class="text-end">Usage</th>
-                                    <th class="text-center" style="width: 180px;">Actions</th>
+                                    <th class="text-center" style="width: 200px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1495,54 +1507,90 @@ try {
                                 };
                                 $isExpiringSoon = $sub['expiry_date'] && strtotime($sub['expiry_date']) < strtotime('+7 days') && strtotime($sub['expiry_date']) > time();
                                 $isExpired = $sub['expiry_date'] && strtotime($sub['expiry_date']) < time();
+                                $daysLeft = $sub['expiry_date'] ? ceil((strtotime($sub['expiry_date']) - time()) / 86400) : null;
                                 ?>
-                                <tr>
+                                <tr class="sub-row" data-sub-id="<?= $sub['id'] ?>">
                                     <td>
                                         <input type="checkbox" class="form-check-input sub-checkbox" value="<?= $sub['id'] ?>" onchange="updateBulkCount()">
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            <div class="me-2">
+                                            <div class="me-2 position-relative">
                                                 <?php if ($isOnline): ?>
-                                                <span class="badge rounded-pill bg-success p-2"><i class="bi bi-wifi"></i></span>
+                                                <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                                    <i class="bi bi-wifi text-white"></i>
+                                                </div>
+                                                <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
                                                 <?php else: ?>
-                                                <span class="badge rounded-pill bg-secondary p-2"><i class="bi bi-wifi-off"></i></span>
+                                                <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                                    <i class="bi bi-wifi-off text-secondary"></i>
+                                                </div>
                                                 <?php endif; ?>
                                             </div>
                                             <div>
-                                                <strong><?= htmlspecialchars($sub['username']) ?></strong>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <a href="?page=isp&view=subscriber&id=<?= $sub['id'] ?>" class="fw-bold text-decoration-none"><?= htmlspecialchars($sub['username']) ?></a>
+                                                    <button class="btn btn-link btn-sm p-0 text-muted" onclick="copyToClipboard('<?= htmlspecialchars($sub['username']) ?>')" title="Copy username"><i class="bi bi-clipboard"></i></button>
+                                                </div>
                                                 <?php if ($isOnline && !empty($onlineInfo['ip'])): ?>
-                                                <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($onlineInfo['ip']) ?>')" class="badge bg-success-subtle text-success border border-success-subtle ms-1 text-decoration-none" title="Click to open router page"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></a>
+                                                <a href="javascript:void(0)" onclick="openRouterPage('<?= htmlspecialchars($onlineInfo['ip']) ?>')" class="badge bg-success-subtle text-success border border-success-subtle text-decoration-none" title="Click to open router page"><i class="bi bi-hdd-network"></i> <?= htmlspecialchars($onlineInfo['ip']) ?></a>
                                                 <?php endif; ?>
-                                                <br><small class="text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></small>
+                                                <div class="small text-muted"><?= htmlspecialchars($sub['customer_name'] ?? 'No customer') ?></div>
                                                 <?php if (!empty($sub['customer_phone'])): ?>
-                                                <br><small class="text-muted"><i class="bi bi-telephone"></i> <?= htmlspecialchars($sub['customer_phone']) ?></small>
+                                                <div class="small">
+                                                    <a href="tel:<?= htmlspecialchars($sub['customer_phone']) ?>" class="text-decoration-none text-muted"><i class="bi bi-telephone"></i> <?= htmlspecialchars($sub['customer_phone']) ?></a>
+                                                    <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank" class="text-success ms-1" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                                                </div>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($sub['package_name']) ?></span>
-                                        <br><small class="text-muted"><?= $sub['download_speed'] ?>/<?= $sub['upload_speed'] ?></small>
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle"><?= htmlspecialchars($sub['package_name']) ?></span>
+                                        <div class="small text-muted mt-1">
+                                            <i class="bi bi-arrow-down text-success"></i> <?= $sub['download_speed'] ?>
+                                            <i class="bi bi-arrow-up text-danger ms-1"></i> <?= $sub['upload_speed'] ?>
+                                        </div>
+                                        <div class="small text-muted">KES <?= number_format($sub['package_price'] ?? 0) ?></div>
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge bg-<?= $statusClass ?>"><?= ucfirst($sub['status']) ?></span>
-                                        <br><small class="badge bg-light text-dark"><?= strtoupper($sub['access_type']) ?></small>
+                                        <span class="badge bg-<?= $statusClass ?> px-3"><?= ucfirst($sub['status']) ?></span>
+                                        <div class="mt-1">
+                                            <span class="badge bg-light text-dark border"><?= strtoupper($sub['access_type']) ?></span>
+                                        </div>
+                                        <?php if ($sub['mac_address']): ?>
+                                        <div class="small text-success mt-1" title="MAC Bound"><i class="bi bi-lock-fill"></i> MAC</div>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if ($sub['expiry_date']): ?>
-                                            <?= date('M j, Y', strtotime($sub['expiry_date'])) ?>
+                                            <div class="<?= $isExpired ? 'text-danger' : ($isExpiringSoon ? 'text-warning' : '') ?>">
+                                                <?= date('M j, Y', strtotime($sub['expiry_date'])) ?>
+                                            </div>
                                             <?php if ($isExpired): ?>
-                                            <br><span class="badge bg-danger"><i class="bi bi-x-circle"></i> Expired</span>
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> <?= abs($daysLeft) ?>d ago</span>
                                             <?php elseif ($isExpiringSoon): ?>
-                                            <br><span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Soon</span>
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> <?= $daysLeft ?>d left</span>
+                                            <?php else: ?>
+                                            <span class="badge bg-success-subtle text-success"><?= $daysLeft ?>d left</span>
                                             <?php endif; ?>
                                         <?php else: ?>
-                                            <span class="text-muted">-</span>
+                                            <span class="text-muted">No expiry</span>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end">
-                                        <strong><?= number_format($sub['data_used_mb'] / 1024, 2) ?></strong> GB
+                                        <?php 
+                                        $usageGB = $sub['data_used_mb'] / 1024;
+                                        $quotaGB = ($sub['data_quota_mb'] ?? 0) / 1024;
+                                        $usagePercent = $quotaGB > 0 ? min(100, ($usageGB / $quotaGB) * 100) : 0;
+                                        ?>
+                                        <div class="fw-bold"><?= number_format($usageGB, 2) ?> GB</div>
+                                        <?php if ($quotaGB > 0): ?>
+                                        <div class="progress mt-1" style="height: 4px; width: 60px; margin-left: auto;">
+                                            <div class="progress-bar <?= $usagePercent >= 100 ? 'bg-danger' : ($usagePercent >= 80 ? 'bg-warning' : 'bg-success') ?>" style="width: <?= $usagePercent ?>%;"></div>
+                                        </div>
+                                        <div class="small text-muted"><?= round($usagePercent) ?>% of <?= number_format($quotaGB, 0) ?>GB</div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group btn-group-sm">
@@ -1550,29 +1598,31 @@ try {
                                                 <i class="bi bi-eye"></i>
                                             </a>
                                             <?php if ($sub['status'] === 'active'): ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="suspend_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-outline-warning" title="Suspend" onclick="return confirm('Suspend this subscriber?')">
-                                                    <i class="bi bi-pause-fill"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-warning" title="Suspend" onclick="quickAction('suspend', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
+                                                <i class="bi bi-pause-fill"></i>
+                                            </button>
                                             <?php else: ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="activate_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-outline-success" title="Activate">
-                                                    <i class="bi bi-play-fill"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-success" title="Activate" onclick="quickAction('activate', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
+                                                <i class="bi bi-play-fill"></i>
+                                            </button>
                                             <?php endif; ?>
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="renew_subscription">
-                                                <input type="hidden" name="id" value="<?= $sub['id'] ?>">
-                                                <button type="submit" class="btn btn-outline-info" title="Renew" onclick="return confirm('Renew this subscription for another period?')">
-                                                    <i class="bi bi-arrow-clockwise"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-info" title="Renew" onclick="quickAction('renew', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" title="More actions"></button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li><a class="dropdown-item" href="#" onclick="copyCredentials(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>', '<?= htmlspecialchars($sub['password'] ?? '') ?>')"><i class="bi bi-key me-2"></i>Copy Credentials</a></li>
+                                                    <?php if (!empty($sub['customer_phone'])): ?>
+                                                    <li><a class="dropdown-item" href="#" onclick="sendQuickSMS('<?= htmlspecialchars($sub['customer_phone']) ?>', '<?= htmlspecialchars($sub['customer_name'] ?? '') ?>')"><i class="bi bi-chat-dots me-2"></i>Send SMS</a></li>
+                                                    <li><a class="dropdown-item" href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $sub['customer_phone']) ?>" target="_blank"><i class="bi bi-whatsapp me-2"></i>WhatsApp</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <?php endif; ?>
+                                                    <li><a class="dropdown-item" href="#" onclick="initiateMpesa(<?= $sub['id'] ?>, '<?= htmlspecialchars($sub['customer_phone'] ?? '') ?>', <?= (int)($sub['package_price'] ?? 0) ?>)"><i class="bi bi-phone me-2"></i>M-Pesa Payment</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-danger" href="#" onclick="quickAction('delete', <?= $sub['id'] ?>, '<?= htmlspecialchars($sub['username']) ?>')"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -4402,7 +4452,132 @@ try {
         const frame = document.getElementById('routerBrowserFrame');
         frame.src = frame.src;
     }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Copied to clipboard!', 'success');
+        }).catch(() => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('Copied to clipboard!', 'success');
+        });
+    }
+    
+    function copyCredentials(subId, username, password) {
+        const text = `Username: ${username}\nPassword: ${password}`;
+        copyToClipboard(text);
+    }
+    
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3 shadow-lg`;
+        toast.style.zIndex = '9999';
+        toast.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+    
+    function quickAction(action, subId, username) {
+        const messages = {
+            'suspend': `Suspend subscriber ${username}?`,
+            'activate': `Activate subscriber ${username}?`,
+            'renew': `Renew subscription for ${username}?`,
+            'delete': `DELETE subscriber ${username}? This cannot be undone!`
+        };
+        
+        if (!confirm(messages[action] || `Perform ${action} on ${username}?`)) return;
+        
+        const actionMap = {
+            'suspend': 'suspend_subscription',
+            'activate': 'activate_subscription',
+            'renew': 'renew_subscription',
+            'delete': 'delete_subscription'
+        };
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = `<input type="hidden" name="action" value="${actionMap[action]}"><input type="hidden" name="id" value="${subId}">`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    function initiateMpesa(subId, phone, amount) {
+        const formattedPhone = phone.replace(/[^0-9]/g, '');
+        const modal = document.getElementById('mpesaPaymentModal');
+        if (modal) {
+            document.getElementById('mpesaSubId').value = subId;
+            document.getElementById('mpesaPhone').value = formattedPhone;
+            document.getElementById('mpesaAmount').value = amount;
+            new bootstrap.Modal(modal).show();
+        } else {
+            if (confirm(`Send M-Pesa STK Push for KES ${amount} to ${formattedPhone}?`)) {
+                fetch(`/index.php?page=api&action=mpesa_stk_push&subscription_id=${subId}&phone=${formattedPhone}&amount=${amount}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast('STK Push sent! User should enter PIN.', 'success');
+                        } else {
+                            showToast('Failed: ' + (data.error || 'Unknown error'), 'danger');
+                        }
+                    })
+                    .catch(() => showToast('Failed to initiate payment', 'danger'));
+            }
+        }
+    }
+    
+    function refreshOnlineStatus() {
+        const icon = document.getElementById('refreshIcon');
+        icon.classList.add('spin');
+        
+        fetch('/index.php?page=isp&action=get_online_subscribers')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('onlineCountNum').textContent = data.count;
+                    
+                    document.querySelectorAll('.sub-row').forEach(row => {
+                        const subId = row.dataset.subId;
+                        const isOnline = data.online_ids.includes(parseInt(subId));
+                        const statusDiv = row.querySelector('.me-2.position-relative');
+                        if (statusDiv) {
+                            if (isOnline) {
+                                statusDiv.innerHTML = `
+                                    <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <i class="bi bi-wifi text-white"></i>
+                                    </div>
+                                    <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style="width: 12px; height: 12px;"></span>
+                                `;
+                            } else {
+                                statusDiv.innerHTML = `
+                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <i class="bi bi-wifi-off text-secondary"></i>
+                                    </div>
+                                `;
+                            }
+                        }
+                    });
+                    
+                    showToast(`Updated: ${data.count} subscribers online`, 'success');
+                }
+            })
+            .catch(() => showToast('Failed to refresh status', 'danger'))
+            .finally(() => icon.classList.remove('spin'));
+    }
     </script>
+    
+    <style>
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    </style>
     
     <div class="modal fade" id="routerBrowserModal" tabindex="-1" aria-labelledby="routerBrowserTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
