@@ -2840,22 +2840,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => 'ONU not found']);
                     exit;
                 }
-                $cmd = "display ont tr069-config {$onu['frame']}/{$onu['slot']} {$onu['port']} {$onu['onu_id']}";
-                $cmdResult = $huaweiOLT->executeCommand($onu['olt_id'], $cmd);
-                $output = $cmdResult['output'] ?? '';
+                
                 $status = 'pending'; $ip = '-'; $acsUrl = '-'; $lastInform = '-'; $interval = '-';
-                if (preg_match('/ACS\s*URL\s*[:\s]+([^\r\n]+)/i', $output, $m)) $acsUrl = trim($m[1]);
-                if (preg_match('/Periodic\s*inform\s*interval\s*[:\s]+(\d+)/i', $output, $m)) $interval = $m[1];
-                if (!empty($onu['tr069_ip'])) { $ip = $onu['tr069_ip']; $status = 'connected'; }
-                if (!empty($onu['tr069_last_inform'])) $lastInform = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
+                $genieInfo = null;
+                
+                // Get TR-069 info from GenieACS if device is registered
+                if (!empty($onu['serial_number'])) {
+                    try {
+                        require_once __DIR__ . '/../src/GenieACS.php';
+                        $genieacs = new \App\GenieACS($db);
+                        $deviceResult = $genieacs->getDeviceBySerial($onu['serial_number']);
+                        if ($deviceResult['success'] && !empty($deviceResult['device'])) {
+                            $device = $deviceResult['device'];
+                            $genieInfo = $device;
+                            
+                            // Get management IP from InternetGatewayDevice.ManagementServer
+                            if (isset($device['InternetGatewayDevice']['ManagementServer']['ConnectionRequestURL']['_value'])) {
+                                $connUrl = $device['InternetGatewayDevice']['ManagementServer']['ConnectionRequestURL']['_value'];
+                                if (preg_match('/https?:\/\/([^:\/]+)/', $connUrl, $m)) {
+                                    $ip = $m[1];
+                                    $status = 'connected';
+                                }
+                            }
+                            
+                            // Get ACS URL
+                            if (isset($device['InternetGatewayDevice']['ManagementServer']['URL']['_value'])) {
+                                $acsUrl = $device['InternetGatewayDevice']['ManagementServer']['URL']['_value'];
+                            }
+                            
+                            // Get periodic inform interval
+                            if (isset($device['InternetGatewayDevice']['ManagementServer']['PeriodicInformInterval']['_value'])) {
+                                $interval = $device['InternetGatewayDevice']['ManagementServer']['PeriodicInformInterval']['_value'];
+                            }
+                            
+                            // Get last inform time
+                            if (isset($device['_lastInform'])) {
+                                $lastInform = date('Y-m-d H:i:s', strtotime($device['_lastInform']));
+                            }
+                        }
+                    } catch (Exception $e) {
+                        // GenieACS not available, fall back to database
+                    }
+                }
+                
+                // Fall back to database values if GenieACS didn't provide them
+                if ($ip === '-' && !empty($onu['tr069_ip'])) { 
+                    $ip = $onu['tr069_ip']; 
+                    $status = 'connected'; 
+                }
+                if ($lastInform === '-' && !empty($onu['tr069_last_inform'])) {
+                    $lastInform = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
+                }
+                
                 echo json_encode([
                     'success' => true,
                     'status' => $status,
                     'ip' => $ip,
                     'acs_url' => $acsUrl,
                     'last_inform' => $lastInform,
-                    'inform_interval' => $interval,
-                    'raw_output' => $output
+                    'inform_interval' => $interval
                 ]);
                 exit;
             case 'get_tr069_wan_status':
