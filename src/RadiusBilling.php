@@ -544,7 +544,7 @@ class RadiusBilling {
     public function suspendSubscription(int $id, string $reason = ''): array {
         try {
             $stmt = $this->db->prepare("
-                UPDATE radius_subscriptions SET status = 'suspended', notes = CONCAT(notes, ?), updated_at = CURRENT_TIMESTAMP
+                UPDATE radius_subscriptions SET status = 'suspended', notes = COALESCE(notes, '') || ?::text, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             ");
             $stmt->execute(["\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
