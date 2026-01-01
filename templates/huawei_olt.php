@@ -6050,19 +6050,64 @@ try {
                                 <br>
                                 <span id="onuModeDisplay">
                                     <span class="badge bg-<?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'secondary' : 'info' ?>"><?= $currentOnu['ip_mode'] ?? 'Bridge' ?></span>
-                                    <?= !empty($currentOnu['vlan_id']) && ($currentOnu['ip_mode'] ?? 'Bridge') !== 'Bridge' ? '- WAN vlan: '.$currentOnu['vlan_id'] : '' ?>
+                                    <?php if (($currentOnu['ip_mode'] ?? 'Bridge') !== 'Bridge' && !empty($currentOnu['wan_mode'])): ?>
+                                    - <?= strtoupper($currentOnu['wan_mode']) ?>
+                                    <?php endif; ?>
                                 </span>
-                                <div id="onuModeEdit" style="display: none;" class="mt-1">
-                                    <div class="input-group input-group-sm" style="max-width: 250px;">
-                                        <select id="onuModeSelect" class="form-select form-select-sm">
-                                            <option value="Bridge" <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'selected' : '' ?>>Bridge</option>
-                                            <option value="Router" <?= ($currentOnu['ip_mode'] ?? '') === 'Router' ? 'selected' : '' ?>>Router (WAN)</option>
+                                <div id="onuModeEdit" style="display: none;" class="mt-2 p-2 border rounded bg-light" style="max-width: 320px;">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Mode</label>
+                                        <select id="onuModeSelect" class="form-select form-select-sm" onchange="onModeChange()">
+                                            <option value="Bridge" <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'selected' : '' ?>>Bridge (OMCI)</option>
+                                            <option value="Router" <?= ($currentOnu['ip_mode'] ?? '') === 'Router' ? 'selected' : '' ?>>Router (TR-069)</option>
                                         </select>
+                                    </div>
+                                    <div id="routerWanOptions" style="display: <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Router' ? 'block' : 'none' ?>;">
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1">WAN Type</label>
+                                            <select id="routerWanType" class="form-select form-select-sm" onchange="onWanTypeChange()">
+                                                <option value="dhcp" <?= ($currentOnu['wan_mode'] ?? '') === 'dhcp' ? 'selected' : '' ?>>DHCP</option>
+                                                <option value="static" <?= ($currentOnu['wan_mode'] ?? '') === 'static' ? 'selected' : '' ?>>Static IP</option>
+                                                <option value="pppoe" <?= ($currentOnu['wan_mode'] ?? '') === 'pppoe' ? 'selected' : '' ?>>PPPoE</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small mb-1">Service VLAN</label>
+                                            <select id="routerServiceVlan" class="form-select form-select-sm">
+                                                <?php if (empty($attachedVlans)): ?>
+                                                <option value="">-- Attach VLANs first --</option>
+                                                <?php else: foreach ($attachedVlans as $vid): ?>
+                                                <option value="<?= $vid ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vid ? 'selected' : '' ?>><?= $vid ?></option>
+                                                <?php endforeach; endif; ?>
+                                            </select>
+                                        </div>
+                                        <div id="pppoeFields2" style="display: <?= ($currentOnu['wan_mode'] ?? '') === 'pppoe' ? 'block' : 'none' ?>;">
+                                            <div class="mb-2">
+                                                <label class="form-label small mb-1">PPPoE Username</label>
+                                                <input type="text" id="pppoeUser" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['pppoe_username'] ?? '') ?>" placeholder="username">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small mb-1">PPPoE Password</label>
+                                                <input type="text" id="pppoePass" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['pppoe_password'] ?? '') ?>" placeholder="password">
+                                            </div>
+                                        </div>
+                                        <div id="staticFields2" style="display: <?= ($currentOnu['wan_mode'] ?? '') === 'static' ? 'block' : 'none' ?>;">
+                                            <div class="mb-2">
+                                                <label class="form-label small mb-1">Static IP</label>
+                                                <input type="text" id="staticIp" class="form-control form-control-sm" placeholder="192.168.1.100">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small mb-1">Gateway</label>
+                                                <input type="text" id="staticGw" class="form-control form-control-sm" placeholder="192.168.1.1">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
                                         <button type="button" class="btn btn-success btn-sm" onclick="saveOnuMode()">
-                                            <i class="bi bi-check"></i>
+                                            <i class="bi bi-check me-1"></i> Save
                                         </button>
                                         <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnuModeEdit()">
-                                            <i class="bi bi-x"></i>
+                                            <i class="bi bi-x me-1"></i> Cancel
                                         </button>
                                     </div>
                                 </div>
@@ -6193,11 +6238,37 @@ try {
                 }
             }
             
+            function onModeChange() {
+                const mode = document.getElementById('onuModeSelect').value;
+                document.getElementById('routerWanOptions').style.display = mode === 'Router' ? 'block' : 'none';
+            }
+            
+            function onWanTypeChange() {
+                const wanType = document.getElementById('routerWanType').value;
+                document.getElementById('pppoeFields2').style.display = wanType === 'pppoe' ? 'block' : 'none';
+                document.getElementById('staticFields2').style.display = wanType === 'static' ? 'block' : 'none';
+            }
+            
             async function saveOnuMode() {
                 const mode = document.getElementById('onuModeSelect').value;
                 const formData = new FormData();
                 formData.append('onu_id', onuDbId);
                 formData.append('ip_mode', mode);
+                
+                if (mode === 'Router') {
+                    const wanType = document.getElementById('routerWanType').value;
+                    const serviceVlan = document.getElementById('routerServiceVlan').value;
+                    formData.append('wan_mode', wanType);
+                    formData.append('service_vlan', serviceVlan);
+                    
+                    if (wanType === 'pppoe') {
+                        formData.append('pppoe_username', document.getElementById('pppoeUser').value);
+                        formData.append('pppoe_password', document.getElementById('pppoePass').value);
+                    } else if (wanType === 'static') {
+                        formData.append('static_ip', document.getElementById('staticIp').value);
+                        formData.append('gateway', document.getElementById('staticGw').value);
+                    }
+                }
                 
                 try {
                     const resp = await fetch('?page=api&action=update_onu_mode', {
@@ -6209,13 +6280,18 @@ try {
                     if (data.success) {
                         const display = document.getElementById('onuModeDisplay');
                         const badgeClass = mode === 'Bridge' ? 'secondary' : 'info';
-                        display.innerHTML = `<span class="badge bg-${badgeClass}">${mode}</span>`;
+                        let displayText = `<span class="badge bg-${badgeClass}">${mode}</span>`;
+                        if (mode === 'Router') {
+                            const wanType = document.getElementById('routerWanType').value;
+                            displayText += ` - ${wanType.toUpperCase()}`;
+                        }
+                        display.innerHTML = displayText;
                         toggleOnuModeEdit();
                         
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
-                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>ONU mode updated to ' + mode + '</div></div>';
+                        toast.innerHTML = '<div class="toast show bg-success text-white"><div class="toast-body"><i class="bi bi-check-circle me-2"></i>' + data.message + '</div></div>';
                         document.body.appendChild(toast);
                         setTimeout(() => toast.remove(), 3000);
                     } else {

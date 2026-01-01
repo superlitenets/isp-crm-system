@@ -1002,10 +1002,41 @@ if ($page === 'api' && $action === 'update_onu_mode') {
     }
     
     try {
-        $stmt = $db->prepare("UPDATE huawei_onus SET ip_mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([$ipMode, $onuId]);
-        
-        echo json_encode(['success' => true, 'message' => "ONU mode updated to {$ipMode}"]);
+        if ($ipMode === 'Bridge') {
+            // Simple Bridge mode - just update the database
+            $stmt = $db->prepare("UPDATE huawei_onus SET ip_mode = ?, wan_mode = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$ipMode, $onuId]);
+            echo json_encode(['success' => true, 'message' => "ONU mode set to Bridge (OMCI)"]);
+        } else {
+            // Router mode - configure WAN via TR-069
+            $wanMode = $_POST['wan_mode'] ?? 'dhcp';
+            $serviceVlan = isset($_POST['service_vlan']) ? (int)$_POST['service_vlan'] : 0;
+            
+            $config = [
+                'wan_mode' => $wanMode,
+                'service_vlan' => $serviceVlan,
+                'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                'static_ip' => $_POST['static_ip'] ?? '',
+                'gateway' => $_POST['gateway'] ?? '',
+                'subnet_mask' => '255.255.255.0',
+                'dns_servers' => '8.8.8.8,8.8.4.4'
+            ];
+            
+            // Update mode in database
+            $stmt = $db->prepare("UPDATE huawei_onus SET ip_mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$ipMode, $onuId]);
+            
+            // Configure WAN via TR-069
+            $huaweiOLT = new \App\HuaweiOLT($db);
+            $result = $huaweiOLT->configureWANViaTR069($onuId, $config);
+            
+            if ($result['success']) {
+                echo json_encode(['success' => true, 'message' => "Router mode with " . strtoupper($wanMode) . " configured via TR-069"]);
+            } else {
+                echo json_encode(['success' => true, 'message' => "Mode set to Router. WAN config: " . ($result['error'] ?? 'pending TR-069 connection')]);
+            }
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
