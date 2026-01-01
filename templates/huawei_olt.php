@@ -2841,8 +2841,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     exit;
                 }
                 
-                $status = 'pending'; $ip = '-'; $acsUrl = '-'; $lastInform = '-'; $interval = '-';
-                $genieInfo = null;
+                $result = [
+                    'success' => true,
+                    'status' => 'pending',
+                    'ip' => '-',
+                    'acs_url' => '-',
+                    'last_inform' => '-',
+                    'inform_interval' => '-',
+                    'manufacturer' => '-',
+                    'oui' => '-',
+                    'model' => '-',
+                    'sw_version' => '-',
+                    'hw_version' => '-',
+                    'provisioning_code' => '-',
+                    'serial' => $onu['serial_number'] ?? '-',
+                    'cpu_usage' => '-',
+                    'ram_usage' => '-',
+                    'uptime' => '-',
+                    'uptime_seconds' => 0,
+                    'found_in_acs' => false
+                ];
                 
                 // Get TR-069 info from GenieACS if device is registered
                 if (!empty($onu['serial_number'])) {
@@ -2852,54 +2870,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $deviceResult = $genieacs->getDeviceBySerial($onu['serial_number']);
                         if ($deviceResult['success'] && !empty($deviceResult['device'])) {
                             $device = $deviceResult['device'];
-                            $genieInfo = $device;
+                            $result['found_in_acs'] = true;
+                            $result['status'] = 'connected';
                             
-                            // Get management IP from InternetGatewayDevice.ManagementServer
-                            if (isset($device['InternetGatewayDevice']['ManagementServer']['ConnectionRequestURL']['_value'])) {
-                                $connUrl = $device['InternetGatewayDevice']['ManagementServer']['ConnectionRequestURL']['_value'];
-                                if (preg_match('/https?:\/\/([^:\/]+)/', $connUrl, $m)) {
-                                    $ip = $m[1];
-                                    $status = 'connected';
+                            // Device Info
+                            $igd = $device['InternetGatewayDevice'] ?? [];
+                            $devInfo = $igd['DeviceInfo'] ?? [];
+                            $mgmtServer = $igd['ManagementServer'] ?? [];
+                            
+                            // Manufacturer & OUI
+                            if (isset($devInfo['Manufacturer']['_value'])) {
+                                $result['manufacturer'] = $devInfo['Manufacturer']['_value'];
+                            }
+                            if (isset($device['_deviceId']['_OUI'])) {
+                                $result['oui'] = $device['_deviceId']['_OUI'];
+                            }
+                            
+                            // Model
+                            if (isset($devInfo['ModelName']['_value'])) {
+                                $result['model'] = $devInfo['ModelName']['_value'];
+                            } elseif (isset($device['_deviceId']['_ProductClass'])) {
+                                $result['model'] = $device['_deviceId']['_ProductClass'];
+                            }
+                            
+                            // Software/Hardware Version
+                            if (isset($devInfo['SoftwareVersion']['_value'])) {
+                                $result['sw_version'] = $devInfo['SoftwareVersion']['_value'];
+                            }
+                            if (isset($devInfo['HardwareVersion']['_value'])) {
+                                $result['hw_version'] = $devInfo['HardwareVersion']['_value'];
+                            }
+                            
+                            // Provisioning Code
+                            if (isset($devInfo['ProvisioningCode']['_value'])) {
+                                $result['provisioning_code'] = $devInfo['ProvisioningCode']['_value'];
+                            }
+                            
+                            // Serial Number
+                            if (isset($devInfo['SerialNumber']['_value'])) {
+                                $result['serial'] = $devInfo['SerialNumber']['_value'];
+                            } elseif (isset($device['_deviceId']['_SerialNumber'])) {
+                                $result['serial'] = $device['_deviceId']['_SerialNumber'];
+                            }
+                            
+                            // CPU Usage (X_HW_DeviceMgr.CpuUsage or similar)
+                            if (isset($igd['X_HW_DeviceMgr']['CpuUsage']['_value'])) {
+                                $result['cpu_usage'] = $igd['X_HW_DeviceMgr']['CpuUsage']['_value'] . ' %';
+                            } elseif (isset($devInfo['ProcessStatus']['CPUUsage']['_value'])) {
+                                $result['cpu_usage'] = $devInfo['ProcessStatus']['CPUUsage']['_value'] . ' %';
+                            }
+                            
+                            // Memory/RAM Usage
+                            if (isset($igd['X_HW_DeviceMgr']['MemUsage']['_value'])) {
+                                $result['ram_usage'] = $igd['X_HW_DeviceMgr']['MemUsage']['_value'] . ' %';
+                            } elseif (isset($devInfo['MemoryStatus']['Free']['_value']) && isset($devInfo['MemoryStatus']['Total']['_value'])) {
+                                $free = $devInfo['MemoryStatus']['Free']['_value'];
+                                $total = $devInfo['MemoryStatus']['Total']['_value'];
+                                if ($total > 0) {
+                                    $usedPercent = round((($total - $free) / $total) * 100);
+                                    $result['ram_usage'] = $usedPercent . ' %';
                                 }
                             }
                             
-                            // Get ACS URL
-                            if (isset($device['InternetGatewayDevice']['ManagementServer']['URL']['_value'])) {
-                                $acsUrl = $device['InternetGatewayDevice']['ManagementServer']['URL']['_value'];
+                            // Uptime
+                            if (isset($devInfo['UpTime']['_value'])) {
+                                $uptimeSec = (int)$devInfo['UpTime']['_value'];
+                                $result['uptime_seconds'] = $uptimeSec;
+                                $days = floor($uptimeSec / 86400);
+                                $hours = floor(($uptimeSec % 86400) / 3600);
+                                $mins = floor(($uptimeSec % 3600) / 60);
+                                $secs = $uptimeSec % 60;
+                                $result['uptime'] = '';
+                                if ($days > 0) $result['uptime'] .= "{$days} day" . ($days > 1 ? 's' : '') . ", ";
+                                if ($hours > 0) $result['uptime'] .= "{$hours} hour" . ($hours > 1 ? 's' : '') . ", ";
+                                $result['uptime'] .= "{$mins} min" . ($mins > 1 ? 's' : '') . ", {$secs} sec";
                             }
                             
-                            // Get periodic inform interval
-                            if (isset($device['InternetGatewayDevice']['ManagementServer']['PeriodicInformInterval']['_value'])) {
-                                $interval = $device['InternetGatewayDevice']['ManagementServer']['PeriodicInformInterval']['_value'];
+                            // Management IP from ConnectionRequestURL
+                            if (isset($mgmtServer['ConnectionRequestURL']['_value'])) {
+                                $connUrl = $mgmtServer['ConnectionRequestURL']['_value'];
+                                if (preg_match('/https?:\/\/([^:\/]+)/', $connUrl, $m)) {
+                                    $result['ip'] = $m[1];
+                                }
                             }
                             
-                            // Get last inform time
+                            // ACS URL
+                            if (isset($mgmtServer['URL']['_value'])) {
+                                $result['acs_url'] = $mgmtServer['URL']['_value'];
+                            }
+                            
+                            // Periodic inform interval
+                            if (isset($mgmtServer['PeriodicInformInterval']['_value'])) {
+                                $result['inform_interval'] = $mgmtServer['PeriodicInformInterval']['_value'];
+                            }
+                            
+                            // Last inform time
                             if (isset($device['_lastInform'])) {
-                                $lastInform = date('Y-m-d H:i:s', strtotime($device['_lastInform']));
+                                $result['last_inform'] = date('Y-m-d H:i:s', strtotime($device['_lastInform']));
                             }
                         }
                     } catch (Exception $e) {
-                        // GenieACS not available, fall back to database
+                        $result['error_detail'] = $e->getMessage();
                     }
                 }
                 
                 // Fall back to database values if GenieACS didn't provide them
-                if ($ip === '-' && !empty($onu['tr069_ip'])) { 
-                    $ip = $onu['tr069_ip']; 
-                    $status = 'connected'; 
+                if ($result['ip'] === '-' && !empty($onu['tr069_ip'])) { 
+                    $result['ip'] = $onu['tr069_ip']; 
+                    $result['status'] = 'connected'; 
                 }
-                if ($lastInform === '-' && !empty($onu['tr069_last_inform'])) {
-                    $lastInform = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
+                if ($result['last_inform'] === '-' && !empty($onu['tr069_last_inform'])) {
+                    $result['last_inform'] = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
                 }
                 
-                echo json_encode([
-                    'success' => true,
-                    'status' => $status,
-                    'ip' => $ip,
-                    'acs_url' => $acsUrl,
-                    'last_inform' => $lastInform,
-                    'inform_interval' => $interval
-                ]);
+                echo json_encode($result);
                 exit;
             case 'get_tr069_wan_status':
                 // Get WAN status via TR-069 (SmartOLT-style)
@@ -13515,8 +13599,8 @@ echo "# ================================================\n";
         const title = document.getElementById('onuFullStatusTitle');
         const body = document.getElementById('onuFullStatusBody');
         
-        title.textContent = 'TR-069 Status';
-        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching TR-069 info...</p></div>';
+        title.textContent = 'TR-069 Device Info';
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching TR-069 device info from GenieACS...</p></div>';
         modal.show();
         
         fetch('?page=huawei-olt', {
@@ -13530,16 +13614,49 @@ echo "# ================================================\n";
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No TR-069 data available') + '</div>';
                 return;
             }
-            let html = '<table class="table table-sm">';
-            html += '<tr><th>TR-069 Status</th><td><span class="badge bg-' + (data.status === 'connected' ? 'success' : 'warning') + '">' + (data.status || 'Unknown') + '</span></td></tr>';
-            html += '<tr><th>Management IP</th><td><code>' + (data.ip || '-') + '</code></td></tr>';
-            html += '<tr><th>ACS URL</th><td><small>' + (data.acs_url || '-') + '</small></td></tr>';
-            html += '<tr><th>Last Inform</th><td>' + (data.last_inform || '-') + '</td></tr>';
-            html += '<tr><th>Inform Interval</th><td>' + (data.inform_interval || '-') + ' sec</td></tr>';
-            html += '</table>';
-            if (data.raw_output) {
-                html += '<pre class="bg-dark text-light p-2 rounded small" style="max-height: 200px; overflow: auto;">' + escapeHtml(data.raw_output) + '</pre>';
+            
+            if (!data.found_in_acs) {
+                body.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Device not found in GenieACS. The ONU may not have connected to the ACS server yet.</div>' +
+                    '<div class="text-muted small"><strong>Serial:</strong> ' + escapeHtml(data.serial || '-') + '</div>';
+                return;
             }
+            
+            let statusBadge = data.status === 'connected' 
+                ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Connected</span>'
+                : '<span class="badge bg-warning"><i class="bi bi-clock me-1"></i>Pending</span>';
+            
+            let html = '<div class="mb-3">' + statusBadge + '</div>';
+            
+            // General Info Section
+            html += '<h6 class="text-primary border-bottom pb-2 mb-3"><i class="bi bi-info-circle me-2"></i>General</h6>';
+            html += '<table class="table table-sm table-borderless">';
+            html += '<tr><th style="width:40%">Manufacturer</th><td>' + escapeHtml(data.manufacturer || '-') + ' <span class="text-muted">(OUI: ' + escapeHtml(data.oui || '-') + ')</span></td></tr>';
+            html += '<tr><th>Model name</th><td><strong>' + escapeHtml(data.model || '-') + '</strong></td></tr>';
+            html += '<tr><th>Software version</th><td><code>' + escapeHtml(data.sw_version || '-') + '</code></td></tr>';
+            html += '<tr><th>Hardware version</th><td>' + escapeHtml(data.hw_version || '-') + '</td></tr>';
+            html += '<tr><th>Provisioning code</th><td>' + escapeHtml(data.provisioning_code || '-') + '</td></tr>';
+            html += '<tr><th>Serial number</th><td><code>' + escapeHtml(data.serial || '-') + '</code></td></tr>';
+            html += '<tr><th>CPU Usage</th><td>' + escapeHtml(data.cpu_usage || '-') + '</td></tr>';
+            html += '<tr><th>Used RAM</th><td>' + escapeHtml(data.ram_usage || '-') + '</td></tr>';
+            html += '<tr><th>Uptime</th><td>' + escapeHtml(data.uptime || '-') + '</td></tr>';
+            html += '</table>';
+            
+            // TR-069 Connection Info
+            html += '<h6 class="text-primary border-bottom pb-2 mb-3 mt-4"><i class="bi bi-broadcast me-2"></i>TR-069 Connection</h6>';
+            html += '<table class="table table-sm table-borderless">';
+            html += '<tr><th style="width:40%">Management IP</th><td><code>' + escapeHtml(data.ip || '-') + '</code></td></tr>';
+            html += '<tr><th>ACS URL</th><td><small class="text-break">' + escapeHtml(data.acs_url || '-') + '</small></td></tr>';
+            html += '<tr><th>Last Inform</th><td>' + escapeHtml(data.last_inform || '-') + '</td></tr>';
+            html += '<tr><th>Inform Interval</th><td>' + escapeHtml(data.inform_interval || '-') + ' sec</td></tr>';
+            html += '</table>';
+            
+            // Quick Actions
+            html += '<div class="mt-4 pt-3 border-top">';
+            html += '<button class="btn btn-outline-primary btn-sm me-2" onclick="openTR069Config(' + onuId + ')"><i class="bi bi-gear me-1"></i>WiFi Config</button>';
+            html += '<button class="btn btn-outline-info btn-sm me-2" onclick="openWANConfig(' + onuId + ')"><i class="bi bi-globe me-1"></i>WAN Config</button>';
+            html += '<button class="btn btn-outline-warning btn-sm" onclick="rebootONUViaTR069(' + onuId + ')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
+            html += '</div>';
+            
             body.innerHTML = html;
         })
         .catch(err => {
