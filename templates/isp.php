@@ -280,6 +280,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
             
+        case 'add_speed_override':
+            try {
+                $stmt = $db->prepare("
+                    INSERT INTO radius_speed_overrides 
+                    (package_id, name, download_speed, upload_speed, start_time, end_time, days_of_week, priority, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+                ");
+                $stmt->execute([
+                    (int)$_POST['package_id'],
+                    $_POST['name'],
+                    $_POST['download_speed'],
+                    $_POST['upload_speed'],
+                    $_POST['start_time'],
+                    $_POST['end_time'],
+                    $_POST['days_of_week'] ?? null,
+                    (int)($_POST['priority'] ?? 0)
+                ]);
+                $message = 'Speed schedule added';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error adding speed schedule: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'delete_speed_override':
+            try {
+                $stmt = $db->prepare("DELETE FROM radius_speed_overrides WHERE id = ?");
+                $stmt->execute([(int)$_POST['override_id']]);
+                $message = 'Speed schedule deleted';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error deleting speed schedule: ' . $e->getMessage();
+                $messageType = 'danger';
+            }
+            break;
+            
+        case 'send_speed_coa':
+            $subId = (int)$_POST['subscription_id'];
+            $result = $radiusBilling->sendSpeedUpdateCoA($subId);
+            if ($result['success']) {
+                $message = 'CoA sent successfully. New speed: ' . ($result['rate_limit'] ?? 'applied');
+                $messageType = 'success';
+            } else {
+                $message = 'CoA failed: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = 'danger';
+            }
+            break;
+            
         case 'reset_data_usage':
             $id = (int)$_POST['id'];
             try {
@@ -1963,6 +2012,11 @@ try {
                                 <i class="bi bi-sticky me-1"></i> Notes
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#speedOverridesTab">
+                                <i class="bi bi-speedometer2 me-1"></i> Speed Schedules
+                            </a>
+                        </li>
                     </ul>
                     
                     <div class="tab-content">
@@ -2198,6 +2252,106 @@ try {
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Speed Overrides Tab -->
+                        <div class="tab-pane fade" id="speedOverridesTab">
+                            <?php
+                            $speedOverrides = [];
+                            try {
+                                $soStmt = $db->prepare("SELECT * FROM radius_speed_overrides WHERE package_id = ? ORDER BY priority DESC, start_time");
+                                $soStmt->execute([$subscriber['package_id']]);
+                                $speedOverrides = $soStmt->fetchAll(PDO::FETCH_ASSOC);
+                            } catch (Exception $e) {}
+                            ?>
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Speed Schedules for <?= htmlspecialchars($package['name'] ?? 'Package') ?></h6>
+                                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSpeedOverrideModal">
+                                        <i class="bi bi-plus-circle me-1"></i> Add Schedule
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <?php if (empty($speedOverrides)): ?>
+                                    <div class="text-center text-muted py-4">
+                                        <i class="bi bi-speedometer2 fs-1 d-block mb-2"></i>
+                                        No speed schedules configured for this package.<br>
+                                        <small>Speed schedules allow different speeds at different times (e.g., Night Boost)</small>
+                                    </div>
+                                    <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Time Range</th>
+                                                    <th>Days</th>
+                                                    <th>Download</th>
+                                                    <th>Upload</th>
+                                                    <th>Priority</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($speedOverrides as $so): ?>
+                                                <tr>
+                                                    <td><?= htmlspecialchars($so['name']) ?></td>
+                                                    <td><?= date('H:i', strtotime($so['start_time'])) ?> - <?= date('H:i', strtotime($so['end_time'])) ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        $days = $so['days_of_week'] ? explode(',', $so['days_of_week']) : ['All'];
+                                                        echo implode(', ', array_map(fn($d) => ucfirst(substr(trim($d), 0, 3)), $days));
+                                                        ?>
+                                                    </td>
+                                                    <td><span class="badge bg-success"><?= htmlspecialchars($so['download_speed']) ?></span></td>
+                                                    <td><span class="badge bg-info"><?= htmlspecialchars($so['upload_speed']) ?></span></td>
+                                                    <td><?= $so['priority'] ?></td>
+                                                    <td>
+                                                        <?php if ($so['is_active']): ?>
+                                                        <span class="badge bg-success">Active</span>
+                                                        <?php else: ?>
+                                                        <span class="badge bg-secondary">Inactive</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <form method="post" class="d-inline">
+                                                            <input type="hidden" name="action" value="delete_speed_override">
+                                                            <input type="hidden" name="override_id" value="<?= $so['id'] ?>">
+                                                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                                            <input type="hidden" name="return_to" value="subscriber">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this schedule?')">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            
+                            <div class="card shadow-sm">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Actions</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="action" value="send_speed_coa">
+                                        <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                                        <input type="hidden" name="return_to" value="subscriber">
+                                        <button type="submit" class="btn btn-warning">
+                                            <i class="bi bi-arrow-repeat me-1"></i> Apply Current Speed (Send CoA)
+                                        </button>
+                                    </form>
+                                    <small class="text-muted d-block mt-2">
+                                        Immediately sends a Change of Authorization to update the user's speed based on current package and active schedules.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2358,6 +2512,72 @@ try {
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-success">Add Credit</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add Speed Override Modal -->
+            <div class="modal fade" id="addSpeedOverrideModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="post">
+                            <input type="hidden" name="action" value="add_speed_override">
+                            <input type="hidden" name="package_id" value="<?= $subscriber['package_id'] ?? '' ?>">
+                            <input type="hidden" name="subscription_id" value="<?= $subId ?>">
+                            <input type="hidden" name="return_to" value="subscriber">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-speedometer2 me-2"></i>Add Speed Schedule</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Schedule Name</label>
+                                    <input type="text" name="name" class="form-control" placeholder="e.g., Night Boost, Weekend Special" required>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Download Speed</label>
+                                            <input type="text" name="download_speed" class="form-control" placeholder="e.g., 50M, 100M" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Upload Speed</label>
+                                            <input type="text" name="upload_speed" class="form-control" placeholder="e.g., 20M, 50M" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Start Time</label>
+                                            <input type="time" name="start_time" class="form-control" value="22:00" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">End Time</label>
+                                            <input type="time" name="end_time" class="form-control" value="06:00" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Days of Week (leave empty for all days)</label>
+                                    <input type="text" name="days_of_week" class="form-control" placeholder="e.g., monday,tuesday,wednesday">
+                                    <small class="text-muted">Comma-separated: monday,tuesday,wednesday,thursday,friday,saturday,sunday</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Priority</label>
+                                    <input type="number" name="priority" class="form-control" value="10" min="0" max="100">
+                                    <small class="text-muted">Higher priority overrides take precedence (0-100)</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Schedule</button>
                             </div>
                         </form>
                     </div>
