@@ -13844,6 +13844,235 @@ echo "# ================================================\n";
         updateNonAuthBadge();
         setInterval(updateNonAuthBadge, 30000);
     });
+    
+    // Open TR-069 WiFi Config Modal
+    function openTR069Config(onuId) {
+        fetch('?page=api&action=get_onu_details&id=' + onuId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.onu) {
+                    document.getElementById('wifiDeviceId').value = onuId;
+                    document.getElementById('wifiDeviceSn').textContent = data.onu.serial_number || data.onu.sn || 'Unknown';
+                    new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+                } else {
+                    alert('Error loading ONU details');
+                }
+            })
+            .catch(err => alert('Error: ' + err.message));
+    }
+    
+    // Open WAN Config Modal
+    function openWANConfig(onuId) {
+        const modal = document.getElementById('wanConfigModal');
+        const body = document.getElementById('wanConfigBody');
+        document.getElementById('wanConfigOnuId').value = onuId;
+        
+        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Loading WAN configuration...</p></div>';
+        new bootstrap.Modal(modal).show();
+        
+        fetch('?page=api&action=get_wan_config&onu_id=' + onuId)
+            .then(r => r.json())
+            .then(data => {
+                let html = '';
+                
+                if (data.success) {
+                    const onu = data.onu || {};
+                    const wans = data.wans || [];
+                    
+                    html += '<div class="alert alert-light border mb-3">';
+                    html += '<div class="d-flex align-items-center">';
+                    html += '<i class="bi bi-router fs-4 text-primary me-3"></i>';
+                    html += '<div>';
+                    html += '<strong>' + escapeHtml(onu.serial_number || onu.sn || 'Unknown') + '</strong>';
+                    html += '<div class="small text-muted">' + escapeHtml(onu.description || onu.model || '') + '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    if (wans.length > 0) {
+                        html += '<h6 class="text-primary mb-3"><i class="bi bi-globe me-2"></i>Configured WAN Interfaces</h6>';
+                        wans.forEach((wan, idx) => {
+                            const typeLabel = wan.type === 'pppoe' ? 'PPPoE' : (wan.type === 'dhcp' ? 'DHCP' : 'Static IP');
+                            const statusClass = wan.connected ? 'success' : 'secondary';
+                            html += '<div class="card mb-2">';
+                            html += '<div class="card-body py-2">';
+                            html += '<div class="d-flex justify-content-between align-items-center">';
+                            html += '<div>';
+                            html += '<span class="badge bg-' + statusClass + ' me-2">' + (wan.connected ? 'Connected' : 'Disconnected') + '</span>';
+                            html += '<strong>' + escapeHtml(wan.name || 'WAN ' + (idx + 1)) + '</strong>';
+                            html += '<span class="text-muted ms-2">(' + typeLabel + ')</span>';
+                            html += '</div>';
+                            html += '<div>';
+                            if (wan.ip) html += '<code class="small">' + escapeHtml(wan.ip) + '</code>';
+                            html += '</div>';
+                            html += '</div>';
+                            if (wan.vlan) html += '<div class="small text-muted mt-1">VLAN: ' + wan.vlan + '</div>';
+                            html += '</div>';
+                            html += '</div>';
+                        });
+                    } else {
+                        html += '<div class="alert alert-warning">';
+                        html += '<i class="bi bi-exclamation-triangle me-2"></i>';
+                        html += 'No WAN interfaces configured. Use the form below to add one.';
+                        html += '</div>';
+                    }
+                    
+                    html += '<hr class="my-3">';
+                    html += '<h6 class="text-primary mb-3"><i class="bi bi-plus-circle me-2"></i>Add/Update Internet WAN</h6>';
+                    
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">Connection Type</label>';
+                    html += '<select name="wan_type" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
+                    html += '<option value="pppoe">PPPoE</option>';
+                    html += '<option value="dhcp">DHCP (IPoE)</option>';
+                    html += '<option value="static">Static IP</option>';
+                    html += '</select>';
+                    html += '</div>';
+                    
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">Internet VLAN</label>';
+                    html += '<input type="number" name="wan_vlan" class="form-control" value="' + (onu.service_vlan || 902) + '" min="1" max="4094">';
+                    html += '<div class="form-text">Service VLAN for internet traffic</div>';
+                    html += '</div>';
+                    
+                    html += '<div id="pppoeFields">';
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">PPPoE Username <span class="text-danger">*</span></label>';
+                    html += '<input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com">';
+                    html += '</div>';
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">PPPoE Password <span class="text-danger">*</span></label>';
+                    html += '<div class="input-group">';
+                    html += '<input type="password" name="pppoe_password" id="wanPppoePass" class="form-control" placeholder="password">';
+                    html += '<button type="button" class="btn btn-outline-secondary" onclick="togglePassword(\'wanPppoePass\')"><i class="bi bi-eye"></i></button>';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '<div id="staticFields" class="d-none">';
+                    html += '<div class="row">';
+                    html += '<div class="col-md-6 mb-3">';
+                    html += '<label class="form-label">IP Address</label>';
+                    html += '<input type="text" name="static_ip" class="form-control" placeholder="192.168.1.100">';
+                    html += '</div>';
+                    html += '<div class="col-md-6 mb-3">';
+                    html += '<label class="form-label">Subnet Mask</label>';
+                    html += '<input type="text" name="static_mask" class="form-control" value="255.255.255.0">';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '<div class="row">';
+                    html += '<div class="col-md-6 mb-3">';
+                    html += '<label class="form-label">Gateway</label>';
+                    html += '<input type="text" name="static_gateway" class="form-control" placeholder="192.168.1.1">';
+                    html += '</div>';
+                    html += '<div class="col-md-6 mb-3">';
+                    html += '<label class="form-label">DNS Server</label>';
+                    html += '<input type="text" name="static_dns" class="form-control" value="8.8.8.8">';
+                    html += '</div>';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '<div class="form-check mb-3">';
+                    html += '<input type="checkbox" name="nat_enabled" class="form-check-input" id="wanNatEnabled" checked>';
+                    html += '<label class="form-check-label" for="wanNatEnabled">Enable NAT</label>';
+                    html += '</div>';
+                    
+                } else {
+                    html += '<div class="alert alert-danger">';
+                    html += '<i class="bi bi-exclamation-triangle me-2"></i>';
+                    html += (data.error || 'Failed to load WAN configuration');
+                    html += '</div>';
+                    html += '<p class="text-muted">You can still configure WAN manually:</p>';
+                    
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">Connection Type</label>';
+                    html += '<select name="wan_type" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
+                    html += '<option value="pppoe">PPPoE</option>';
+                    html += '<option value="dhcp">DHCP (IPoE)</option>';
+                    html += '<option value="static">Static IP</option>';
+                    html += '</select>';
+                    html += '</div>';
+                    
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">Internet VLAN</label>';
+                    html += '<input type="number" name="wan_vlan" class="form-control" value="902" min="1" max="4094">';
+                    html += '</div>';
+                    
+                    html += '<div id="pppoeFields">';
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">PPPoE Username</label>';
+                    html += '<input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com">';
+                    html += '</div>';
+                    html += '<div class="mb-3">';
+                    html += '<label class="form-label">PPPoE Password</label>';
+                    html += '<input type="password" name="pppoe_password" class="form-control">';
+                    html += '</div>';
+                    html += '</div>';
+                    
+                    html += '<div id="staticFields" class="d-none">';
+                    html += '<div class="mb-3"><label class="form-label">IP Address</label><input type="text" name="static_ip" class="form-control"></div>';
+                    html += '<div class="mb-3"><label class="form-label">Gateway</label><input type="text" name="static_gateway" class="form-control"></div>';
+                    html += '</div>';
+                }
+                
+                body.innerHTML = html;
+            })
+            .catch(err => {
+                body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
+            });
+    }
+    
+    function toggleWanFields() {
+        const type = document.getElementById('wanConnectionType').value;
+        const pppoeFields = document.getElementById('pppoeFields');
+        const staticFields = document.getElementById('staticFields');
+        
+        if (pppoeFields) pppoeFields.classList.toggle('d-none', type !== 'pppoe');
+        if (staticFields) staticFields.classList.toggle('d-none', type !== 'static');
+    }
+    
+    function rebootONUViaTR069(onuId) {
+        if (!confirm('Reboot this ONU via TR-069?')) return;
+        
+        fetch('?page=api&action=tr069_reboot_onu&onu_id=' + onuId, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reboot command sent successfully!');
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to send reboot command'));
+                }
+            })
+            .catch(err => alert('Error: ' + err.message));
+    }
     </script>
+    
+    <!-- WAN Configuration Modal -->
+    <div class="modal fade" id="wanConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="post" id="wanConfigForm">
+                    <input type="hidden" name="action" value="configure_wan_tr069">
+                    <input type="hidden" name="onu_id" id="wanConfigOnuId">
+                    <div class="modal-header bg-info bg-opacity-10 border-bottom">
+                        <h5 class="modal-title text-info"><i class="bi bi-globe me-2"></i>WAN Configuration</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="wanConfigBody">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                            <p class="mt-2 text-muted">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-check-circle me-1"></i> Apply WAN Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

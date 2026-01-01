@@ -815,6 +815,122 @@ if ($page === 'api' && $action === 'huawei_live_onu') {
     exit;
 }
 
+// Get ONU Details API
+if ($page === 'api' && $action === 'get_onu_details') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($onu) {
+            echo json_encode(['success' => true, 'onu' => $onu]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// Get WAN Configuration API
+if ($page === 'api' && $action === 'get_wan_config') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : 0;
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            exit;
+        }
+        
+        $wans = [];
+        if (!empty($onu['genieacs_id'])) {
+            $huaweiOLT = new \App\HuaweiOLT($db);
+            $wanData = $huaweiOLT->getWANConfigFromGenieACS($onu['genieacs_id']);
+            if ($wanData && isset($wanData['wans'])) {
+                $wans = $wanData['wans'];
+            }
+        }
+        
+        echo json_encode([
+            'success' => true, 
+            'onu' => $onu,
+            'wans' => $wans
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => true, 'onu' => $onu ?? null, 'wans' => [], 'note' => 'Could not fetch live WAN data: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// TR-069 Reboot ONU API
+if ($page === 'api' && $action === 'tr069_reboot_onu') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : 0;
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$onu || empty($onu['genieacs_id'])) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found or not registered in GenieACS']);
+            exit;
+        }
+        
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        $result = $huaweiOLT->rebootONUViaTR069($onu['genieacs_id']);
+        echo json_encode($result);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Web Dashboard Clock In/Out API
 if ($page === 'api' && $action === 'clock_in') {
     while (ob_get_level()) ob_end_clean();

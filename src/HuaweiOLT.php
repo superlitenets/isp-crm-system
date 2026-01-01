@@ -9253,4 +9253,122 @@ class HuaweiOLT {
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $result['id'] ?? null;
     }
+    
+    public function getWANConfigFromGenieACS(string $deviceId): array {
+        $stmt = $this->db->query("SELECT * FROM genieacs_config WHERE is_active = TRUE LIMIT 1");
+        $config = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$config) {
+            return ['success' => false, 'error' => 'GenieACS not configured', 'wans' => []];
+        }
+        
+        $acsUrl = rtrim($config['acs_url'], '/');
+        $apiUrl = preg_replace('/:\d+$/', ':7557', parse_url($acsUrl, PHP_URL_HOST));
+        $apiUrl = 'http://' . $apiUrl;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $apiUrl . '/devices/' . urlencode($deviceId),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        
+        if (!empty($config['username']) && !empty($config['password'])) {
+            curl_setopt($ch, CURLOPT_USERPWD, $config['username'] . ':' . $config['password']);
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200 || !$response) {
+            return ['success' => false, 'error' => 'Failed to fetch device from GenieACS', 'wans' => []];
+        }
+        
+        $device = json_decode($response, true);
+        if (!$device) {
+            return ['success' => false, 'error' => 'Invalid response from GenieACS', 'wans' => []];
+        }
+        
+        $wans = [];
+        $wanPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice';
+        
+        if (isset($device[$wanPath])) {
+            foreach ($device[$wanPath] as $wanKey => $wanData) {
+                if (!is_array($wanData)) continue;
+                
+                if (isset($wanData['WANPPPConnection'])) {
+                    foreach ($wanData['WANPPPConnection'] as $pppKey => $ppp) {
+                        if (!is_array($ppp)) continue;
+                        $wans[] = [
+                            'name' => $ppp['Name']['_value'] ?? "PPPoE WAN {$wanKey}.{$pppKey}",
+                            'type' => 'pppoe',
+                            'connected' => ($ppp['ConnectionStatus']['_value'] ?? '') === 'Connected',
+                            'ip' => $ppp['ExternalIPAddress']['_value'] ?? null,
+                            'vlan' => $ppp['X_HW_VLAN']['_value'] ?? null,
+                            'username' => $ppp['Username']['_value'] ?? null
+                        ];
+                    }
+                }
+                
+                if (isset($wanData['WANIPConnection'])) {
+                    foreach ($wanData['WANIPConnection'] as $ipKey => $ipConn) {
+                        if (!is_array($ipConn)) continue;
+                        $addrType = $ipConn['AddressingType']['_value'] ?? 'DHCP';
+                        $wans[] = [
+                            'name' => $ipConn['Name']['_value'] ?? "IP WAN {$wanKey}.{$ipKey}",
+                            'type' => $addrType === 'Static' ? 'static' : 'dhcp',
+                            'connected' => ($ipConn['ConnectionStatus']['_value'] ?? '') === 'Connected',
+                            'ip' => $ipConn['ExternalIPAddress']['_value'] ?? null,
+                            'vlan' => $ipConn['X_HW_VLAN']['_value'] ?? null
+                        ];
+                    }
+                }
+            }
+        }
+        
+        return ['success' => true, 'wans' => $wans];
+    }
+    
+    public function rebootONUViaTR069(string $deviceId): array {
+        $stmt = $this->db->query("SELECT * FROM genieacs_config WHERE is_active = TRUE LIMIT 1");
+        $config = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$config) {
+            return ['success' => false, 'error' => 'GenieACS not configured'];
+        }
+        
+        $acsUrl = rtrim($config['acs_url'], '/');
+        $apiUrl = preg_replace('/:\d+$/', ':7557', parse_url($acsUrl, PHP_URL_HOST));
+        $apiUrl = 'http://' . $apiUrl;
+        
+        $task = [
+            'name' => 'reboot'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $apiUrl . '/devices/' . urlencode($deviceId) . '/tasks?connection_request',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json']
+        ]);
+        
+        if (!empty($config['username']) && !empty($config['password'])) {
+            curl_setopt($ch, CURLOPT_USERPWD, $config['username'] . ':' . $config['password']);
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return ['success' => true, 'message' => 'Reboot command sent'];
+        }
+        
+        return ['success' => false, 'error' => 'Failed to send reboot command. HTTP: ' . $httpCode];
+    }
 }
