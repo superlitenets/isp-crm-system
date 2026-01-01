@@ -5700,25 +5700,105 @@ try {
             $distance = $currentOnu['distance'] ?? null;
             $distanceDisplay = $distance ? ($distance >= 1000 ? number_format($distance/1000, 2).'km' : $distance.'m') : '-';
             $rxClass = 'success';
+            $rxLabel = 'Excellent';
             if ($rx !== null) {
-                if ($rx <= -28) $rxClass = 'danger';
-                elseif ($rx <= -25) $rxClass = 'warning';
+                if ($rx <= -28) { $rxClass = 'danger'; $rxLabel = 'Critical'; }
+                elseif ($rx <= -25) { $rxClass = 'warning'; $rxLabel = 'Fair'; }
+                elseif ($rx <= -20) { $rxClass = 'success'; $rxLabel = 'Good'; }
             }
+            $statusColors = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'];
+            $statusIcons = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill'];
             ?>
             
-            <!-- Back Button -->
-            <div class="mb-3">
-                <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left me-1"></i> Back to ONUs
-                </a>
+            <style>
+            .onu-hero { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 1rem; color: white; }
+            .onu-hero .stat-card { background: rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; backdrop-filter: blur(10px); }
+            .onu-hero .stat-value { font-size: 1.5rem; font-weight: 700; }
+            .onu-hero .stat-label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; letter-spacing: 0.5px; }
+            .quick-action-card { transition: all 0.2s ease; border: 2px solid transparent; }
+            .quick-action-card:hover { transform: translateY(-2px); border-color: var(--oms-accent); box-shadow: 0 8px 25px rgba(59,130,246,0.15); }
+            .quick-action-card .icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+            .config-section { border-left: 3px solid var(--oms-accent); }
+            .signal-gauge { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; }
+            .signal-gauge-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+            .pulse-online { animation: pulse-green 2s infinite; }
+            @keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } }
+            </style>
+            
+            <!-- Breadcrumb Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="text-decoration-none text-muted">
+                        <i class="bi bi-arrow-left me-1"></i> Back to ONUs
+                    </a>
+                    <h4 class="mb-0 mt-2">
+                        <i class="bi bi-router text-primary me-2"></i>
+                        <?= htmlspecialchars($currentOnu['name'] ?: $currentOnu['sn']) ?>
+                    </h4>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary" onclick="fetchLiveOnuData()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-success" id="liveBtn" onclick="toggleLiveMode()">
+                        <i class="bi bi-broadcast me-1"></i> Live Mode
+                    </button>
+                </div>
             </div>
             
             <?php if (!empty($message)): ?>
             <div class="alert alert-<?= $messageType ?? 'success' ?> alert-dismissible fade show" role="alert">
+                <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'x-circle' : 'info-circle') ?> me-2"></i>
                 <?= htmlspecialchars($message) ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php endif; ?>
+            
+            <!-- Hero Status Card -->
+            <div class="onu-hero p-4 mb-4">
+                <div class="row align-items-center">
+                    <div class="col-md-3 text-center border-end border-light border-opacity-25 mb-3 mb-md-0">
+                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center <?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?>" 
+                             style="width: 80px; height: 80px; background: <?= $currentOnu['status'] === 'online' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)' ?>">
+                            <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>" style="font-size: 2.5rem;"></i>
+                        </div>
+                        <h5 data-live-status class="mt-2 mb-0 text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>"><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></h5>
+                        <small class="text-white-50">Device Status</small>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="row g-3">
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card text-center">
+                                    <div class="stat-value text-<?= $rxClass ?>" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
+                                    <div class="stat-label">RX Power (dBm)</div>
+                                    <div class="signal-gauge mt-2">
+                                        <div class="signal-gauge-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
+                                    </div>
+                                    <small class="text-<?= $rxClass ?>"><?= $rxLabel ?></small>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card text-center">
+                                    <div class="stat-value" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
+                                    <div class="stat-label">TX Power (dBm)</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card text-center">
+                                    <div class="stat-value"><?= $distanceDisplay ?></div>
+                                    <div class="stat-label">Distance</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card text-center">
+                                    <div class="stat-value"><?= !empty($currentOnu['vlan_id']) ? $currentOnu['vlan_id'] : '-' ?></div>
+                                    <div class="stat-label">Service VLAN</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- SmartOLT-style ONU Info Header -->
             <div class="card shadow-sm mb-4">
@@ -5927,47 +6007,112 @@ try {
             }
             </script>
             
-            <!-- Status Action Buttons -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body py-2">
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-success btn-sm" onclick="fetchLiveOnuData()">
-                            <i class="bi bi-activity me-1"></i> Get status
-                        </button>
-                        <button type="button" class="btn btn-success btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
-                            <i class="bi bi-code-slash me-1"></i> Show running-config
-                        </button>
-                        <button type="button" class="btn btn-success btn-sm" onclick="getOnuSWInfo(<?= $currentOnu['id'] ?>)">
-                            <i class="bi bi-cpu me-1"></i> SW info
-                        </button>
-                        <button type="button" class="btn btn-success btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)">
-                            <i class="bi bi-broadcast me-1"></i> Tr069 Stat
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm" id="liveBtn" onclick="toggleLiveMode()">
-                            <i class="bi bi-record-circle me-1"></i> LIVE!
-                        </button>
-                        <div class="ms-auto d-flex gap-1">
-                            <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
-                                <input type="hidden" name="action" value="reboot_onu">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <button type="submit" class="btn btn-warning btn-sm">
-                                    <i class="bi bi-arrow-clockwise me-1"></i> Reboot
+            <!-- Quick Actions Grid -->
+            <div class="row g-3 mb-4">
+                <!-- OLT Actions -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="card quick-action-card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="icon-wrapper bg-primary bg-opacity-10 text-primary me-3">
+                                    <i class="bi bi-terminal"></i>
+                                </div>
+                                <h6 class="mb-0">OLT Commands</h6>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-code-slash me-1"></i> Running Config
                                 </button>
-                            </form>
-                            <form method="post" class="d-inline" onsubmit="return confirm('Reset ONU configuration?')">
-                                <input type="hidden" name="action" value="reset_onu_config">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <button type="submit" class="btn btn-outline-warning btn-sm">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuSWInfo(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-cpu me-1"></i> Software Info
                                 </button>
-                            </form>
-                            <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU and return to pending?')">
-                                <input type="hidden" name="action" value="delete_onu_olt">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                <button type="submit" class="btn btn-outline-danger btn-sm">
-                                    <i class="bi bi-trash me-1"></i> Delete
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- TR-069 Actions -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="card quick-action-card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="icon-wrapper bg-info bg-opacity-10 text-info me-3">
+                                    <i class="bi bi-broadcast"></i>
+                                </div>
+                                <h6 class="mb-0">TR-069 Remote</h6>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)">
+                                    <i class="bi bi-info-circle me-1"></i> Device Info
                                 </button>
-                            </form>
+                                <form method="post" class="d-grid">
+                                    <input type="hidden" name="action" value="tr069_refresh">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Refresh Data
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Device Control -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="card quick-action-card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="icon-wrapper bg-warning bg-opacity-10 text-warning me-3">
+                                    <i class="bi bi-power"></i>
+                                </div>
+                                <h6 class="mb-0">Device Control</h6>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot this ONU via OLT?')">
+                                    <input type="hidden" name="action" value="reboot_onu">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-warning btn-sm">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Reboot (OLT)
+                                    </button>
+                                </form>
+                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot via TR-069?')">
+                                    <input type="hidden" name="action" value="tr069_reboot">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Reboot (TR-069)
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Danger Zone -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="card quick-action-card h-100 shadow-sm border-danger border-opacity-25">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="icon-wrapper bg-danger bg-opacity-10 text-danger me-3">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                </div>
+                                <h6 class="mb-0 text-danger">Danger Zone</h6>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <form method="post" class="d-grid" onsubmit="return confirm('FACTORY RESET? All settings will be erased!')">
+                                    <input type="hidden" name="action" value="tr069_factory_reset">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Factory Reset
+                                    </button>
+                                </form>
+                                <form method="post" class="d-grid" onsubmit="return confirm('DELETE this ONU from OLT?')">
+                                    <input type="hidden" name="action" value="delete_onu_olt">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="bi bi-trash me-1"></i> Delete ONU
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
