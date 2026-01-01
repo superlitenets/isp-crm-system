@@ -15,6 +15,10 @@ class RadiusClient {
     private const ATTR_CALLING_STATION_ID = 31;
     private const ATTR_ACCT_SESSION_ID = 44;
     private const ATTR_EVENT_TIMESTAMP = 55;
+    private const ATTR_VENDOR_SPECIFIC = 26;
+    
+    private const VENDOR_MIKROTIK = 14988;
+    private const MIKROTIK_RATE_LIMIT = 8;
     
     private string $nasIp;
     private int $nasPort;
@@ -96,6 +100,11 @@ class RadiusClient {
         $data = '';
         
         foreach ($attributes as $name => $value) {
+            if ($name === 'Mikrotik-Rate-Limit') {
+                $data .= $this->encodeVendorAttribute(self::VENDOR_MIKROTIK, self::MIKROTIK_RATE_LIMIT, (string)$value);
+                continue;
+            }
+            
             $attrType = $this->getAttributeType($name);
             if ($attrType === null) continue;
             
@@ -106,6 +115,12 @@ class RadiusClient {
         }
         
         return $data;
+    }
+    
+    private function encodeVendorAttribute(int $vendorId, int $vendorType, string $value): string {
+        $vendorData = \pack('CC', $vendorType, 2 + \strlen($value)) . $value;
+        $vsaData = \pack('N', $vendorId) . $vendorData;
+        return \pack('CC', self::ATTR_VENDOR_SPECIFIC, 2 + \strlen($vsaData)) . $vsaData;
     }
     
     private function getAttributeType(string $name): ?int {

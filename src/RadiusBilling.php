@@ -979,12 +979,80 @@ class RadiusBilling {
         $upload = $sub['upload_speed'] ?? '5M';
         
         // Check if FUP applies
-        if ($sub['fup_enabled'] && $sub['data_quota_mb'] && $sub['data_used_mb'] >= $sub['fup_quota_mb']) {
+        if (!empty($sub['fup_enabled']) && !empty($sub['data_quota_mb']) && ($sub['data_used_mb'] ?? 0) >= ($sub['fup_quota_mb'] ?? 0)) {
             $download = $sub['fup_download_speed'] ?? '1M';
             $upload = $sub['fup_upload_speed'] ?? '512k';
         }
         
+        // Check for time-based speed override
+        $override = $this->getActiveSpeedOverride($sub['package_id'] ?? null);
+        if ($override) {
+            $download = $override['download_speed'];
+            $upload = $override['upload_speed'];
+        }
+        
         return "{$upload}/{$download}";
+    }
+    
+    public function getActiveSpeedOverride(?int $packageId): ?array {
+        if (!$packageId) return null;
+        
+        $currentTime = \date('H:i:s');
+        $currentDay = \strtolower(\date('l')); // monday, tuesday, etc.
+        
+        $stmt = $this->db->prepare("
+            SELECT download_speed, upload_speed, name
+            FROM radius_speed_overrides
+            WHERE package_id = ? 
+            AND is_active = TRUE
+            AND start_time <= ?
+            AND end_time >= ?
+            AND (
+                days_of_week IS NULL 
+                OR days_of_week = '' 
+                OR days_of_week LIKE ?
+            )
+            ORDER BY priority DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$packageId, $currentTime, $currentTime, '%' . $currentDay . '%']);
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+    }
+    
+    public function sendSpeedUpdateCoA(int $subscriptionId): array {
+        $sub = $this->getSubscription($subscriptionId);
+        if (!$sub) {
+            return ['success' => false, 'error' => 'Subscription not found'];
+        }
+        
+        // Get NAS info
+        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+        $stmt->execute([$sub['nas_id']]);
+        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        // Build CoA with new rate limit
+        $rateLimit = $this->buildRateLimit($sub);
+        $attrs = [
+            'User-Name' => $sub['username'],
+            'Mikrotik-Rate-Limit' => $rateLimit
+        ];
+        
+        try {
+            $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
+            $result = $client->coa($attrs);
+            
+            if ($result['success']) {
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Exception: ' . $e->getMessage()];
+        }
     }
     
     // ==================== MAC Authentication (Hotspot) ====================
@@ -1769,8 +1837,8 @@ class RadiusBilling {
             ");
             $stmt->execute([$newPackageId, $subscriptionId]);
             
-            // Disconnect user to apply new speed
-            $this->disconnectUser($subscriptionId);
+            // Send CoA to update speed without disconnecting user
+            $coaResult = $this->sendSpeedUpdateCoA($subscriptionId);
             
             return [
                 'success' => true,
@@ -1778,7 +1846,8 @@ class RadiusBilling {
                 'new_package' => $newPackage['name'],
                 'credit_amount' => $creditAmount,
                 'prorated_amount' => $proratedAmount,
-                'difference' => $proratedAmount - $creditAmount
+                'difference' => $proratedAmount - $creditAmount,
+                'coa_result' => $coaResult
             ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];

@@ -54,6 +54,11 @@ switch ($action) {
         echo json_encode($result);
         break;
         
+    case 'apply_speed_overrides':
+        $result = applySpeedOverrides($radiusBilling, $db);
+        echo json_encode($result);
+        break;
+        
     case 'all':
         $results = [];
         $results['expired'] = processExpiredSubscriptions($radiusBilling, $db, $settings);
@@ -61,13 +66,14 @@ switch ($action) {
         $results['quota_alerts'] = sendQuotaAlerts($radiusBilling, $db, $settings);
         $results['auto_renew'] = $radiusBilling->processAutoRenewals();
         $results['disconnects'] = processScheduledDisconnects($radiusBilling, $db);
+        $results['speed_overrides'] = applySpeedOverrides($radiusBilling, $db);
         echo json_encode(['success' => true, 'results' => $results]);
         break;
         
     default:
         echo json_encode([
             'error' => 'Unknown action',
-            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'all']
+            'available' => ['process_expired', 'send_expiry_alerts', 'send_quota_alerts', 'auto_renew', 'scheduled_disconnect', 'sync_sessions', 'apply_speed_overrides', 'all']
         ]);
 }
 
@@ -224,4 +230,45 @@ function syncRadiusSessions($radiusBilling, $db): array {
     ");
     
     return ['success' => true, 'stale_sessions_closed' => $stmt->rowCount()];
+}
+
+function applySpeedOverrides($radiusBilling, $db): array {
+    $updated = 0;
+    $errors = [];
+    
+    $currentTime = date('H:i:s');
+    $currentDay = strtolower(date('l'));
+    
+    $stmt = $db->prepare("
+        SELECT DISTINCT s.id as subscription_id, s.package_id, s.username,
+               so.name as override_name, so.download_speed, so.upload_speed
+        FROM radius_subscriptions s
+        INNER JOIN radius_speed_overrides so ON so.package_id = s.package_id
+        INNER JOIN radius_sessions rs ON rs.subscription_id = s.id AND rs.session_end IS NULL
+        WHERE s.status = 'active'
+        AND so.is_active = TRUE
+        AND so.start_time <= ?
+        AND so.end_time >= ?
+        AND (
+            so.days_of_week IS NULL 
+            OR so.days_of_week = '' 
+            OR so.days_of_week LIKE ?
+        )
+    ");
+    $stmt->execute([$currentTime, $currentTime, '%' . $currentDay . '%']);
+    
+    while ($sub = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        try {
+            $result = $radiusBilling->sendSpeedUpdateCoA($sub['subscription_id']);
+            if ($result['success']) {
+                $updated++;
+            } else {
+                $errors[] = "{$sub['username']}: {$result['error']}";
+            }
+        } catch (Exception $e) {
+            $errors[] = "{$sub['username']}: " . $e->getMessage();
+        }
+    }
+    
+    return ['success' => true, 'updated' => $updated, 'errors' => $errors];
 }

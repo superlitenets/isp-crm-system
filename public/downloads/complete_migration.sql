@@ -1928,3 +1928,28 @@
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS success BOOLEAN DEFAULT false;
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS message TEXT;
  ALTER TABLE wireguard_sync_logs ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- ============================================================
+-- RADIUS Speed Overrides (Time-based speed changes)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS radius_speed_overrides (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER REFERENCES radius_packages(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    download_speed VARCHAR(20) NOT NULL,
+    upload_speed VARCHAR(20) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    days_of_week VARCHAR(100) DEFAULT NULL,
+    priority INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE radius_speed_overrides IS 'Time-based speed overrides for packages (e.g., night boost)';
+COMMENT ON COLUMN radius_speed_overrides.days_of_week IS 'Comma-separated days: monday,tuesday,wednesday,thursday,friday,saturday,sunday';
+COMMENT ON COLUMN radius_speed_overrides.priority IS 'Higher priority overrides take precedence';
+
+CREATE INDEX IF NOT EXISTS idx_speed_overrides_package ON radius_speed_overrides(package_id);
+CREATE INDEX IF NOT EXISTS idx_speed_overrides_time ON radius_speed_overrides(start_time, end_time);
