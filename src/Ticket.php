@@ -360,6 +360,7 @@ class Ticket {
             }
             
             if ($customer['phone']) {
+                $techOfficePhone = $technician['office_phone'] ?? $technician['phone'] ?? '';
                 $customerPlaceholders = [
                     '{ticket_number}' => $ticket['ticket_number'],
                     '{subject}' => $ticket['subject'] ?? '',
@@ -369,7 +370,8 @@ class Ticket {
                     '{customer_name}' => $customer['name'] ?? 'Customer',
                     '{customer_phone}' => $customer['phone'] ?? '',
                     '{technician_name}' => $technician['name'] ?? 'Technician',
-                    '{technician_phone}' => $technician['phone'] ?? ''
+                    '{technician_phone}' => $technician['phone'] ?? '',
+                    '{technician_office_phone}' => $techOfficePhone
                 ];
                 
                 $customerMessage = $this->buildSMSFromTemplate('sms_template_ticket_assigned', $customerPlaceholders);
@@ -406,8 +408,8 @@ class Ticket {
             'sms_template_ticket_created' => 'ISP Support - Ticket #{ticket_number} created. Subject: {subject}. Status: {status}. We will contact you shortly.',
             'sms_template_ticket_updated' => 'ISP Support - Ticket #{ticket_number} Status: {status}. {message}',
             'sms_template_ticket_resolved' => 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.',
-            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.',
-            'sms_template_team_assigned' => 'ISP Support - Your ticket #{ticket_number} has been assigned to {team_name}. Team Lead: {team_leader_name} ({team_leader_phone}). We will contact you shortly.',
+            'sms_template_ticket_assigned' => 'ISP Support - Technician {technician_name} ({technician_office_phone}) has been assigned to your ticket #{ticket_number}.',
+            'sms_template_team_assigned' => 'ISP Support - Our {team_name} team has been assigned to your ticket #{ticket_number}. Team Leader: {team_leader_name} ({team_leader_office_phone}).',
             'sms_template_technician_assigned' => 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}',
             'wa_template_branch_ticket_assigned' => "🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n🕐 *Created:* {created_at}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Email: {customer_email}\n• Account: {customer_account}\n• Username: {customer_username}\n• Address: {customer_address}\n• Location: {customer_location}\n• GPS: {customer_coordinates}\n• Plan: {service_plan}\n\n👷 *{assignment_info}*\n📞 Tech Phone: {technician_phone}\n👥 Team: {team_name}\n👥 Members: {team_members}\n\n🏢 Branch: {branch_name}",
         ];

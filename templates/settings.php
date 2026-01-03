@@ -665,9 +665,14 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                     <small class="text-muted">Placeholders: {ticket_number}, {subject}, {status}, {customer_name}, {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Technician/Team Assigned (to Customer)</label>
+                                    <label class="form-label fw-bold">Technician Assigned (to Customer)</label>
                                     <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} ({technician_office_phone}) has been assigned to your ticket #{ticket_number}.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {category}, {priority}, {customer_name}, {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {category}, {priority}, {customer_name}, {technician_name}, {technician_phone}, {technician_office_phone}, {company_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Team Assigned (to Customer)</label>
+                                    <textarea class="form-control" name="sms_template_team_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_team_assigned', 'ISP Support - Our {team_name} team has been assigned to your ticket #{ticket_number}. Team Leader: {team_leader_name} ({team_leader_office_phone}).')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {category}, {priority}, {customer_name}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
