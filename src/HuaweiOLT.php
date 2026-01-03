@@ -3130,11 +3130,53 @@ class HuaweiOLT {
             }
         }
         
+        // Mark discovery entries NOT in current scan as authorized (externally authorized via SmartOLT etc)
+        $markedAuthorized = 0;
+        if (!empty($unconfigured)) {
+            $foundSNs = array_column($unconfigured, 'sn');
+            try {
+                // Get all unauthorized discovery entries for this OLT
+                $stmt = $this->db->prepare("
+                    SELECT id, serial_number FROM onu_discovery_log 
+                    WHERE olt_id = ? AND authorized = FALSE
+                ");
+                $stmt->execute([$oltId]);
+                $existingEntries = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                foreach ($existingEntries as $entry) {
+                    if (!in_array($entry['serial_number'], $foundSNs)) {
+                        // This SN was in discovery but no longer in autofind = authorized externally
+                        $this->db->prepare("
+                            UPDATE onu_discovery_log 
+                            SET authorized = TRUE, authorized_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ")->execute([$entry['id']]);
+                        $markedAuthorized++;
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("Failed to cleanup stale discovery entries: " . $e->getMessage());
+            }
+        } else {
+            // No unconfigured ONUs found - mark ALL discovery entries for this OLT as authorized
+            try {
+                $stmt = $this->db->prepare("
+                    UPDATE onu_discovery_log 
+                    SET authorized = TRUE, authorized_at = CURRENT_TIMESTAMP 
+                    WHERE olt_id = ? AND authorized = FALSE
+                ");
+                $stmt->execute([$oltId]);
+                $markedAuthorized = $stmt->rowCount();
+            } catch (\Exception $e) {
+                error_log("Failed to cleanup all discovery entries: " . $e->getMessage());
+            }
+        }
+        
         $this->addLog([
             'olt_id' => $oltId,
             'action' => 'discover_unconfigured_snmp',
             'status' => 'success',
-            'message' => "Found " . count($unconfigured) . " unconfigured ONUs via SNMP, added {$added} new",
+            'message' => "Found " . count($unconfigured) . " unconfigured ONUs via SNMP, added {$added} new" . ($markedAuthorized > 0 ? ", cleared {$markedAuthorized} stale" : ''),
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
@@ -3143,6 +3185,7 @@ class HuaweiOLT {
             'onus' => $unconfigured,
             'count' => count($unconfigured),
             'added' => $added,
+            'cleared' => $markedAuthorized,
             'method' => 'snmp',
             'used_oid' => $usedOid
         ];
