@@ -155,6 +155,43 @@ function initializeDatabase(): void {
         END IF;
     END $$;
 
+    -- Add new employee profile columns if they don't exist
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'office_phone') THEN
+            ALTER TABLE employees ADD COLUMN office_phone VARCHAR(20);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'passport_photo') THEN
+            ALTER TABLE employees ADD COLUMN passport_photo VARCHAR(500);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'id_number') THEN
+            ALTER TABLE employees ADD COLUMN id_number VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'passport_number') THEN
+            ALTER TABLE employees ADD COLUMN passport_number VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'date_of_birth') THEN
+            ALTER TABLE employees ADD COLUMN date_of_birth DATE;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'gender') THEN
+            ALTER TABLE employees ADD COLUMN gender VARCHAR(20);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'nationality') THEN
+            ALTER TABLE employees ADD COLUMN nationality VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'marital_status') THEN
+            ALTER TABLE employees ADD COLUMN marital_status VARCHAR(20);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'next_of_kin_name') THEN
+            ALTER TABLE employees ADD COLUMN next_of_kin_name VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'next_of_kin_relationship') THEN
+            ALTER TABLE employees ADD COLUMN next_of_kin_relationship VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'employees' AND column_name = 'next_of_kin_phone') THEN
+            ALTER TABLE employees ADD COLUMN next_of_kin_phone VARCHAR(20);
+        END IF;
+    END $$;
+
     CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
