@@ -1,0 +1,88 @@
+root@superlitecrm:~/isp# # Watch FreeRADIUS logs while a customer connects
+docker logs -f isp_crm_freeradius 2>&1 | grep -iE "accounting|INSERT|radius_sessions|SQL"
+including configuration file /etc/freeradius/mods-enabled/sql
+including configuration file /etc/freeradius/mods-config/sql/main/postgresql/queries.conf
+including configuration file /etc/freeradius/policy.d/accounting
+  # Loading module "attr_filter.accounting_response" from file /etc/freeradius/mods-enabled/attr_filter
+  attr_filter attr_filter.accounting_response {
+        filename = "/etc/freeradius/mods-config/attr_filter/accounting_response"
+  # Loading module "log_accounting" from file /etc/freeradius/mods-enabled/linelog
+  linelog log_accounting {
+        filename = "/var/log/freeradius/linelog-accounting"
+        reference = "Accounting-Request.%{%{Acct-Status-Type}:-unknown}"
+        cisco_accounting_username_bug = no
+  # Loaded module rlm_sql
+  # Loading module "sql" from file /etc/freeradius/mods-enabled/sql
+  sql {
+        driver = "rlm_sql_postgresql"
+        sql_user_name = "%{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}"
+        authorize_check_query = "SELECT id, username, 'Cleartext-Password' as attribute, password as value, ':=' as op FROM radius_subscriptions WHERE username = '%{SQL-User-Name}' AND status IN ('active', 'expired')"
+        authorize_reply_query = "SELECT rs.id, rs.username, 'Mikrotik-Rate-Limit' as attribute, CONCAT(rp.upload_speed, '/', rp.download_speed) as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = '%{SQL-User-Name}' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rp.download_speed IS NOT NULL AND rp.download_speed != '' UNION ALL SELECT rs.id, rs.username, 'Session-Timeout' as attribute, CASE WHEN COALESCE(rp.validity_days, 0) > 0 THEN (rp.validity_days * 86400)::text ELSE '86400' END as value, '=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = '%{SQL-User-Name}' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) UNION ALL SELECT rs.id, rs.username, 'Simultaneous-Use' as attribute, rp.simultaneous_sessions::text as value, ':=' as op FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = '%{SQL-User-Name}' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND COALESCE(rp.simultaneous_sessions, 0) > 0 UNION ALL SELECT rs.id, rs.username, 'Framed-IP-Address' as attribute, rs.static_ip as value, '=' as op FROM radius_subscriptions rs WHERE rs.username = '%{SQL-User-Name}' AND rs.status = 'active' AND (rs.expiry_date IS NULL OR rs.expiry_date > CURRENT_DATE) AND rs.static_ip IS NOT NULL AND rs.static_ip != '' UNION ALL SELECT rs.id, rs.username, 'Framed-Pool' as attribute, COALESCE(rn.expired_pool, 'expired-pool') as value, '=' as op FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rs.nas_id = rn.id WHERE rs.username = '%{SQL-User-Name}' AND (rs.status = 'expired' OR (rs.status = 'active' AND rs.expiry_date IS NOT NULL AND rs.expiry_date <= CURRENT_DATE))"
+        group_membership_query = "SELECT rp.name as groupname FROM radius_subscriptions rs JOIN radius_packages rp ON rs.package_id = rp.id WHERE rs.username = '%{SQL-User-Name}' AND rs.status = 'active' ORDER BY rp.id"
+        simul_count_query = "SELECT COUNT(*) FROM radius_sessions WHERE subscription_id = ( SELECT id FROM radius_subscriptions WHERE username = '%{SQL-User-Name}' ) AND stopped_at IS NULL"
+        simul_verify_query = "SELECT framed_ip as framedipaddress, session_id as acctsessionid, nas_ip as nasipaddress, nas_port as nasportid, mac_address as callingstationid, (SELECT username FROM radius_subscriptions WHERE id = subscription_id) as username, '' as framedprotocol FROM radius_sessions WHERE subscription_id = ( SELECT id FROM radius_subscriptions WHERE username = '%{SQL-User-Name}' ) AND stopped_at IS NULL ORDER BY started_at DESC"
+   accounting {
+     accounting-on {
+     accounting-off {
+        query = "INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets) SELECT rs.id, rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW(), 0, 0 FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}'"
+        query = "UPDATE radius_sessions SET input_octets = '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, framed_ip_address = COALESCE(NULLIF('%{Framed-IP-Address}', ''), framed_ip_address) WHERE acct_session_id = '%{Acct-Session-Id}' AND session_end IS NULL"
+        query = "UPDATE radius_sessions SET session_end = NOW(), terminate_cause = '%{Acct-Terminate-Cause}', input_octets = '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint WHERE acct_session_id = '%{Acct-Session-Id}'"
+        query = "INSERT INTO radpostauth (username, pass, reply, authdate, nasipaddress, calledstationid, callingstationid) VALUES ( '%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{NAS-IP-Address}', '%{Called-Station-Id}', '%{Calling-Station-Id}')"
+rlm_sql (sql): Driver rlm_sql_postgresql (module rlm_sql_postgresql) loaded and linked
+Creating attribute SQL-Group
+  # Instantiating module "attr_filter.accounting_response" from file /etc/freeradius/mods-enabled/attr_filter
+reading pairlist file /etc/freeradius/mods-config/attr_filter/accounting_response
+  # Instantiating module "log_accounting" from file /etc/freeradius/mods-enabled/linelog
+  # Instantiating module "sql" from file /etc/freeradius/mods-enabled/sql
+   postgresql {
+rlm_sql (sql): Attempting to connect to database "isp_crm"
+rlm_sql (sql): Initialising connection pool
+rlm_sql (sql): Opening additional connection (0), 1 of 32 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+rlm_sql (sql): Opening additional connection (1), 1 of 31 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+rlm_sql (sql): Opening additional connection (2), 1 of 30 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+rlm_sql (sql): Opening additional connection (3), 1 of 29 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+rlm_sql (sql): Opening additional connection (4), 1 of 28 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+ # Loading accounting {...}
+(0) Received Accounting-Request Id 30 from 10.200.0.5:48342 to 172.18.0.6:1813 length 241
+(0) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+(0)   accounting {
+(0) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+(0) sql:    --> type.interim-update.query
+(0) sql: Using query template 'query'
+rlm_sql (sql): Reserved connection (0)
+(0) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+(0) sql:    --> SFL001
+(0) sql: SQL-User-Name set to 'SFL001'
+(0) sql: EXPAND UPDATE radius_sessions SET input_octets = '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, output_octets = '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, framed_ip_address = COALESCE(NULLIF('%{Framed-IP-Address}', ''), framed_ip_address) WHERE acct_session_id = '%{Acct-Session-Id}' AND session_end IS NULL
+(0) sql:    --> UPDATE radius_sessions SET input_octets = '0'::bigint * 4294967296 + '129988'::bigint, output_octets = '0'::bigint * 4294967296 + '298'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.255.255', ''), framed_ip_address) WHERE acct_session_id = '81000003' AND session_end IS NULL
+(0) sql: Executing query: UPDATE radius_sessions SET input_octets = '0'::bigint * 4294967296 + '129988'::bigint, output_octets = '0'::bigint * 4294967296 + '298'::bigint, framed_ip_address = COALESCE(NULLIF('10.31.255.255', ''), framed_ip_address) WHERE acct_session_id = '81000003' AND session_end IS NULL
+rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+rlm_sql_postgresql: query affected rows = 0
+(0) sql: SQL query returned: success
+(0) sql: 0 record(s) updated
+(0) sql: No additional queries configured
+rlm_sql (sql): Released connection (0)
+rlm_sql (sql): Opening additional connection (5), 1 of 27 pending slots used
+rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+rlm_sql (sql): Closing expired connection (4) - Hit idle_timeout limit
+rlm_sql_postgresql: Socket destructor called, closing socket
+rlm_sql (sql): Closing expired connection (3) - Hit idle_timeout limit
+rlm_sql_postgresql: Socket destructor called, closing socket
+rlm_sql (sql): Closing expired connection (2) - Hit idle_timeout limit
+rlm_sql_postgresql: Socket destructor called, closing socket
+rlm_sql (sql): You probably need to lower "min"
+rlm_sql (sql): Closing expired connection (1) - Hit idle_timeout limit
+rlm_sql_postgresql: Socket destructor called, closing socket
+(0)     [sql] = noop
+(0) attr_filter.accounting_response: EXPAND %{User-Name}
+(0) attr_filter.accounting_response:    --> SFL001
+(0) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+(0)     [attr_filter.accounting_response] = updated
+(0)   } # accounting = updated
+(0) Sent Accounting-Response Id 30 from 172.18.0.6:1813 to 10.200.0.5:48342 length 20
+
