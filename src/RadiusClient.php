@@ -160,18 +160,26 @@ class RadiusClient {
         $diagnostic = [
             'nas_ip' => $this->nasIp,
             'coa_port' => $this->nasPort,
-            'ping_reachable' => false,
+            'ping_reachable' => null,
             'likely_cause' => ''
         ];
         
-        \exec("ping -c 1 -W 2 " . \escapeshellarg($this->nasIp) . " 2>&1", $output, $exitCode);
-        $diagnostic['ping_reachable'] = ($exitCode === 0);
-        
-        if ($diagnostic['ping_reachable']) {
-            $diagnostic['likely_cause'] = 'NAS is reachable but CoA port not responding. Check MikroTik config: /radius incoming set accept=yes port=3799';
-            $diagnostic['mikrotik_fix'] = '/radius incoming set accept=yes port=3799';
+        // Check if exec is available (may be disabled in some environments)
+        if (\function_exists('exec') && !\in_array('exec', \array_map('trim', \explode(',', \ini_get('disable_functions'))))) {
+            $output = [];
+            $exitCode = -1;
+            @\exec("ping -c 1 -W 2 " . \escapeshellarg($this->nasIp) . " 2>&1", $output, $exitCode);
+            $diagnostic['ping_reachable'] = ($exitCode === 0);
+            
+            if ($diagnostic['ping_reachable']) {
+                $diagnostic['likely_cause'] = 'NAS is reachable but CoA port not responding. Check MikroTik config: /radius incoming set accept=yes port=3799';
+                $diagnostic['mikrotik_fix'] = '/radius incoming set accept=yes port=3799';
+            } else {
+                $diagnostic['likely_cause'] = 'NAS is not reachable. Check VPN tunnel, firewall, or NAS IP address.';
+            }
         } else {
-            $diagnostic['likely_cause'] = 'NAS is not reachable. Check VPN tunnel, firewall, or NAS IP address.';
+            $diagnostic['likely_cause'] = 'CoA failed. Check: 1) VPN/network connectivity to NAS, 2) MikroTik CoA config: /radius incoming set accept=yes port=3799';
+            $diagnostic['mikrotik_fix'] = '/radius incoming set accept=yes port=3799';
         }
         
         return $diagnostic;
