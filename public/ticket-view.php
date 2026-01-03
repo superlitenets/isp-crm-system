@@ -11,7 +11,8 @@ $messageType = '';
 $tokenRecord = null;
 $timeline = [];
 
-$customerLink = new CustomerTicketLink($pdo);
+$db = Database::getConnection();
+$customerLink = new CustomerTicketLink($db);
 
 if (!empty($tokenParam)) {
     $tokenRecord = $customerLink->validateToken($tokenParam);
