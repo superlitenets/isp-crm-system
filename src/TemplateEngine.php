@@ -25,7 +25,8 @@ class TemplateEngine {
             '{ticket_category}' => 'Ticket category',
             '{ticket_created}' => 'Ticket creation date',
             '{technician_name}' => 'Assigned technician name',
-            '{technician_phone}' => 'Assigned technician phone',
+            '{technician_phone}' => 'Assigned technician personal phone',
+            '{technician_office_phone}' => 'Assigned technician office phone (shown to customers)',
             '{technician_email}' => 'Assigned technician email',
             '{company_name}' => 'Your company name',
             '{company_phone}' => 'Company phone number',
@@ -40,7 +41,8 @@ class TemplateEngine {
         return [
             '{employee_name}' => 'Employee\'s full name',
             '{employee_id}' => 'Employee ID code',
-            '{employee_phone}' => 'Employee\'s phone number',
+            '{employee_phone}' => 'Employee\'s personal phone (for internal notifications)',
+            '{employee_office_phone}' => 'Employee\'s office phone (shown to customers)',
             '{employee_email}' => 'Employee\'s email address',
             '{department_name}' => 'Employee\'s department',
             '{position}' => 'Employee\'s position/job title',
@@ -79,7 +81,8 @@ class TemplateEngine {
             ],
             'Technician' => [
                 '{technician_name}' => 'Assigned technician name',
-                '{technician_phone}' => 'Assigned technician phone',
+                '{technician_phone}' => 'Assigned technician personal phone',
+                '{technician_office_phone}' => 'Assigned technician office phone (shown to customers)',
                 '{technician_email}' => 'Assigned technician email',
             ],
             'Company' => [
@@ -120,6 +123,7 @@ class TemplateEngine {
     public function setTechnicianData(?array $technician): self {
         $this->placeholders['{technician_name}'] = $technician['name'] ?? 'Not Assigned';
         $this->placeholders['{technician_phone}'] = $technician['phone'] ?? '';
+        $this->placeholders['{technician_office_phone}'] = $technician['office_phone'] ?? ($technician['phone'] ?? '');
         $this->placeholders['{technician_email}'] = $technician['email'] ?? '';
         return $this;
     }
@@ -211,6 +215,7 @@ class TemplateEngine {
         $this->placeholders['{employee_name}'] = $employee['name'] ?? '';
         $this->placeholders['{employee_id}'] = $employee['employee_id'] ?? '';
         $this->placeholders['{employee_phone}'] = $employee['phone'] ?? '';
+        $this->placeholders['{employee_office_phone}'] = $employee['office_phone'] ?? ($employee['phone'] ?? '');
         $this->placeholders['{employee_email}'] = $employee['email'] ?? '';
         $this->placeholders['{department_name}'] = $employee['department_name'] ?? '';
         $this->placeholders['{position}'] = $employee['position'] ?? '';
@@ -256,6 +261,7 @@ class TemplateEngine {
             '{employee_name}' => 'John Kamau',
             '{employee_id}' => 'EMP-2024-0012',
             '{employee_phone}' => '+254712345678',
+            '{employee_office_phone}' => '+254700123456',
             '{employee_email}' => 'john.kamau@company.com',
             '{department_name}' => 'Technical Support',
             '{position}' => 'Senior Technician',

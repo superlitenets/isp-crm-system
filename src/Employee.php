@@ -192,8 +192,8 @@ class Employee {
         }
         
         $stmt = $this->db->prepare("
-            INSERT INTO employees (employee_id, user_id, name, email, phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (employee_id, user_id, name, email, phone, office_phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -202,6 +202,7 @@ class Employee {
             $data['name'],
             $data['email'],
             $data['phone'],
+            $data['office_phone'] ?? null,
             $data['department_id'] ?: null,
             $data['position'],
             $data['salary'] ?: null,
@@ -235,7 +236,7 @@ class Employee {
             $this->updateUserRole((int)$data['user_id'], (int)$data['new_user_role_id']);
         }
         
-        $allowedFields = ['name', 'email', 'phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id'];
+        $allowedFields = ['name', 'email', 'phone', 'office_phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {

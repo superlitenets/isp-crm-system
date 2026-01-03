@@ -68,8 +68,14 @@ $allRoles = $roleManager->getAllRoles();
                     <input type="text" class="form-control" name="name" value="<?= htmlspecialchars($employeeData['name'] ?? '') ?>" required>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Phone Number *</label>
+                    <label class="form-label">Personal Phone *</label>
                     <input type="tel" class="form-control" name="phone" value="<?= htmlspecialchars($employeeData['phone'] ?? '') ?>" placeholder="+1234567890" required>
+                    <small class="text-muted">Used for internal notifications to employee</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Office Phone</label>
+                    <input type="tel" class="form-control" name="office_phone" value="<?= htmlspecialchars($employeeData['office_phone'] ?? '') ?>" placeholder="+1234567890">
+                    <small class="text-muted">Shown to customers (e.g. on tickets)</small>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Email</label>
