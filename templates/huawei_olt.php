@@ -152,6 +152,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_unconfigured_count') {
     exit;
 }
 
+// AJAX endpoint to get customers for authorization modal
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $db->query("SELECT id, name, phone, account_number FROM customers ORDER BY name LIMIT 5000");
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'customers' => $customers]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint for realtime OMS stats (dashboard refresh)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_stats') {
     header('Content-Type: application/json');
@@ -1148,7 +1161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 break;
             
             case 'authorize_onu_simple':
-                // SIMPLIFIED AUTHORIZATION: Name, Zone, Address, Service VLAN
+                // ENHANCED AUTHORIZATION: Name, Phone, Customer, Zone, Address, GPS, VLAN, PPPoE
                 // Auto-configures TR-069 WAN in background and redirects to ONU config page
                 $message = '';
                 $messageType = 'danger';
@@ -1163,6 +1176,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
                 $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
+                
+                // New enhanced fields
+                $phone = trim($_POST['phone'] ?? '');
+                $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+                $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+                $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
+                $pppoePassword = trim($_POST['pppoe_password'] ?? '');
                 
                 // Ensure ONU exists in database
                 $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
@@ -1213,11 +1234,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     exit;
                 }
                 
-                // Update ONU record with name, zone, address
+                // Update ONU record with all new fields
                 $updateFields = ['name' => $name ?: $sn];
                 if (!empty($zone)) $updateFields['zone'] = $zone;
                 if ($zoneId) $updateFields['zone_id'] = $zoneId;
-                if (!empty($address)) $updateFields['description'] = $address;
+                if (!empty($address)) $updateFields['address'] = $address;
+                if (!empty($phone)) $updateFields['phone'] = $phone;
+                if ($customerId) $updateFields['customer_id'] = $customerId;
+                if ($latitude !== null) $updateFields['latitude'] = $latitude;
+                if ($longitude !== null) $updateFields['longitude'] = $longitude;
+                if ($onuTypeId) $updateFields['onu_type_id'] = $onuTypeId;
+                if (!empty($pppoeUsername)) $updateFields['pppoe_username'] = $pppoeUsername;
+                if (!empty($pppoePassword)) $updateFields['pppoe_password'] = $pppoePassword;
+                $updateFields['installation_date'] = date('Y-m-d'); // Auto-set installation date
                 $huaweiOLT->updateONU($onuId, $updateFields);
                 
                 // Get default profile
@@ -12081,9 +12110,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         <input type="hidden" name="id" id="actionId">
     </form>
     
-    <!-- Authorization Modal (Simplified - SmartOLT style) -->
+    <!-- Authorization Modal (Enhanced with customer linking, GPS, PPPoE) -->
     <div class="modal fade" id="authModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="post" id="authForm">
                     <input type="hidden" name="action" value="authorize_onu_simple">
@@ -12091,7 +12120,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <input type="hidden" name="olt_id" id="authOltId">
                     <input type="hidden" name="sn" id="authSnInput">
                     <input type="hidden" name="frame_slot_port" id="authFsp">
-                    <input type="hidden" name="onu_type_id" id="authOnuType">
+                    <input type="hidden" name="detected_onu_type_id" id="authOnuTypeDetected">
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Authorize ONU</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -12108,24 +12137,54 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" id="authName" class="form-control" placeholder="e.g., John Doe" required>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" id="authName" class="form-control" placeholder="e.g., John Doe" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-telephone text-primary me-1"></i>Phone</label>
+                                    <input type="text" name="phone" id="authPhone" class="form-control" placeholder="e.g., 0712345678">
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Zone <span class="text-danger">*</span></label>
-                            <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
-                                <option value="">-- Select Zone --</option>
-                                <?php
-                                $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
-                                while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
-                                    <?= htmlspecialchars($zone['name']) ?>
-                                </option>
-                                <?php endwhile; ?>
+                            <label class="form-label"><i class="bi bi-person-check text-success me-1"></i>Link to Customer</label>
+                            <select name="customer_id" id="authCustomerId" class="form-select">
+                                <option value="">-- No Customer Link --</option>
                             </select>
-                            <input type="hidden" name="zone" id="authZoneName">
+                            <small class="text-muted">Search by name, phone, or account number</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Zone <span class="text-danger">*</span></label>
+                                    <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
+                                        <option value="">-- Select Zone --</option>
+                                        <?php
+                                        $zonesStmt = $db->query("SELECT id, name FROM huawei_zones WHERE is_active = true ORDER BY name");
+                                        while ($zone = $zonesStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                        <option value="<?= $zone['id'] ?>" data-name="<?= htmlspecialchars($zone['name']) ?>">
+                                            <?= htmlspecialchars($zone['name']) ?>
+                                        </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                    <input type="hidden" name="zone" id="authZoneName">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
+                                    <select name="vlan_id" id="authVlanId" class="form-select" required>
+                                        <option value="">-- Loading VLANs --</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
@@ -12133,17 +12192,69 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <input type="text" name="address" id="authAddress" class="form-control" placeholder="e.g., 123 Main St, Apt 5">
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
-                            <select name="vlan_id" id="authVlanId" class="form-select" required>
-                                <option value="">-- Loading VLANs --</option>
-                            </select>
-                            <small class="text-muted">Internet VLAN for the customer</small>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Latitude</label>
+                                    <input type="text" name="latitude" id="authLatitude" class="form-control" placeholder="e.g., -1.2921">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Longitude</label>
+                                    <div class="input-group">
+                                        <input type="text" name="longitude" id="authLongitude" class="form-control" placeholder="e.g., 36.8219">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="getGPSLocation()" title="Get current location">
+                                            <i class="bi bi-crosshair"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-router text-info me-1"></i>ONU Type Override</label>
+                            <select name="onu_type_id" id="authOnuTypeSelect" class="form-select">
+                                <option value="">-- Auto-detect from OLT --</option>
+                                <?php
+                                $typesStmt = $db->query("SELECT id, name, equipment_id FROM huawei_onu_types WHERE is_active = true ORDER BY name");
+                                while ($type = $typesStmt->fetch(PDO::FETCH_ASSOC)): ?>
+                                <option value="<?= $type['id'] ?>" data-eqid="<?= htmlspecialchars($type['equipment_id'] ?? '') ?>">
+                                    <?= htmlspecialchars($type['name']) ?> <?= $type['equipment_id'] ? "({$type['equipment_id']})" : '' ?>
+                                </option>
+                                <?php endwhile; ?>
+                            </select>
+                            <small class="text-muted">Leave empty to use auto-detected type</small>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-primary mb-3"><i class="bi bi-wifi me-2"></i>PPPoE Internet Configuration (Optional)</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">PPPoE Username</label>
+                                    <input type="text" name="pppoe_username" id="authPppoeUser" class="form-control" placeholder="e.g., user@isp.com">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">PPPoE Password</label>
+                                    <div class="input-group">
+                                        <input type="password" name="pppoe_password" id="authPppoePass" class="form-control" placeholder="Password">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePppoePassword()">
+                                            <i class="bi bi-eye" id="pppoeEyeIcon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mb-3">
+                            <i class="bi bi-info-circle me-1"></i>If provided, PPPoE credentials will be configured via TR-069 after authorization.
+                        </small>
                         
                         <div class="alert alert-secondary small mb-0">
                             <i class="bi bi-gear me-2"></i>
-                            <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured after authorization.
+                            <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -12162,6 +12273,88 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         const selectedOption = select.options[select.selectedIndex];
         document.getElementById('authZoneName').value = selectedOption.dataset.name || '';
     }
+    
+    function getGPSLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                document.getElementById('authLatitude').value = position.coords.latitude.toFixed(6);
+                document.getElementById('authLongitude').value = position.coords.longitude.toFixed(6);
+            }, function(error) {
+                alert('Unable to get GPS location: ' + error.message);
+            });
+        } else {
+            alert('Geolocation is not supported by this browser.');
+        }
+    }
+    
+    function togglePppoePassword() {
+        const input = document.getElementById('authPppoePass');
+        const icon = document.getElementById('pppoeEyeIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+    
+    // Initialize customer search dropdown
+    document.addEventListener('DOMContentLoaded', function() {
+        const customerSelect = document.getElementById('authCustomerId');
+        if (customerSelect) {
+            // Load customers for search
+            fetch('?page=huawei-olt&ajax=get_customers_for_auth')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.customers) {
+                        data.customers.forEach(c => {
+                            const opt = document.createElement('option');
+                            opt.value = c.id;
+                            opt.textContent = `${c.name} - ${c.phone || 'No phone'} (${c.account_number || 'N/A'})`;
+                            opt.dataset.phone = c.phone || '';
+                            opt.dataset.name = c.name;
+                            customerSelect.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(e => console.log('Customer load failed:', e));
+            
+            // Auto-fill name and phone when customer selected
+            customerSelect.addEventListener('change', function() {
+                const selected = this.options[this.selectedIndex];
+                if (selected && selected.value) {
+                    const nameField = document.getElementById('authName');
+                    const phoneField = document.getElementById('authPhone');
+                    if (!nameField.value && selected.dataset.name) {
+                        nameField.value = selected.dataset.name;
+                    }
+                    if (!phoneField.value && selected.dataset.phone) {
+                        phoneField.value = selected.dataset.phone;
+                    }
+                }
+            });
+        }
+        
+        // Make zone dropdown searchable
+        const zoneSelect = document.getElementById('authZoneId');
+        if (zoneSelect && zoneSelect.options.length > 10) {
+            // Add search input for zones
+            const wrapper = zoneSelect.parentElement;
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.className = 'form-control form-control-sm mb-1';
+            searchInput.placeholder = 'Search zones...';
+            searchInput.addEventListener('input', function() {
+                const filter = this.value.toLowerCase();
+                Array.from(zoneSelect.options).forEach(opt => {
+                    if (opt.value === '') return;
+                    opt.style.display = opt.textContent.toLowerCase().includes(filter) ? '' : 'none';
+                });
+            });
+            wrapper.insertBefore(searchInput, zoneSelect);
+        }
+    });
     </script>
     
     <div class="modal fade" id="wifiConfigModal" tabindex="-1">
