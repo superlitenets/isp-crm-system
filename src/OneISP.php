@@ -4,7 +4,7 @@ namespace App;
 
 class OneISP {
     private \PDO $db;
-    private string $baseUrl = 'https://one-isp.net';
+    private string $baseUrl = 'https://app.one-isp.net';
     private string $apiUrl = 'https://ns3.api.one-isp.net/api/isp';
     private ?string $token = null;
     private ?string $sessionCookie = null;
@@ -75,12 +75,19 @@ class OneISP {
         return $this->username;
     }
     
+    private string $lastLoginError = '';
+    
     private function login(): bool {
         if (empty($this->username) || empty($this->password)) {
+            $this->lastLoginError = 'Username or password is empty';
             return false;
         }
         
         $cookieFile = sys_get_temp_dir() . '/oneisp_cookies_' . md5($this->username) . '.txt';
+        
+        if (file_exists($cookieFile)) {
+            @unlink($cookieFile);
+        }
         
         $loginUrl = $this->baseUrl . '/login';
         $ch = curl_init($loginUrl);
@@ -90,7 +97,13 @@ class OneISP {
         curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
         $html = curl_exec($ch);
+        $curlError = curl_error($ch);
         curl_close($ch);
+        
+        if (!empty($curlError)) {
+            $this->lastLoginError = 'Failed to fetch login page: ' . $curlError;
+            return false;
+        }
         
         $csrfToken = '';
         if (preg_match('/<meta name="csrf-token" content="([^"]+)"/', $html, $matches)) {
@@ -100,13 +113,13 @@ class OneISP {
         }
         
         $postData = [
-            'email' => $this->username,
+            'username' => $this->username,
             'password' => $this->password,
             '_token' => $csrfToken
         ];
         
         if (!empty($this->prefix)) {
-            $postData['prefix'] = $this->prefix;
+            $postData['account_prefix'] = $this->prefix;
         }
         
         $ch = curl_init($loginUrl);
@@ -128,7 +141,7 @@ class OneISP {
         $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
         
-        if (strpos($finalUrl, 'dashboard') !== false || strpos($finalUrl, 'home') !== false || $httpCode === 302) {
+        if (strpos($finalUrl, 'dashboard') !== false || strpos($finalUrl, 'home') !== false) {
             $this->sessionCookie = $cookieFile;
             return true;
         }
@@ -138,7 +151,19 @@ class OneISP {
             return true;
         }
         
+        if (preg_match('/class="[^"]*alert[^"]*"[^>]*>([^<]+)/i', $response, $errorMatch)) {
+            $this->lastLoginError = trim(strip_tags($errorMatch[1]));
+        } elseif (preg_match('/<div[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)/i', $response, $errorMatch)) {
+            $this->lastLoginError = trim(strip_tags($errorMatch[1]));
+        } else {
+            $this->lastLoginError = "HTTP $httpCode - Final URL: $finalUrl" . (empty($csrfToken) ? ' (No CSRF token found - page may be JS-rendered)' : '');
+        }
+        
         return false;
+    }
+    
+    public function getLastLoginError(): string {
+        return $this->lastLoginError;
     }
     
     private function request(string $endpoint, array $params = []): array {
@@ -332,7 +357,8 @@ class OneISP {
             if ($this->login()) {
                 return ['success' => true, 'message' => 'Login successful', 'mode' => 'login'];
             }
-            return ['success' => false, 'error' => 'Login failed. Check username and password.'];
+            $error = $this->getLastLoginError();
+            return ['success' => false, 'error' => 'Login failed: ' . ($error ?: 'Check username and password.')];
         }
         
         $result = $this->getCustomers(1, 1);
