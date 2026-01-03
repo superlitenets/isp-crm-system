@@ -13541,10 +13541,14 @@ echo "# ================================================\n";
             fspInput.value = frameSlotPort || '';
         }
         
-        document.getElementById('authModeBridge').checked = true;
+        var authModeBridge = document.getElementById('authModeBridge');
+        if (authModeBridge) {
+            authModeBridge.checked = true;
+        }
         
         // Load VLANs for this specific OLT with PON default
         var vlanSelect = document.getElementById('authVlanId');
+        if (!vlanSelect) return;
         vlanSelect.innerHTML = '<option value="">Loading VLANs...</option>';
         
         if (oltId) {
