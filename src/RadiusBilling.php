@@ -1618,10 +1618,94 @@ class RadiusBilling {
                 return ['success' => true, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address']];
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
+            // Add diagnostic info for connection issues
+            $error = $result['error'] ?? 'CoA failed';
+            if (strpos($error, 'timeout') !== false || strpos($error, 'No response') !== false) {
+                $pingCheck = $this->checkNasReachability($nas['ip_address']);
+                if ($pingCheck['reachable']) {
+                    // Device is reachable but CoA port not responding
+                    $error = "CoA timeout - MikroTik reachable but port 3799 not responding. Enable RADIUS Incoming: /radius incoming set accept=yes port=3799";
+                } else {
+                    $error .= ". Ping FAILED - check VPN tunnel";
+                }
+            }
+            
+            return ['success' => false, 'error' => $error, 'target_ip' => $nas['ip_address']];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
+    }
+    
+    public function checkNasReachability(string $nasIp): array {
+        $output = [];
+        $returnVar = 0;
+        exec("ping -c 1 -W 2 " . escapeshellarg($nasIp) . " 2>&1", $output, $returnVar);
+        
+        $reachable = ($returnVar === 0);
+        $latency = null;
+        
+        if ($reachable) {
+            foreach ($output as $line) {
+                if (preg_match('/time[=<](\d+(?:\.\d+)?)\s*ms/i', $line, $matches)) {
+                    $latency = round((float)$matches[1], 1);
+                    break;
+                }
+            }
+        }
+        
+        return [
+            'reachable' => $reachable,
+            'latency' => $latency,
+            'output' => implode("\n", $output)
+        ];
+    }
+    
+    public function testNasConnectivity(int $nasId): array {
+        $stmt = $this->db->prepare("SELECT * FROM radius_nas WHERE id = ?");
+        $stmt->execute([$nasId]);
+        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$nas) {
+            return ['success' => false, 'error' => 'NAS not found'];
+        }
+        
+        $results = [
+            'nas_id' => $nasId,
+            'nas_name' => $nas['name'],
+            'nas_ip' => $nas['ip_address'],
+            'tests' => []
+        ];
+        
+        // Test 1: Ping
+        $pingResult = $this->checkNasReachability($nas['ip_address']);
+        $results['tests']['ping'] = [
+            'status' => $pingResult['reachable'] ? 'pass' : 'fail',
+            'message' => $pingResult['reachable'] ? "Reachable ({$pingResult['latency']}ms)" : 'Not reachable - check VPN tunnel',
+            'details' => $pingResult['output']
+        ];
+        
+        // Test 2: UDP port 3799 (CoA)
+        $socket = @socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        $coaPortOpen = false;
+        if ($socket) {
+            socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 2, 'usec' => 0]);
+            socket_set_option($socket, SOL_SOCKET, SO_SNDTIMEO, ['sec' => 2, 'usec' => 0]);
+            $testPacket = pack('CCn', 1, rand(0, 255), 20) . random_bytes(16);
+            $sent = @socket_sendto($socket, $testPacket, strlen($testPacket), 0, $nas['ip_address'], 3799);
+            $coaPortOpen = ($sent !== false);
+            socket_close($socket);
+        }
+        $results['tests']['coa_port'] = [
+            'status' => $coaPortOpen ? 'pass' : 'fail',
+            'message' => $coaPortOpen ? 'UDP 3799 accessible' : 'Cannot send to UDP 3799 - check firewall'
+        ];
+        
+        $results['success'] = $pingResult['reachable'];
+        $results['summary'] = $pingResult['reachable'] 
+            ? 'NAS is reachable. If CoA still fails, verify: 1) CoA secret matches, 2) MikroTik has RADIUS CoA enabled on port 3799'
+            : 'NAS is NOT reachable. Check: 1) VPN tunnel is up, 2) NAS IP is correct, 3) Firewall allows traffic';
+        
+        return $results;
     }
     
     // ==================== Reports ====================

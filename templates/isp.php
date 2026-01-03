@@ -4309,6 +4309,10 @@ try {
 # Enable RADIUS for PPPoE
 /ppp aaa set use-radius=yes accounting=yes interim-update=5m
 
+# IMPORTANT: Enable RADIUS Incoming for CoA/Disconnect
+# This allows the server to disconnect users or change their speed
+/radius incoming set accept=yes port=3799
+
 # Optional: Set NAS identifier
 /system identity set name="${nas.name}"
 `;
@@ -4332,6 +4336,9 @@ try {
 
 /radius add service=ppp address=${radiusServer || 'RADIUS_SERVER_IP'} secret="${radiusSecret}" timeout=3000ms
 /ppp aaa set use-radius=yes accounting=yes interim-update=5m
+
+# IMPORTANT: Enable RADIUS Incoming for CoA/Disconnect
+/radius incoming set accept=yes port=3799
 `;
                 document.getElementById('radiusScript').textContent = radiusScript;
                 document.getElementById('fullScript').textContent = radiusScript + '\n\n' + vpnScript;
