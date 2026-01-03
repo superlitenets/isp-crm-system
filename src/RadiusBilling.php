@@ -1042,13 +1042,35 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info
-        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-        $stmt->execute([$sub['nas_id']]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        // Get NAS info - try subscription's nas_id first
+        $nas = null;
+        if (!empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // If not found, try to get NAS from active session
+        if (!$nas) {
+            $stmt = $this->db->prepare("
+                SELECT rn.ip_address, rn.secret 
+                FROM radius_sessions rs
+                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // If still not found, try default active NAS
+        if (!$nas) {
+            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
         
         if (!$nas) {
-            return ['success' => false, 'error' => 'NAS not found'];
+            return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
         // Build CoA with new rate limit
@@ -1515,13 +1537,35 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Subscription not found'];
         }
         
-        // Get NAS info
-        $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
-        $stmt->execute([$sub['nas_id']]);
-        $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        // Get NAS info - try subscription's nas_id first
+        $nas = null;
+        if (!empty($sub['nas_id'])) {
+            $stmt = $this->db->prepare("SELECT ip_address, secret FROM radius_nas WHERE id = ?");
+            $stmt->execute([$sub['nas_id']]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // If not found, try to get NAS from active session
+        if (!$nas) {
+            $stmt = $this->db->prepare("
+                SELECT rn.ip_address, rn.secret 
+                FROM radius_sessions rs
+                JOIN radius_nas rn ON rs.nas_id = rn.id OR rs.nas_ip_address = rn.ip_address
+                WHERE rs.subscription_id = ? AND rs.session_end IS NULL
+                ORDER BY rs.session_start DESC LIMIT 1
+            ");
+            $stmt->execute([$subscriptionId]);
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        // If still not found, try default active NAS
+        if (!$nas) {
+            $stmt = $this->db->query("SELECT ip_address, secret FROM radius_nas WHERE is_active = true ORDER BY id LIMIT 1");
+            $nas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
         
         if (!$nas) {
-            return ['success' => false, 'error' => 'NAS not found'];
+            return ['success' => false, 'error' => 'NAS not found - please assign a NAS to this subscription or add an active NAS device'];
         }
         
         // Build CoA attributes
