@@ -52,7 +52,7 @@ $mpesaEnabled = $mpesa->isConfigured();
 // Get available packages for purchase
 $packages = [];
 if ($mpesaEnabled) {
-    $stmt = $db->query("SELECT * FROM radius_packages WHERE status = 'active' ORDER BY price ASC");
+    $stmt = $db->query("SELECT * FROM radius_packages WHERE is_active = true ORDER BY price ASC");
     $packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
