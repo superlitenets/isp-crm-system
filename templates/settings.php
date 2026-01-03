@@ -662,12 +662,12 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Ticket Resolved</label>
                                     <textarea class="form-control" name="sms_template_ticket_resolved" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_resolved', 'ISP Support - Ticket #{ticket_number} has been RESOLVED. Thank you for your patience.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {status}, {customer_name}, {customer_phone}, {technician_name}, {technician_phone}, {company_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {status}, {customer_name}, {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Technician Assigned (to Customer)</label>
-                                    <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} ({technician_phone}) has been assigned to your ticket #{ticket_number}.')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {technician_name}, {technician_phone}, {company_name}</small>
+                                    <label class="form-label fw-bold">Technician/Team Assigned (to Customer)</label>
+                                    <textarea class="form-control" name="sms_template_ticket_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_ticket_assigned', 'ISP Support - Technician {technician_name} ({technician_office_phone}) has been assigned to your ticket #{ticket_number}.')) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {category}, {priority}, {customer_name}, {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -684,9 +684,9 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                         <div class="accordion-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label fw-bold">New Ticket Assigned to Technician</label>
+                                    <label class="form-label fw-bold">New Ticket Assigned to Technician/Team</label>
                                     <textarea class="form-control" name="sms_template_technician_assigned" rows="3"><?= htmlspecialchars($settings->get('sms_template_technician_assigned', 'New Ticket #{ticket_number} assigned to you. Customer: {customer_name} ({customer_phone}). Subject: {subject}. Priority: {priority}. Address: {customer_address}')) ?></textarea>
-                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {description}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_address}, {customer_email}, {technician_name}, {technician_phone}, {company_name}</small>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {category}, {priority}, {customer_name}, {customer_phone}, {customer_address}, {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {company_name}</small>
                                 </div>
                             </div>
                         </div>
@@ -778,7 +778,7 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                                     <textarea class="form-control" name="wa_template_branch_ticket_assigned" rows="16"><?= htmlspecialchars($settings->get('wa_template_branch_ticket_assigned', "🎫 *NEW TICKET ASSIGNED*\n\n📋 *Ticket:* #{ticket_number}\n📌 *Subject:* {subject}\n🏷️ *Category:* {category}\n⚡ *Priority:* {priority}\n🕐 *Created:* {created_at}\n\n👤 *Customer Details:*\n• Name: {customer_name}\n• Phone: {customer_phone}\n• Email: {customer_email}\n• Account: {customer_account}\n• Username: {customer_username}\n• Address: {customer_address}\n• Location: {customer_location}\n• GPS: {customer_coordinates}\n• Plan: {service_plan}\n\n👷 *{assignment_info}*\n📞 Tech Phone: {technician_phone}\n👥 Team: {team_name}\n👥 Members: {team_members}\n\n🏢 Branch: {branch_name}")) ?></textarea>
                                     <small class="text-muted d-block mb-2"><strong>Ticket:</strong> {ticket_number}, {subject}, {description}, {category}, {priority}, {created_at}</small>
                                     <small class="text-muted d-block mb-2"><strong>Customer:</strong> {customer_name}, {customer_phone}, {customer_email}, {customer_account}, {customer_username}, {customer_address}, {customer_location}, {customer_coordinates}, {service_plan}</small>
-                                    <small class="text-muted d-block"><strong>Assignment:</strong> {technician_name}, {technician_phone}, {team_name}, {team_members}, {assignment_info}, {branch_name}, {branch_code}</small>
+                                    <small class="text-muted d-block"><strong>Assignment:</strong> {technician_name}, {technician_phone}, {technician_office_phone}, {team_name}, {team_leader_name}, {team_leader_phone}, {team_leader_office_phone}, {team_members}, {assignment_info}, {branch_name}, {branch_code}</small>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-bold">Daily Branch Summary</label>
