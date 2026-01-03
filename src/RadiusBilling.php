@@ -516,6 +516,8 @@ class RadiusBilling {
                 return ['success' => false, 'error' => 'Subscription not found'];
             }
             
+            $wasExpired = ($sub['status'] !== 'active' || (isset($sub['expiry_date']) && $sub['expiry_date'] < date('Y-m-d')));
+            
             $packageId = $packageId ?? $sub['package_id'];
             $package = $this->getPackage($packageId);
             if (!$package) {
@@ -535,7 +537,18 @@ class RadiusBilling {
             
             $this->createBillingRecord($id, $packageId, $package['price'], 'renewal', $startDate, $expiryDate);
             
-            return ['success' => true, 'expiry_date' => $expiryDate];
+            // If user was expired/suspended, send CoA to update their speed
+            $coaResult = null;
+            if ($wasExpired) {
+                $coaResult = $this->sendSpeedUpdateCoA($id);
+            }
+            
+            return [
+                'success' => true, 
+                'expiry_date' => $expiryDate,
+                'coa_sent' => $coaResult ? ($coaResult['success'] ?? false) : false,
+                'new_speed' => $coaResult['rate_limit'] ?? null
+            ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -548,7 +561,15 @@ class RadiusBilling {
                 WHERE id = ?
             ");
             $stmt->execute(["\nSuspended: $reason (" . date('Y-m-d H:i') . ")", $id]);
-            return ['success' => true];
+            
+            // Disconnect active sessions via CoA
+            $disconnectResult = $this->disconnectSubscription($id);
+            
+            return [
+                'success' => true, 
+                'sessions_disconnected' => $disconnectResult['disconnected'] ?? 0,
+                'coa_errors' => $disconnectResult['errors'] ?? []
+            ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -560,7 +581,15 @@ class RadiusBilling {
                 UPDATE radius_subscriptions SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?
             ");
             $stmt->execute([$id]);
-            return ['success' => true];
+            
+            // Send CoA to update speed limit (in case user is still connected with expired/suspended limits)
+            $coaResult = $this->sendSpeedUpdateCoA($id);
+            
+            return [
+                'success' => true,
+                'coa_sent' => $coaResult['success'] ?? false,
+                'new_speed' => $coaResult['rate_limit'] ?? null
+            ];
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -1647,7 +1676,7 @@ class RadiusBilling {
     public function checkNasReachability(string $nasIp): array {
         $output = [];
         $returnVar = 0;
-        exec("ping -c 1 -W 2 " . escapeshellarg($nasIp) . " 2>&1", $output, $returnVar);
+        \exec("ping -c 1 -W 2 " . \escapeshellarg($nasIp) . " 2>&1", $output, $returnVar);
         
         $reachable = ($returnVar === 0);
         $latency = null;
@@ -1921,7 +1950,7 @@ class RadiusBilling {
             ];
             
             // Ping check
-            exec("ping -c 1 -W 2 " . escapeshellarg($nas['ip_address']) . " 2>&1", $output, $returnCode);
+            \exec("ping -c 1 -W 2 " . \escapeshellarg($nas['ip_address']) . " 2>&1", $output, $returnCode);
             if ($returnCode === 0) {
                 $status['online'] = true;
                 if (preg_match('/time=(\d+\.?\d*)/', implode("\n", $output), $matches)) {

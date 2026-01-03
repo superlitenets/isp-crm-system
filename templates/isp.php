@@ -470,20 +470,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
         case 'renew_subscription':
             $result = $radiusBilling->renewSubscription((int)$_POST['id'], (int)$_POST['package_id'] ?: null);
-            $message = $result['success'] ? 'Subscription renewed until ' . $result['expiry_date'] : 'Error: ' . ($result['error'] ?? 'Unknown error');
-            $messageType = $result['success'] ? 'success' : 'danger';
+            if ($result['success']) {
+                $msg = 'Subscription renewed until ' . $result['expiry_date'];
+                if (!empty($result['coa_sent'])) {
+                    $msg .= ' (speed updated via CoA)';
+                }
+                $message = $msg;
+                $messageType = 'success';
+            } else {
+                $message = 'Error: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = 'danger';
+            }
             break;
             
         case 'suspend_subscription':
             $result = $radiusBilling->suspendSubscription((int)$_POST['id'], $_POST['reason'] ?? '');
-            $message = $result['success'] ? 'Subscription suspended' : 'Error: ' . ($result['error'] ?? 'Unknown error');
-            $messageType = $result['success'] ? 'success' : 'danger';
+            if ($result['success']) {
+                $msg = 'Subscription suspended';
+                if (!empty($result['sessions_disconnected'])) {
+                    $msg .= ' (' . $result['sessions_disconnected'] . ' session(s) disconnected)';
+                }
+                if (!empty($result['coa_errors'])) {
+                    $msg .= ' - CoA warnings: ' . implode('; ', array_slice($result['coa_errors'], 0, 2));
+                }
+                $message = $msg;
+                $messageType = 'success';
+            } else {
+                $message = 'Error: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = 'danger';
+            }
             break;
             
         case 'activate_subscription':
             $result = $radiusBilling->activateSubscription((int)$_POST['id']);
-            $message = $result['success'] ? 'Subscription activated' : 'Error: ' . ($result['error'] ?? 'Unknown error');
-            $messageType = $result['success'] ? 'success' : 'danger';
+            if ($result['success']) {
+                $msg = 'Subscription activated';
+                if (!empty($result['coa_sent'])) {
+                    $msg .= ' (speed updated: ' . ($result['new_speed'] ?? 'applied') . ')';
+                }
+                $message = $msg;
+                $messageType = 'success';
+            } else {
+                $message = 'Error: ' . ($result['error'] ?? 'Unknown error');
+                $messageType = 'danger';
+            }
             break;
             
         case 'generate_vouchers':
