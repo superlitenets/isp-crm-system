@@ -2500,6 +2500,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
                 
+            case 'upload_kyc_document':
+                $employeeId = (int)($_POST['employee_id'] ?? 0);
+                $documentType = trim($_POST['document_type'] ?? '');
+                
+                if (!$employeeId || !$documentType || empty($_FILES['kyc_document']['name'])) {
+                    $message = 'Please select a document type and file.';
+                    $messageType = 'danger';
+                } else {
+                    try {
+                        $uploadDir = __DIR__ . '/uploads/kyc/';
+                        if (!is_dir($uploadDir)) {
+                            mkdir($uploadDir, 0755, true);
+                        }
+                        
+                        $ext = pathinfo($_FILES['kyc_document']['name'], PATHINFO_EXTENSION);
+                        $filename = 'kyc_' . $employeeId . '_' . $documentType . '_' . uniqid() . '.' . $ext;
+                        $targetPath = $uploadDir . $filename;
+                        
+                        if (move_uploaded_file($_FILES['kyc_document']['tmp_name'], $targetPath)) {
+                            $employee->addKycDocument($employeeId, [
+                                'document_type' => $documentType,
+                                'document_name' => $_FILES['kyc_document']['name'],
+                                'file_path' => '/uploads/kyc/' . $filename,
+                                'notes' => $_POST['notes'] ?? null
+                            ]);
+                            $message = 'KYC document uploaded successfully!';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to upload file.';
+                            $messageType = 'danger';
+                        }
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error uploading document: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'delete_kyc_document':
+                $documentId = (int)($_POST['document_id'] ?? 0);
+                if ($documentId) {
+                    try {
+                        $employee->deleteKycDocument($documentId);
+                        $message = 'KYC document deleted successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error deleting document: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
+            case 'verify_kyc_document':
+                $documentId = (int)($_POST['document_id'] ?? 0);
+                if ($documentId) {
+                    try {
+                        $employee->verifyKycDocument($documentId, $currentUser['id']);
+                        $message = 'Document verified successfully!';
+                        $messageType = 'success';
+                        \App\Auth::regenerateToken();
+                    } catch (Exception $e) {
+                        $message = 'Error verifying document: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                break;
+                
             case 'create_department':
                 $name = trim($_POST['name'] ?? '');
                 if (empty($name)) {

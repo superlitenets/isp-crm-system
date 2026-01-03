@@ -458,6 +458,128 @@ $allRoles = $roleManager->getAllRoles();
     </div>
 </div>
 
+<!-- KYC Documents Section -->
+<div class="card mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-check"></i> KYC Documents</h5>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadKycModal">
+            <i class="bi bi-upload"></i> Upload Document
+        </button>
+    </div>
+    <div class="card-body">
+        <?php 
+        $kycDocuments = $employee->getKycDocuments($employeeData['id']);
+        $documentTypes = $employee->getKycDocumentTypes();
+        ?>
+        <?php if (empty($kycDocuments)): ?>
+        <p class="text-muted text-center mb-0">No KYC documents uploaded yet.</p>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Document Type</th>
+                        <th>File Name</th>
+                        <th>Uploaded</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($kycDocuments as $doc): ?>
+                    <tr>
+                        <td>
+                            <i class="bi bi-file-earmark-text text-primary me-1"></i>
+                            <?= htmlspecialchars($documentTypes[$doc['document_type']] ?? ucfirst(str_replace('_', ' ', $doc['document_type']))) ?>
+                        </td>
+                        <td><?= htmlspecialchars($doc['document_name']) ?></td>
+                        <td><?= date('M j, Y', strtotime($doc['uploaded_at'])) ?></td>
+                        <td>
+                            <?php if ($doc['verified_at']): ?>
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Verified</span>
+                            <small class="text-muted d-block">by <?= htmlspecialchars($doc['verified_by_name'] ?? 'System') ?></small>
+                            <?php else: ?>
+                            <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Pending</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <a href="<?= htmlspecialchars($doc['file_path']) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="<?= htmlspecialchars($doc['file_path']) ?>" download class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            <?php if (!$doc['verified_at']): ?>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="verify_kyc_document">
+                                <input type="hidden" name="document_id" value="<?= $doc['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-success" title="Verify">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            </form>
+                            <?php endif; ?>
+                            <form method="POST" class="d-inline" onsubmit="return confirm('Delete this document?')">
+                                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                                <input type="hidden" name="action" value="delete_kyc_document">
+                                <input type="hidden" name="document_id" value="<?= $doc['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Upload KYC Modal -->
+<div class="modal fade" id="uploadKycModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                <input type="hidden" name="action" value="upload_kyc_document">
+                <input type="hidden" name="employee_id" value="<?= $employeeData['id'] ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload"></i> Upload KYC Document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Document Type *</label>
+                        <select class="form-select" name="document_type" required>
+                            <option value="">Select document type...</option>
+                            <?php foreach ($documentTypes as $key => $label): ?>
+                            <option value="<?= $key ?>"><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Document File *</label>
+                        <input type="file" class="form-control" name="kyc_document" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required>
+                        <small class="text-muted">Accepted: PDF, JPG, PNG, DOC, DOCX (Max 5MB)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="2" placeholder="Optional notes about this document..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Upload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 var bioDevicesData = <?= $bioDevicesJson ?? '[]' ?>;
 

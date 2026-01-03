@@ -1058,4 +1058,71 @@ class Employee {
             return false;
         }
     }
+
+    public function getKycDocuments(int $employeeId): array {
+        $stmt = $this->db->prepare("
+            SELECT kd.*, u.name as verified_by_name
+            FROM employee_kyc_documents kd
+            LEFT JOIN users u ON kd.verified_by = u.id
+            WHERE kd.employee_id = ?
+            ORDER BY kd.uploaded_at DESC
+        ");
+        $stmt->execute([$employeeId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function addKycDocument(int $employeeId, array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO employee_kyc_documents (employee_id, document_type, document_name, file_path, notes)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $employeeId,
+            $data['document_type'],
+            $data['document_name'],
+            $data['file_path'],
+            $data['notes'] ?? null
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function deleteKycDocument(int $documentId): bool {
+        $stmt = $this->db->prepare("SELECT file_path FROM employee_kyc_documents WHERE id = ?");
+        $stmt->execute([$documentId]);
+        $doc = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($doc && file_exists(__DIR__ . '/../public' . $doc['file_path'])) {
+            unlink(__DIR__ . '/../public' . $doc['file_path']);
+        }
+        
+        $stmt = $this->db->prepare("DELETE FROM employee_kyc_documents WHERE id = ?");
+        return $stmt->execute([$documentId]);
+    }
+
+    public function verifyKycDocument(int $documentId, int $verifiedBy): bool {
+        $stmt = $this->db->prepare("
+            UPDATE employee_kyc_documents 
+            SET verified_at = CURRENT_TIMESTAMP, verified_by = ?
+            WHERE id = ?
+        ");
+        return $stmt->execute([$verifiedBy, $documentId]);
+    }
+
+    public function getKycDocumentTypes(): array {
+        return [
+            'national_id' => 'National ID Card',
+            'passport' => 'Passport',
+            'drivers_license' => 'Driver\'s License',
+            'birth_certificate' => 'Birth Certificate',
+            'kra_pin' => 'KRA PIN Certificate',
+            'nhif_card' => 'NHIF Card',
+            'nssf_card' => 'NSSF Card',
+            'academic_cert' => 'Academic Certificate',
+            'professional_cert' => 'Professional Certificate',
+            'police_clearance' => 'Police Clearance Certificate',
+            'recommendation_letter' => 'Recommendation Letter',
+            'contract' => 'Employment Contract',
+            'other' => 'Other Document'
+        ];
+    }
 }
