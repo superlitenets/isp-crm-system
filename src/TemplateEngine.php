@@ -28,6 +28,10 @@ class TemplateEngine {
             '{technician_phone}' => 'Assigned technician personal phone',
             '{technician_office_phone}' => 'Assigned technician office phone (shown to customers)',
             '{technician_email}' => 'Assigned technician email',
+            '{team_name}' => 'Assigned team name',
+            '{team_leader_name}' => 'Team leader name',
+            '{team_leader_phone}' => 'Team leader personal phone',
+            '{team_leader_office_phone}' => 'Team leader office phone (shown to customers)',
             '{company_name}' => 'Your company name',
             '{company_phone}' => 'Company phone number',
             '{company_email}' => 'Company email address',
@@ -85,6 +89,12 @@ class TemplateEngine {
                 '{technician_office_phone}' => 'Assigned technician office phone (shown to customers)',
                 '{technician_email}' => 'Assigned technician email',
             ],
+            'Team' => [
+                '{team_name}' => 'Assigned team name',
+                '{team_leader_name}' => 'Team leader name',
+                '{team_leader_phone}' => 'Team leader personal phone',
+                '{team_leader_office_phone}' => 'Team leader office phone (shown to customers)',
+            ],
             'Company' => [
                 '{company_name}' => 'Your company name',
                 '{company_phone}' => 'Company phone number',
@@ -128,6 +138,14 @@ class TemplateEngine {
         return $this;
     }
     
+    public function setTeamData(?array $team, ?array $leader = null): self {
+        $this->placeholders['{team_name}'] = $team['name'] ?? 'Not Assigned';
+        $this->placeholders['{team_leader_name}'] = $leader['name'] ?? '';
+        $this->placeholders['{team_leader_phone}'] = $leader['phone'] ?? '';
+        $this->placeholders['{team_leader_office_phone}'] = $leader['office_phone'] ?? ($leader['phone'] ?? '');
+        return $this;
+    }
+    
     public function setCompanyData(): self {
         $companyInfo = $this->settings->getCompanyInfo();
         $this->placeholders['{company_name}'] = $companyInfo['company_name'] ?? '';
@@ -158,7 +176,7 @@ class TemplateEngine {
         );
     }
     
-    public function renderForTicket(string $template, array $ticket, ?array $customer = null, ?array $technician = null): string {
+    public function renderForTicket(string $template, array $ticket, ?array $customer = null, ?array $technician = null, ?array $team = null, ?array $teamLeader = null): string {
         $this->setTicketData($ticket);
         
         if ($customer) {
@@ -174,6 +192,16 @@ class TemplateEngine {
         } elseif (isset($ticket['assigned_name'])) {
             $this->placeholders['{technician_name}'] = $ticket['assigned_name'] ?? 'Not Assigned';
             $this->placeholders['{technician_phone}'] = $ticket['assigned_phone'] ?? '';
+            $this->placeholders['{technician_office_phone}'] = $ticket['assigned_office_phone'] ?? ($ticket['assigned_phone'] ?? '');
+        }
+        
+        if ($team) {
+            $this->setTeamData($team, $teamLeader);
+        } elseif (isset($ticket['team_name'])) {
+            $this->placeholders['{team_name}'] = $ticket['team_name'] ?? '';
+            $this->placeholders['{team_leader_name}'] = $ticket['team_leader_name'] ?? '';
+            $this->placeholders['{team_leader_phone}'] = $ticket['team_leader_phone'] ?? '';
+            $this->placeholders['{team_leader_office_phone}'] = $ticket['team_leader_office_phone'] ?? ($ticket['team_leader_phone'] ?? '');
         }
         
         return $this->render($template);
@@ -195,7 +223,12 @@ class TemplateEngine {
             '{ticket_created}' => date('M j, Y'),
             '{technician_name}' => 'Jane Smith',
             '{technician_phone}' => '+254798765432',
+            '{technician_office_phone}' => '+254711111111',
             '{technician_email}' => 'jane@company.com',
+            '{team_name}' => 'Support Team',
+            '{team_leader_name}' => 'Mike Johnson',
+            '{team_leader_phone}' => '+254722222222',
+            '{team_leader_office_phone}' => '+254733333333',
             '{company_name}' => $this->settings->get('company_name', 'ISP Company'),
             '{company_phone}' => $this->settings->get('company_phone', '+254700000000'),
             '{company_email}' => $this->settings->get('company_email', 'support@company.com'),

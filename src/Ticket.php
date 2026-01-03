@@ -1029,14 +1029,24 @@ class Ticket {
         $customer = (new Customer())->find($ticket['customer_id']);
         $team = $this->getTeam($teamId);
         
-        // Get team leader info
+        // Get team leader info with office_phone from employee record
         $leaderName = '';
         $leaderPhone = '';
+        $leaderOfficePhone = '';
         if (!empty($team['leader_id'])) {
             $leader = $this->getUser($team['leader_id']);
             if ($leader) {
                 $leaderName = $leader['name'] ?? '';
                 $leaderPhone = $leader['phone'] ?? '';
+                // Get office_phone from employee record
+                $empStmt = $this->db->prepare("SELECT office_phone, phone FROM employees WHERE user_id = ?");
+                $empStmt->execute([$team['leader_id']]);
+                $empData = $empStmt->fetch();
+                if ($empData) {
+                    $leaderOfficePhone = $empData['office_phone'] ?? $empData['phone'] ?? $leaderPhone;
+                } else {
+                    $leaderOfficePhone = $leaderPhone;
+                }
             }
         }
         
@@ -1044,6 +1054,7 @@ class Ticket {
         if (empty($leaderName) && !empty($members)) {
             $leaderName = $members[0]['user_name'] ?? $members[0]['name'] ?? 'Team Support';
             $leaderPhone = $members[0]['phone'] ?? '';
+            $leaderOfficePhone = $members[0]['office_phone'] ?? $leaderPhone;
         }
 
         // Notify team members
@@ -1092,15 +1103,18 @@ class Ticket {
                 '{team_name}' => $teamName,
                 '{team_leader_name}' => $leaderName,
                 '{team_leader_phone}' => $leaderPhone,
+                '{team_leader_office_phone}' => $leaderOfficePhone ?: $leaderPhone,
                 '{technician_name}' => $leaderName ?: $teamName,
-                '{technician_phone}' => $leaderPhone
+                '{technician_phone}' => $leaderOfficePhone ?: $leaderPhone,
+                '{technician_office_phone}' => $leaderOfficePhone ?: $leaderPhone
             ];
             
             // Use team-specific template or fall back to standard ticket assigned template
             $customerMessage = $this->buildSMSFromTemplate('sms_template_team_assigned', $customerPlaceholders);
             if (strpos($customerMessage, '{team_name}') !== false || empty(trim($customerMessage))) {
-                // Template not set, use default
-                $customerMessage = "ISP Support - Your ticket #{$ticket['ticket_number']} has been assigned to {$teamName}. Contact: {$leaderName} ({$leaderPhone}).";
+                // Template not set, use default with office phone
+                $contactPhone = $leaderOfficePhone ?: $leaderPhone;
+                $customerMessage = "ISP Support - Your ticket #{$ticket['ticket_number']} has been assigned to {$teamName}. Contact: {$leaderName} ({$contactPhone}).";
             }
             
             $customerResult = $this->sms->send($customer['phone'], $customerMessage);
