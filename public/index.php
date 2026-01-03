@@ -3933,10 +3933,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'save_billing_api':
                 try {
-                    $token = trim($_POST['oneisp_api_token'] ?? '');
-                    $settings->set('oneisp_api_token', $token);
+                    $authType = $_POST['auth_type'] ?? 'token';
+                    
+                    if ($authType === 'token') {
+                        $token = trim($_POST['oneisp_api_token'] ?? '');
+                        $settings->set('oneisp_api_token', $token);
+                        if (!empty($token)) {
+                            $settings->set('oneisp_username', '');
+                            $settings->set('oneisp_password', '');
+                        }
+                        $message = 'API token saved successfully!';
+                    } else {
+                        $username = trim($_POST['oneisp_username'] ?? '');
+                        $password = trim($_POST['oneisp_password'] ?? '');
+                        $settings->set('oneisp_username', $username);
+                        $settings->set('oneisp_password', $password);
+                        if (!empty($username) && !empty($password)) {
+                            $settings->set('oneisp_api_token', '');
+                        }
+                        $message = 'Login credentials saved successfully!';
+                    }
+                    
                     \App\Settings::clearCache();
-                    $message = 'Billing API settings saved successfully!';
                     $messageType = 'success';
                     \App\Auth::regenerateToken();
                 } catch (Exception $e) {

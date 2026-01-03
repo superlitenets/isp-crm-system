@@ -6495,6 +6495,9 @@ if ($action === 'edit_branch' && $id) {
 require_once __DIR__ . '/../src/OneISP.php';
 $oneIsp = new \App\OneISP();
 $billingToken = $settings->get('oneisp_api_token', '');
+$billingUsername = $settings->get('oneisp_username', '');
+$billingPassword = $settings->get('oneisp_password', '');
+$authMode = $oneIsp->getAuthMode();
 $testResult = null;
 if (($_GET['action'] ?? '') === 'test_billing') {
     $testResult = $oneIsp->testConnection();
@@ -6502,15 +6505,18 @@ if (($_GET['action'] ?? '') === 'test_billing') {
 ?>
 
 <div class="row g-4">
-    <div class="col-lg-6">
+    <div class="col-lg-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> Customers API</h5>
+                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> One-ISP Integration</h5>
             </div>
             <div class="card-body">
                 <?php if ($testResult): ?>
                 <div class="alert alert-<?= $testResult['success'] ? 'success' : 'danger' ?> alert-dismissible">
                     <strong><?= $testResult['success'] ? 'Connection Successful!' : 'Connection Failed' ?></strong>
+                    <?php if ($testResult['success'] && !empty($testResult['mode'])): ?>
+                    <br><small>Mode: <?= htmlspecialchars(ucfirst($testResult['mode'])) ?></small>
+                    <?php endif; ?>
                     <?php if (!$testResult['success']): ?>
                     <br><?= htmlspecialchars($testResult['error'] ?? 'Unknown error') ?>
                     <?php endif; ?>
@@ -6518,35 +6524,95 @@ if (($_GET['action'] ?? '') === 'test_billing') {
                 </div>
                 <?php endif; ?>
                 
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
-                    <input type="hidden" name="action" value="save_billing_api">
-                    
-                    <div class="mb-3">
-                        <label class="form-label">API Key</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" name="oneisp_api_token" id="billingApiToken"
-                                   value="<?= htmlspecialchars($billingToken) ?>" placeholder="Enter your API key">
-                            <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility()">
-                                <i class="bi bi-eye" id="toggleIcon"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg"></i> Save
-                        </button>
-                        <a href="?page=settings&subpage=billing_api&action=test_billing" class="btn btn-outline-info">
-                            <i class="bi bi-arrow-repeat"></i> Test Connection
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link <?= empty($billingToken) && !empty($billingUsername) ? '' : 'active' ?>" data-bs-toggle="tab" href="#apiTab">
+                            <i class="bi bi-key"></i> API Token
                         </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?= empty($billingToken) && !empty($billingUsername) ? 'active' : '' ?>" data-bs-toggle="tab" href="#loginTab">
+                            <i class="bi bi-person-lock"></i> Login Credentials
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="tab-content">
+                    <div class="tab-pane fade <?= empty($billingToken) && !empty($billingUsername) ? '' : 'show active' ?>" id="apiTab">
+                        <form method="POST">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="save_billing_api">
+                            <input type="hidden" name="auth_type" value="token">
+                            
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle"></i> Use this if you have an API token from One-ISP.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">API Token</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="oneisp_api_token" id="billingApiToken"
+                                           value="<?= htmlspecialchars($billingToken) ?>" placeholder="Enter your API token">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility('billingApiToken', 'toggleIcon1')">
+                                        <i class="bi bi-eye" id="toggleIcon1"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i> Save API Token
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                    
+                    <div class="tab-pane fade <?= empty($billingToken) && !empty($billingUsername) ? 'show active' : '' ?>" id="loginTab">
+                        <form method="POST">
+                            <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
+                            <input type="hidden" name="action" value="save_billing_api">
+                            <input type="hidden" name="auth_type" value="login">
+                            
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle"></i> Use your One-ISP dashboard login credentials (email & password).
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Email / Username</label>
+                                <input type="text" class="form-control" name="oneisp_username" 
+                                       value="<?= htmlspecialchars($billingUsername) ?>" placeholder="your@email.com">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="oneisp_password" id="billingPassword"
+                                           value="<?= htmlspecialchars($billingPassword) ?>" placeholder="Your login password">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleTokenVisibility('billingPassword', 'toggleIcon2')">
+                                        <i class="bi bi-eye" id="toggleIcon2"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i> Save Credentials
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <a href="?page=settings&subpage=billing_api&action=test_billing" class="btn btn-outline-info">
+                    <i class="bi bi-arrow-repeat"></i> Test Connection
+                </a>
             </div>
         </div>
     </div>
     
-    <div class="col-lg-6">
+    <div class="col-lg-4">
         <div class="card">
             <div class="card-header bg-light">
                 <h5 class="mb-0"><i class="bi bi-plug"></i> Status</h5>
@@ -6557,21 +6623,41 @@ if (($_GET['action'] ?? '') === 'test_billing') {
                     <i class="bi bi-check-circle-fill display-4"></i>
                 </div>
                 <h5 class="text-success">Connected</h5>
+                <p class="text-muted small mb-0">
+                    Mode: <strong><?= ucfirst($authMode) ?></strong>
+                    <?php if ($authMode === 'login'): ?>
+                    <br>User: <?= htmlspecialchars($billingUsername) ?>
+                    <?php endif; ?>
+                </p>
                 <?php else: ?>
                 <div class="text-secondary mb-2">
                     <i class="bi bi-x-circle-fill display-4"></i>
                 </div>
                 <h5 class="text-secondary">Not Configured</h5>
+                <p class="text-muted small mb-0">Enter API token or login credentials</p>
                 <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-question-circle"></i> Help</h5>
+            </div>
+            <div class="card-body small">
+                <p><strong>Option 1: API Token</strong><br>
+                If One-ISP provided you with an API token, enter it in the API Token tab.</p>
+                
+                <p class="mb-0"><strong>Option 2: Login Credentials</strong><br>
+                Use your One-ISP dashboard email and password. The system will log in and fetch customer data automatically.</p>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-function toggleTokenVisibility() {
-    var input = document.getElementById('billingApiToken');
-    var icon = document.getElementById('toggleIcon');
+function toggleTokenVisibility(inputId, iconId) {
+    var input = document.getElementById(inputId);
+    var icon = document.getElementById(iconId);
     if (input.type === 'password') {
         input.type = 'text';
         icon.className = 'bi bi-eye-slash';
