@@ -6495,6 +6495,7 @@ if ($action === 'edit_branch' && $id) {
 require_once __DIR__ . '/../src/OneISP.php';
 $oneIsp = new \App\OneISP();
 $billingToken = $settings->get('oneisp_api_token', '');
+$billingPrefix = $settings->get('oneisp_prefix', '');
 $billingUsername = $settings->get('oneisp_username', '');
 $billingPassword = $settings->get('oneisp_password', '');
 $authMode = $oneIsp->getAuthMode();
@@ -6574,7 +6575,14 @@ if (($_GET['action'] ?? '') === 'test_billing') {
                             <input type="hidden" name="auth_type" value="login">
                             
                             <div class="alert alert-info small">
-                                <i class="bi bi-info-circle"></i> Use your One-ISP dashboard login credentials (email & password).
+                                <i class="bi bi-info-circle"></i> Use your One-ISP dashboard login credentials. For IAM users, also enter the account prefix.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Account Prefix <small class="text-muted">(IAM users only)</small></label>
+                                <input type="text" class="form-control" name="oneisp_prefix" 
+                                       value="<?= htmlspecialchars($billingPrefix) ?>" placeholder="e.g. mycompany">
+                                <div class="form-text">Leave empty for root account login</div>
                             </div>
                             
                             <div class="mb-3">

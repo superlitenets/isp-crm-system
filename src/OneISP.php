@@ -8,6 +8,7 @@ class OneISP {
     private string $apiUrl = 'https://ns3.api.one-isp.net/api/isp';
     private ?string $token = null;
     private ?string $sessionCookie = null;
+    private ?string $prefix = null;
     private ?string $username = null;
     private ?string $password = null;
     private string $authMode = 'token';
@@ -19,6 +20,7 @@ class OneISP {
     
     private function loadCredentials(): void {
         $this->token = getenv('ONEISP_API_TOKEN') ?: null;
+        $this->prefix = getenv('ONEISP_PREFIX') ?: null;
         $this->username = getenv('ONEISP_USERNAME') ?: null;
         $this->password = getenv('ONEISP_PASSWORD') ?: null;
         
@@ -27,6 +29,13 @@ class OneISP {
             $stmt->execute();
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
             $this->token = !empty($result['setting_value']) ? trim($result['setting_value']) : null;
+        }
+        
+        if (empty($this->prefix)) {
+            $stmt = $this->db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'oneisp_prefix'");
+            $stmt->execute();
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $this->prefix = !empty($result['setting_value']) ? trim($result['setting_value']) : null;
         }
         
         if (empty($this->username)) {
@@ -95,6 +104,10 @@ class OneISP {
             'password' => $this->password,
             '_token' => $csrfToken
         ];
+        
+        if (!empty($this->prefix)) {
+            $postData['prefix'] = $this->prefix;
+        }
         
         $ch = curl_init($loginUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

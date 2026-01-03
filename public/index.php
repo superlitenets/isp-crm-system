@@ -3944,8 +3944,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $message = 'API token saved successfully!';
                     } else {
+                        $prefix = trim($_POST['oneisp_prefix'] ?? '');
                         $username = trim($_POST['oneisp_username'] ?? '');
                         $password = trim($_POST['oneisp_password'] ?? '');
+                        $settings->set('oneisp_prefix', $prefix);
                         $settings->set('oneisp_username', $username);
                         $settings->set('oneisp_password', $password);
                         if (!empty($username) && !empty($password)) {
