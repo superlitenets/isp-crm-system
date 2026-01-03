@@ -1,5 +1,10 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../src/Settings.php';
+require_once __DIR__ . '/../src/SMSGateway.php';
+require_once __DIR__ . '/../src/WhatsApp.php';
+require_once __DIR__ . '/../src/SLA.php';
+require_once __DIR__ . '/../src/ActivityLog.php';
 require_once __DIR__ . '/../src/CustomerTicketLink.php';
 require_once __DIR__ . '/../src/Ticket.php';
 
