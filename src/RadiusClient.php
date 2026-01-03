@@ -164,7 +164,7 @@ class RadiusClient {
             'likely_cause' => ''
         ];
         
-        exec("ping -c 1 -W 2 " . escapeshellarg($this->nasIp) . " 2>&1", $output, $exitCode);
+        \exec("ping -c 1 -W 2 " . \escapeshellarg($this->nasIp) . " 2>&1", $output, $exitCode);
         $diagnostic['ping_reachable'] = ($exitCode === 0);
         
         if ($diagnostic['ping_reachable']) {
