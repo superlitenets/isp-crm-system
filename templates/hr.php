@@ -303,6 +303,72 @@ $allRoles = $roleManager->getAllRoles();
 </div>
 
 <?php elseif ($action === 'view_employee' && $employeeData): ?>
+<?php
+// Fetch employee statistics
+$empStats = [];
+try {
+    $statsDb = Database::getConnection();
+    
+    // Get tickets assigned to this employee (via user_id)
+    $ticketStats = ['total' => 0, 'open' => 0, 'closed' => 0];
+    if ($employeeData['user_id']) {
+        $ticketStmt = $statsDb->prepare("
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status NOT IN ('closed', 'resolved') THEN 1 ELSE 0 END) as open,
+                SUM(CASE WHEN status IN ('closed', 'resolved') THEN 1 ELSE 0 END) as closed
+            FROM tickets WHERE assigned_to = ?
+        ");
+        $ticketStmt->execute([$employeeData['user_id']]);
+        $ticketStats = $ticketStmt->fetch(PDO::FETCH_ASSOC) ?: $ticketStats;
+    }
+    
+    // Get attendance this month
+    $attendanceStmt = $statsDb->prepare("
+        SELECT 
+            COUNT(*) as days_present,
+            COALESCE(SUM(hours_worked), 0) as total_hours,
+            SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days
+        FROM attendance 
+        WHERE employee_id = ? 
+        AND date >= DATE_TRUNC('month', CURRENT_DATE)
+    ");
+    $attendanceStmt->execute([$employeeData['id']]);
+    $attendanceStats = $attendanceStmt->fetch(PDO::FETCH_ASSOC) ?: ['days_present' => 0, 'total_hours' => 0, 'late_days' => 0];
+    
+    // Get salary advances this month
+    $advanceStmt = $statsDb->prepare("
+        SELECT COALESCE(SUM(amount), 0) as total_advances, COUNT(*) as advance_count
+        FROM salary_advances 
+        WHERE employee_id = ? 
+        AND status = 'approved'
+        AND request_date >= DATE_TRUNC('month', CURRENT_DATE)
+    ");
+    $advanceStmt->execute([$employeeData['id']]);
+    $advanceStats = $advanceStmt->fetch(PDO::FETCH_ASSOC) ?: ['total_advances' => 0, 'advance_count' => 0];
+    
+    // Get leave balance
+    $leaveStmt = $statsDb->prepare("
+        SELECT 
+            COALESCE(SUM(CASE WHEN status = 'approved' THEN days_requested ELSE 0 END), 0) as days_taken,
+            COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_requests
+        FROM leave_requests 
+        WHERE employee_id = ? 
+        AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+    ");
+    $leaveStmt->execute([$employeeData['id']]);
+    $leaveStats = $leaveStmt->fetch(PDO::FETCH_ASSOC) ?: ['days_taken' => 0, 'pending_requests' => 0];
+    
+    $empStats = [
+        'tickets' => $ticketStats,
+        'attendance' => $attendanceStats,
+        'advances' => $advanceStats,
+        'leave' => $leaveStats
+    ];
+} catch (\Exception $e) {
+    // Stats tables may not exist
+}
+?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-person-badge"></i> Employee Details</h2>
     <div>
@@ -315,6 +381,82 @@ $allRoles = $roleManager->getAllRoles();
         <a href="?page=hr&action=edit_employee&id=<?= $employeeData['id'] ?>" class="btn btn-primary">
             <i class="bi bi-pencil"></i> Edit
         </a>
+    </div>
+</div>
+
+<!-- Employee Statistics -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0"><?= (int)($empStats['tickets']['total'] ?? 0) ?></h3>
+                        <small>Total Tickets</small>
+                    </div>
+                    <i class="bi bi-ticket-detailed fs-1 opacity-50"></i>
+                </div>
+                <div class="mt-2 small">
+                    <span class="badge bg-light text-primary"><?= (int)($empStats['tickets']['open'] ?? 0) ?> Open</span>
+                    <span class="badge bg-light text-success"><?= (int)($empStats['tickets']['closed'] ?? 0) ?> Closed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0"><?= (int)($empStats['attendance']['days_present'] ?? 0) ?></h3>
+                        <small>Days Present (Month)</small>
+                    </div>
+                    <i class="bi bi-calendar-check fs-1 opacity-50"></i>
+                </div>
+                <div class="mt-2 small">
+                    <span class="badge bg-light text-success"><?= number_format((float)($empStats['attendance']['total_hours'] ?? 0), 1) ?> hrs</span>
+                    <?php if (($empStats['attendance']['late_days'] ?? 0) > 0): ?>
+                    <span class="badge bg-warning text-dark"><?= (int)$empStats['attendance']['late_days'] ?> Late</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0"><?= $currencySymbol ?> <?= number_format((float)($empStats['advances']['total_advances'] ?? 0)) ?></h3>
+                        <small>Advances (Month)</small>
+                    </div>
+                    <i class="bi bi-cash-stack fs-1 opacity-50"></i>
+                </div>
+                <div class="mt-2 small">
+                    <span class="badge bg-dark"><?= (int)($empStats['advances']['advance_count'] ?? 0) ?> requests</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0"><?= (int)($empStats['leave']['days_taken'] ?? 0) ?></h3>
+                        <small>Leave Days (Year)</small>
+                    </div>
+                    <i class="bi bi-calendar-x fs-1 opacity-50"></i>
+                </div>
+                <div class="mt-2 small">
+                    <?php if (($empStats['leave']['pending_requests'] ?? 0) > 0): ?>
+                    <span class="badge bg-warning text-dark"><?= (int)$empStats['leave']['pending_requests'] ?> Pending</span>
+                    <?php else: ?>
+                    <span class="badge bg-light text-info">No pending</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -403,56 +545,6 @@ $allRoles = $roleManager->getAllRoles();
             </div>
             <div class="card-body">
                 <p class="mb-0"><?= nl2br(htmlspecialchars($employeeData['notes'] ?? 'No notes')) ?></p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-fingerprint"></i> Biometric Registration</h5>
-            </div>
-            <div class="card-body">
-                <div id="biometricSyncStatus" class="alert d-none mb-3"></div>
-                <p class="mb-2"><strong>Biometric ID:</strong> <?= htmlspecialchars($employeeData['biometric_id'] ?? $employeeData['id']) ?></p>
-                <p class="mb-3"><strong>Card Number:</strong> <?= htmlspecialchars($employeeData['card_number'] ?? 'Not set') ?></p>
-                
-                <?php
-                $bioDevices = [];
-                try {
-                    $bioDb = Database::getConnection();
-                    $bioDevices = $bioDb->query("SELECT id, name, device_type FROM biometric_devices WHERE is_active = true ORDER BY device_type, name")->fetchAll();
-                } catch (\Exception $e) {
-                    // Table may not exist
-                }
-                $bioDevicesJson = json_encode($bioDevices);
-                ?>
-                
-                <?php if (!empty($bioDevices)): ?>
-                <div class="mb-3">
-                    <label class="form-label">Select Device:</label>
-                    <select id="biometricDeviceSelect" class="form-select" onchange="updateBiometricButtons()">
-                        <?php foreach ($bioDevices as $dev): ?>
-                        <option value="<?= $dev['id'] ?>" data-type="<?= $dev['device_type'] ?>"><?= htmlspecialchars($dev['name']) ?> (<?= ucfirst($dev['device_type']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div id="hikvisionButtons" class="d-flex gap-2 flex-wrap mb-2">
-                    <button type="button" class="btn btn-primary" onclick="syncEmployeeToBiometric(<?= $employeeData['id'] ?>)">
-                        <i class="bi bi-upload"></i> Register User
-                    </button>
-                </div>
-                <div id="hikvisionExtraButtons" class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="viewDeviceUsers()">
-                        <i class="bi bi-people"></i> View Device Users
-                    </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeFromBiometric(<?= $employeeData['id'] ?>)">
-                        <i class="bi bi-trash"></i> Remove
-                    </button>
-                </div>
-                <?php else: ?>
-                <p class="text-muted mb-0">No biometric devices configured. Add devices in Settings.</p>
-                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -579,194 +671,6 @@ $allRoles = $roleManager->getAllRoles();
         </div>
     </div>
 </div>
-
-<script>
-var bioDevicesData = <?= $bioDevicesJson ?? '[]' ?>;
-
-function updateBiometricButtons() {
-    var select = document.getElementById('biometricDeviceSelect');
-    if (!select) return;
-    var selectedOption = select.options[select.selectedIndex];
-    var deviceType = selectedOption ? selectedOption.getAttribute('data-type') : '';
-    
-    var hikvisionButtons = document.getElementById('hikvisionButtons');
-    var hikvisionExtraButtons = document.getElementById('hikvisionExtraButtons');
-    
-    if (deviceType === 'zkteco') {
-        if (hikvisionButtons) hikvisionButtons.style.display = 'none';
-        if (hikvisionExtraButtons) hikvisionExtraButtons.style.display = 'none';
-    } else {
-        if (hikvisionButtons) hikvisionButtons.style.display = 'flex';
-        if (hikvisionExtraButtons) hikvisionExtraButtons.style.display = 'flex';
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    updateBiometricButtons();
-});
-
-function syncEmployeeToBiometric(employeeId) {
-    var deviceId = document.getElementById('biometricDeviceSelect').value;
-    var statusDiv = document.getElementById('biometricSyncStatus');
-    
-    statusDiv.className = 'alert alert-info mb-3';
-    statusDiv.textContent = 'Registering employee to biometric device...';
-    statusDiv.classList.remove('d-none');
-    
-    fetch('/biometric-api.php?action=sync-employees-to-device', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            device_id: parseInt(deviceId),
-            employee_ids: [employeeId]
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success && data.success_count > 0) {
-            statusDiv.className = 'alert alert-success mb-3';
-            statusDiv.textContent = 'Employee registered to biometric device successfully!';
-        } else if (data.results && data.results[0]) {
-            statusDiv.className = 'alert alert-warning mb-3';
-            statusDiv.textContent = data.results[0].message || 'Registration completed with notes';
-        } else {
-            statusDiv.className = 'alert alert-danger mb-3';
-            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
-        }
-    })
-    .catch(e => {
-        statusDiv.className = 'alert alert-danger mb-3';
-        statusDiv.textContent = 'Error: ' + e.message;
-    });
-}
-
-function removeFromBiometric(employeeId) {
-    if (!confirm('Remove this employee from the biometric device?')) return;
-    
-    var deviceId = document.getElementById('biometricDeviceSelect').value;
-    var statusDiv = document.getElementById('biometricSyncStatus');
-    var bioId = '<?= $employeeData['biometric_id'] ?? $employeeData['id'] ?>';
-    
-    statusDiv.className = 'alert alert-info mb-3';
-    statusDiv.textContent = 'Removing employee from device...';
-    statusDiv.classList.remove('d-none');
-    
-    fetch('/biometric-api.php?action=delete-device-user', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            device_id: parseInt(deviceId),
-            employee_no: bioId
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            statusDiv.className = 'alert alert-success mb-3';
-            statusDiv.textContent = 'Employee removed from biometric device.';
-        } else {
-            statusDiv.className = 'alert alert-danger mb-3';
-            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
-        }
-    })
-    .catch(e => {
-        statusDiv.className = 'alert alert-danger mb-3';
-        statusDiv.textContent = 'Error: ' + e.message;
-    });
-}
-
-function viewDeviceUsers() {
-    var deviceId = document.getElementById('biometricDeviceSelect').value;
-    var statusDiv = document.getElementById('biometricSyncStatus');
-    
-    statusDiv.className = 'alert alert-info mb-3';
-    statusDiv.textContent = 'Fetching users from device...';
-    statusDiv.classList.remove('d-none');
-    
-    fetch('/biometric-api.php?action=fetch-device-users&device_id=' + deviceId)
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            statusDiv.classList.add('d-none');
-            showDeviceUsersModal(data);
-        } else {
-            statusDiv.className = 'alert alert-danger mb-3';
-            statusDiv.textContent = 'Failed: ' + (data.error || 'Unknown error');
-        }
-    })
-    .catch(e => {
-        statusDiv.className = 'alert alert-danger mb-3';
-        statusDiv.textContent = 'Error: ' + e.message;
-    });
-}
-
-function showDeviceUsersModal(data) {
-    var existingModal = document.getElementById('deviceUsersModal');
-    if (existingModal) existingModal.remove();
-    
-    var modalHtml = '<div class="modal fade" id="deviceUsersModal" tabindex="-1">' +
-        '<div class="modal-dialog modal-lg">' +
-        '<div class="modal-content">' +
-        '<div class="modal-header">' +
-        '<h5 class="modal-title"><i class="bi bi-people"></i> Device Users - ' + data.device_name + '</h5>' +
-        '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>' +
-        '</div>' +
-        '<div class="modal-body">' +
-        '<p class="text-muted">Total users on device: <strong>' + data.user_count + '</strong></p>' +
-        '<div class="table-responsive"><table class="table table-sm table-striped">' +
-        '<thead><tr><th>Device User ID</th><th>Name</th><th>Linked Employee</th><th>Actions</th></tr></thead>' +
-        '<tbody>';
-    
-    if (data.users && data.users.length > 0) {
-        data.users.forEach(function(user) {
-            var linkedText = user.linked_employee ? 
-                '<span class="text-success"><i class="bi bi-check-circle"></i> ' + user.linked_employee.name + ' (ID: ' + user.linked_employee.id + ')</span>' : 
-                '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Not linked</span>';
-            modalHtml += '<tr>' +
-                '<td><strong>' + user.device_user_id + '</strong></td>' +
-                '<td>' + (user.name || '-') + '</td>' +
-                '<td>' + linkedText + '</td>' +
-                '<td><button class="btn btn-sm btn-outline-primary" onclick="linkDeviceUser(\'' + user.device_user_id + '\')"><i class="bi bi-link"></i> Link</button></td>' +
-                '</tr>';
-        });
-    } else {
-        modalHtml += '<tr><td colspan="4" class="text-center text-muted">No users found on device</td></tr>';
-    }
-    
-    modalHtml += '</tbody></table></div></div>' +
-        '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>' +
-        '</div></div></div>';
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    var modal = new bootstrap.Modal(document.getElementById('deviceUsersModal'));
-    modal.show();
-}
-
-function linkDeviceUser(deviceUserId) {
-    var empId = prompt('Enter Employee ID to link with device user ' + deviceUserId + ':');
-    if (!empId) return;
-    
-    var db = window.Database || null;
-    fetch('/biometric-api.php?action=link-device-user', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            device_user_id: deviceUserId,
-            employee_id: parseInt(empId)
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('Device user ' + deviceUserId + ' linked to employee ID ' + empId);
-            bootstrap.Modal.getInstance(document.getElementById('deviceUsersModal')).hide();
-        } else {
-            alert('Failed: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(e => alert('Error: ' + e.message));
-}
-</script>
 
 <!-- Job Card Modal -->
 <div class="modal fade" id="jobCardModal" tabindex="-1">
