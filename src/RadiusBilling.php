@@ -896,8 +896,12 @@ class RadiusBilling {
             return ['success' => false, 'reply' => 'Access-Reject', 'reason' => 'Invalid password'];
         }
         
-        // Check MAC binding if enabled and MAC is set on subscription
-        if (!empty($sub['mac_address']) && !empty($callingStationId)) {
+        // Check MAC binding - only enforce for PPPoE if mac_binding is enabled
+        // Hotspot users can use any device (MAC is auto-updated on login)
+        $enforceMacBinding = $this->getSetting('enforce_mac_binding') === 'true';
+        $isHotspot = ($sub['access_type'] ?? '') === 'hotspot';
+        
+        if ($enforceMacBinding && !$isHotspot && !empty($sub['mac_address']) && !empty($callingStationId)) {
             $normalizedSubMac = strtoupper(str_replace(['-', '.'], ':', $sub['mac_address']));
             $normalizedCallingMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
             if ($normalizedSubMac !== $normalizedCallingMac) {
@@ -991,6 +995,15 @@ class RadiusBilling {
             if ($nasRecord && (empty($sub['nas_id']) || $sub['nas_id'] != $nasRecord['id'])) {
                 $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET nas_id = ? WHERE id = ?");
                 $updateStmt->execute([$nasRecord['id'], $sub['id']]);
+            }
+        }
+        
+        // Auto-save MAC address for hotspot users (no pre-registration needed)
+        if (!empty($callingStationId)) {
+            $normalizedMac = strtoupper(str_replace(['-', '.'], ':', $callingStationId));
+            if (empty($sub['mac_address']) || $sub['mac_address'] !== $normalizedMac) {
+                $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET mac_address = ? WHERE id = ?");
+                $updateStmt->execute([$normalizedMac, $sub['id']]);
             }
         }
         
