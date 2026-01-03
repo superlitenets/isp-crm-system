@@ -65,6 +65,7 @@ services:
       - OLT_SERVICE_URL=http://localhost:3002
     volumes:
       - ./logs:/var/www/html/logs
+      - ./public/uploads:/var/www/html/public/uploads
       - whatsapp_secret:/var/www/html/whatsapp-service/.api_secret_dir:ro
       - wireguard_config:/etc/wireguard
       - ./storage/wireguard:/var/www/html/storage/wireguard
