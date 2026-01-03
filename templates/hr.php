@@ -676,90 +676,199 @@ try {
 <div class="modal fade" id="jobCardModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-card-heading"></i> Employee Job Card</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-person-badge"></i> Employee ID Card</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div id="jobCardPrintArea" class="p-3">
-                    <div class="card border-2 border-primary" style="max-width: 400px; margin: 0 auto;">
-                        <div class="card-header bg-primary text-white text-center py-3">
-                            <h5 class="mb-0"><?= htmlspecialchars($settings->get('company_name', 'Company Name')) ?></h5>
+            <div class="modal-body bg-light">
+                <div id="jobCardPrintArea" class="p-4">
+                    <style>
+                        .id-card {
+                            width: 350px;
+                            margin: 0 auto;
+                            border-radius: 15px;
+                            overflow: hidden;
+                            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        }
+                        .id-card-header {
+                            background: linear-gradient(90deg, #e94560 0%, #ff6b6b 100%);
+                            padding: 15px 20px;
+                            text-align: center;
+                            position: relative;
+                        }
+                        .id-card-header::after {
+                            content: '';
+                            position: absolute;
+                            bottom: -10px;
+                            left: 0;
+                            right: 0;
+                            height: 20px;
+                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                            clip-path: ellipse(60% 100% at 50% 100%);
+                        }
+                        .id-card-header h4 {
+                            color: #fff;
+                            margin: 0;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 2px;
+                            font-size: 1rem;
+                        }
+                        .id-card-header small {
+                            color: rgba(255,255,255,0.9);
+                            font-size: 0.7rem;
+                            letter-spacing: 1px;
+                        }
+                        .id-card-body {
+                            padding: 25px 20px 15px;
+                            color: #fff;
+                        }
+                        .id-card-photo {
+                            width: 100px;
+                            height: 120px;
+                            border-radius: 10px;
+                            object-fit: cover;
+                            border: 3px solid #e94560;
+                            box-shadow: 0 5px 15px rgba(233,69,96,0.3);
+                        }
+                        .id-card-photo-placeholder {
+                            width: 100px;
+                            height: 120px;
+                            border-radius: 10px;
+                            background: linear-gradient(135deg, #2d2d44 0%, #1a1a2e 100%);
+                            border: 3px solid #e94560;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        .id-card-name {
+                            font-size: 1.2rem;
+                            font-weight: 700;
+                            color: #fff;
+                            margin-bottom: 3px;
+                        }
+                        .id-card-position {
+                            color: #e94560;
+                            font-weight: 600;
+                            font-size: 0.85rem;
+                            text-transform: uppercase;
+                            letter-spacing: 1px;
+                        }
+                        .id-card-emp-id {
+                            background: rgba(233,69,96,0.2);
+                            border: 1px solid #e94560;
+                            border-radius: 20px;
+                            padding: 3px 12px;
+                            font-size: 0.75rem;
+                            color: #ff6b6b;
+                            display: inline-block;
+                            margin-top: 8px;
+                        }
+                        .id-card-details {
+                            background: rgba(255,255,255,0.05);
+                            border-radius: 10px;
+                            padding: 12px 15px;
+                            margin-top: 15px;
+                        }
+                        .id-card-detail-row {
+                            display: flex;
+                            justify-content: space-between;
+                            padding: 6px 0;
+                            border-bottom: 1px solid rgba(255,255,255,0.1);
+                        }
+                        .id-card-detail-row:last-child {
+                            border-bottom: none;
+                        }
+                        .id-card-detail-label {
+                            color: rgba(255,255,255,0.6);
+                            font-size: 0.75rem;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        }
+                        .id-card-detail-value {
+                            color: #fff;
+                            font-weight: 600;
+                            font-size: 0.8rem;
+                            text-align: right;
+                        }
+                        .id-card-footer {
+                            background: linear-gradient(90deg, #e94560 0%, #ff6b6b 100%);
+                            padding: 10px 20px;
+                            display: flex;
+                            justify-content: space-between;
+                            font-size: 0.7rem;
+                            color: #fff;
+                        }
+                        .id-card-qr {
+                            position: absolute;
+                            right: 15px;
+                            bottom: 60px;
+                            width: 50px;
+                            height: 50px;
+                            background: #fff;
+                            border-radius: 5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                    </style>
+                    
+                    <div class="id-card">
+                        <div class="id-card-header">
+                            <h4><?= htmlspecialchars($settings->get('company_name', 'Company Name')) ?></h4>
                             <small>Employee Identification Card</small>
                         </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-4 text-center">
+                        <div class="id-card-body">
+                            <div class="d-flex gap-3">
+                                <div>
                                     <?php if (!empty($employeeData['passport_photo'])): ?>
-                                    <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Photo" class="img-thumbnail" style="width: 100px; height: 120px; object-fit: cover;">
+                                    <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Photo" class="id-card-photo">
                                     <?php else: ?>
-                                    <div class="bg-light border rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 120px;">
-                                        <i class="bi bi-person-fill text-muted" style="font-size: 3rem;"></i>
+                                    <div class="id-card-photo-placeholder">
+                                        <i class="bi bi-person-fill" style="font-size: 2.5rem; color: #e94560;"></i>
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <div class="col-8">
-                                    <table class="table table-sm table-borderless mb-0">
-                                        <tr>
-                                            <td class="text-muted small">Name</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['name']) ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-muted small">Employee ID</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['employee_id']) ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-muted small">Position</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['position']) ?></td>
-                                        </tr>
-                                    </table>
+                                <div class="flex-grow-1">
+                                    <div class="id-card-name"><?= htmlspecialchars($employeeData['name']) ?></div>
+                                    <div class="id-card-position"><?= htmlspecialchars($employeeData['position'] ?? 'Employee') ?></div>
+                                    <div class="id-card-emp-id">
+                                        <i class="bi bi-upc-scan me-1"></i><?= htmlspecialchars($employeeData['employee_id']) ?>
+                                    </div>
                                 </div>
                             </div>
-                            <hr>
-                            <div class="row small">
-                                <div class="col-6">
-                                    <span class="text-muted">ID/National ID:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></strong>
+                            
+                            <div class="id-card-details">
+                                <div class="id-card-detail-row">
+                                    <span class="id-card-detail-label"><i class="bi bi-building me-1"></i>Department</span>
+                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></span>
                                 </div>
-                                <div class="col-6">
-                                    <span class="text-muted">Department:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></strong>
+                                <div class="id-card-detail-row">
+                                    <span class="id-card-detail-label"><i class="bi bi-person-vcard me-1"></i>ID Number</span>
+                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></span>
                                 </div>
-                            </div>
-                            <hr>
-                            <div class="row small">
-                                <div class="col-6">
-                                    <span class="text-muted">Phone:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></strong>
+                                <div class="id-card-detail-row">
+                                    <span class="id-card-detail-label"><i class="bi bi-telephone me-1"></i>Phone</span>
+                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></span>
                                 </div>
-                                <div class="col-6">
-                                    <span class="text-muted">Email:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['email'] ?? 'N/A') ?></strong>
+                                <div class="id-card-detail-row">
+                                    <span class="id-card-detail-label"><i class="bi bi-envelope me-1"></i>Email</span>
+                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['email'] ?? 'N/A') ?></span>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer text-center small text-muted">
-                            <div class="row">
-                                <div class="col-6">
-                                    <span>Hire Date: <?= $employeeData['hire_date'] ? date('M Y', strtotime($employeeData['hire_date'])) : 'N/A' ?></span>
-                                </div>
-                                <div class="col-6">
-                                    <span>Valid Until: <?= date('M Y', strtotime('+1 year')) ?></span>
-                                </div>
-                            </div>
+                        <div class="id-card-footer">
+                            <span><i class="bi bi-calendar-check me-1"></i>Hired: <?= $employeeData['hire_date'] ? date('M Y', strtotime($employeeData['hire_date'])) : 'N/A' ?></span>
+                            <span><i class="bi bi-shield-check me-1"></i>Valid: <?= date('M Y', strtotime('+1 year')) ?></span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="printJobCard()">
+                <button type="button" class="btn btn-danger" onclick="printJobCard()">
                     <i class="bi bi-printer"></i> Print Job Card
                 </button>
             </div>
@@ -780,8 +889,8 @@ function printJobCard() {
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
             <style>
                 @media print {
-                    body { margin: 0; padding: 20px; }
-                    .card { border: 2px solid #0d6efd !important; }
+                    body { margin: 0; padding: 20px; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .id-card { box-shadow: none !important; }
                 }
             </style>
         </head>
