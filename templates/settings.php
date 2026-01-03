@@ -6509,7 +6509,7 @@ if (($_GET['action'] ?? '') === 'test_billing') {
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> One-ISP Integration</h5>
+                <h5 class="mb-0"><i class="bi bi-cloud-arrow-down"></i> External Billing</h5>
             </div>
             <div class="card-body">
                 <?php if ($testResult): ?>
