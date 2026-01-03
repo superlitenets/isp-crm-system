@@ -51,18 +51,22 @@ outputType = "console"
 name = "OLT Session Manager"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd olt-service && npm start"
-waitForPort = 3001
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd olt-service && OLT_SERVICE_PORT=3002 npm start"
+waitForPort = 3002
 
 [[ports]]
 localPort = 3001
 externalPort = 80
 exposeLocalhost = true
+
+[[ports]]
+localPort = 3002
+externalPort = 3002
 
 [[ports]]
 localPort = 5000

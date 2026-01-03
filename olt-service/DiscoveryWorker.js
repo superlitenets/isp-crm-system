@@ -394,7 +394,7 @@ class DiscoveryWorker {
     async getProvisioningGroup() {
         try {
             const result = await this.pool.query(`
-                SELECT setting_value FROM settings WHERE setting_key = 'wa_provisioning_group'
+                SELECT setting_value FROM company_settings WHERE setting_key = 'wa_provisioning_group'
             `);
             return result.rows[0]?.setting_value || null;
         } catch (error) {
