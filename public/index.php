@@ -2425,7 +2425,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 } else {
                     try {
-                        $employee->create($_POST);
+                        $data = $_POST;
+                        if (!empty($_FILES['passport_photo']['name']) && $_FILES['passport_photo']['error'] === UPLOAD_ERR_OK) {
+                            $uploadDir = __DIR__ . '/uploads/employees/';
+                            if (!is_dir($uploadDir)) {
+                                mkdir($uploadDir, 0755, true);
+                            }
+                            $ext = pathinfo($_FILES['passport_photo']['name'], PATHINFO_EXTENSION);
+                            $filename = 'passport_' . uniqid() . '.' . $ext;
+                            $targetPath = $uploadDir . $filename;
+                            if (move_uploaded_file($_FILES['passport_photo']['tmp_name'], $targetPath)) {
+                                $data['passport_photo'] = '/uploads/employees/' . $filename;
+                            }
+                        }
+                        $employee->create($data);
                         $message = 'Employee added successfully!';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();
@@ -2446,7 +2459,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $messageType = 'danger';
                 } else {
                     try {
-                        $employee->update((int)$_POST['id'], $_POST);
+                        $data = $_POST;
+                        if (!empty($_FILES['passport_photo']['name']) && $_FILES['passport_photo']['error'] === UPLOAD_ERR_OK) {
+                            $uploadDir = __DIR__ . '/uploads/employees/';
+                            if (!is_dir($uploadDir)) {
+                                mkdir($uploadDir, 0755, true);
+                            }
+                            $ext = pathinfo($_FILES['passport_photo']['name'], PATHINFO_EXTENSION);
+                            $filename = 'passport_' . uniqid() . '.' . $ext;
+                            $targetPath = $uploadDir . $filename;
+                            if (move_uploaded_file($_FILES['passport_photo']['tmp_name'], $targetPath)) {
+                                $data['passport_photo'] = '/uploads/employees/' . $filename;
+                            }
+                        }
+                        $employee->update((int)$_POST['id'], $data);
                         $message = 'Employee updated successfully!';
                         $messageType = 'success';
                         \App\Auth::regenerateToken();

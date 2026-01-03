@@ -55,7 +55,7 @@ $allRoles = $roleManager->getAllRoles();
 
 <div class="card">
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
             <input type="hidden" name="action" value="<?= $action === 'create_employee' ? 'create_employee' : 'update_employee' ?>">
             <?php if ($action === 'edit_employee'): ?>
@@ -198,9 +198,85 @@ $allRoles = $roleManager->getAllRoles();
                     </div>
                 </div>
                 <?php endif; ?>
+                
+                <div class="col-12 mt-3">
+                    <h6 class="text-primary border-bottom pb-2"><i class="bi bi-person-vcard"></i> Personal Details</h6>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">ID/National ID Number</label>
+                    <input type="text" class="form-control" name="id_number" value="<?= htmlspecialchars($employeeData['id_number'] ?? '') ?>" placeholder="e.g. 12345678">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Passport Number</label>
+                    <input type="text" class="form-control" name="passport_number" value="<?= htmlspecialchars($employeeData['passport_number'] ?? '') ?>" placeholder="e.g. AB1234567">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" class="form-control" name="date_of_birth" value="<?= htmlspecialchars($employeeData['date_of_birth'] ?? '') ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Gender</label>
+                    <select class="form-select" name="gender">
+                        <option value="">Select...</option>
+                        <option value="Male" <?= ($employeeData['gender'] ?? '') === 'Male' ? 'selected' : '' ?>>Male</option>
+                        <option value="Female" <?= ($employeeData['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
+                        <option value="Other" <?= ($employeeData['gender'] ?? '') === 'Other' ? 'selected' : '' ?>>Other</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nationality</label>
+                    <input type="text" class="form-control" name="nationality" value="<?= htmlspecialchars($employeeData['nationality'] ?? '') ?>" placeholder="e.g. Kenyan">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Marital Status</label>
+                    <select class="form-select" name="marital_status">
+                        <option value="">Select...</option>
+                        <option value="Single" <?= ($employeeData['marital_status'] ?? '') === 'Single' ? 'selected' : '' ?>>Single</option>
+                        <option value="Married" <?= ($employeeData['marital_status'] ?? '') === 'Married' ? 'selected' : '' ?>>Married</option>
+                        <option value="Divorced" <?= ($employeeData['marital_status'] ?? '') === 'Divorced' ? 'selected' : '' ?>>Divorced</option>
+                        <option value="Widowed" <?= ($employeeData['marital_status'] ?? '') === 'Widowed' ? 'selected' : '' ?>>Widowed</option>
+                    </select>
+                </div>
                 <div class="col-12">
                     <label class="form-label">Address</label>
                     <textarea class="form-control" name="address" rows="2"><?= htmlspecialchars($employeeData['address'] ?? '') ?></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Passport Photo</label>
+                    <?php if (!empty($employeeData['passport_photo'])): ?>
+                    <div class="mb-2">
+                        <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Passport Photo" class="img-thumbnail" style="max-width: 100px; max-height: 100px;">
+                    </div>
+                    <?php endif; ?>
+                    <input type="file" class="form-control" name="passport_photo" accept="image/*">
+                    <small class="text-muted">Upload a passport-size photo for job card</small>
+                </div>
+                
+                <div class="col-12 mt-3">
+                    <h6 class="text-primary border-bottom pb-2"><i class="bi bi-people"></i> Next of Kin</h6>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Next of Kin Name</label>
+                    <input type="text" class="form-control" name="next_of_kin_name" value="<?= htmlspecialchars($employeeData['next_of_kin_name'] ?? '') ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Next of Kin Phone</label>
+                    <input type="tel" class="form-control" name="next_of_kin_phone" value="<?= htmlspecialchars($employeeData['next_of_kin_phone'] ?? '') ?>">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Relationship</label>
+                    <select class="form-select" name="next_of_kin_relationship">
+                        <option value="">Select...</option>
+                        <option value="Spouse" <?= ($employeeData['next_of_kin_relationship'] ?? '') === 'Spouse' ? 'selected' : '' ?>>Spouse</option>
+                        <option value="Parent" <?= ($employeeData['next_of_kin_relationship'] ?? '') === 'Parent' ? 'selected' : '' ?>>Parent</option>
+                        <option value="Sibling" <?= ($employeeData['next_of_kin_relationship'] ?? '') === 'Sibling' ? 'selected' : '' ?>>Sibling</option>
+                        <option value="Child" <?= ($employeeData['next_of_kin_relationship'] ?? '') === 'Child' ? 'selected' : '' ?>>Child</option>
+                        <option value="Other" <?= ($employeeData['next_of_kin_relationship'] ?? '') === 'Other' ? 'selected' : '' ?>>Other</option>
+                    </select>
+                </div>
+                
+                <div class="col-12 mt-3">
+                    <h6 class="text-primary border-bottom pb-2"><i class="bi bi-telephone"></i> Emergency Contact</h6>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Emergency Contact Name</label>
@@ -233,6 +309,9 @@ $allRoles = $roleManager->getAllRoles();
         <a href="?page=hr&subpage=employees" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back
         </a>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#jobCardModal">
+            <i class="bi bi-card-heading"></i> Job Card
+        </button>
         <a href="?page=hr&action=edit_employee&id=<?= $employeeData['id'] ?>" class="btn btn-primary">
             <i class="bi bi-pencil"></i> Edit
         </a>
@@ -564,6 +643,128 @@ function linkDeviceUser(deviceUserId) {
         }
     })
     .catch(e => alert('Error: ' + e.message));
+}
+</script>
+
+<!-- Job Card Modal -->
+<div class="modal fade" id="jobCardModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-card-heading"></i> Employee Job Card</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="jobCardPrintArea" class="p-3">
+                    <div class="card border-2 border-primary" style="max-width: 400px; margin: 0 auto;">
+                        <div class="card-header bg-primary text-white text-center py-3">
+                            <h5 class="mb-0"><?= htmlspecialchars($settings->get('company_name', 'Company Name')) ?></h5>
+                            <small>Employee Identification Card</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-4 text-center">
+                                    <?php if (!empty($employeeData['passport_photo'])): ?>
+                                    <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Photo" class="img-thumbnail" style="width: 100px; height: 120px; object-fit: cover;">
+                                    <?php else: ?>
+                                    <div class="bg-light border rounded d-flex align-items-center justify-content-center" style="width: 100px; height: 120px;">
+                                        <i class="bi bi-person-fill text-muted" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-8">
+                                    <table class="table table-sm table-borderless mb-0">
+                                        <tr>
+                                            <td class="text-muted small">Name</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['name']) ?></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted small">Employee ID</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['employee_id']) ?></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted small">Position</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold"><?= htmlspecialchars($employeeData['position']) ?></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row small">
+                                <div class="col-6">
+                                    <span class="text-muted">ID/National ID:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></strong>
+                                </div>
+                                <div class="col-6">
+                                    <span class="text-muted">Passport No:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['passport_number'] ?? 'N/A') ?></strong>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row small">
+                                <div class="col-6">
+                                    <span class="text-muted">Department:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></strong>
+                                </div>
+                                <div class="col-6">
+                                    <span class="text-muted">Phone:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer text-center small text-muted">
+                            <div class="row">
+                                <div class="col-6">
+                                    <span>Hire Date: <?= $employeeData['hire_date'] ? date('M Y', strtotime($employeeData['hire_date'])) : 'N/A' ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span>Valid Until: <?= date('M Y', strtotime('+1 year')) ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printJobCard()">
+                    <i class="bi bi-printer"></i> Print Job Card
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function printJobCard() {
+    var printContent = document.getElementById('jobCardPrintArea').innerHTML;
+    var printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Job Card - <?= htmlspecialchars($employeeData['name']) ?></title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+            <style>
+                @media print {
+                    body { margin: 0; padding: 20px; }
+                    .card { border: 2px solid #0d6efd !important; }
+                }
+            </style>
+        </head>
+        <body onload="window.print(); window.close();">
+            ${printContent}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
 }
 </script>
 

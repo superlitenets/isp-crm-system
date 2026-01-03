@@ -192,8 +192,8 @@ class Employee {
         }
         
         $stmt = $this->db->prepare("
-            INSERT INTO employees (employee_id, user_id, name, email, phone, office_phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (employee_id, user_id, name, email, phone, office_phone, department_id, position, salary, hire_date, employment_status, emergency_contact, emergency_phone, address, notes, passport_photo, id_number, passport_number, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship, date_of_birth, gender, nationality, marital_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
@@ -211,7 +211,17 @@ class Employee {
             $data['emergency_contact'] ?? null,
             $data['emergency_phone'] ?? null,
             $data['address'] ?? null,
-            $data['notes'] ?? null
+            $data['notes'] ?? null,
+            $data['passport_photo'] ?? null,
+            $data['id_number'] ?? null,
+            $data['passport_number'] ?? null,
+            $data['next_of_kin_name'] ?? null,
+            $data['next_of_kin_phone'] ?? null,
+            $data['next_of_kin_relationship'] ?? null,
+            $data['date_of_birth'] ?: null,
+            $data['gender'] ?? null,
+            $data['nationality'] ?? null,
+            $data['marital_status'] ?? null
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -236,7 +246,7 @@ class Employee {
             $this->updateUserRole((int)$data['user_id'], (int)$data['new_user_role_id']);
         }
         
-        $allowedFields = ['name', 'email', 'phone', 'office_phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id'];
+        $allowedFields = ['name', 'email', 'phone', 'office_phone', 'department_id', 'position', 'salary', 'hire_date', 'employment_status', 'emergency_contact', 'emergency_phone', 'address', 'notes', 'user_id', 'passport_photo', 'id_number', 'passport_number', 'next_of_kin_name', 'next_of_kin_phone', 'next_of_kin_relationship', 'date_of_birth', 'gender', 'nationality', 'marital_status'];
         
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
