@@ -728,19 +728,19 @@ try {
                                     <strong><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></strong>
                                 </div>
                                 <div class="col-6">
-                                    <span class="text-muted">Passport No:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['passport_number'] ?? 'N/A') ?></strong>
+                                    <span class="text-muted">Department:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></strong>
                                 </div>
                             </div>
                             <hr>
                             <div class="row small">
                                 <div class="col-6">
-                                    <span class="text-muted">Department:</span><br>
-                                    <strong><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></strong>
-                                </div>
-                                <div class="col-6">
                                     <span class="text-muted">Phone:</span><br>
                                     <strong><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></strong>
+                                </div>
+                                <div class="col-6">
+                                    <span class="text-muted">Email:</span><br>
+                                    <strong><?= htmlspecialchars($employeeData['email'] ?? 'N/A') ?></strong>
                                 </div>
                             </div>
                         </div>
