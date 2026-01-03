@@ -676,199 +676,227 @@ try {
 <div class="modal fade" id="jobCardModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="bi bi-person-badge"></i> Employee ID Card</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body bg-light">
-                <div id="jobCardPrintArea" class="p-4">
+            <div class="modal-body" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem;">
+                <div id="jobCardPrintArea">
                     <style>
-                        .id-card {
-                            width: 350px;
+                        .id-card-bright {
+                            width: 380px;
                             margin: 0 auto;
-                            border-radius: 15px;
+                            border-radius: 20px;
                             overflow: hidden;
-                            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                            background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
                             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        }
-                        .id-card-header {
-                            background: linear-gradient(90deg, #e94560 0%, #ff6b6b 100%);
-                            padding: 15px 20px;
-                            text-align: center;
                             position: relative;
                         }
-                        .id-card-header::after {
+                        .id-card-bright::before {
                             content: '';
                             position: absolute;
-                            bottom: -10px;
+                            top: 0;
                             left: 0;
                             right: 0;
-                            height: 20px;
-                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-                            clip-path: ellipse(60% 100% at 50% 100%);
+                            height: 8px;
+                            background: linear-gradient(90deg, #00b4db 0%, #0083b0 50%, #00b4db 100%);
                         }
-                        .id-card-header h4 {
+                        .id-card-bright-header {
+                            background: linear-gradient(135deg, #0083b0 0%, #00b4db 100%);
+                            padding: 20px;
+                            text-align: center;
+                            position: relative;
+                            clip-path: polygon(0 0, 100% 0, 100% 85%, 50% 100%, 0 85%);
+                            padding-bottom: 35px;
+                        }
+                        .id-card-bright-header h4 {
                             color: #fff;
                             margin: 0;
-                            font-weight: 700;
+                            font-weight: 800;
                             text-transform: uppercase;
+                            letter-spacing: 3px;
+                            font-size: 1.1rem;
+                            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        }
+                        .id-card-bright-header small {
+                            color: rgba(255,255,255,0.95);
+                            font-size: 0.75rem;
                             letter-spacing: 2px;
-                            font-size: 1rem;
+                            text-transform: uppercase;
                         }
-                        .id-card-header small {
-                            color: rgba(255,255,255,0.9);
-                            font-size: 0.7rem;
-                            letter-spacing: 1px;
+                        .id-card-bright-body {
+                            padding: 15px 25px 20px;
+                            color: #333;
                         }
-                        .id-card-body {
-                            padding: 25px 20px 15px;
-                            color: #fff;
-                        }
-                        .id-card-photo {
-                            width: 100px;
-                            height: 120px;
-                            border-radius: 10px;
+                        .id-card-bright-photo {
+                            width: 110px;
+                            height: 130px;
+                            border-radius: 12px;
                             object-fit: cover;
-                            border: 3px solid #e94560;
-                            box-shadow: 0 5px 15px rgba(233,69,96,0.3);
+                            border: 4px solid #00b4db;
+                            box-shadow: 0 8px 25px rgba(0,180,219,0.3);
                         }
-                        .id-card-photo-placeholder {
-                            width: 100px;
-                            height: 120px;
-                            border-radius: 10px;
-                            background: linear-gradient(135deg, #2d2d44 0%, #1a1a2e 100%);
-                            border: 3px solid #e94560;
+                        .id-card-bright-photo-placeholder {
+                            width: 110px;
+                            height: 130px;
+                            border-radius: 12px;
+                            background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
+                            border: 4px solid #00b4db;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                         }
-                        .id-card-name {
-                            font-size: 1.2rem;
-                            font-weight: 700;
-                            color: #fff;
-                            margin-bottom: 3px;
+                        .id-card-bright-name {
+                            font-size: 1.3rem;
+                            font-weight: 800;
+                            color: #1a1a2e;
+                            margin-bottom: 4px;
                         }
-                        .id-card-position {
-                            color: #e94560;
-                            font-weight: 600;
-                            font-size: 0.85rem;
+                        .id-card-bright-position {
+                            color: #0083b0;
+                            font-weight: 700;
+                            font-size: 0.9rem;
                             text-transform: uppercase;
                             letter-spacing: 1px;
                         }
-                        .id-card-emp-id {
-                            background: rgba(233,69,96,0.2);
-                            border: 1px solid #e94560;
-                            border-radius: 20px;
-                            padding: 3px 12px;
-                            font-size: 0.75rem;
-                            color: #ff6b6b;
+                        .id-card-bright-emp-id {
+                            background: linear-gradient(90deg, #00b4db 0%, #0083b0 100%);
+                            border-radius: 25px;
+                            padding: 5px 15px;
+                            font-size: 0.8rem;
+                            color: #fff;
                             display: inline-block;
-                            margin-top: 8px;
+                            margin-top: 10px;
+                            font-weight: 600;
+                            box-shadow: 0 3px 10px rgba(0,180,219,0.3);
                         }
-                        .id-card-details {
-                            background: rgba(255,255,255,0.05);
-                            border-radius: 10px;
-                            padding: 12px 15px;
+                        .id-card-bright-details {
+                            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                            border-radius: 12px;
+                            padding: 15px;
                             margin-top: 15px;
+                            border: 1px solid #dee2e6;
                         }
-                        .id-card-detail-row {
+                        .id-card-bright-detail-row {
                             display: flex;
                             justify-content: space-between;
-                            padding: 6px 0;
-                            border-bottom: 1px solid rgba(255,255,255,0.1);
+                            align-items: center;
+                            padding: 8px 0;
+                            border-bottom: 1px dashed #dee2e6;
                         }
-                        .id-card-detail-row:last-child {
+                        .id-card-bright-detail-row:last-child {
                             border-bottom: none;
                         }
-                        .id-card-detail-label {
-                            color: rgba(255,255,255,0.6);
+                        .id-card-bright-detail-label {
+                            color: #6c757d;
                             font-size: 0.75rem;
                             text-transform: uppercase;
                             letter-spacing: 0.5px;
-                        }
-                        .id-card-detail-value {
-                            color: #fff;
                             font-weight: 600;
-                            font-size: 0.8rem;
+                        }
+                        .id-card-bright-detail-label i {
+                            color: #00b4db;
+                            margin-right: 5px;
+                        }
+                        .id-card-bright-detail-value {
+                            color: #1a1a2e;
+                            font-weight: 700;
+                            font-size: 0.85rem;
                             text-align: right;
                         }
-                        .id-card-footer {
-                            background: linear-gradient(90deg, #e94560 0%, #ff6b6b 100%);
-                            padding: 10px 20px;
+                        .id-card-bright-barcode {
+                            background: #fff;
+                            padding: 10px 15px;
+                            text-align: center;
+                            border-top: 2px dashed #dee2e6;
+                        }
+                        .id-card-bright-barcode svg {
+                            max-width: 100%;
+                            height: 50px;
+                        }
+                        .id-card-bright-footer {
+                            background: linear-gradient(135deg, #0083b0 0%, #00b4db 100%);
+                            padding: 12px 20px;
                             display: flex;
                             justify-content: space-between;
-                            font-size: 0.7rem;
+                            font-size: 0.75rem;
                             color: #fff;
+                            font-weight: 600;
                         }
-                        .id-card-qr {
+                        .id-card-bright-footer i {
+                            margin-right: 4px;
+                        }
+                        .id-card-bright-validity {
                             position: absolute;
-                            right: 15px;
-                            bottom: 60px;
-                            width: 50px;
-                            height: 50px;
-                            background: #fff;
-                            border-radius: 5px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
+                            top: 12px;
+                            right: 12px;
+                            background: rgba(255,255,255,0.2);
+                            padding: 3px 10px;
+                            border-radius: 15px;
+                            font-size: 0.65rem;
+                            color: #fff;
+                            backdrop-filter: blur(5px);
                         }
                     </style>
                     
-                    <div class="id-card">
-                        <div class="id-card-header">
+                    <div class="id-card-bright">
+                        <div class="id-card-bright-header">
+                            <div class="id-card-bright-validity">
+                                <i class="bi bi-shield-check"></i> VALID
+                            </div>
                             <h4><?= htmlspecialchars($settings->get('company_name', 'Company Name')) ?></h4>
                             <small>Employee Identification Card</small>
                         </div>
-                        <div class="id-card-body">
-                            <div class="d-flex gap-3">
+                        <div class="id-card-bright-body">
+                            <div class="d-flex gap-3 align-items-start">
                                 <div>
                                     <?php if (!empty($employeeData['passport_photo'])): ?>
-                                    <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Photo" class="id-card-photo">
+                                    <img src="<?= htmlspecialchars($employeeData['passport_photo']) ?>" alt="Photo" class="id-card-bright-photo">
                                     <?php else: ?>
-                                    <div class="id-card-photo-placeholder">
-                                        <i class="bi bi-person-fill" style="font-size: 2.5rem; color: #e94560;"></i>
+                                    <div class="id-card-bright-photo-placeholder">
+                                        <i class="bi bi-person-fill" style="font-size: 3rem; color: #00b4db;"></i>
                                     </div>
                                     <?php endif; ?>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="id-card-name"><?= htmlspecialchars($employeeData['name']) ?></div>
-                                    <div class="id-card-position"><?= htmlspecialchars($employeeData['position'] ?? 'Employee') ?></div>
-                                    <div class="id-card-emp-id">
-                                        <i class="bi bi-upc-scan me-1"></i><?= htmlspecialchars($employeeData['employee_id']) ?>
+                                    <div class="id-card-bright-name"><?= htmlspecialchars($employeeData['name']) ?></div>
+                                    <div class="id-card-bright-position"><?= htmlspecialchars($employeeData['position'] ?? 'Employee') ?></div>
+                                    <div class="id-card-bright-emp-id">
+                                        <i class="bi bi-person-badge me-1"></i><?= htmlspecialchars($employeeData['employee_id']) ?>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="id-card-details">
-                                <div class="id-card-detail-row">
-                                    <span class="id-card-detail-label"><i class="bi bi-building me-1"></i>Department</span>
-                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></span>
+                            <div class="id-card-bright-details">
+                                <div class="id-card-bright-detail-row">
+                                    <span class="id-card-bright-detail-label"><i class="bi bi-building"></i>Department</span>
+                                    <span class="id-card-bright-detail-value"><?= htmlspecialchars($employeeData['department_name'] ?? 'N/A') ?></span>
                                 </div>
-                                <div class="id-card-detail-row">
-                                    <span class="id-card-detail-label"><i class="bi bi-person-vcard me-1"></i>ID Number</span>
-                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></span>
+                                <div class="id-card-bright-detail-row">
+                                    <span class="id-card-bright-detail-label"><i class="bi bi-person-vcard"></i>ID Number</span>
+                                    <span class="id-card-bright-detail-value"><?= htmlspecialchars($employeeData['id_number'] ?? 'N/A') ?></span>
                                 </div>
-                                <div class="id-card-detail-row">
-                                    <span class="id-card-detail-label"><i class="bi bi-telephone me-1"></i>Phone</span>
-                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></span>
-                                </div>
-                                <div class="id-card-detail-row">
-                                    <span class="id-card-detail-label"><i class="bi bi-envelope me-1"></i>Email</span>
-                                    <span class="id-card-detail-value"><?= htmlspecialchars($employeeData['email'] ?? 'N/A') ?></span>
+                                <div class="id-card-bright-detail-row">
+                                    <span class="id-card-bright-detail-label"><i class="bi bi-telephone"></i>Phone</span>
+                                    <span class="id-card-bright-detail-value"><?= htmlspecialchars($employeeData['office_phone'] ?? $employeeData['phone'] ?? 'N/A') ?></span>
                                 </div>
                             </div>
                         </div>
-                        <div class="id-card-footer">
-                            <span><i class="bi bi-calendar-check me-1"></i>Hired: <?= $employeeData['hire_date'] ? date('M Y', strtotime($employeeData['hire_date'])) : 'N/A' ?></span>
-                            <span><i class="bi bi-shield-check me-1"></i>Valid: <?= date('M Y', strtotime('+1 year')) ?></span>
+                        <div class="id-card-bright-barcode">
+                            <svg id="employeeBarcode"></svg>
+                            <div style="font-size: 0.7rem; color: #6c757d; margin-top: 5px;">Scan to verify</div>
+                        </div>
+                        <div class="id-card-bright-footer">
+                            <span><i class="bi bi-calendar-event"></i>Joined: <?= $employeeData['hire_date'] ? date('M Y', strtotime($employeeData['hire_date'])) : 'N/A' ?></span>
+                            <span><i class="bi bi-calendar-check"></i>Valid: <?= date('M Y', strtotime('+1 year')) ?></span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-danger" onclick="printJobCard()">
+                <button type="button" class="btn btn-primary" onclick="printJobCard()">
                     <i class="bi bi-printer"></i> Print Job Card
                 </button>
             </div>
@@ -876,8 +904,26 @@ try {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>
+document.getElementById('jobCardModal').addEventListener('shown.bs.modal', function() {
+    var empId = '<?= htmlspecialchars($employeeData['employee_id'] ?? 'EMP000') ?>';
+    if (document.getElementById('employeeBarcode')) {
+        JsBarcode("#employeeBarcode", empId, {
+            format: "CODE128",
+            width: 2,
+            height: 40,
+            displayValue: true,
+            fontSize: 12,
+            margin: 5,
+            background: "#ffffff",
+            lineColor: "#1a1a2e"
+        });
+    }
+});
+
 function printJobCard() {
+    var empId = '<?= htmlspecialchars($employeeData['employee_id'] ?? 'EMP000') ?>';
     var printContent = document.getElementById('jobCardPrintArea').innerHTML;
     var printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -887,15 +933,30 @@ function printJobCard() {
             <title>Job Card - <?= htmlspecialchars($employeeData['name']) ?></title>
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
             <style>
+                body { margin: 0; padding: 20px; background: #fff !important; }
                 @media print {
-                    body { margin: 0; padding: 20px; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .id-card { box-shadow: none !important; }
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .id-card-bright { box-shadow: none !important; }
                 }
             </style>
         </head>
-        <body onload="window.print(); window.close();">
+        <body>
             ${printContent}
+            <script>
+                JsBarcode("#employeeBarcode", "${empId}", {
+                    format: "CODE128",
+                    width: 2,
+                    height: 40,
+                    displayValue: true,
+                    fontSize: 12,
+                    margin: 5,
+                    background: "#ffffff",
+                    lineColor: "#1a1a2e"
+                });
+                setTimeout(function() { window.print(); window.close(); }, 300);
+            <\/script>
         </body>
         </html>
     `);
