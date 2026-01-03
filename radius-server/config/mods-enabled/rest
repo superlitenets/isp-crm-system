@@ -2,7 +2,7 @@ rest {
     tls {
     }
 
-    connect_uri = "http://isp_crm_php:80"
+    connect_uri = "http://isp_crm_nginx:80"
     connect_timeout = 4.0
 
     accounting {
