@@ -107,7 +107,7 @@ class CustomerTicketLink {
             UNION ALL
             SELECT 'activity' as type, al.details as content, al.created_at, NULL as author
             FROM activity_logs al
-            WHERE al.entity_type = 'ticket' AND al.entity_id = ?::text
+            WHERE al.entity_type = 'ticket' AND al.entity_id = ?::integer
             AND al.action_type IN ('status_change', 'resolved', 'closed')
             ORDER BY created_at DESC
             LIMIT 20
