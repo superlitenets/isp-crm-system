@@ -832,6 +832,79 @@ if (($_GET['action'] ?? '') === 'send_test' && isset($_GET['phone'])) {
                         </div>
                     </div>
                 </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#dailySummaryTemplates">
+                            <i class="bi bi-calendar-day me-2"></i> Daily Summary Templates (Detailed)
+                        </button>
+                    </h2>
+                    <div id="dailySummaryTemplates" class="accordion-collapse collapse" data-bs-parent="#smsTemplatesAccordion">
+                        <div class="accordion-body">
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Note:</strong> These templates control the format of daily summary reports. Each section can be customized independently.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Report Header</label>
+                                    <textarea class="form-control" name="wa_template_daily_header" rows="5"><?= htmlspecialchars($settings->get('wa_template_daily_header', "*📋 {report_title}*\n\n📅 Date: {report_date}\n🕐 Time: {report_time}\n🏢 Branch: {branch_name}\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {report_title}, {report_date}, {report_time}, {branch_name}, {company_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Statistics Summary</label>
+                                    <textarea class="form-control" name="wa_template_daily_stats" rows="5"><?= htmlspecialchars($settings->get('wa_template_daily_stats', "*📊 TICKET SUMMARY*\n🔢 Total Incomplete: {total_incomplete}\n🆕 Open: {open_count}\n🔄 In Progress: {in_progress_count}\n⏳ Pending: {pending_count}\n✅ Resolved Today: {resolved_today}\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {total_incomplete}, {open_count}, {in_progress_count}, {pending_count}, {resolved_today}, {new_today}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Critical Tickets Section Header</label>
+                                    <textarea class="form-control" name="wa_template_daily_critical_header" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_critical_header', "\n*🔴 CRITICAL ({count})*\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {count}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">High Priority Section Header</label>
+                                    <textarea class="form-control" name="wa_template_daily_high_header" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_high_header', "\n*🟠 HIGH PRIORITY ({count})*\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {count}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Medium/Low Section Header</label>
+                                    <textarea class="form-control" name="wa_template_daily_other_header" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_other_header', "\n*🟡 OTHER TICKETS ({count})*\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {count}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Ticket Line Format (Detailed)</label>
+                                    <textarea class="form-control" name="wa_template_daily_ticket_line" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_ticket_line', "• #{ticket_number}: {subject}\n  👤 {assigned_name} | ⏱️ {age}d | 📍 {category}\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {ticket_number}, {subject}, {assigned_name}, {age}, {category}, {status}, {customer_name}, {customer_phone}, {priority}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Ticket Line Format (Simple)</label>
+                                    <textarea class="form-control" name="wa_template_daily_ticket_simple" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_ticket_simple', "• #{ticket_number}: {subject} ({priority})\n")) ?></textarea>
+                                    <small class="text-muted">Used when showing many tickets. Placeholders: {ticket_number}, {subject}, {priority}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Technician Workload Section</label>
+                                    <textarea class="form-control" name="wa_template_daily_technician_section" rows="3"><?= htmlspecialchars($settings->get('wa_template_daily_technician_section', "\n*👥 TECHNICIAN WORKLOAD*\n{technician_list}")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {technician_list}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Technician Line Format</label>
+                                    <textarea class="form-control" name="wa_template_daily_tech_line" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_tech_line', "• {name}: {open} open, {in_progress} in progress\n")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {name}, {open}, {in_progress}, {resolved_today}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Report Footer</label>
+                                    <textarea class="form-control" name="wa_template_daily_footer" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_footer', "\n_ISP CRM - {company_name}_")) ?></textarea>
+                                    <small class="text-muted">Placeholders: {company_name}</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">"More" Indicator</label>
+                                    <textarea class="form-control" name="wa_template_daily_more" rows="2"><?= htmlspecialchars($settings->get('wa_template_daily_more', "  _...and {count} more_\n")) ?></textarea>
+                                    <small class="text-muted">Shown when there are more tickets than displayed. Placeholders: {count}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="mt-4">

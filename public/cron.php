@@ -123,56 +123,116 @@ function sendDailySummaryToGroups(\PDO $db, \App\Settings $settings): void {
     ");
     $incompleteTickets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
     
-    $message = "*📋 INCOMPLETE TICKETS REPORT*\n";
-    $message .= "Date: " . date('l, M j, Y') . "\n";
-    $message .= "Time: " . date('h:i A') . "\n\n";
+    $resolvedStmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE status = 'resolved' AND DATE(resolved_at) = ?");
+    $resolvedStmt->execute([$today]);
+    $resolvedToday = $resolvedStmt->fetchColumn();
+    
+    $newStmt = $db->prepare("SELECT COUNT(*) FROM tickets WHERE DATE(created_at) = ?");
+    $newStmt->execute([$today]);
+    $newToday = $newStmt->fetchColumn();
     
     $openTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'open');
     $inProgressTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'in_progress');
     $pendingTickets = array_filter($incompleteTickets, fn($t) => $t['status'] === 'pending');
-    
-    $message .= "*📊 SUMMARY*\n";
-    $message .= "Total Incomplete: " . count($incompleteTickets) . "\n";
-    $message .= "Open: " . count($openTickets) . " | In Progress: " . count($inProgressTickets) . " | Pending: " . count($pendingTickets) . "\n\n";
-    
     $criticalTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'critical');
+    $highTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'high');
+    $otherTickets = array_filter($incompleteTickets, fn($t) => !in_array($t['priority'], ['critical', 'high']));
+    
+    $companyName = $settings->get('company_name', 'Your ISP');
+    
+    $headerTpl = $settings->get('wa_template_daily_header', "*📋 {report_title}*\n\n📅 Date: {report_date}\n🕐 Time: {report_time}\n🏢 Branch: {branch_name}\n");
+    $statsTpl = $settings->get('wa_template_daily_stats', "*📊 TICKET SUMMARY*\n🔢 Total Incomplete: {total_incomplete}\n🆕 Open: {open_count}\n🔄 In Progress: {in_progress_count}\n⏳ Pending: {pending_count}\n✅ Resolved Today: {resolved_today}\n");
+    $criticalHeaderTpl = $settings->get('wa_template_daily_critical_header', "\n*🔴 CRITICAL ({count})*\n");
+    $highHeaderTpl = $settings->get('wa_template_daily_high_header', "\n*🟠 HIGH PRIORITY ({count})*\n");
+    $otherHeaderTpl = $settings->get('wa_template_daily_other_header', "\n*🟡 OTHER TICKETS ({count})*\n");
+    $ticketLineTpl = $settings->get('wa_template_daily_ticket_line', "• #{ticket_number}: {subject}\n  👤 {assigned_name} | ⏱️ {age}d | 📍 {category}\n");
+    $ticketSimpleTpl = $settings->get('wa_template_daily_ticket_simple', "• #{ticket_number}: {subject} ({priority})\n");
+    $techSectionTpl = $settings->get('wa_template_daily_technician_section', "\n*👥 TECHNICIAN WORKLOAD*\n{technician_list}");
+    $techLineTpl = $settings->get('wa_template_daily_tech_line', "• {name}: {open} open, {in_progress} in progress\n");
+    $footerTpl = $settings->get('wa_template_daily_footer', "\n_ISP CRM - {company_name}_");
+    $moreTpl = $settings->get('wa_template_daily_more', "  _...and {count} more_\n");
+    
+    $message = str_replace(
+        ['{report_title}', '{report_date}', '{report_time}', '{branch_name}', '{company_name}'],
+        ['INCOMPLETE TICKETS REPORT', date('l, M j, Y'), date('h:i A'), 'All Branches', $companyName],
+        $headerTpl
+    );
+    
+    $message .= str_replace(
+        ['{total_incomplete}', '{open_count}', '{in_progress_count}', '{pending_count}', '{resolved_today}', '{new_today}'],
+        [count($incompleteTickets), count($openTickets), count($inProgressTickets), count($pendingTickets), $resolvedToday, $newToday],
+        $statsTpl
+    );
+    
     if (count($criticalTickets) > 0) {
-        $message .= "*🔴 CRITICAL (" . count($criticalTickets) . ")*\n";
+        $message .= str_replace('{count}', count($criticalTickets), $criticalHeaderTpl);
         foreach ($criticalTickets as $t) {
             $age = floor((time() - strtotime($t['created_at'])) / 86400);
-            $message .= "• #{$t['ticket_number']}: {$t['subject']}\n";
-            $message .= "  👤 " . ($t['assigned_name'] ?? 'Unassigned') . " | ⏱️ {$age}d old\n";
+            $message .= str_replace(
+                ['{ticket_number}', '{subject}', '{assigned_name}', '{age}', '{category}', '{status}', '{customer_name}', '{customer_phone}', '{priority}'],
+                [$t['ticket_number'], $t['subject'], $t['assigned_name'] ?? 'Unassigned', $age, $t['category'] ?? '-', $t['status'], $t['customer_name'] ?? '-', $t['customer_phone'] ?? '-', $t['priority']],
+                $ticketLineTpl
+            );
         }
-        $message .= "\n";
     }
     
-    $highTickets = array_filter($incompleteTickets, fn($t) => $t['priority'] === 'high');
     if (count($highTickets) > 0) {
-        $message .= "*🟠 HIGH PRIORITY (" . count($highTickets) . ")*\n";
+        $message .= str_replace('{count}', count($highTickets), $highHeaderTpl);
         foreach (array_slice($highTickets, 0, 10) as $t) {
             $age = floor((time() - strtotime($t['created_at'])) / 86400);
-            $message .= "• #{$t['ticket_number']}: {$t['subject']}\n";
-            $message .= "  👤 " . ($t['assigned_name'] ?? 'Unassigned') . " | ⏱️ {$age}d old\n";
+            $message .= str_replace(
+                ['{ticket_number}', '{subject}', '{assigned_name}', '{age}', '{category}', '{status}', '{customer_name}', '{customer_phone}', '{priority}'],
+                [$t['ticket_number'], $t['subject'], $t['assigned_name'] ?? 'Unassigned', $age, $t['category'] ?? '-', $t['status'], $t['customer_name'] ?? '-', $t['customer_phone'] ?? '-', $t['priority']],
+                $ticketLineTpl
+            );
         }
         if (count($highTickets) > 10) {
-            $message .= "  _...and " . (count($highTickets) - 10) . " more_\n";
+            $message .= str_replace('{count}', count($highTickets) - 10, $moreTpl);
         }
-        $message .= "\n";
     }
     
-    $otherTickets = array_filter($incompleteTickets, fn($t) => !in_array($t['priority'], ['critical', 'high']));
     if (count($otherTickets) > 0) {
-        $message .= "*🟡 OTHER TICKETS (" . count($otherTickets) . ")*\n";
+        $message .= str_replace('{count}', count($otherTickets), $otherHeaderTpl);
         foreach (array_slice($otherTickets, 0, 10) as $t) {
-            $age = floor((time() - strtotime($t['created_at'])) / 86400);
-            $message .= "• #{$t['ticket_number']}: {$t['subject']} ({$t['priority']})\n";
+            $message .= str_replace(
+                ['{ticket_number}', '{subject}', '{priority}'],
+                [$t['ticket_number'], $t['subject'], $t['priority']],
+                $ticketSimpleTpl
+            );
         }
         if (count($otherTickets) > 10) {
-            $message .= "  _...and " . (count($otherTickets) - 10) . " more_\n";
+            $message .= str_replace('{count}', count($otherTickets) - 10, $moreTpl);
         }
     }
     
-    $message .= "\n_ISP CRM - " . ($settings->get('company_name', 'Your ISP')) . "_";
+    $techStmt = $db->query("
+        SELECT u.id, u.name, 
+            COUNT(CASE WHEN t.status = 'open' THEN 1 END) as open_count,
+            COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_count,
+            COUNT(CASE WHEN t.status = 'resolved' AND DATE(t.resolved_at) = CURRENT_DATE THEN 1 END) as resolved_today
+        FROM users u
+        LEFT JOIN tickets t ON t.assigned_to = u.id AND t.status NOT IN ('closed')
+        WHERE u.role IN ('technician', 'admin', 'manager')
+        GROUP BY u.id, u.name
+        HAVING COUNT(t.id) > 0
+        ORDER BY open_count DESC, in_progress_count DESC
+        LIMIT 10
+    ");
+    $techStats = $techStmt->fetchAll(\PDO::FETCH_ASSOC);
+    
+    if (!empty($techStats)) {
+        $techList = '';
+        foreach ($techStats as $tech) {
+            $techList .= str_replace(
+                ['{name}', '{open}', '{in_progress}', '{resolved_today}'],
+                [$tech['name'], $tech['open_count'], $tech['in_progress_count'], $tech['resolved_today']],
+                $techLineTpl
+            );
+        }
+        $message .= str_replace('{technician_list}', $techList, $techSectionTpl);
+    }
+    
+    $message .= str_replace('{company_name}', $companyName, $footerTpl);
     
     $groupsJson = $settings->get('whatsapp_daily_summary_groups', '[]');
     $groups = json_decode($groupsJson, true) ?: [];
