@@ -1,0 +1,43 @@
+
+root@superlitecrm:~/isp# # First check what indexes exist
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "\d radius_sessions"
+
+# Add a proper unique constraint (not just an index)
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "ALTER TABLE radius_sessions ADD CONSTRAINT radius_sessions_acct_session_id_unique UNIQUE (acct_session_id);"
+                                            Table "public.radius_sessions"
+      Column       |            Type             | Collation | Nullable |                   Default
+-------------------+-----------------------------+-----------+----------+---------------------------------------------
+ id                | integer                     |           | not null | nextval('radius_sessions_id_seq'::regclass)
+ subscription_id   | integer                     |           |          |
+ acct_session_id   | character varying(64)       |           | not null |
+ nas_id            | integer                     |           |          |
+ nas_ip_address    | character varying(45)       |           |          |
+ nas_port_id       | character varying(50)       |           |          |
+ framed_ip_address | character varying(45)       |           |          |
+ mac_address       | character varying(17)       |           |          |
+ session_start     | timestamp without time zone |           | not null |
+ session_end       | timestamp without time zone |           |          |
+ session_duration  | integer                     |           |          | 0
+ input_octets      | bigint                      |           |          | 0
+ output_octets     | bigint                      |           |          | 0
+ input_packets     | bigint                      |           |          | 0
+ output_packets    | bigint                      |           |          | 0
+ terminate_cause   | character varying(50)       |           |          |
+ status            | character varying(20)       |           |          | 'active'::character varying
+ created_at        | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ started_at        | timestamp without time zone |           |          |
+ stopped_at        | timestamp without time zone |           |          |
+ username          | character varying(100)      |           |          |
+Indexes:
+    "radius_sessions_pkey" PRIMARY KEY, btree (id)
+    "idx_radius_sessions_acct_session_id" UNIQUE, btree (acct_session_id)
+    "idx_radius_sessions_start" btree (session_start)
+    "idx_radius_sessions_status" btree (status)
+    "idx_radius_sessions_subscription" btree (subscription_id)
+    "idx_radius_sessions_username" btree (username)
+Foreign-key constraints:
+    "radius_sessions_nas_id_fkey" FOREIGN KEY (nas_id) REFERENCES radius_nas(id)
+    "radius_sessions_subscription_id_fkey" FOREIGN KEY (subscription_id) REFERENCES radius_subscriptions(id) ON DELETE CASCADE
+
+ALTER TABLE
+root@superlitecrm:~/isp#
