@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token']) && !empty($
     } else {
         try {
             $ticket = new Ticket();
-            $ticket->submitRating($tokenRecord['ticket_id'], [
+            $ticket->submitSatisfactionRating($tokenRecord['ticket_id'], [
                 'rating' => $rating,
                 'feedback' => $feedback,
                 'customer_id' => $tokenRecord['customer_id'],
