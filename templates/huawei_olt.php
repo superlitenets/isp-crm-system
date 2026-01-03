@@ -1832,7 +1832,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $imported = 0;
                         $updated = 0;
                         $skipped = 0;
+                        $zonesCreated = 0;
                         $errors = [];
+                        $zoneCache = [];
                         
                         while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
                             $sn = strtoupper(trim($row[2] ?? ''));
@@ -1867,8 +1869,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 $onuTypeId = $typeRow['id'] ?? null;
                             }
                             
-                            $statusMap = ['online' => 'online', 'offline' => 'offline', 'power fail' => 'offline', 'los' => 'los', 'dying-gasp' => 'offline'];
-                            $mappedStatus = $statusMap[$status] ?? 'offline';
+                            // Auto-create zone if it doesn't exist
+                            $zoneId = null;
+                            if (!empty($zone)) {
+                                if (isset($zoneCache[$zone])) {
+                                    $zoneId = $zoneCache[$zone];
+                                } else {
+                                    $stmt = $db->prepare("SELECT id FROM huawei_zones WHERE LOWER(name) = LOWER(?) LIMIT 1");
+                                    $stmt->execute([$zone]);
+                                    $zoneRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                    if ($zoneRow) {
+                                        $zoneId = $zoneRow['id'];
+                                    } else {
+                                        // Create the zone
+                                        $stmt = $db->prepare("INSERT INTO huawei_zones (name, is_active, created_at) VALUES (?, true, NOW()) RETURNING id");
+                                        $stmt->execute([$zone]);
+                                        $newZone = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                        $zoneId = $newZone['id'] ?? null;
+                                        $zonesCreated++;
+                                    }
+                                    $zoneCache[$zone] = $zoneId;
+                                }
+                            }
+                            
+                            // Extended status mapping for SmartOLT
+                            $statusMap = [
+                                'online' => 'online', 
+                                'offline' => 'offline', 
+                                'power fail' => 'offline', 
+                                'los' => 'los', 
+                                'dying-gasp' => 'offline',
+                                'working' => 'online',
+                                'dyinggasp' => 'offline',
+                                'losi' => 'los',
+                                'lofi' => 'los',
+                                'power-off' => 'offline',
+                                'initial' => 'offline'
+                            ];
+                            $mappedStatus = $statusMap[$status] ?? 'online';
                             
                             $stmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
                             $stmt->execute([$sn]);
@@ -1876,12 +1914,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             
                             try {
                                 if ($existing) {
-                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, zone = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
-                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
+                                    $stmt = $db->prepare("UPDATE huawei_onus SET name = ?, description = ?, slot = ?, port = ?, onu_id = ?, status = ?, zone = ?, zone_id = ?, onu_type_id = ?, vlan_id = ?, smartolt_external_id = ?, rx_power = ?, tx_power = ?, distance = ?, is_authorized = true, updated_at = NOW() WHERE id = ?");
+                                    $stmt->execute([$name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat, $existing['id']]);
                                     $updated++;
                                 } else {
-                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, is_authorized, zone, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
+                                    $stmt = $db->prepare("INSERT INTO huawei_onus (sn, olt_id, name, description, frame, slot, port, onu_id, status, is_authorized, zone, zone_id, onu_type_id, vlan_id, smartolt_external_id, rx_power, tx_power, distance, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+                                    $stmt->execute([$sn, $oltId, $name ?: $sn, $address, $board, $port, $allocatedOnu, $mappedStatus, $zone, $zoneId, $onuTypeId, $serviceVlan > 0 ? $serviceVlan : null, $externalId ?: null, $rxPowerFloat, $txPowerFloat, $distanceFloat]);
                                     $imported++;
                                 }
                             } catch (\Exception $e) {
@@ -1891,6 +1929,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         fclose($handle);
                         
                         $message = "CSV Import complete: {$imported} added, {$updated} updated";
+                        if ($zonesCreated > 0) $message .= ", {$zonesCreated} zones created";
                         if ($skipped > 0) $message .= ", {$skipped} skipped (continuation rows)";
                         if (!empty($errors)) $message .= ". Errors: " . count($errors);
                         $messageType = empty($errors) ? 'success' : 'warning';
