@@ -1,0 +1,20 @@
+
+isp_crm_nginx           | 102.205.239.250 - - [03/Jan/2026:15:54:48 +0000] "GET /?page=hr&action=view_employee&id=1 HTTP/2.0" 200 37451 "https://crm.superlite.co.ke/?page=hr&subpage=employees" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_nginx           | 102.205.239.250 - - [03/Jan/2026:15:54:48 +0000] "GET /uploads/employees/passport_69593bb01190a.jpg HTTP/2.0" 404 555 "https://crm.superlite.co.ke/?page=hr&action=view_employee&id=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_nginx           | 2026/01/03 15:54:48 [error] 29#29: *2360 open() "/var/www/html/public/uploads/employees/passport_69593bb01190a.jpg" failed (2: No such file or directory), client: 102.205.239.250, server: crm.superlite.co.ke, request: "GET /uploads/employees/passport_69593bb01190a.jpg HTTP/2.0", host: "crm.superlite.co.ke", referrer: "https://crm.superlite.co.ke/?page=hr&action=view_employee&id=1"
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_php             | NOTICE: PHP message: Fallback SNMP Walk for Descriptions .43.1.2: FAILED
+isp_crm_php             | 172.18.0.7 -  03/Jan/2026:18:54:00 +0300 "GET /api/snmp-discovery.php" 200
+isp_crm_nginx           | 102.205.236.243 - - [03/Jan/2026:15:55:00 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+isp_crm_olt_service     | [Discovery] SNMP API error: timeout of 30000ms exceeded
+isp_crm_olt_service     | [OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+isp_crm_php             | NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Sending 4 new ONU notifications...
+isp_crm_olt_service     | [Discovery] No provisioning group configured (set wa_provisioning_group in settings)
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_php             | 172.18.0.7 -  03/Jan/2026:18:55:02 +0300 "GET /cron.php" 403
+isp_crm_nginx           | 102.205.236.243 - - [03/Jan/2026:15:55:02 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 403 24 "-" "curl/8.5.0" "-"
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-03T15:55:05.110+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767455705:110033][1:0x71d5d4f0f700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 999, snapshot max: 999 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 68050"}}
