@@ -983,6 +983,17 @@ class RadiusBilling {
             $attributes['Framed-IP-Address'] = $sub['static_ip'];
         }
         
+        // Auto-assign NAS ID based on the NAS IP the user connected through
+        if (!empty($nasIp)) {
+            $nasStmt = $this->db->prepare("SELECT id FROM radius_nas WHERE ip_address = ? LIMIT 1");
+            $nasStmt->execute([$nasIp]);
+            $nasRecord = $nasStmt->fetch(\PDO::FETCH_ASSOC);
+            if ($nasRecord && (empty($sub['nas_id']) || $sub['nas_id'] != $nasRecord['id'])) {
+                $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET nas_id = ? WHERE id = ?");
+                $updateStmt->execute([$nasRecord['id'], $sub['id']]);
+            }
+        }
+        
         return [
             'success' => true,
             'reply' => 'Access-Accept',
@@ -1159,6 +1170,17 @@ class RadiusBilling {
         
         if ($sub['static_ip']) {
             $attributes['Framed-IP-Address'] = $sub['static_ip'];
+        }
+        
+        // Auto-assign NAS ID based on the NAS IP the user connected through
+        if (!empty($nasIp)) {
+            $nasStmt = $this->db->prepare("SELECT id FROM radius_nas WHERE ip_address = ? LIMIT 1");
+            $nasStmt->execute([$nasIp]);
+            $nasRecord = $nasStmt->fetch(\PDO::FETCH_ASSOC);
+            if ($nasRecord && (empty($sub['nas_id']) || $sub['nas_id'] != $nasRecord['id'])) {
+                $updateStmt = $this->db->prepare("UPDATE radius_subscriptions SET nas_id = ? WHERE id = ?");
+                $updateStmt->execute([$nasRecord['id'], $sub['id']]);
+            }
         }
         
         return [
