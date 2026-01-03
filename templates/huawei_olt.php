@@ -13504,20 +13504,27 @@ echo "# ================================================\n";
         }
         
         // Set default mode based on ONU type
-        if (defaultMode === 'router') {
-            document.getElementById('authModeRouter').checked = true;
-        } else {
-            document.getElementById('authModeBridge').checked = true;
+        var authModeRouter = document.getElementById('authModeRouter');
+        var authModeBridge = document.getElementById('authModeBridge');
+        if (defaultMode === 'router' && authModeRouter) {
+            authModeRouter.checked = true;
+        } else if (authModeBridge) {
+            authModeBridge.checked = true;
         }
         
         new bootstrap.Modal(document.getElementById('authModal')).show();
     }
     
     function openAuthModal(sn, oltId, frameSlotPort, onuTypeId) {
-        document.getElementById('authOnuId').value = '';
-        document.getElementById('authOnuSn').textContent = sn;
-        document.getElementById('authOnuLocation').textContent = frameSlotPort || '-';
-        document.getElementById('authDescription').value = '';
+        var authOnuId = document.getElementById('authOnuId');
+        var authOnuSn = document.getElementById('authOnuSn');
+        var authOnuLocation = document.getElementById('authOnuLocation');
+        var authDescription = document.getElementById('authDescription');
+        
+        if (authOnuId) authOnuId.value = '';
+        if (authOnuSn) authOnuSn.textContent = sn;
+        if (authOnuLocation) authOnuLocation.textContent = frameSlotPort || '-';
+        if (authDescription) authDescription.value = '';
         
         var onuTypeSelect = document.getElementById('authOnuType');
         if (onuTypeSelect && onuTypeId) {
