@@ -118,88 +118,78 @@ class OneISP {
     private string $lastLoginError = '';
     
     private function login(): bool {
-        if (empty($this->username) || empty($this->password)) {
-            $this->lastLoginError = 'Username or password is empty';
+        if (empty($this->username) || empty($this->password) || empty($this->prefix)) {
+            $this->lastLoginError = 'Username, password, or prefix is empty';
             return false;
         }
         
-        $cookieFile = sys_get_temp_dir() . '/oneisp_cookies_' . md5($this->username) . '.txt';
+        $email = $this->username . '@' . strtolower($this->prefix) . '.isp';
         
-        if (file_exists($cookieFile)) {
-            @unlink($cookieFile);
-        }
-        
-        $loginUrl = $this->baseUrl . '/login';
-        $ch = curl_init($loginUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-        $html = curl_exec($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-        
-        if (!empty($curlError)) {
-            $this->lastLoginError = 'Failed to fetch login page: ' . $curlError;
-            return false;
-        }
-        
-        $csrfToken = '';
-        if (preg_match('/<meta name="csrf-token" content="([^"]+)"/', $html, $matches)) {
-            $csrfToken = $matches[1];
-        } elseif (preg_match('/name="_token"[^>]+value="([^"]+)"/', $html, $matches)) {
-            $csrfToken = $matches[1];
-        }
-        
-        $postData = [
-            'username' => $this->username,
+        $postData = json_encode([
+            'email' => $email,
+            'prefix' => $this->prefix,
             'password' => $this->password,
-            '_token' => $csrfToken
-        ];
+            'isISP' => true,
+            'isApp' => true
+        ]);
         
-        if (!empty($this->prefix)) {
-            $postData['account_prefix'] = $this->prefix;
-        }
-        
-        $ch = curl_init($loginUrl);
+        $ch = curl_init($this->apiUrl . '/../auth/login');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/x-www-form-urlencoded',
-            'Accept: text/html,application/xhtml+xml',
-            'Referer: ' . $loginUrl
+            'Content-Type: application/json',
+            'Accept: application/json'
         ]);
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $curlError = curl_error($ch);
         curl_close($ch);
         
-        if (strpos($finalUrl, 'dashboard') !== false || strpos($finalUrl, 'home') !== false) {
-            $this->sessionCookie = $cookieFile;
-            return true;
+        if (!empty($curlError)) {
+            $this->lastLoginError = 'cURL error: ' . $curlError;
+            return false;
         }
         
-        if (strpos($response, 'dashboard') !== false || strpos($response, 'logout') !== false) {
-            $this->sessionCookie = $cookieFile;
-            return true;
+        if ($httpCode !== 200) {
+            $this->lastLoginError = "HTTP $httpCode";
+            return false;
         }
         
-        if (preg_match('/class="[^"]*alert[^"]*"[^>]*>([^<]+)/i', $response, $errorMatch)) {
-            $this->lastLoginError = trim(strip_tags($errorMatch[1]));
-        } elseif (preg_match('/<div[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)/i', $response, $errorMatch)) {
-            $this->lastLoginError = trim(strip_tags($errorMatch[1]));
-        } else {
-            $this->lastLoginError = "HTTP $httpCode - Final URL: $finalUrl" . (empty($csrfToken) ? ' (No CSRF token found - page may be JS-rendered)' : '');
+        $data = json_decode($response, true);
+        if (empty($data['token'])) {
+            $this->lastLoginError = $data['Error'] ?? $data['message'] ?? 'No token in response';
+            return false;
         }
         
-        return false;
+        $this->token = $data['token'];
+        $this->authMode = 'token';
+        
+        $this->saveToken($data['token']);
+        
+        return true;
+    }
+    
+    private function saveToken(string $token): void {
+        try {
+            $stmt = $this->db->prepare("INSERT INTO company_settings (setting_key, setting_value) VALUES ('oneisp_api_token', ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = ?");
+            $stmt->execute([$token, $token]);
+        } catch (\Exception $e) {
+        }
+    }
+    
+    public function refreshToken(): array {
+        if (empty($this->username) || empty($this->password) || empty($this->prefix)) {
+            return ['success' => false, 'error' => 'Login credentials not configured'];
+        }
+        
+        if ($this->login()) {
+            return ['success' => true, 'message' => 'Token refreshed successfully', 'token_info' => $this->getTokenExpiryInfo()];
+        }
+        
+        return ['success' => false, 'error' => $this->lastLoginError];
     }
     
     public function getLastLoginError(): string {
@@ -214,9 +204,24 @@ class OneISP {
         }
     }
     
-    private function requestWithToken(string $endpoint, array $params = []): array {
+    private function requestWithToken(string $endpoint, array $params = [], bool $retried = false): array {
         if (empty($this->token)) {
-            return ['success' => false, 'error' => 'One-ISP API token not configured'];
+            if (!empty($this->username) && !empty($this->password) && !empty($this->prefix)) {
+                if (!$this->login()) {
+                    return ['success' => false, 'error' => 'No token and login failed: ' . $this->lastLoginError];
+                }
+            } else {
+                return ['success' => false, 'error' => 'One-ISP API token not configured'];
+            }
+        }
+        
+        if ($this->isTokenExpired() && !$retried) {
+            if (!empty($this->username) && !empty($this->password) && !empty($this->prefix)) {
+                if ($this->login()) {
+                    return $this->requestWithToken($endpoint, $params, true);
+                }
+            }
+            return ['success' => false, 'error' => 'Token expired. Please refresh or get a new token.'];
         }
         
         $url = $this->apiUrl . $endpoint;
@@ -239,6 +244,15 @@ class OneISP {
         
         if ($error) {
             return ['success' => false, 'error' => 'cURL error: ' . $error];
+        }
+        
+        if ($httpCode === 401 && !$retried) {
+            if (!empty($this->username) && !empty($this->password) && !empty($this->prefix)) {
+                if ($this->login()) {
+                    return $this->requestWithToken($endpoint, $params, true);
+                }
+            }
+            return ['success' => false, 'error' => 'Unauthorized. Token may be expired.'];
         }
         
         if ($httpCode !== 200) {
