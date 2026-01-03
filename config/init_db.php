@@ -124,6 +124,7 @@ function initializeDatabase(): void {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(100),
         phone VARCHAR(20) NOT NULL,
+        office_phone VARCHAR(20),
         department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
         position VARCHAR(100) NOT NULL,
         salary DECIMAL(12, 2),
@@ -133,6 +134,16 @@ function initializeDatabase(): void {
         emergency_phone VARCHAR(20),
         address TEXT,
         notes TEXT,
+        passport_photo VARCHAR(500),
+        id_number VARCHAR(50),
+        passport_number VARCHAR(50),
+        date_of_birth DATE,
+        gender VARCHAR(20),
+        nationality VARCHAR(50),
+        marital_status VARCHAR(20),
+        next_of_kin_name VARCHAR(100),
+        next_of_kin_relationship VARCHAR(50),
+        next_of_kin_phone VARCHAR(20),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -163,6 +174,18 @@ function initializeDatabase(): void {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(employee_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS employee_kyc_documents (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        document_type VARCHAR(50) NOT NULL,
+        document_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        verified_at TIMESTAMP,
+        verified_by INTEGER REFERENCES users(id),
+        notes TEXT
     );
 
     CREATE TABLE IF NOT EXISTS payroll (
