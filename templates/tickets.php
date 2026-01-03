@@ -52,14 +52,20 @@ if (isset($_GET['customer_id'])) {
                 
                 <div class="col-md-6" id="existingCustomerSection">
                     <label class="form-label">Select Customer *</label>
-                    <select class="form-select" name="customer_id" id="customerIdSelect">
-                        <option value="">Select Customer</option>
-                        <?php foreach ($allCustomers as $c): ?>
-                        <option value="<?= $c['id'] ?>" <?= ($preselectedCustomer && $preselectedCustomer['id'] == $c['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?><?= !empty($c['username']) ? ' - ' . $c['username'] : '' ?>)
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="position-relative">
+                        <input type="text" class="form-control mb-1" id="customerSearch" placeholder="Type to search customers..." autocomplete="off">
+                        <select class="form-select" name="customer_id" id="customerIdSelect" size="1">
+                            <option value="">Select Customer</option>
+                            <?php foreach ($allCustomers as $c): ?>
+                            <option value="<?= $c['id'] ?>" 
+                                data-search="<?= htmlspecialchars(strtolower($c['name'] . ' ' . $c['account_number'] . ' ' . ($c['username'] ?? '') . ' ' . ($c['phone'] ?? ''))) ?>"
+                                <?= ($preselectedCustomer && $preselectedCustomer['id'] == $c['id']) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['account_number']) ?><?= !empty($c['username']) ? ' - ' . $c['username'] : '' ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted"><?= count($allCustomers) ?> customers available</small>
+                    </div>
                 </div>
                 
                 <div id="billingCustomerSection" class="col-12" style="display: none;">
@@ -516,6 +522,47 @@ document.addEventListener('DOMContentLoaded', function() {
     customerIdSelect.addEventListener('change', function() {
         fetchCustomerHistory(this.value);
     });
+    
+    // Customer search filter
+    const customerSearch = document.getElementById('customerSearch');
+    if (customerSearch) {
+        const allOptions = Array.from(customerIdSelect.querySelectorAll('option'));
+        
+        customerSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            let matchCount = 0;
+            
+            allOptions.forEach(opt => {
+                if (opt.value === '') {
+                    opt.style.display = '';
+                    return;
+                }
+                const searchData = opt.dataset.search || opt.textContent.toLowerCase();
+                if (searchTerm === '' || searchData.includes(searchTerm)) {
+                    opt.style.display = '';
+                    matchCount++;
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+            
+            // Expand dropdown to show filtered results
+            if (searchTerm.length > 0) {
+                customerIdSelect.size = Math.min(8, matchCount + 1);
+            } else {
+                customerIdSelect.size = 1;
+            }
+        });
+        
+        customerSearch.addEventListener('blur', function() {
+            setTimeout(() => { customerIdSelect.size = 1; }, 200);
+        });
+        
+        customerIdSelect.addEventListener('change', function() {
+            customerSearch.value = '';
+            customerIdSelect.size = 1;
+        });
+    }
     
     if (customerIdSelect.value) {
         fetchCustomerHistory(customerIdSelect.value);
