@@ -83,7 +83,6 @@ server default {
         detail
         unix
         sql
-        rest
         exec
         attr_filter.accounting_response
     }

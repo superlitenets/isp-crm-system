@@ -2,9 +2,7 @@ FROM freeradius/freeradius-server:3.2.3
 
 RUN apt-get update && apt-get install -y \
     freeradius-postgresql \
-    freeradius-rest \
     gettext-base \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy to /etc/freeradius/ (without 3.0) - the actual config location
