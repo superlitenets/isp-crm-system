@@ -1,0 +1,24 @@
+ckpoint timestamp: (0, 0) base write gen: 67745"}}
+isp_crm_olt_service     | [OLT 2] Command timeout, got 227 bytes
+isp_crm_olt_service     | [OLT 2] Last 300 chars: screen-length0temporary\n                ^\n  % Unknown command, the error locates at '^'\n\nMA5683T(config)#\n\nMA5683T(config)#display ont autofind all\n  Failure: The automatically found ONTs do not exist\n\nMA5683T(config)#
+isp_crm_olt_service     | [OLT 2] Disabled paging - ready for commands
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_nginx           | 102.205.236.243 - - [03/Jan/2026:10:12:06 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+isp_crm_olt_service     | [Discovery] SNMP API error: timeout of 30000ms exceeded
+isp_crm_olt_service     | [Discovery] Connecting to G45_OLT...
+isp_crm_olt_service     | [Discovery] Decrypted password: on***
+isp_crm_olt_service     | [OLT 1] TCP connected to 10.98.0.3
+isp_crm_olt_service     | [OLT 1] Sent proactive telnet negotiation (character mode)
+isp_crm_php             | NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+isp_crm_olt_service     | [OLT 1] Sent username
+isp_crm_olt_service     | [OLT 1] Sent password
+isp_crm_olt_service     | [OLT 1] Login successful - prompt detected
+isp_crm_olt_service     | [OLT 1] Sending: "enable" (hex: 656e61626c650d0a)
+isp_crm_olt_service     | [OLT 1] Entered enable mode
+isp_crm_olt_service     | [OLT 1] Sending: "config" (hex: 636f6e6669670d0a)
+isp_crm_olt_service     | [OLT 1] Entered config mode
+isp_crm_olt_service     | [OLT 1] Sending: "screen-length 0 temporary" (hex: 73637265656e2d6c656e67746820302074656d706f726172790d0a)
+isp_crm_php             | 172.18.0.7 -  03/Jan/2026:13:12:04 +0300 "POST /index.php" 302
+isp_crm_nginx           | 102.205.239.250 - - [03/Jan/2026:10:12:09 +0000] "POST /?page=isp&view=subscriber&id=1 HTTP/2.0" 302 0 "https://crm.superlite.co.ke/?page=isp&view=subscriber&id=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.7 -  03/Jan/2026:13:12:09 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [03/Jan/2026:10:12:09 +0000] "GET /?page=isp&view=subscriber&id=1 HTTP/2.0" 200 108407 "https://crm.superlite.co.ke/?page=isp&view=subscriber&id=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"

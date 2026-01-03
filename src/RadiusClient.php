@@ -74,7 +74,12 @@ class RadiusClient {
         \socket_close($socket);
         
         if ($result === false || $result < 20) {
-            return ['success' => false, 'error' => 'No response from NAS (timeout or connection refused)'];
+            $diagnostic = $this->diagnoseConnection();
+            return [
+                'success' => false, 
+                'error' => 'No response from NAS (timeout or connection refused)',
+                'diagnostic' => $diagnostic
+            ];
         }
         
         $header = \unpack('Ccode/Cid/nlength', \substr($response, 0, 4));
@@ -149,5 +154,26 @@ class RadiusClient {
             default:
                 return (string)$value;
         }
+    }
+    
+    private function diagnoseConnection(): array {
+        $diagnostic = [
+            'nas_ip' => $this->nasIp,
+            'coa_port' => $this->nasPort,
+            'ping_reachable' => false,
+            'likely_cause' => ''
+        ];
+        
+        exec("ping -c 1 -W 2 " . escapeshellarg($this->nasIp) . " 2>&1", $output, $exitCode);
+        $diagnostic['ping_reachable'] = ($exitCode === 0);
+        
+        if ($diagnostic['ping_reachable']) {
+            $diagnostic['likely_cause'] = 'NAS is reachable but CoA port not responding. Check MikroTik config: /radius incoming set accept=yes port=3799';
+            $diagnostic['mikrotik_fix'] = '/radius incoming set accept=yes port=3799';
+        } else {
+            $diagnostic['likely_cause'] = 'NAS is not reachable. Check VPN tunnel, firewall, or NAS IP address.';
+        }
+        
+        return $diagnostic;
     }
 }

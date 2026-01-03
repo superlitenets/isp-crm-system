@@ -340,7 +340,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'CoA sent successfully. New speed: ' . ($result['rate_limit'] ?? 'applied');
                 $messageType = 'success';
             } else {
-                $message = 'CoA failed: ' . ($result['error'] ?? 'Unknown error');
+                $errorMsg = $result['error'] ?? 'Unknown error';
+                if (!empty($result['diagnostic'])) {
+                    $diag = $result['diagnostic'];
+                    if ($diag['ping_reachable']) {
+                        $errorMsg .= ' | NAS is reachable but CoA port not responding. Run on MikroTik: /radius incoming set accept=yes port=3799';
+                    } else {
+                        $errorMsg .= ' | NAS (' . $diag['nas_ip'] . ') is not reachable. Check VPN tunnel or firewall.';
+                    }
+                }
+                $message = 'CoA failed: ' . $errorMsg;
                 $messageType = 'danger';
             }
             break;

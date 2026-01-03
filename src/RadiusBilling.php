@@ -1113,7 +1113,11 @@ class RadiusBilling {
                 return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address']];
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
+            $errorResponse = ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
+            if (!empty($result['diagnostic'])) {
+                $errorResponse['diagnostic'] = $result['diagnostic'];
+            }
+            return $errorResponse;
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nas['ip_address']];
         }
@@ -1560,7 +1564,11 @@ class RadiusBilling {
                 return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK', 'target_ip' => $nasIp];
             }
             
-            return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $nasIp];
+            $errorResponse = ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $nasIp];
+            if (!empty($result['diagnostic'])) {
+                $errorResponse['diagnostic'] = $result['diagnostic'];
+            }
+            return $errorResponse;
         } catch (\Exception $e) {
             return ['success' => false, 'error' => 'Exception: ' . $e->getMessage(), 'target_ip' => $nasIp];
         }
