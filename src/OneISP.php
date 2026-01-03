@@ -75,6 +75,46 @@ class OneISP {
         return $this->username;
     }
     
+    public function getTokenExpiry(): ?int {
+        if (empty($this->token)) {
+            return null;
+        }
+        $parts = explode('.', $this->token);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+        return $payload['exp'] ?? null;
+    }
+    
+    public function isTokenExpired(): bool {
+        $exp = $this->getTokenExpiry();
+        if ($exp === null) {
+            return false;
+        }
+        return time() >= $exp;
+    }
+    
+    public function getTokenExpiryInfo(): array {
+        $exp = $this->getTokenExpiry();
+        if ($exp === null) {
+            return ['valid' => false, 'message' => 'No token or invalid format'];
+        }
+        $now = time();
+        $remaining = $exp - $now;
+        if ($remaining <= 0) {
+            return ['valid' => false, 'expired' => true, 'message' => 'Token has expired'];
+        }
+        $hours = floor($remaining / 3600);
+        $minutes = floor(($remaining % 3600) / 60);
+        return [
+            'valid' => true,
+            'expires_at' => date('Y-m-d H:i:s', $exp),
+            'remaining_seconds' => $remaining,
+            'message' => "Token valid for {$hours}h {$minutes}m"
+        ];
+    }
+    
     private string $lastLoginError = '';
     
     private function login(): bool {

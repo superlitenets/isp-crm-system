@@ -6627,6 +6627,28 @@ if (($_GET['action'] ?? '') === 'test_billing') {
             </div>
             <div class="card-body text-center">
                 <?php if ($oneIsp->isConfigured()): ?>
+                <?php $tokenInfo = $oneIsp->getTokenExpiryInfo(); ?>
+                <?php if ($authMode === 'token' && isset($tokenInfo['expired']) && $tokenInfo['expired']): ?>
+                <div class="text-danger mb-2">
+                    <i class="bi bi-exclamation-triangle-fill display-4"></i>
+                </div>
+                <h5 class="text-danger">Token Expired</h5>
+                <p class="text-muted small mb-0">Please get a new token from One-ISP</p>
+                <?php elseif ($authMode === 'token' && $tokenInfo['valid']): ?>
+                <div class="text-success mb-2">
+                    <i class="bi bi-check-circle-fill display-4"></i>
+                </div>
+                <h5 class="text-success">Connected</h5>
+                <p class="text-muted small mb-0">
+                    Mode: <strong>JWT Token</strong><br>
+                    <span class="<?= $tokenInfo['remaining_seconds'] < 3600 ? 'text-warning' : '' ?>">
+                        <?= $tokenInfo['message'] ?>
+                    </span>
+                    <?php if (!empty($tokenInfo['expires_at'])): ?>
+                    <br><small>Expires: <?= $tokenInfo['expires_at'] ?></small>
+                    <?php endif; ?>
+                </p>
+                <?php else: ?>
                 <div class="text-success mb-2">
                     <i class="bi bi-check-circle-fill display-4"></i>
                 </div>
@@ -6637,6 +6659,7 @@ if (($_GET['action'] ?? '') === 'test_billing') {
                     <br>User: <?= htmlspecialchars($billingUsername) ?>
                     <?php endif; ?>
                 </p>
+                <?php endif; ?>
                 <?php else: ?>
                 <div class="text-secondary mb-2">
                     <i class="bi bi-x-circle-fill display-4"></i>
