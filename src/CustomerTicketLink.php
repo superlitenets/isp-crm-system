@@ -105,7 +105,7 @@ class CustomerTicketLink {
             LEFT JOIN users u ON tc.user_id = u.id
             WHERE tc.ticket_id = ? AND tc.is_internal = FALSE
             UNION ALL
-            SELECT 'activity' as type, al.details as content, al.created_at, NULL as author
+            SELECT 'activity' as type, al.details::text as content, al.created_at, NULL as author
             FROM activity_logs al
             WHERE al.entity_type = 'ticket' AND al.entity_id = ?::integer
             AND al.action_type IN ('status_change', 'resolved', 'closed')
