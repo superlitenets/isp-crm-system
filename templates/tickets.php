@@ -31,7 +31,7 @@ if (isset($_GET['customer_id'])) {
             
             <div class="row g-3">
                 <?php if ($action === 'create'): ?>
-                <?php $allCustomers = $customer->getAll(); ?>
+                <?php $allCustomers = $customer->getAll('', 10000); ?>
                 <div class="col-12">
                     <label class="form-label">Customer Type *</label>
                     <div class="btn-group w-100" role="group">
