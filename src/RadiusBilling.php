@@ -1532,7 +1532,7 @@ class RadiusBilling {
         
         // Get active sessions with subscription username and NAS ID for VPN lookup
         $stmt = $this->db->prepare("
-            SELECT rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
+            SELECT rs.id, rs.acct_session_id, rs.framed_ip_address, rs.mac_address, rs.nas_id,
                    sub.username, rn.ip_address as nas_ip, rn.secret as nas_secret
             FROM radius_sessions rs
             LEFT JOIN radius_nas rn ON rs.nas_id = rn.id
@@ -1548,6 +1548,10 @@ class RadiusBilling {
             $result = $this->sendCoADisconnect($session);
             if ($result['success']) {
                 $disconnected++;
+                // Mark session as ended in database so dashboard updates immediately
+                if (!empty($session['id'])) {
+                    $this->markSessionEnded($session['id'], 'coa_disconnect');
+                }
             } else {
                 $errors[] = $result['error'];
             }
@@ -1559,6 +1563,17 @@ class RadiusBilling {
             'total_sessions' => count($sessions),
             'errors' => $errors
         ];
+    }
+    
+    private function markSessionEnded(int $sessionId, string $terminateCause = 'Admin-Reset'): void {
+        $stmt = $this->db->prepare("
+            UPDATE radius_sessions SET 
+                session_end = CURRENT_TIMESTAMP,
+                status = 'closed',
+                terminate_cause = ?
+            WHERE id = ? AND session_end IS NULL
+        ");
+        $stmt->execute([$terminateCause, $sessionId]);
     }
     
     public function sendCoADisconnect(array $session): array {
