@@ -336,12 +336,12 @@ class OLTSession {
             ]);
             this.socket.write(telnetNegotiation);
             
-            // Wait briefly for negotiation to process, then send command
+            // Wait for negotiation to process, then send command
             setTimeout(() => {
                 const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
                 console.log(`[OLT ${this.oltId}] Sending: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
                 this.socket.write(cmdBuffer);
-            }, 50);
+            }, 200);
         });
     }
     

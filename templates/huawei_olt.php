@@ -6127,13 +6127,8 @@ try {
                             </div>
                             <div class="mb-2">
                                 <span class="text-primary">Management IP</span><br>
-                                <?php if (!empty($currentOnu['tr069_ip'])): ?>
-                                <span class="text-success fw-bold" id="tr069IpDisplay"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></span>
+                                <span class="<?= !empty($currentOnu['tr069_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? htmlspecialchars($currentOnu['tr069_ip']) : '-' ?></span>
                                 <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
-                                <?php else: ?>
-                                <span class="text-muted" id="tr069IpDisplay">Click refresh to fetch</span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
-                                <?php endif; ?>
                             </div>
                             <div class="mb-2">
                                 <span class="text-primary">ONU/OLT Rx signal</span><br>
