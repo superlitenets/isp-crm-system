@@ -4608,34 +4608,34 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'OLT not found'];
         }
         
-        // Try using the Node.js persistent session service first (for Telnet)
-        if (!$forceDirectConnection && $olt['connection_type'] === 'telnet' && $this->isOLTServiceAvailable()) {
+        // For Telnet connections, ONLY use the OLT Session Service (no direct fallback)
+        if ($olt['connection_type'] === 'telnet') {
+            if (!$this->isOLTServiceAvailable()) {
+                return ['success' => false, 'message' => 'OLT Session Service not available. Please ensure it is running.'];
+            }
             return $this->executeViaService($oltId, $command);
         }
         
-        // Fall back to direct connection
-        $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
-        
-        $result = ['success' => false, 'message' => 'Unsupported connection type for commands'];
-        
-        if ($olt['connection_type'] === 'telnet') {
-            $result = $this->executeTelnetCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
-        } elseif ($olt['connection_type'] === 'ssh') {
+        // SSH connections use direct connection
+        if ($olt['connection_type'] === 'ssh') {
+            $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
             $result = $this->executeSSHCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
+            
+            // Log command with response
+            $this->addLog([
+                'olt_id' => $oltId,
+                'action' => 'command',
+                'status' => $result['success'] ? 'success' : 'failed',
+                'message' => $result['message'] ?? '',
+                'command_sent' => $command,
+                'command_response' => substr($result['output'] ?? '', 0, 10000),
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return $result;
         }
         
-        // Log command with response
-        $this->addLog([
-            'olt_id' => $oltId,
-            'action' => 'command',
-            'status' => $result['success'] ? 'success' : 'failed',
-            'message' => $result['message'] ?? '',
-            'command_sent' => $command,
-            'command_response' => substr($result['output'] ?? '', 0, 10000),
-            'user_id' => $_SESSION['user_id'] ?? null
-        ]);
-        
-        return $result;
+        return ['success' => false, 'message' => 'Unsupported connection type'];
     }
     
     private function executeTelnetCommand(string $ip, int $port, string $username, string $password, string $command): array {
