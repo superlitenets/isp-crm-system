@@ -1,7 +1,6 @@
 <?php
 $pageTitle = 'Call Center';
 $currentPage = 'call_center';
-ob_start();
 
 require_once __DIR__ . '/../src/CallCenter.php';
 $callCenter = new CallCenter($db);
@@ -772,8 +771,3 @@ function deleteTrunk(id) {
     }
 }
 </script>
-
-<?php
-$content = ob_get_clean();
-include __DIR__ . '/layout.php';
-?>
