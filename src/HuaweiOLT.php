@@ -548,9 +548,16 @@ class HuaweiOLT {
         $descriptions = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
         
         $onus = [];
+        $debugCount = 0;
         foreach ($serials as $oid => $serial) {
             $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
             $parts = explode('.', $indexPart);
+            
+            // Log first 5 entries for debugging
+            if ($debugCount < 5) {
+                error_log("SNMP ONU #{$debugCount}: OID={$oid}, index={$indexPart}, parts=" . json_encode($parts) . ", serial=" . $this->cleanSnmpValue($serial));
+                $debugCount++;
+            }
             
             $frame = 0;
             $slot = 0;
