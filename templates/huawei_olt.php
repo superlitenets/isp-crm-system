@@ -6342,17 +6342,22 @@ try {
                 if (liveIntervalId) {
                     clearInterval(liveIntervalId);
                     liveIntervalId = null;
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-danger');
-                    btn.innerHTML = '<i class="bi bi-record-circle me-1"></i> LIVE!';
-                } else {
-                    fetchLiveOnuData();
-                    liveIntervalId = setInterval(fetchLiveOnuData, 5000);
                     btn.classList.remove('btn-danger');
                     btn.classList.add('btn-success');
-                    btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i> STOP';
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Live Mode';
+                } else {
+                    fetchLiveOnuData();
+                    liveIntervalId = setInterval(fetchLiveOnuData, 10000); // Refresh every 10 seconds
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-danger');
+                    btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i> Stop Live';
                 }
             }
+            
+            // Auto-start live mode when page loads
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(toggleLiveMode, 1000); // Start after 1 second
+            });
             
             function toggleOnuModeEdit() {
                 const display = document.getElementById('onuModeDisplay');
