@@ -569,10 +569,9 @@ class HuaweiOLT {
                 $ifIndex = (int)$parts[0];
                 $onuId = (int)$parts[1];
                 
-                // Huawei ifIndex bit-mask decoding for GPON interfaces
-                // Large ifIndex (like 4194320384 = 0xFA004000) format:
-                // - Byte 3 (bits 24-31): 0xFA = interface type (GPON)
-                // - Lower 24 bits: ponIndex encoding
+                // Huawei ifIndex decoding for GPON interfaces
+                // Format: 0xFA000000 | (frame << 19) | (slot << 13) | (port << 8) | subport
+                // OR alternate: ponIndex = frame*8192 + slot*256 + port
                 
                 if ($ifIndex > 0xFFFFFF) {
                     // Strip interface type prefix (0xFA...) to get ponIndex
@@ -581,35 +580,47 @@ class HuaweiOLT {
                     $ponIndex = $ifIndex;
                 }
                 
-                // MA5683T/MA5680T ponIndex encoding (verified):
-                // ponIndex bit layout:
-                // - Bits 13-15: port (0-7)
-                // - Bits 8-12: slot (0-21)
-                // - Bits 0-7: reserved/frame
-                if ($ponIndex > 0) {
-                    $port = ($ponIndex >> 13) & 0x7;   // Bits 13-15
-                    $slot = ($ponIndex >> 8) & 0x1F;   // Bits 8-12
-                    $frame = $ponIndex & 0xFF;         // Bits 0-7 (usually 0)
-                    
-                    // If frame seems like it contains encoded data, try alternate layout
-                    if ($frame > 7) {
-                        // Some firmware uses: slot*256 + port
-                        $slot = (int)floor($ponIndex / 256);
-                        $port = $ponIndex % 256;
-                        $frame = 0;
-                        
-                        // If still invalid, try: slot*8 + port
-                        if ($slot > 21 || $port > 15) {
-                            $slot = (int)floor($ponIndex / 8);
-                            $port = $ponIndex % 8;
-                        }
-                    }
+                // Try MA5683T/MA5680T ponIndex encoding method 1:
+                // Format: (frame << 19) | (slot << 13) | (port << 8) | subport
+                $frame1 = ($ponIndex >> 19) & 0x1F;
+                $slot1 = ($ponIndex >> 13) & 0x3F;
+                $port1 = ($ponIndex >> 8) & 0x1F;
+                
+                // Try method 2: ponIndex = frame*8192 + slot*256 + port
+                $frame2 = (int)floor($ponIndex / 8192);
+                $remainder = $ponIndex % 8192;
+                $slot2 = (int)floor($remainder / 256);
+                $port2 = $remainder % 256;
+                
+                // Try method 3: Simple division for some firmware
+                $slot3 = (int)floor($ponIndex / 256);
+                $port3 = $ponIndex % 256;
+                
+                // Pick the method that gives valid values
+                if ($slot1 <= 21 && $port1 <= 15 && $frame1 <= 7) {
+                    $frame = $frame1;
+                    $slot = $slot1;
+                    $port = $port1;
+                } elseif ($slot2 <= 21 && $port2 <= 15 && $frame2 <= 7) {
+                    $frame = $frame2;
+                    $slot = $slot2;
+                    $port = $port2;
+                } elseif ($slot3 <= 21 && $port3 <= 15) {
+                    $frame = 0;
+                    $slot = $slot3;
+                    $port = $port3;
+                } else {
+                    // Last resort: use raw values with sanity limits
+                    $frame = 0;
+                    $slot = min(21, (int)floor($ponIndex / 8));
+                    $port = min(15, $ponIndex % 8);
                 }
                 
                 // Sanity check - valid ranges for MA5683T
                 if ($frame > 7) $frame = 0;
                 if ($slot > 21) $slot = 0;
                 if ($port > 15) $port = 0;
+                if ($onuId > 128) $onuId = 0; // Max 128 ONUs per port
             } else {
                 continue; // Skip invalid entries
             }
