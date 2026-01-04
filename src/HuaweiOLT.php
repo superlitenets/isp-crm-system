@@ -550,7 +550,14 @@ class HuaweiOLT {
         $onus = [];
         $debugCount = 0;
         foreach ($serials as $oid => $serial) {
-            $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
+            // Extract index from OID - handle both "1.3.6..." and "iso.3.6..." formats
+            // Find the last occurrence of ".9." (table column) or extract last 2-3 numeric parts
+            if (preg_match('/\.43\.1\.9\.(.+)$/', $oid, $m)) {
+                $indexPart = $m[1];
+            } else {
+                // Fallback to old method
+                $indexPart = substr($oid, strlen($huaweiONTSerialBase) + 1);
+            }
             $parts = explode('.', $indexPart);
             
             // Log first 5 entries for debugging
@@ -564,13 +571,32 @@ class HuaweiOLT {
             $port = 0;
             $onuId = 0;
             
-            // MA5680T can use different index formats depending on the OID table
+            // MA5680T OID index format: ifIndex.onuId (2-part)
+            // The OID table number (9) should NOT be part of the index
             if (count($parts) >= 4) {
                 // 4-part index: frame.slot.port.onu_id (e.g., 0.1.3.12)
                 $frame = (int)$parts[0];
                 $slot = (int)$parts[1];
                 $port = (int)$parts[2];
                 $onuId = (int)$parts[3];
+            } elseif (count($parts) == 3 && (int)$parts[0] <= 15) {
+                // 3-part index where first part might be table column: skip it
+                // Format: tableCol.ifIndex.onuId - use parts[1] as ifIndex, parts[2] as onuId
+                $ifIndex = (int)$parts[1];
+                $onuId = (int)$parts[2];
+                
+                // Decode ifIndex (e.g., 4194320384 = 0xFA004000)
+                if ($ifIndex > 0xFFFFFF) {
+                    $ponIndex = $ifIndex & 0xFFFFFF;
+                } else {
+                    $ponIndex = $ifIndex;
+                }
+                
+                // MA5683T ponIndex bit layout: (slot << 13) | (port << 8)
+                $slot = ($ponIndex >> 13) & 0x1F;
+                $port = ($ponIndex >> 8) & 0x1F;
+                
+                error_log("3-part decode: ifIndex={$ifIndex}, ponIndex={$ponIndex}, slot={$slot}, port={$port}, onuId={$onuId}");
             } elseif (count($parts) >= 2) {
                 // 2-part index: ifIndex.onuId (Huawei uses ifIndex encoding)
                 $ifIndex = (int)$parts[0];
