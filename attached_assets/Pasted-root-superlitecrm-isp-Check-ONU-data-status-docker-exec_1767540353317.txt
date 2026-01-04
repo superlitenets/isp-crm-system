@@ -1,0 +1,58 @@
+root@superlitecrm:~/isp# # Check ONU data status
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT COUNT(*) as total, COUNT(zone_id) as with_zone, COUNT(onu_type_id) as with_type, COUNT(rx_power) as with_power FROM huawei_onus;"
+
+# Check zones linked to ONUs
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT z.name, COUNT(o.id) as count FROM huawei_zones z LEFT JOIN huawei_onus o ON o.zone_id = z.id GROUP BY z.id, z.name ORDER BY count DESC LIMIT 15;"
+
+# Sample ONUs
+docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT sn, name, zone_id, onu_type_id, rx_power, tx_power, distance FROM huawei_onus LIMIT 10;"
+
+# Check PHP SNMP logs
+docker logs isp_crm_php 2>&1 | tail -100 | grep -i "snmp"
+ total | with_zone | with_type | with_power
+-------+-----------+-----------+------------
+  1144 |       227 |       205 |        226
+(1 row)
+
+        name        | count
+--------------------+-------
+ Majengo_Kiangiciri |    22
+ Modern Paradise    |    14
+ DISCOVERY          |    10
+ SEASONS            |    10
+ KIAMUMBI           |     9
+ FOUNTAIN_JUNIOR    |     9
+ MUMBI              |     9
+ PCEA_GITHURAI      |     8
+ Rurii              |     7
+ ABUNDANT           |     6
+ LOFTY              |     6
+ DYKAAN             |     6
+ CLAYCITY           |     6
+ PIMA GAS           |     6
+ RIFLO              |     6
+(15 rows)
+
+                            sn                            |   name    | zone_id | onu_type_id | rx_power | tx_power | distance
+----------------------------------------------------------+-----------+---------+-------------+----------+----------+----------
+ SNS000150_zone_DYKAAN                                    | ONU 2/0:0 |         |             |          |          |
+ SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016 | ONU 2/0:1 |         |             |          |          |
+ SNS000850_zone_DYKAAN_authd_20240916                     | ONU 2/0:2 |         |             |          |          |
+ SNS000771_zone_DYKAAN_authd_20240724                     | ONU 2/0:3 |         |             |          |          |
+ SNS000582_zone_CARWASH_authd_20240914                    | ONU 2/0:4 |         |             |          |          |
+ SNS000535_zone_DYKAAN_authd_20240914                     | ONU 2/0:5 |         |             |          |          |
+ SNS001035_zone_DYKAAN_authd_20241111                     | ONU 2/0:6 |         |             |          |          |
+ SNS001110_zone_DYKAAN_descr_Peter muchoki_authd_20251203 | ONU 2/0:7 |         |             |          |          |
+ SNS001125_zone_DYKAAN_authd_20241223                     | ONU 2/0:8 |         |             |          |          |
+ SNS001304_zone_DYKAAN_descr_Peter_Morias_authd_20250422  | ONU 2/0:9 |         |             |          |          |
+(10 rows)
+
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+172.18.0.6 -  04/Jan/2026:18:23:00 +0300 "GET /api/snmp-discovery.php" 200
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: 574 entries
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194312192.1 = STRING: "Abdullahi mohammed"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.0 = STRING: "SNS000150_zone_DYKAAN"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.1 = STRING: "SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016"
+NOTICE: PHP message: Fallback SNMP Walk for Descriptions .43.1.2: FAILED
+172.18.0.6 -  04/Jan/202
