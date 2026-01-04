@@ -1647,7 +1647,7 @@ class HuaweiOLT {
     }
     
     /**
-     * Get live data for a single ONU from OLT
+     * Get live data for a single ONU from OLT using CLI via OLT Session Service
      */
     public function getSingleONULiveData(int $oltId, int $frame, ?int $slot, ?int $port, ?int $onuId, string $sn = ''): array {
         $olt = $this->getOLT($oltId);
@@ -1661,75 +1661,35 @@ class HuaweiOLT {
         
         set_time_limit(120);
         
-        $socket = @fsockopen($olt['ip_address'], $olt['telnet_port'] ?: 23, $errno, $errstr, 15);
-        if (!$socket) {
-            return ['success' => false, 'error' => "Connection failed: $errstr"];
+        // Use OLT Session Service for CLI commands (works through VPN)
+        // Build command to get optical info
+        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}";
+        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+        
+        $opticalOutput = '';
+        if ($opticalResult['success']) {
+            $opticalOutput = $opticalResult['output'] ?? '';
         }
         
-        stream_set_timeout($socket, 30);
+        // Get ONU info
+        $infoCmd = "display ont info {$port} {$onuId}";
+        $infoResult = $this->executeCommand($oltId, $infoCmd);
         
-        $password = $this->decrypt($olt['password_encrypted']);
-        
-        // Login
-        $this->readUntilOLT($socket, ['Username:', 'User name:'], 10);
-        fwrite($socket, $olt['username'] . "\n");
-        usleep(300000);
-        
-        $this->readUntilOLT($socket, ['Password:'], 10);
-        fwrite($socket, $password . "\n");
-        usleep(500000);
-        
-        $loginResp = $this->readUntilOLT($socket, ['>', '#', 'fail', 'error'], 10);
-        if (stripos($loginResp, 'fail') !== false || stripos($loginResp, 'error') !== false) {
-            fclose($socket);
-            return ['success' => false, 'error' => 'Login failed'];
+        $infoOutput = '';
+        if ($infoResult['success']) {
+            $infoOutput = $infoResult['output'] ?? '';
         }
         
-        // Disable pagination
-        fwrite($socket, "enable\n");
-        usleep(500000);
-        $this->drainSocketOLT($socket);
-        
-        fwrite($socket, "undo terminal monitor\n");
-        usleep(300000);
-        $this->drainSocketOLT($socket);
-        
-        fwrite($socket, "scroll 512\n");
-        usleep(300000);
-        $this->drainSocketOLT($socket);
-        
-        // Get ONU optical power
-        $cmd = sprintf("display ont optical-info %d %d\n", $port, $onuId);
-        fwrite($socket, "interface gpon $frame/$slot\n");
-        usleep(500000);
-        $this->drainSocketOLT($socket);
-        
-        fwrite($socket, $cmd);
-        usleep(2000000);
-        $opticalOutput = $this->drainSocketOLT($socket);
-        
-        // Get ONU info summary 
-        $cmd2 = sprintf("display ont info %d %d\n", $port, $onuId);
-        fwrite($socket, $cmd2);
-        usleep(2000000);
-        $infoOutput = $this->drainSocketOLT($socket);
-        
-        fwrite($socket, "quit\n");
-        usleep(300000);
-        fwrite($socket, "quit\n");
-        usleep(300000);
-        fclose($socket);
-        
-        // Parse optical power
+        // Parse optical power - ONU's Rx power (what ONU receives from OLT)
         $rxPower = null;
-        $txPower = null;
-        
-        // Parse: RX optical power(dBm)    : -22.85
-        if (preg_match('/RX\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
+        // Parse: Rx optical power(dBm)  : -22.85
+        if (preg_match('/Rx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
             $rxPower = (float)$m[1];
         }
-        // Parse: OLT RX ONT optical power(dBm): -22.23
-        if (preg_match('/OLT\s+RX\s+ONT\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
+        
+        // Parse ONU's Tx power (what ONU sends to OLT)
+        $txPower = null;
+        if (preg_match('/Tx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
             $txPower = (float)$m[1];
         }
         
@@ -1745,7 +1705,6 @@ class HuaweiOLT {
         }
         
         // Parse distance from info output
-        // Formats: "Distance(m) : 1234", "ONU Distance : 1234", "Ont distance(m) : 1234"
         $distance = null;
         if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $infoOutput, $m)) {
             $distance = (int)$m[1];
@@ -2608,31 +2567,29 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU location (slot/port) not set'];
         }
         
-        // Priority: SNMP first (less OLT load, no session conflicts), CLI as fallback
-        $optical = ['success' => false, 'optical' => ['rx_power' => null, 'tx_power' => null]];
+        // Priority: CLI first (reliable via OLT Session Service), SNMP as fallback
+        $optical = $this->getONUOpticalInfoViaCLI(
+            $onu['olt_id'],
+            $frame,
+            $slot,
+            $port,
+            $onuIdNum
+        );
         
-        if (function_exists('snmpget')) {
-            $optical = $this->getONUOpticalInfoViaSNMP(
-                $onu['olt_id'],
-                $frame,
-                $slot,
-                $port,
-                $onuIdNum
-            );
-        }
-        
-        // Fall back to CLI only if SNMP fails or returns no data
+        // Fall back to SNMP only if CLI fails or returns no data
         if (!$optical['success'] || 
             ($optical['optical']['rx_power'] === null && $optical['optical']['tx_power'] === null)) {
-            $cliOptical = $this->getONUOpticalInfoViaCLI(
-                $onu['olt_id'],
-                $frame,
-                $slot,
-                $port,
-                $onuIdNum
-            );
-            if ($cliOptical['success']) {
-                $optical = $cliOptical;
+            if (function_exists('snmpget')) {
+                $snmpOptical = $this->getONUOpticalInfoViaSNMP(
+                    $onu['olt_id'],
+                    $frame,
+                    $slot,
+                    $port,
+                    $onuIdNum
+                );
+                if ($snmpOptical['success']) {
+                    $optical = $snmpOptical;
+                }
             }
         }
         
