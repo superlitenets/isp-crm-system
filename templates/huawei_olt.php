@@ -3379,7 +3379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $message = $result['message'];
                     $messageType = 'success';
                 } else {
-                    $message = $result['message'] ?? 'Failed to get TR-069 IP';
+                    $message = $result['message'] ?? 'Failed to get Management IP';
                     $messageType = 'warning';
                 }
                 break;
@@ -6126,13 +6126,13 @@ try {
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">TR-069 WAN IP</span><br>
+                                <span class="text-primary">Management IP</span><br>
                                 <?php if (!empty($currentOnu['tr069_ip'])): ?>
                                 <span class="text-success fw-bold" id="tr069IpDisplay"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
                                 <?php else: ?>
                                 <span class="text-muted" id="tr069IpDisplay">Click refresh to fetch</span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
@@ -6923,7 +6923,7 @@ try {
                 loadSignalHistory(7);
             })();
             
-            // TR-069 IP refresh function
+            // Management IP refresh function
             async function refreshTR069IP() {
                 const icon = document.getElementById('tr069RefreshIcon');
                 const display = document.getElementById('tr069IpDisplay');
@@ -6944,9 +6944,9 @@ try {
                     // Page will reload with updated IP
                     location.reload();
                 } catch (e) {
-                    console.error('Failed to refresh TR-069 IP:', e);
+                    console.error('Failed to refresh Management IP:', e);
                     icon.classList.remove('spin-animation');
-                    alert('Failed to refresh TR-069 IP');
+                    alert('Failed to refresh Management IP');
                 }
             }
             </script>
