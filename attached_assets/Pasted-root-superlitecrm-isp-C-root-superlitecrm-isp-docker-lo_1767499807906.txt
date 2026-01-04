@@ -1,0 +1,32 @@
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 20 2>&1 | grep -i "optical\|snmp\|error\|power"
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: 574 entries
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194312192.1 = STRING: "Abdullahi mohammed"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.0 = STRING: "SNS000150_zone_DYKAAN"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.1 = STRING: "SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016"
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: 574 entries
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194312192.1 = STRING: "Abdullahi mohammed"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.0 = STRING: "SNS000150_zone_DYKAAN"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.1 = STRING: "SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016"
+NOTICE: PHP message: Fallback SNMP Walk for Descriptions .43.1.2: FAILED
+172.18.0.7 -  04/Jan/2026:07:07:35 +0300 "GET /api/snmp-discovery.php" 200
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail 20 2>&1 | grep -i "optical\|snmp\|error\|power"
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: 574 entries
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194312192.1 = STRING: "Abdullahi mohammed"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.0 = STRING: "SNS000150_zone_DYKAAN"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.1 = STRING: "SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016"
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: 574 entries
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194312192.1 = STRING: "Abdullahi mohammed"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.0 = STRING: "SNS000150_zone_DYKAAN"
+NOTICE: PHP message: SNMP Entry: iso.3.6.1.4.1.2011.6.128.1.1.2.43.1.9.4194320384.1 = STRING: "SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016"
+NOTICE: PHP message: Fallback SNMP Walk for Descriptions .43.1.2: FAILED
+172.18.0.7 -  04/Jan/2026:07:07:35 +0300 "GET /api/snmp-discovery.php" 200
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+NOTICE: PHP message: SNMP Serial Walk Result for OID 1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9: FAILED
+root@superlitecrm:~/isp#
+
