@@ -1757,6 +1757,20 @@ class HuaweiOLT {
             $name = trim($m[1]);
         }
         
+        // Save the optical data to database if we got valid readings
+        if ($rxPower !== null || $txPower !== null) {
+            // Find ONU by serial number and update
+            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+            $stmt->execute([$sn]);
+            $dbOnu = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($dbOnu) {
+                $this->updateONUOpticalInDB($dbOnu['id'], $rxPower, $txPower, $distance);
+                if ($status) {
+                    $this->updateONUStatus($dbOnu['id'], $status);
+                }
+            }
+        }
+        
         return [
             'success' => true,
             'onu' => [
@@ -4870,7 +4884,7 @@ class HuaweiOLT {
     // ==================== Node.js OLT Session Service ====================
     
     private function getOLTServiceUrl(): string {
-        return getenv('OLT_SERVICE_URL') ?: 'http://localhost:3001';
+        return getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
     }
     
     private function callOLTService(string $endpoint, array $data = [], string $method = 'POST'): array {
