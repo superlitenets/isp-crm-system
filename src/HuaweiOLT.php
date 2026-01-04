@@ -617,19 +617,21 @@ class HuaweiOLT {
                 
                 error_log("Decode attempts: M1[s={$slot1},p={$port1}] M2[s={$slot2},p={$port2}] M3[s={$slot3},p={$port3}] M4[f={$frame4},s={$slot4},p={$port4}] M5[s={$slot5},p={$port5}]");
                 
-                // Pick the first method that gives valid values (non-zero and in range)
-                if ($slot1 > 0 && $slot1 <= 21 && $port1 <= 15) {
+                // Pick the first method that gives valid values
+                // For small ponIndex values (like 9), M3/M4 work best: ponIndex = port directly
+                if ($ponIndex <= 15) {
+                    // Small ponIndex - it's likely just the port number directly
+                    $frame = 0;
+                    $slot = 0;
+                    $port = $ponIndex;
+                } elseif ($slot1 >= 0 && $slot1 <= 21 && $port1 <= 15 && ($slot1 > 0 || $port1 > 0)) {
                     $frame = $frame1;
                     $slot = $slot1;
                     $port = $port1;
-                } elseif ($slot2 > 0 && $slot2 <= 21 && $port2 <= 15) {
+                } elseif ($slot2 >= 0 && $slot2 <= 21 && $port2 <= 15 && ($slot2 > 0 || $port2 > 0)) {
                     $frame = $frame2;
                     $slot = $slot2;
                     $port = $port2;
-                } elseif ($slot5 > 0 && $slot5 <= 21 && $port5 <= 15) {
-                    $frame = 0;
-                    $slot = $slot5;
-                    $port = $port5;
                 } elseif ($slot4 <= 21 && $port4 <= 15 && $frame4 <= 7) {
                     $frame = $frame4;
                     $slot = $slot4;

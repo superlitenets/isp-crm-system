@@ -1,0 +1,102 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php 2>&1 | tail -100
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: ifIndex decoding: ifIndex=9 (0x9), ponIndex=9 (0x9)
+NOTICE: PHP message: Decode attempts: M1[s=0,p=0] M2[s=0,p=0] M3[s=0,p=9] M4[f=0,s=0,p=9] M5[s=0,p=0]
+NOTICE: PHP message: Parsed 574 ONUs from SNMP
+172.18.0.6 -  04/Jan/2026:17:29:30 +0300 "GET /api/snmp-discovery.php" 200
+172.18.0.6 -  04/Jan/2026:17:30:02 +0300 "GET /cron.php" 403
+172.18.0.6 -  04/Jan/2026:17:30:02 +0300 "GET /cron.php" 200
+root@superlitecrm:~/isp#
