@@ -1,0 +1,461 @@
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:06:26.229+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767513986:229523][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 586, snapshot max: 586 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:07:26.239+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514046:239702][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 588, snapshot max: 588 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:08:26.253+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514106:253642][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 590, snapshot max: 590 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:09:26.265+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514166:265688][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 592, snapshot max: 592 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:10:26.279+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514226:279653][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 594, snapshot max: 594 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:11:26.291+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514286:291191][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 596, snapshot max: 596 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:12:26.304+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514346:304718][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 598, snapshot max: 598 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:13:26.315+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514406:315726][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 600, snapshot max: 600 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:14:26.329+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514466:329358][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 602, snapshot max: 602 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:15:26.341+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514526:341673][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 604, snapshot max: 604 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:16:26.355+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514586:355571][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 606, snapshot max: 606 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:17:26.368+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514646:368215][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 608, snapshot max: 608 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:18:26.382+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514706:382467][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 610, snapshot max: 610 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:19:26.405+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514766:405217][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 612, snapshot max: 612 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:20:26.421+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514826:421018][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 614, snapshot max: 614 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:21:26.432+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514886:432771][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 616, snapshot max: 616 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:22:26.445+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767514946:445486][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 618, snapshot max: 618 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:23:26.457+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515006:457481][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 620, snapshot max: 620 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:24:26.471+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515066:471558][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 622, snapshot max: 622 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:25:26.481+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515126:481536][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 624, snapshot max: 624 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:26:26.498+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515186:498296][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 626, snapshot max: 626 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | (0) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:27:26.508+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515246:508643][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 628, snapshot max: 628 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | (0) sql:    --> SFL001
+isp_crm_freeradius      | (0) sql: SQL-User-Name set to 'SFL001'
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:28:26.524+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515306:524251][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 633, snapshot max: 633 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | (0) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:29:26.567+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515366:567426][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 636, snapshot max: 636 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | (0) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '31500 seconds', '0'::bigint * 4294967296 + '615688'::bigint, '0'::bigint * 4294967296 + '10662'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (0) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '31500 seconds', '0'::bigint * 4294967296 + '615688'::bigint, '0'::bigint * 4294967296 + '10662'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (0) sql: SQL query returned: success
+isp_crm_freeradius      | (0) sql: 1 record(s) updated
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:30:26.596+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515426:596722][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 638, snapshot max: 638 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:31:26.608+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515486:608377][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 640, snapshot max: 640 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:32:26.621+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515546:621032][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 645, snapshot max: 645 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:33:26.656+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515606:656931][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 649, snapshot max: 649 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:34:26.671+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515666:671332][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 652, snapshot max: 652 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:35:26.686+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515726:686476][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 654, snapshot max: 654 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:36:26.708+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515786:708575][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 656, snapshot max: 656 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:37:26.720+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515846:720087][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 658, snapshot max: 658 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:38:26.732+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515906:732387][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 660, snapshot max: 660 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:39:26.745+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767515966:745027][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 665, snapshot max: 665 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:40:26.766+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516026:766238][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 668, snapshot max: 668 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:41:26.777+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516086:777881][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 670, snapshot max: 670 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:42:26.788+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516146:788818][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 675, snapshot max: 675 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:43:26.815+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516206:815358][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 678, snapshot max: 678 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:44:26.830+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516266:830242][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 681, snapshot max: 681 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:45:26.842+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516326:842038][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 684, snapshot max: 684 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:46:26.859+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516386:859886][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 686, snapshot max: 686 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:47:26.870+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516446:870486][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 688, snapshot max: 688 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:48:26.885+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516506:884993][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 690, snapshot max: 690 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:49:26.895+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516566:895524][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 692, snapshot max: 692 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:50:26.909+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516626:909363][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 694, snapshot max: 694 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:51:26.919+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516686:919507][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 696, snapshot max: 696 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:52:26.931+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516746:931226][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 698, snapshot max: 698 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:53:26.942+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516806:941998][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 700, snapshot max: 700 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:54:26.954+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516866:954437][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 702, snapshot max: 702 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:55:26.965+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516926:965073][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 704, snapshot max: 704 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:56:26.977+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767516986:977583][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 706, snapshot max: 706 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:57:26.988+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517046:988857][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 708, snapshot max: 708 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:58:27.000+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517107:302][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 710, snapshot max: 710 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T08:59:27.010+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517167:10827][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 712, snapshot max: 712 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:00:27.024+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517227:24249][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 714, snapshot max: 714 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:01:27.034+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517287:34288][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 716, snapshot max: 716 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:02:27.049+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517347:49016][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 727, snapshot max: 727 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:03:27.102+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517407:102208][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 730, snapshot max: 730 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:04:27.139+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517467:139036][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 732, snapshot max: 732 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (5), 1 of 27 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1642
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (4) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (3) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (2) - Hit idle_timeout limit
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:05:27.150+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517527:150861][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 734, snapshot max: 734 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:06:27.161+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517587:161505][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 736, snapshot max: 736 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (1) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (0)     [sql] = ok
+isp_crm_freeradius      | (0)     [exec] = noop
+isp_crm_freeradius      | (0) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (0) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (0) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (0)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (0)   } # accounting = updated
+isp_crm_freeradius      | (0) Sent Accounting-Response Id 226 from 172.18.0.5:1813 to 10.200.0.5:49610 length 20
+isp_crm_freeradius      | (0) Finished request
+isp_crm_freeradius      | (0) Cleaning up request packet ID 226 with timestamp +74 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (1) Received Accounting-Request Id 227 from 10.200.0.5:54147 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (1)   Service-Type = Framed-User
+isp_crm_freeradius      | (1)   Framed-Protocol = PPP
+isp_crm_freeradius      | (1)   NAS-Port = 15728657
+isp_crm_freeradius      | (1)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (1)   User-Name = "SFL001"
+isp_crm_freeradius      | (1)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (1)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (1)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (1)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (1)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (1)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (1)   Event-Timestamp = "Jan  4 2026 08:52:01 UTC"
+isp_crm_freeradius      | (1)   Acct-Session-Time = 31800
+isp_crm_freeradius      | (1)   Idle-Timeout = 0
+isp_crm_freeradius      | (1)   Session-Timeout = 2592000
+isp_crm_freeradius      | (1)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (1)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (1)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (1)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (1)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (1)   Acct-Input-Octets = 617368
+isp_crm_freeradius      | (1)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (1)   Acct-Input-Packets = 7354
+isp_crm_freeradius      | (1)   Acct-Output-Octets = 12342
+isp_crm_freeradius      | (1)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (1)   Acct-Output-Packets = 152
+isp_crm_freeradius      | (1)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (1)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (1)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (1)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (1) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (1)   preacct {
+isp_crm_freeradius      | (1)     [preprocess] = ok
+isp_crm_freeradius      | (1) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (1) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (1) suffix: No such realm "NULL"
+isp_crm_freeradius      | (1)     [suffix] = noop
+isp_crm_freeradius      | (1)     [files] = noop
+isp_crm_freeradius      | (1)   } # preacct = ok
+isp_crm_freeradius      | (1) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (1)   accounting {
+isp_crm_freeradius      | (1) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (1) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (1) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (1) detail: EXPAND %t
+isp_crm_freeradius      | (1) detail:    --> Sun Jan  4 08:52:01 2026
+isp_crm_freeradius      | (1)     [detail] = ok
+isp_crm_freeradius      | (1)     [unix] = noop
+isp_crm_freeradius      | (1) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (1) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (1) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (1) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (1) sql:    --> SFL001
+isp_crm_freeradius      | (1) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (1) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (1) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '31800 seconds', '0'::bigint * 4294967296 + '617368'::bigint, '0'::bigint * 4294967296 + '12342'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (1) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '31800 seconds', '0'::bigint * 4294967296 + '617368'::bigint, '0'::bigint * 4294967296 + '12342'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (1) sql: SQL query returned: success
+isp_crm_freeradius      | (1) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (6), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1695
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (5) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (1)     [sql] = ok
+isp_crm_freeradius      | (1)     [exec] = noop
+isp_crm_freeradius      | (1) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (1) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (1) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (1)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (1)   } # accounting = updated
+isp_crm_freeradius      | (1) Sent Accounting-Response Id 227 from 172.18.0.5:1813 to 10.200.0.5:54147 length 20
+isp_crm_freeradius      | (1) Finished request
+isp_crm_freeradius      | (1) Cleaning up request packet ID 227 with timestamp +374 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (2) Received Accounting-Request Id 228 from 10.200.0.5:41913 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (2)   Service-Type = Framed-User
+isp_crm_freeradius      | (2)   Framed-Protocol = PPP
+isp_crm_freeradius      | (2)   NAS-Port = 15728657
+isp_crm_freeradius      | (2)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (2)   User-Name = "SFL001"
+isp_crm_freeradius      | (2)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (2)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (2)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (2)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (2)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (2)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (2)   Event-Timestamp = "Jan  4 2026 08:57:01 UTC"
+isp_crm_freeradius      | (2)   Acct-Session-Time = 32100
+isp_crm_freeradius      | (2)   Idle-Timeout = 0
+isp_crm_freeradius      | (2)   Session-Timeout = 2592000
+isp_crm_freeradius      | (2)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (2)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (2)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (2)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (2)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (2)   Acct-Input-Octets = 618964
+isp_crm_freeradius      | (2)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (2)   Acct-Input-Packets = 7373
+isp_crm_freeradius      | (2)   Acct-Output-Octets = 13938
+isp_crm_freeradius      | (2)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (2)   Acct-Output-Packets = 171
+isp_crm_freeradius      | (2)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (2)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (2)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (2)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (2) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (2)   preacct {
+isp_crm_freeradius      | (2)     [preprocess] = ok
+isp_crm_freeradius      | (2) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (2) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (2) suffix: No such realm "NULL"
+isp_crm_freeradius      | (2)     [suffix] = noop
+isp_crm_freeradius      | (2)     [files] = noop
+isp_crm_freeradius      | (2)   } # preacct = ok
+isp_crm_freeradius      | (2) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (2)   accounting {
+isp_crm_freeradius      | (2) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (2) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (2) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (2) detail: EXPAND %t
+isp_crm_freeradius      | (2) detail:    --> Sun Jan  4 08:57:01 2026
+isp_crm_freeradius      | (2)     [detail] = ok
+isp_crm_freeradius      | (2)     [unix] = noop
+isp_crm_freeradius      | (2) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (2) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (2) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (2) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (2) sql:    --> SFL001
+isp_crm_freeradius      | (2) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (2) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (2) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32100 seconds', '0'::bigint * 4294967296 + '618964'::bigint, '0'::bigint * 4294967296 + '13938'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (2) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32100 seconds', '0'::bigint * 4294967296 + '618964'::bigint, '0'::bigint * 4294967296 + '13938'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (2) sql: SQL query returned: success
+isp_crm_freeradius      | (2) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (7), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1735
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (6) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (2)     [sql] = ok
+isp_crm_freeradius      | (2)     [exec] = noop
+isp_crm_freeradius      | (2) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (2) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (2) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (2)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (2)   } # accounting = updated
+isp_crm_freeradius      | (2) Sent Accounting-Response Id 228 from 172.18.0.5:1813 to 10.200.0.5:41913 length 20
+isp_crm_freeradius      | (2) Finished request
+isp_crm_freeradius      | (2) Cleaning up request packet ID 228 with timestamp +674 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (3) Received Accounting-Request Id 229 from 10.200.0.5:49589 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (3)   Service-Type = Framed-User
+isp_crm_freeradius      | (3)   Framed-Protocol = PPP
+isp_crm_freeradius      | (3)   NAS-Port = 15728657
+isp_crm_freeradius      | (3)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (3)   User-Name = "SFL001"
+isp_crm_freeradius      | (3)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (3)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (3)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (3)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (3)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (3)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (3)   Event-Timestamp = "Jan  4 2026 09:02:01 UTC"
+isp_crm_freeradius      | (3)   Acct-Session-Time = 32400
+isp_crm_freeradius      | (3)   Idle-Timeout = 0
+isp_crm_freeradius      | (3)   Session-Timeout = 2592000
+isp_crm_freeradius      | (3)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (3)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (3)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (3)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (3)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (3)   Acct-Input-Octets = 620644
+isp_crm_freeradius      | (3)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (3)   Acct-Input-Packets = 7393
+isp_crm_freeradius      | (3)   Acct-Output-Octets = 15618
+isp_crm_freeradius      | (3)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (3)   Acct-Output-Packets = 191
+isp_crm_freeradius      | (3)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (3)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (3)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (3)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (3) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (3)   preacct {
+isp_crm_freeradius      | (3)     [preprocess] = ok
+isp_crm_freeradius      | (3) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (3) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (3) suffix: No such realm "NULL"
+isp_crm_freeradius      | (3)     [suffix] = noop
+isp_crm_freeradius      | (3)     [files] = noop
+isp_crm_freeradius      | (3)   } # preacct = ok
+isp_crm_freeradius      | (3) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (3)   accounting {
+isp_crm_freeradius      | (3) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (3) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (3) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (3) detail: EXPAND %t
+isp_crm_freeradius      | (3) detail:    --> Sun Jan  4 09:02:01 2026
+isp_crm_freeradius      | (3)     [detail] = ok
+isp_crm_freeradius      | (3)     [unix] = noop
+isp_crm_freeradius      | (3) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (3) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (3) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (3) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (3) sql:    --> SFL001
+isp_crm_freeradius      | (3) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (3) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (3) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32400 seconds', '0'::bigint * 4294967296 + '620644'::bigint, '0'::bigint * 4294967296 + '15618'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (3) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32400 seconds', '0'::bigint * 4294967296 + '620644'::bigint, '0'::bigint * 4294967296 + '15618'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (3) sql: SQL query returned: success
+isp_crm_freeradius      | (3) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (8), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1774
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (7) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (3)     [sql] = ok
+isp_crm_freeradius      | (3)     [exec] = noop
+isp_crm_freeradius      | (3) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (3) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (3) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (3)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (3)   } # accounting = updated
+isp_crm_freeradius      | (3) Sent Accounting-Response Id 229 from 172.18.0.5:1813 to 10.200.0.5:49589 length 20
+isp_crm_freeradius      | (3) Finished request
+isp_crm_freeradius      | (3) Cleaning up request packet ID 229 with timestamp +974 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (4) Received Accounting-Request Id 230 from 10.200.0.5:56623 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (4)   Service-Type = Framed-User
+isp_crm_freeradius      | (4)   Framed-Protocol = PPP
+isp_crm_freeradius      | (4)   NAS-Port = 15728657
+isp_crm_freeradius      | (4)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (4)   User-Name = "SFL001"
+isp_crm_freeradius      | (4)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (4)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (4)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (4)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (4)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (4)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (4)   Event-Timestamp = "Jan  4 2026 09:07:01 UTC"
+isp_crm_freeradius      | (4)   Acct-Session-Time = 32700
+isp_crm_freeradius      | (4)   Idle-Timeout = 0
+isp_crm_freeradius      | (4)   Session-Timeout = 2592000
+isp_crm_freeradius      | (4)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (4)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (4)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (4)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (4)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (4)   Acct-Input-Octets = 622324
+isp_crm_freeradius      | (4)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (4)   Acct-Input-Packets = 7413
+isp_crm_freeradius      | (4)   Acct-Output-Octets = 17298
+isp_crm_freeradius      | (4)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (4)   Acct-Output-Packets = 211
+isp_crm_freeradius      | (4)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (4)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (4)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (4)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (4) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (4)   preacct {
+isp_crm_freeradius      | (4)     [preprocess] = ok
+isp_crm_freeradius      | (4) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (4) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (4) suffix: No such realm "NULL"
+isp_crm_freeradius      | (4)     [suffix] = noop
+isp_crm_freeradius      | (4)     [files] = noop
+isp_crm_freeradius      | (4)   } # preacct = ok
+isp_crm_freeradius      | (4) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (4)   accounting {
+isp_crm_freeradius      | (4) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (4) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (4) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (4) detail: EXPAND %t
+isp_crm_freeradius      | (4) detail:    --> Sun Jan  4 09:07:01 2026
+isp_crm_freeradius      | (4)     [detail] = ok
+isp_crm_freeradius      | (4)     [unix] = noop
+isp_crm_freeradius      | (4) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (4) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (4) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (4) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (4) sql:    --> SFL001
+isp_crm_freeradius      | (4) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (4) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (4) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32700 seconds', '0'::bigint * 4294967296 + '622324'::bigint, '0'::bigint * 4294967296 + '17298'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (4) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32700 seconds', '0'::bigint * 4294967296 + '622324'::bigint, '0'::bigint * 4294967296 + '17298'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (4) sql: SQL query returned: success
+isp_crm_freeradius      | (4) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (9), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1813
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (8) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (4)     [sql] = ok
+isp_crm_freeradius      | (4)     [exec] = noop
+isp_crm_freeradius      | (4) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (4) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (4) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (4)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (4)   } # accounting = updated
+isp_crm_freeradius      | (4) Sent Accounting-Response Id 230 from 172.18.0.5:1813 to 10.200.0.5:56623 length 20
+isp_crm_freeradius      | (4) Finished request
+isp_crm_freeradius      | (4) Cleaning up request packet ID 230 with timestamp +1274 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:07:27.173+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517647:173119][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 738, snapshot max: 738 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_nginx           | 193.142.147.209 - - [04/Jan/2026:09:07:29 +0000] "GET
+/ HTTP/1.1" 499 0 "http://102.205.236.243:80" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "-"
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_db              | 2026-01-04 09:07:33.146 UTC [26] LOG:  checkpoint complete: wrote 95 buffers (0.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=9.445 s, sync=0.008 s, total=9.460 s; sync files=23, longest=0.005 s, average=0.001 s; distance=458 kB, estimate=458 kB
