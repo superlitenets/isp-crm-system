@@ -6764,8 +6764,8 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         
         // Huawei MA5683T requires interface context for ont reset
-        // Use forceDirectConnection=true to bypass Node.js service and use direct Telnet
-        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\nquit";
+        // The reset command requires "y" confirmation: "Are you sure to reset the ONT(s)? (y/n)[n]:"
+        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\ny\r\nquit";
         $result = $this->executeCommand($onu['olt_id'], $command, true);
         
         // Check for success indicators in output
@@ -6824,8 +6824,8 @@ class HuaweiOLT {
             $allOutput .= "[Delete SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
         }
         
-        // Step 2: Delete the ONU
-        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\nquit";
+        // Step 2: Delete the ONU (requires "y" confirmation)
+        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
         $result = $this->executeCommand($oltId, $command);
         
         // Check for success indicators in output
@@ -6867,8 +6867,8 @@ class HuaweiOLT {
         $port = $onu['port'];
         $onuIdNum = $onu['onu_id'];
         
-        // Huawei MA5683T requires interface context
-        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\nquit";
+        // Huawei MA5683T requires interface context (requires "y" confirmation)
+        $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\ny\r\nquit";
         $result = $this->executeCommand($onu['olt_id'], $command);
         
         $this->addLog([
