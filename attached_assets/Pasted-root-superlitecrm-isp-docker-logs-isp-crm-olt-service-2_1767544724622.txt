@@ -1,0 +1,52 @@
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service 2>&1 | tail -50
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Trying SNMP discovery for G45_OLT...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] SNMP API error: timeout of 30000ms exceeded
+[OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+[Discovery] Sending 3 new ONU notifications...
+[Discovery] Discovery cycle complete
+[Discovery] Failed to notify provisioning group (will retry next cycle): Request failed with status code 405
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 78ms - Success: 2, Failed: 0
+[Discovery] Starting discovery cycle...
+[Discovery] Found 2 active OLTs
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Trying SNMP discovery for HRM_OLT...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 75ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] SNMP API error: timeout of 30000ms exceeded
+[OLT 2] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+[Discovery] Checking OLT: G45_OLT (10.98.0.3)
+[Discovery] Trying SNMP discovery for G45_OLT...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] Completed in 79ms - Success: 2, Failed: 0
+[Discovery] Already running, skipping...
+[Discovery] SNMP API error: timeout of 30000ms exceeded
+[OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+[Discovery] Sending 3 new ONU notifications...
+[Discovery] Failed to notify provisioning group (will retry next cycle): Request failed with status code 405
+[Discovery] Discovery cycle complete
+root@superlitecrm:~/isp#
