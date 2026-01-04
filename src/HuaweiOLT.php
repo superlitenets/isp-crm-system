@@ -989,22 +989,17 @@ class HuaweiOLT {
         foreach ($result['onus'] as $onu) {
             $existing = $this->getONUBySN($onu['sn']);
             
-            // Generate a meaningful name from description - extract SNS code only
+            // Generate a meaningful name from description - use first part before underscore
             $onuName = '';
             $desc = $onu['description'] ?? '';
             if (!empty($desc)) {
-                // Extract SNS/SFL code (e.g., SNS000540, SFL0034) from description
-                if (preg_match('/^(SNS\d+|SFL\d+)/i', $desc, $m)) {
-                    $onuName = strtoupper($m[1]);
-                } else {
-                    // If no SNS code, use first part before underscore
-                    $parts = explode('_', $desc);
-                    $onuName = $parts[0];
-                }
+                // Truncate at first underscore
+                $parts = explode('_', $desc);
+                $onuName = trim($parts[0]);
             }
             if (empty($onuName)) {
                 // Fallback to location-based name
-                $onuName = "Port {$onu['slot']}/{$onu['port']} ONU #{$onu['onu_id']}";
+                $onuName = "ONU {$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             }
             
             // ONUs visible via SNMP are already authorized on the OLT

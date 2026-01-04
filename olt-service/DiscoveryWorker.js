@@ -158,16 +158,12 @@ class DiscoveryWorker {
                 let onuName = '';
                 const desc = snmpData.description || '';
                 if (desc) {
-                    const match = desc.match(/^(SNS\d+|SFL\d+)/i);
-                    if (match) {
-                        onuName = match[1].toUpperCase();
-                    } else {
-                        const parts = desc.split('_');
-                        onuName = parts[0];
-                    }
+                    // Truncate at first underscore
+                    const parts = desc.split('_');
+                    onuName = parts[0].trim();
                 }
                 if (!onuName) {
-                    onuName = `Port ${snmpData.slot || 0}/${snmpData.port || 0} ONU #${snmpData.onu_id || 0}`;
+                    onuName = `ONU ${snmpData.slot || 0}/${snmpData.port || 0}:${snmpData.onu_id || 0}`;
                 }
 
                 await this.pool.query(`
