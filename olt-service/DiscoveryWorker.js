@@ -98,25 +98,9 @@ class DiscoveryWorker {
     }
 
     async discoverViaSNMP(olt) {
-        // Call PHP API to use SNMP for ONU list and optical info
-        const url = `${this.phpApiUrl}/api/snmp-discovery.php?olt_id=${olt.id}`;
-        console.log(`[Discovery] Trying SNMP discovery for ${olt.name}...`);
-        
-        try {
-            const response = await axios.get(url, { timeout: 30000 });
-            if (response.data && response.data.success) {
-                const onus = response.data.onus || [];
-                console.log(`[Discovery] SNMP found ${onus.length} ONUs on ${olt.name}`);
-                
-                // Update optical power and distance in database
-                for (const onu of onus) {
-                    await this.updateOnuFromSNMP(olt.id, onu);
-                }
-                return true;
-            }
-        } catch (error) {
-            console.log(`[Discovery] SNMP API error: ${error.message}`);
-        }
+        // PHP-based SNMP discovery disabled - it blocks the single-threaded PHP server
+        // SNMP polling is handled separately by SNMPWorker.js
+        console.log(`[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)`);
         return false;
     }
 

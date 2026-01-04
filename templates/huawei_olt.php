@@ -3737,7 +3737,8 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         'status' => $currentOnu['status']
     ];
     
-    // Fetch TR-069 device info
+    // Fetch TR-069 device info from local database only (no network calls)
+    // Live GenieACS data is fetched via AJAX to prevent page hanging
     $tr069Device = null;
     $tr069Info = null;
     $pendingTr069Config = null;
@@ -3760,32 +3761,8 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
             $pendingTr069Config['config'] = json_decode($pendingTr069Config['config_data'], true);
         }
         
-        // If device found in local table and GenieACS is configured, get live info
-        if ($genieacsConfigured && $tr069Device && $tr069Device['device_id']) {
-            $deviceResult = $genieacs->getDeviceInfo($tr069Device['device_id']);
-            if ($deviceResult['success']) {
-                $tr069Info = $deviceResult['info'];
-            }
-        }
-        // Fallback: If not in local table but GenieACS is configured, try direct lookup
-        elseif ($genieacsConfigured && !$tr069Device && !empty($currentOnu['sn'])) {
-            $deviceResult = $genieacs->getDeviceBySerial($currentOnu['sn']);
-            if ($deviceResult['success'] && isset($deviceResult['device'])) {
-                $device = $deviceResult['device'];
-                $deviceId = $device['_id'] ?? '';
-                // Create a pseudo tr069Device for display
-                $tr069Device = [
-                    'device_id' => $deviceId,
-                    'serial_number' => $currentOnu['sn'],
-                    'from_genieacs' => true
-                ];
-                // Get device info
-                $infoResult = $genieacs->getDeviceInfo($deviceId);
-                if ($infoResult['success']) {
-                    $tr069Info = $infoResult['info'];
-                }
-            }
-        }
+        // Skip live GenieACS calls on page load - they are slow and can timeout
+        // TR-069 info can be refreshed via AJAX when user clicks the refresh button
     } catch (Exception $e) {
         // TR-069 tables may not exist yet
     }
@@ -6349,10 +6326,8 @@ try {
                 }
             }
             
-            // Auto-start live mode when page loads
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(toggleLiveMode, 1000); // Start after 1 second
-            });
+            // Live mode is manually started by clicking the button
+            // Auto-start disabled to prevent page hanging on load
             
             function toggleOnuModeEdit() {
                 const display = document.getElementById('onuModeDisplay');
