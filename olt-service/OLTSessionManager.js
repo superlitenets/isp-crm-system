@@ -265,6 +265,22 @@ class OLTSession {
     }
 
     async sendCommand(command, timeout = 60000) {
+        // Check if this is a multi-line command - if so, split and send sequentially
+        const lines = command.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length > 1) {
+            console.log(`[OLT ${this.oltId}] Multi-line command detected (${lines.length} lines), sending sequentially`);
+            let fullResponse = '';
+            for (const line of lines) {
+                const response = await this.sendSingleCommand(line, timeout);
+                fullResponse += response;
+            }
+            return fullResponse;
+        }
+        
+        return this.sendSingleCommand(command, timeout);
+    }
+    
+    async sendSingleCommand(command, timeout = 60000) {
         // Flush any stale data first by sending empty line and waiting
         await this.flushBuffer();
         
@@ -282,7 +298,7 @@ class OLTSession {
                 response += chunk;
                 
                 // Only start collecting after we see echo of our command
-                if (!commandSeen && response.includes(command.split('\r\n')[0])) {
+                if (!commandSeen && response.includes(command.substring(0, 20))) {
                     commandSeen = true;
                 }
                 
