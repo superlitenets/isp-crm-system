@@ -328,17 +328,20 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send telnet negotiation to reinforce character mode, then command
-            // This ensures LINEMODE doesn't get re-applied between commands
+            // Send telnet negotiation first to reinforce character mode
             const telnetNegotiation = Buffer.from([
                 IAC, WILL, OPT_SGA,       // We will suppress go-ahead
                 IAC, DONT, OPT_LINEMODE,  // Don't use linemode (prevents space stripping)
                 IAC, DO, OPT_SGA          // Server should suppress go-ahead
             ]);
-            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
-            const fullBuffer = Buffer.concat([telnetNegotiation, cmdBuffer]);
-            console.log(`[OLT ${this.oltId}] Sending: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
-            this.socket.write(fullBuffer);
+            this.socket.write(telnetNegotiation);
+            
+            // Wait briefly for negotiation to process, then send command
+            setTimeout(() => {
+                const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
+                console.log(`[OLT ${this.oltId}] Sending: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
+                this.socket.write(cmdBuffer);
+            }, 50);
         });
     }
     

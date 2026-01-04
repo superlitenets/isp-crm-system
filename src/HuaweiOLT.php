@@ -1872,30 +1872,48 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'Slot, port and ONU ID required'];
         }
         
-        set_time_limit(120);
+        set_time_limit(180);
         
         // Use OLT Session Service for CLI commands (works through VPN)
-        // Build command to get optical info
-        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}";
-        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+        // Execute commands sequentially - each waits for its prompt
+        $fullOutput = '';
         
+        // 1. Enter interface context
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
+        $this->executeViaService($oltId, $interfaceCmd, 30000);
+        
+        // 2. Get optical info
+        $opticalCmd = "display ont optical-info {$port} {$onuId}";
+        $opticalResult = $this->executeViaService($oltId, $opticalCmd, 30000);
         $opticalOutput = '';
         if ($opticalResult['success']) {
             $opticalOutput = $opticalResult['output'] ?? '';
-            // Strip ANSI escape codes
             $opticalOutput = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $opticalOutput);
+            $fullOutput .= $opticalOutput;
         }
         
-        // Get ONU info (needs interface context)
-        $infoCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId}\r\nquit";
-        $infoResult = $this->executeCommand($oltId, $infoCmd);
-        
+        // 3. Get ONU info
+        $infoCmd = "display ont info {$port} {$onuId}";
+        $infoResult = $this->executeViaService($oltId, $infoCmd, 30000);
         $infoOutput = '';
         if ($infoResult['success']) {
             $infoOutput = $infoResult['output'] ?? '';
-            // Strip ANSI escape codes
             $infoOutput = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $infoOutput);
+            $fullOutput .= $infoOutput;
         }
+        
+        // 4. Get WAN info (for Management IP)
+        $wanCmd = "display ont wan-info {$port} {$onuId}";
+        $wanResult = $this->executeViaService($oltId, $wanCmd, 30000);
+        $wanOutput = '';
+        if ($wanResult['success']) {
+            $wanOutput = $wanResult['output'] ?? '';
+            $wanOutput = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $wanOutput);
+            $fullOutput .= $wanOutput;
+        }
+        
+        // 5. Exit interface context
+        $this->executeViaService($oltId, "quit", 5000);
         
         // Parse optical power - ONU's Rx power (what ONU receives from OLT)
         $rxPower = null;
@@ -1947,14 +1965,14 @@ class HuaweiOLT {
             $name = trim($m[1]);
         }
         
-        // Note: TR-069 WAN IP is fetched separately via refresh button to keep live refresh fast
-        // Get existing tr069_ip from database
+        // Parse TR-069 WAN IP from wan-info output
+        // Format: IPv4 address : 10.97.132.28
         $tr069Ip = null;
-        $stmt = $this->db->prepare("SELECT tr069_ip FROM huawei_onus WHERE sn = ?");
-        $stmt->execute([$sn]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if ($row && !empty($row['tr069_ip'])) {
-            $tr069Ip = $row['tr069_ip'];
+        if (preg_match('/IPv4\s+address\s*:\s*([\d.]+)/i', $wanOutput, $m)) {
+            $ip = $m[1];
+            if ($ip && $ip !== '0.0.0.0') {
+                $tr069Ip = $ip;
+            }
         }
         
         // Save the optical data to database if we got valid readings
@@ -3671,7 +3689,7 @@ class HuaweiOLT {
                    'vlan_id', 'vlan_priority', 'ip_mode', 'line_profile_id', 'srv_profile_id',
                    'tr069_profile_id', 'zone', 'zone_id', 'area', 'customer_name', 'auth_date',
                    'phone', 'address', 'latitude', 'longitude', 'installation_date',
-                   'pppoe_username', 'pppoe_password', 'onu_type_id', 'tr069_status'];
+                   'pppoe_username', 'pppoe_password', 'onu_type_id', 'tr069_status', 'tr069_ip'];
         $booleanFields = ['is_authorized'];
         $updates = [];
         $params = [];
