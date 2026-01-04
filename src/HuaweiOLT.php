@@ -1943,9 +1943,9 @@ class HuaweiOLT {
             $name = trim($m[1]);
         }
         
-        // Get TR-069 WAN IP via display ont wan-info command
+        // Get TR-069 WAN IP via display ont wan-info command (needs interface context)
         $tr069Ip = null;
-        $wanCmd = "display ont wan-info {$port} {$onuId}\r\nquit";
+        $wanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont wan-info {$port} {$onuId}\r\nquit";
         $wanResult = $this->executeCommand($oltId, $wanCmd);
         if ($wanResult['success']) {
             $wanOutput = $wanResult['output'] ?? '';
