@@ -569,9 +569,9 @@ class HuaweiOLT {
                 $ifIndex = (int)$parts[0];
                 $onuId = (int)$parts[1];
                 
-                // Huawei ifIndex decoding for GPON interfaces
-                // Format: 0xFA000000 | (frame << 19) | (slot << 13) | (port << 8) | subport
-                // OR alternate: ponIndex = frame*8192 + slot*256 + port
+                // Huawei MA5683T/MA5680T ifIndex decoding
+                // Format: 0xFA000000 | ponIndex where ponIndex encodes frame/slot/port
+                // The exact bit layout varies by firmware version
                 
                 if ($ifIndex > 0xFFFFFF) {
                     // Strip interface type prefix (0xFA...) to get ponIndex
@@ -580,47 +580,73 @@ class HuaweiOLT {
                     $ponIndex = $ifIndex;
                 }
                 
-                // Try MA5683T/MA5680T ponIndex encoding method 1:
-                // Format: (frame << 19) | (slot << 13) | (port << 8) | subport
-                $frame1 = ($ponIndex >> 19) & 0x1F;
-                $slot1 = ($ponIndex >> 13) & 0x3F;
+                // Log for debugging
+                error_log("ifIndex decoding: ifIndex={$ifIndex} (0x" . dechex($ifIndex) . "), ponIndex={$ponIndex} (0x" . dechex($ponIndex) . ")");
+                
+                // Method 1: Common MA5683T format - (slot << 13) | (port << 8)
+                // slot in bits 13-17, port in bits 8-12
+                $slot1 = ($ponIndex >> 13) & 0x1F;
                 $port1 = ($ponIndex >> 8) & 0x1F;
+                $frame1 = 0;
                 
-                // Try method 2: ponIndex = frame*8192 + slot*256 + port
-                $frame2 = (int)floor($ponIndex / 8192);
-                $remainder = $ponIndex % 8192;
-                $slot2 = (int)floor($remainder / 256);
-                $port2 = $remainder % 256;
+                // Method 2: Alternative - slot in high byte, port in middle nibble
+                $slot2 = ($ponIndex >> 16) & 0xFF;
+                $port2 = ($ponIndex >> 8) & 0xFF;
+                $frame2 = 0;
                 
-                // Try method 3: Simple division for some firmware
+                // Method 3: Another variant - ponIndex = slot*256 + port
                 $slot3 = (int)floor($ponIndex / 256);
                 $port3 = $ponIndex % 256;
                 
-                // Pick the method that gives valid values
-                if ($slot1 <= 21 && $port1 <= 15 && $frame1 <= 7) {
+                // Method 4: ponIndex = frame*8192 + slot*256 + port  
+                $frame4 = (int)floor($ponIndex / 8192);
+                $remainder = $ponIndex % 8192;
+                $slot4 = (int)floor($remainder / 256);
+                $port4 = $remainder % 256;
+                
+                // Method 5: Simple nibble-based - slot in high nibble, port in low nibble of lower 16 bits
+                $slot5 = ($ponIndex >> 12) & 0xF;
+                $port5 = ($ponIndex >> 8) & 0xF;
+                
+                error_log("Decode attempts: M1[s={$slot1},p={$port1}] M2[s={$slot2},p={$port2}] M3[s={$slot3},p={$port3}] M4[f={$frame4},s={$slot4},p={$port4}] M5[s={$slot5},p={$port5}]");
+                
+                // Pick the first method that gives valid values (non-zero and in range)
+                if ($slot1 > 0 && $slot1 <= 21 && $port1 <= 15) {
                     $frame = $frame1;
                     $slot = $slot1;
                     $port = $port1;
-                } elseif ($slot2 <= 21 && $port2 <= 15 && $frame2 <= 7) {
+                } elseif ($slot2 > 0 && $slot2 <= 21 && $port2 <= 15) {
                     $frame = $frame2;
                     $slot = $slot2;
                     $port = $port2;
+                } elseif ($slot5 > 0 && $slot5 <= 21 && $port5 <= 15) {
+                    $frame = 0;
+                    $slot = $slot5;
+                    $port = $port5;
+                } elseif ($slot4 <= 21 && $port4 <= 15 && $frame4 <= 7) {
+                    $frame = $frame4;
+                    $slot = $slot4;
+                    $port = $port4;
                 } elseif ($slot3 <= 21 && $port3 <= 15) {
                     $frame = 0;
                     $slot = $slot3;
                     $port = $port3;
                 } else {
-                    // Last resort: use raw values with sanity limits
+                    // All methods failed - keep zeros and try to extract from description later
                     $frame = 0;
-                    $slot = min(21, (int)floor($ponIndex / 8));
-                    $port = min(15, $ponIndex % 8);
+                    $slot = 0;
+                    $port = 0;
                 }
                 
-                // Sanity check - valid ranges for MA5683T
-                if ($frame > 7) $frame = 0;
-                if ($slot > 21) $slot = 0;
-                if ($port > 15) $port = 0;
-                if ($onuId > 128) $onuId = 0; // Max 128 ONUs per port
+                // Cap onu_id at 128
+                if ($onuId > 128) $onuId = $onuId % 128;
+            } elseif (count($parts) == 1) {
+                // Single part - might be just ifIndex, try to decode
+                $ifIndex = (int)$parts[0];
+                $ponIndex = $ifIndex > 0xFFFFFF ? ($ifIndex & 0xFFFFFF) : $ifIndex;
+                $slot = ($ponIndex >> 13) & 0x1F;
+                $port = ($ponIndex >> 8) & 0x1F;
+                $onuId = 0; // Unknown
             } else {
                 continue; // Skip invalid entries
             }
@@ -630,6 +656,25 @@ class HuaweiOLT {
             
             $descOid = $huaweiONTDescBase . '.' . $indexPart;
             $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
+            
+            // If slot/port are still 0, try to extract from description
+            // SmartOLT often stores location in description like "SNS001328_zone_name_0/9/5" or "_0_9_5_"
+            if ($slot == 0 && $port == 0 && !empty($desc)) {
+                // Try pattern: frame/slot/port (e.g., "0/9/5")
+                if (preg_match('/(\d+)\/(\d+)\/(\d+)/', $desc, $locMatch)) {
+                    $frame = (int)$locMatch[1];
+                    $slot = (int)$locMatch[2];
+                    $port = (int)$locMatch[3];
+                    error_log("Extracted location from desc pattern /: {$frame}/{$slot}/{$port}");
+                }
+                // Try pattern: _frame_slot_port_ (e.g., "_0_9_5_")
+                elseif (preg_match('/_(\d+)_(\d+)_(\d+)/', $desc, $locMatch)) {
+                    $frame = (int)$locMatch[1];
+                    $slot = (int)$locMatch[2];
+                    $port = (int)$locMatch[3];
+                    error_log("Extracted location from desc pattern _: {$frame}/{$slot}/{$port}");
+                }
+            }
             
             $onus[] = [
                 'sn' => $this->cleanSnmpValue($serial),
