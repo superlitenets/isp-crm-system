@@ -4739,14 +4739,14 @@ class HuaweiOLT {
                 
                 // Handle "---- More ----" pagination
                 if (preg_match('/----\s*More\s*----/i', $chunk)) {
-                    fwrite($socket, " ");
+                    @fwrite($socket, " ");
                     usleep(500000);
                     continue;
                 }
                 
                 // Handle Huawei parameter prompts like "{ <cr>|... }:"
                 if (preg_match('/\}\s*:\s*$/', $output)) {
-                    fwrite($socket, "\r\n");
+                    @fwrite($socket, "\r\n");
                     usleep(1000000);
                     continue;
                 }
@@ -4767,12 +4767,12 @@ class HuaweiOLT {
             usleep(100000);
         }
         
-        // Cleanup
-        fwrite($socket, "quit\r\n");
+        // Cleanup - suppress errors as socket may already be closed
+        @fwrite($socket, "quit\r\n");
         usleep(200000);
-        fwrite($socket, "quit\r\n");
+        @fwrite($socket, "quit\r\n");
         usleep(200000);
-        fclose($socket);
+        @fclose($socket);
         
         // Clean ANSI escape codes
         $output = preg_replace('/\x1b\[[0-9;]*[a-zA-Z]/', '', $output);
