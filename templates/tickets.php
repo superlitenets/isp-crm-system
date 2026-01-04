@@ -968,14 +968,21 @@ $isEscalated = $ticketData['is_escalated'] ?? false;
             <div class="card-body">
                 <p class="mb-1"><strong><?= htmlspecialchars($ticketData['customer_name']) ?></strong></p>
                 <p class="mb-1"><small class="text-muted"><?= htmlspecialchars($ticketData['account_number']) ?></small></p>
-                <p class="mb-2"><i class="bi bi-telephone"></i> <?= htmlspecialchars($ticketData['customer_phone']) ?></p>
+                <p class="mb-2">
+                    <i class="bi bi-telephone"></i> <?= htmlspecialchars($ticketData['customer_phone']) ?>
+                    <?php if (!empty($ticketData['customer_phone'])): ?>
+                    <button type="button" class="btn btn-sm btn-success ms-2 click-to-call-ticket" data-phone="<?= htmlspecialchars($ticketData['customer_phone']) ?>" data-customer-id="<?= $ticketData['customer_id'] ?>" data-ticket-id="<?= $ticketData['id'] ?>" title="Click to Call via PBX">
+                        <i class="bi bi-telephone-fill"></i>
+                    </button>
+                    <?php endif; ?>
+                </p>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="?page=customers&action=view&id=<?= $ticketData['customer_id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-person"></i> View
                     </a>
                     <?php if (!empty($ticketData['customer_phone'])): ?>
                     <a href="tel:<?= htmlspecialchars($ticketData['customer_phone']) ?>" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-telephone"></i> Call
+                        <i class="bi bi-telephone-outbound"></i> Mobile
                     </a>
                     <?php 
                     $waCustomer = new \App\WhatsApp();
@@ -1790,5 +1797,50 @@ function repostTicketToWhatsApp(ticketId, ticketNumber) {
             alert('Error: ' + err.message);
         });
 }
+
+// Click-to-call via PBX
+document.querySelectorAll('.click-to-call-ticket').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const phone = this.dataset.phone;
+        const customerId = this.dataset.customerId;
+        const ticketId = this.dataset.ticketId;
+        
+        if (!phone) {
+            alert('No phone number available');
+            return;
+        }
+        
+        this.disabled = true;
+        const originalHtml = this.innerHTML;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch('?page=call_center', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: new URLSearchParams({
+                action: 'originate_call',
+                phone: phone,
+                customer_id: customerId || '',
+                ticket_id: ticketId || '',
+                csrf_token: '<?= $csrfToken ?>'
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Call initiated! Your phone will ring shortly.');
+            } else {
+                alert('Call failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.innerHTML = originalHtml;
+        });
+    });
+});
 </script>
 <?php endif; ?>

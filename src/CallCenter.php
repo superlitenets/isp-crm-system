@@ -71,7 +71,7 @@ class CallCenter {
     }
 
     // Originate a call (click-to-call)
-    public function originateCall($extension, $destination, $customerId = null, $callerid = null) {
+    public function originateCall($extension, $destination, $customerId = null, $ticketId = null, $callerid = null) {
         if (!$this->connected) {
             $result = $this->connectAMI();
             if (!$result['success']) return $result;
@@ -97,6 +97,7 @@ class CallCenter {
         if (strpos($response, 'Success') !== false) {
             $this->logCall($extension, $destination, 'outbound', [
                 'customer_id' => $customerId,
+                'ticket_id' => $ticketId,
                 'disposition' => 'CALLING'
             ]);
             return ['success' => true, 'message' => 'Call initiated'];
