@@ -519,7 +519,7 @@ if (isset($_SESSION['user_id'])) {
                         <select class="form-select" name="user_id" id="ext_user_id">
                             <option value="">-- None --</option>
                             <?php 
-                            $usersStmt = $db->query("SELECT id, name FROM users WHERE status = 'active' ORDER BY name");
+                            $usersStmt = $db->query("SELECT id, name FROM users ORDER BY name");
                             while ($user = $usersStmt->fetch(PDO::FETCH_ASSOC)):
                             ?>
                             <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['name']) ?></option>
