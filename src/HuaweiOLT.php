@@ -1112,32 +1112,50 @@ class HuaweiOLT {
             $existing = $this->getONUBySN($onu['sn']);
             
             // Parse SmartOLT description format: NAME_zone_ZONENAME_descr_ADDRESS_authd_DATE
+            // SmartOLT stores this format in the ONU description field which appears in SNMP serial OID
+            $snField = $onu['sn'] ?? '';
             $desc = $onu['description'] ?? '';
             $onuName = '';
             $zoneName = '';
             $address = '';
+            $cleanSn = $snField; // Keep original for matching, but extract clean SN
             
-            if (!empty($desc)) {
-                // Try SmartOLT format: SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016
-                if (preg_match('/^([^_]+)_zone_([^_]+)(?:_descr_(.+?))?(?:_authd_\d+)?$/i', $desc, $m)) {
-                    $onuName = trim($m[1]);
-                    $zoneName = trim($m[2]);
-                    $address = isset($m[3]) ? str_replace('_', ' ', trim($m[3])) : '';
-                } 
-                // Try simpler format: NAME_zone_ZONENAME
-                elseif (preg_match('/^([^_]+)_zone_([^_]+)/i', $desc, $m)) {
-                    $onuName = trim($m[1]);
-                    $zoneName = trim($m[2]);
+            // Parse from SN field first (SmartOLT stores description in serial field)
+            // Format: SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016
+            if (!empty($snField) && strpos($snField, '_zone_') !== false) {
+                // Extract zone name (everything between _zone_ and next _descr_ or _authd_ or end)
+                if (preg_match('/_zone_([^_]+(?:_[^_]+)*?)(?:_descr_|_authd_|$)/i', $snField, $zm)) {
+                    $zoneName = trim($zm[1]);
                 }
-                // Try format with just zone: NAME_ZONENAME or just take first part
-                else {
-                    $parts = explode('_', $desc);
-                    $onuName = trim($parts[0]);
+                // Extract address/customer name from _descr_ section
+                if (preg_match('/_descr_(.+?)(?:_authd_|$)/i', $snField, $dm)) {
+                    $address = str_replace('_', ' ', trim($dm[1]));
                 }
+                // Extract clean SN (first part before _zone_)
+                if (preg_match('/^([A-Z0-9]+)_zone_/i', $snField, $snm)) {
+                    $cleanSn = trim($snm[1]);
+                    $onuName = $cleanSn;
+                }
+            }
+            // Fallback: parse from description field
+            elseif (!empty($desc)) {
+                if (preg_match('/_zone_([^_]+(?:_[^_]+)*?)(?:_descr_|_authd_|$)/i', $desc, $zm)) {
+                    $zoneName = trim($zm[1]);
+                }
+                if (preg_match('/_descr_(.+?)(?:_authd_|$)/i', $desc, $dm)) {
+                    $address = str_replace('_', ' ', trim($dm[1]));
+                }
+                $parts = explode('_', $desc);
+                $onuName = trim($parts[0]);
             }
             
             if (empty($onuName)) {
                 $onuName = "ONU {$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
+            }
+            
+            // Debug logging for zone parsing
+            if (!empty($zoneName)) {
+                error_log("SNMP Sync: Parsed zone '{$zoneName}' from SN '{$snField}'");
             }
             
             // Detect ONU type from equipment_id (model from SNMP like "HG8546M")
