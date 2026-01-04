@@ -165,6 +165,183 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
     exit;
 }
 
+// AJAX endpoint for staged authorization (with progress)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
+    header('Content-Type: application/json');
+    
+    $stage = isset($_POST['stage']) ? (int)$_POST['stage'] : 1;
+    $response = ['success' => false, 'stage' => $stage, 'next_stage' => null];
+    
+    try {
+        switch ($stage) {
+            case 1: // Save ONU details
+                $onuId = (int)$_POST['onu_id'];
+                $sn = trim($_POST['sn'] ?? '');
+                $name = trim($_POST['name'] ?? '');
+                $zoneId = !empty($_POST['zone_id']) ? (int)$_POST['zone_id'] : null;
+                $zone = $_POST['zone'] ?? '';
+                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+                $address = trim($_POST['address'] ?? '');
+                $phone = trim($_POST['phone'] ?? '');
+                $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+                $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+                $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
+                $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
+                $pppoePassword = trim($_POST['pppoe_password'] ?? '');
+                $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
+                $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
+                
+                // Ensure ONU exists in database
+                $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
+                
+                if (!$onu && !empty($sn)) {
+                    $existingStmt = $db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+                    $existingStmt->execute([$sn]);
+                    $existingOnuId = $existingStmt->fetchColumn();
+                    
+                    if ($existingOnuId) {
+                        $onuId = (int)$existingOnuId;
+                        $onu = $huaweiOLT->getONU($onuId);
+                    } else {
+                        $discStmt = $db->prepare("SELECT * FROM onu_discovery_log WHERE serial_number = ? ORDER BY last_seen_at DESC LIMIT 1");
+                        $discStmt->execute([$sn]);
+                        $discoveredOnu = $discStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($discoveredOnu || (!empty($oltIdInput) && !empty($frameSlotPort))) {
+                            $frame = 0; $slot = 0; $port = 0;
+                            $fsp = $discoveredOnu['frame_slot_port'] ?? $frameSlotPort;
+                            if (preg_match('/(\d+)\/(\d+)\/(\d+)/', $fsp, $fspMatch)) {
+                                $frame = (int)$fspMatch[1];
+                                $slot = (int)$fspMatch[2];
+                                $port = (int)$fspMatch[3];
+                            }
+                            
+                            $oltIdForOnu = $discoveredOnu['olt_id'] ?? $oltIdInput;
+                            $onuTypeIdForOnu = $onuTypeId ?: ($discoveredOnu['onu_type_id'] ?? null);
+                            
+                            $insertStmt = $db->prepare("
+                                INSERT INTO huawei_onus (olt_id, sn, name, frame, slot, port, onu_type_id, discovered_eqid, is_authorized, status, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, 'offline', NOW())
+                                RETURNING id
+                            ");
+                            $insertStmt->execute([
+                                $oltIdForOnu, $sn, $name ?: $sn, $frame, $slot, $port,
+                                $onuTypeIdForOnu, $discoveredOnu['equipment_id'] ?? null
+                            ]);
+                            $onuId = (int)$insertStmt->fetchColumn();
+                            $onu = $huaweiOLT->getONU($onuId);
+                        }
+                    }
+                }
+                
+                if (!$onu) {
+                    throw new Exception('ONU record not found. Please try again.');
+                }
+                
+                // Update ONU record with all fields
+                $updateFields = ['name' => $name ?: $sn];
+                if (!empty($zone)) $updateFields['zone'] = $zone;
+                if ($zoneId) $updateFields['zone_id'] = $zoneId;
+                if (!empty($address)) $updateFields['address'] = $address;
+                if (!empty($phone)) $updateFields['phone'] = $phone;
+                if ($customerId) $updateFields['customer_id'] = $customerId;
+                if ($latitude !== null) $updateFields['latitude'] = $latitude;
+                if ($longitude !== null) $updateFields['longitude'] = $longitude;
+                if ($onuTypeId) $updateFields['onu_type_id'] = $onuTypeId;
+                if (!empty($pppoeUsername)) $updateFields['pppoe_username'] = $pppoeUsername;
+                if (!empty($pppoePassword)) $updateFields['pppoe_password'] = $pppoePassword;
+                $updateFields['installation_date'] = date('Y-m-d');
+                $huaweiOLT->updateONU($onuId, $updateFields);
+                
+                $response['success'] = true;
+                $response['message'] = 'ONU details saved';
+                $response['next_stage'] = 2;
+                $response['onu_id'] = $onuId;
+                $response['vlan_id'] = $vlanId;
+                break;
+                
+            case 2: // Authorize on OLT
+                $onuId = (int)$_POST['onu_id'];
+                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+                $name = trim($_POST['name'] ?? '');
+                $sn = trim($_POST['sn'] ?? '');
+                
+                $defaultProfile = $huaweiOLT->getDefaultServiceProfile();
+                if (!$defaultProfile) {
+                    $defaultProfileId = $huaweiOLT->addServiceProfile([
+                        'name' => 'Default Internet', 'line_profile' => 1, 'srv_profile' => 1,
+                        'download_speed' => 100, 'upload_speed' => 50, 'is_default' => true, 'is_active' => true
+                    ]);
+                    $defaultProfile = $huaweiOLT->getServiceProfile($defaultProfileId);
+                }
+                
+                $result = $huaweiOLT->authorizeONUStage1($onuId, $defaultProfile['id'], [
+                    'description' => $name ?: $sn,
+                    'vlan_id' => $vlanId,
+                    'skip_service_port' => true // We'll do this in stage 3
+                ]);
+                
+                if (!$result['success']) {
+                    throw new Exception($result['message'] ?? 'Failed to authorize ONU on OLT');
+                }
+                
+                $response['success'] = true;
+                $response['message'] = 'ONU authorized as ID ' . ($result['onu_id'] ?? 'N/A');
+                $response['next_stage'] = 3;
+                $response['olt_onu_id'] = $result['onu_id'] ?? null;
+                break;
+                
+            case 3: // Configure service VLAN
+                $onuId = (int)$_POST['onu_id'];
+                $vlanId = !empty($_POST['vlan_id']) ? (int)$_POST['vlan_id'] : null;
+                
+                if ($vlanId) {
+                    $onu = $huaweiOLT->getONU($onuId);
+                    if ($onu) {
+                        $result = $huaweiOLT->configureServicePort($onuId, $vlanId);
+                        if (!$result['success']) {
+                            // Non-fatal - continue to next stage
+                            $response['warning'] = 'Service port config: ' . ($result['message'] ?? 'Check manually');
+                        }
+                    }
+                }
+                
+                $response['success'] = true;
+                $response['message'] = $vlanId ? "Service VLAN $vlanId configured" : 'No VLAN specified';
+                $response['next_stage'] = 4;
+                break;
+                
+            case 4: // Configure TR-069
+                $onuId = (int)$_POST['onu_id'];
+                
+                $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
+                    'tr069_vlan' => 69,
+                    'tr069_gem_port' => 2
+                ]);
+                
+                $response['success'] = true;
+                if ($tr069Result['success']) {
+                    $response['message'] = 'TR-069 management configured on VLAN 69';
+                } else {
+                    $response['message'] = 'TR-069 setup pending: ' . ($tr069Result['message'] ?? 'Manual config may be needed');
+                }
+                $response['next_stage'] = null; // Done
+                $response['redirect'] = '?page=huawei-olt&view=onu_detail&onu_id=' . $onuId;
+                break;
+                
+            default:
+                throw new Exception('Invalid stage');
+        }
+    } catch (Exception $e) {
+        $response['success'] = false;
+        $response['error'] = $e->getMessage();
+    }
+    
+    echo json_encode($response);
+    exit;
+}
+
 // AJAX endpoint for realtime OMS stats (dashboard refresh)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_stats') {
     header('Content-Type: application/json');
@@ -4286,9 +4463,38 @@ try {
         <div class="loading-spinner-container">
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">Connecting to OLT...</div>
-            <div class="text-muted small mt-2">This may take a few seconds</div>
+            <div class="text-muted small mt-2" id="loadingSubtext">This may take a few seconds</div>
+            <div id="loadingStages" class="mt-3 text-start" style="display:none; max-width: 350px;">
+                <div class="stage-item" id="stage1" data-stage="1">
+                    <i class="bi bi-circle stage-icon me-2"></i>
+                    <span>Saving ONU details...</span>
+                </div>
+                <div class="stage-item" id="stage2" data-stage="2">
+                    <i class="bi bi-circle stage-icon me-2"></i>
+                    <span>Authorizing on OLT...</span>
+                </div>
+                <div class="stage-item" id="stage3" data-stage="3">
+                    <i class="bi bi-circle stage-icon me-2"></i>
+                    <span>Configuring service VLAN...</span>
+                </div>
+                <div class="stage-item" id="stage4" data-stage="4">
+                    <i class="bi bi-circle stage-icon me-2"></i>
+                    <span>Setting up TR-069 management...</span>
+                </div>
+            </div>
+            <div id="loadingError" class="alert alert-danger mt-3" style="display:none; max-width: 350px;"></div>
         </div>
     </div>
+    <style>
+        .stage-item { padding: 6px 0; color: #6c757d; font-size: 0.9rem; }
+        .stage-item.active { color: #0d6efd; font-weight: 500; }
+        .stage-item.active .stage-icon { animation: pulse 1s infinite; }
+        .stage-item.success { color: #198754; }
+        .stage-item.success .stage-icon:before { content: "\F26B"; }
+        .stage-item.error { color: #dc3545; }
+        .stage-item.error .stage-icon:before { content: "\F62A"; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
     
     <!-- OMS Mobile Header -->
     <div class="oms-mobile-header">
@@ -12372,7 +12578,134 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             });
             wrapper.insertBefore(searchInput, zoneSelect);
         }
+        
+        // Handle staged authorization form submission
+        const authForm = document.getElementById('authForm');
+        if (authForm) {
+            authForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                runStagedAuthorization(new FormData(authForm));
+            });
+        }
     });
+    
+    // Staged authorization with progress
+    async function runStagedAuthorization(formData) {
+        const overlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const loadingSubtext = document.getElementById('loadingSubtext');
+        const loadingStages = document.getElementById('loadingStages');
+        const loadingError = document.getElementById('loadingError');
+        const stageItems = loadingStages.querySelectorAll('.stage-item');
+        
+        // Show overlay with stages
+        loadingText.textContent = 'Authorizing ONU';
+        loadingSubtext.textContent = 'Please wait while we configure the device...';
+        loadingStages.style.display = 'block';
+        loadingError.style.display = 'none';
+        
+        // Reset all stages
+        stageItems.forEach(item => {
+            item.className = 'stage-item';
+            item.querySelector('.stage-icon').className = 'bi bi-circle stage-icon me-2';
+        });
+        
+        overlay.classList.add('active');
+        
+        // Close the modal
+        const authModal = bootstrap.Modal.getInstance(document.getElementById('authModal'));
+        if (authModal) authModal.hide();
+        
+        let currentOnuId = formData.get('onu_id');
+        let currentVlanId = formData.get('vlan_id');
+        
+        for (let stage = 1; stage <= 4; stage++) {
+            const stageItem = document.getElementById('stage' + stage);
+            const stageIcon = stageItem.querySelector('.stage-icon');
+            
+            // Mark current stage as active
+            stageItem.className = 'stage-item active';
+            stageIcon.className = 'bi bi-arrow-right-circle-fill stage-icon me-2';
+            
+            try {
+                // Build stage-specific form data
+                const stageData = new FormData();
+                stageData.append('stage', stage);
+                
+                if (stage === 1) {
+                    // Pass all form data for stage 1
+                    for (let [key, value] of formData.entries()) {
+                        stageData.append(key, value);
+                    }
+                } else {
+                    // For later stages, just pass essential data
+                    stageData.append('onu_id', currentOnuId);
+                    stageData.append('vlan_id', currentVlanId);
+                    stageData.append('name', formData.get('name'));
+                    stageData.append('sn', formData.get('sn'));
+                }
+                
+                const response = await fetch('?page=huawei-olt&ajax=authorize_staged', {
+                    method: 'POST',
+                    body: stageData
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    // Stage failed
+                    stageItem.className = 'stage-item error';
+                    stageIcon.className = 'bi bi-x-circle-fill stage-icon me-2';
+                    
+                    loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Stage ' + stage + ' Failed:</strong> ' + (result.error || 'Unknown error');
+                    loadingError.style.display = 'block';
+                    loadingText.textContent = 'Authorization Failed';
+                    loadingSubtext.innerHTML = '<button class="btn btn-sm btn-outline-light mt-2" onclick="hideLoading()">Close</button>';
+                    return;
+                }
+                
+                // Stage succeeded
+                stageItem.className = 'stage-item success';
+                stageIcon.className = 'bi bi-check-circle-fill stage-icon me-2';
+                
+                // Update data for next stage
+                if (result.onu_id) currentOnuId = result.onu_id;
+                if (result.vlan_id) currentVlanId = result.vlan_id;
+                
+                // Show warning if any
+                if (result.warning) {
+                    const spanEl = stageItem.querySelector('span');
+                    spanEl.innerHTML += ' <small class="text-warning">(' + result.warning + ')</small>';
+                }
+                
+                // Check if we're done
+                if (result.next_stage === null) {
+                    loadingText.textContent = 'Authorization Complete!';
+                    loadingSubtext.innerHTML = 'Redirecting to ONU configuration...';
+                    
+                    setTimeout(() => {
+                        if (result.redirect) {
+                            window.location.href = result.redirect;
+                        } else {
+                            hideLoading();
+                            location.reload();
+                        }
+                    }, 1500);
+                    return;
+                }
+                
+            } catch (err) {
+                stageItem.className = 'stage-item error';
+                stageIcon.className = 'bi bi-x-circle-fill stage-icon me-2';
+                
+                loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Network Error:</strong> ' + err.message;
+                loadingError.style.display = 'block';
+                loadingText.textContent = 'Authorization Failed';
+                loadingSubtext.innerHTML = '<button class="btn btn-sm btn-outline-light mt-2" onclick="hideLoading()">Close</button>';
+                return;
+            }
+        }
+    }
     </script>
     
     <div class="modal fade" id="wifiConfigModal" tabindex="-1">
