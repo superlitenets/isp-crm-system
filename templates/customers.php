@@ -114,7 +114,12 @@ if ($action === 'view' && $id) {
                     </tr>
                     <tr>
                         <th>Phone</th>
-                        <td><?= htmlspecialchars($customerData['phone']) ?></td>
+                        <td>
+                            <?= htmlspecialchars($customerData['phone']) ?>
+                            <button type="button" class="btn btn-sm btn-success ms-2 click-to-call" data-phone="<?= htmlspecialchars($customerData['phone']) ?>" data-customer-id="<?= $customerData['id'] ?>" title="Click to Call">
+                                <i class="bi bi-telephone-fill"></i>
+                            </button>
+                        </td>
                     </tr>
                     <tr>
                         <th>Email</th>
@@ -262,7 +267,12 @@ if ($action === 'view' && $id) {
                     <tr>
                         <td><strong><?= htmlspecialchars($c['account_number']) ?></strong></td>
                         <td><?= htmlspecialchars($c['name']) ?></td>
-                        <td><?= htmlspecialchars($c['phone']) ?></td>
+                        <td>
+                            <?= htmlspecialchars($c['phone']) ?>
+                            <button type="button" class="btn btn-sm btn-outline-success click-to-call" data-phone="<?= htmlspecialchars($c['phone']) ?>" data-customer-id="<?= $c['id'] ?>" title="Click to Call">
+                                <i class="bi bi-telephone"></i>
+                            </button>
+                        </td>
                         <td><?= htmlspecialchars($servicePlans[$c['service_plan']] ?? $c['service_plan']) ?></td>
                         <td>
                             <span class="badge bg-<?= $c['connection_status'] === 'active' ? 'success' : ($c['connection_status'] === 'suspended' ? 'warning' : 'secondary') ?>">
@@ -303,3 +313,47 @@ if ($action === 'view' && $id) {
     </div>
 </div>
 <?php endif; ?>
+
+<script>
+document.querySelectorAll('.click-to-call').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const phone = this.dataset.phone;
+        const customerId = this.dataset.customerId;
+        
+        if (!phone) {
+            alert('No phone number available');
+            return;
+        }
+        
+        this.disabled = true;
+        const originalHtml = this.innerHTML;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch('?page=call_center', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: new URLSearchParams({
+                action: 'originate_call',
+                phone: phone,
+                customer_id: customerId || '',
+                csrf_token: '<?= $csrfToken ?>'
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Call initiated! Your phone will ring shortly.');
+            } else {
+                alert('Call failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+        })
+        .finally(() => {
+            this.disabled = false;
+            this.innerHTML = originalHtml;
+        });
+    });
+});
+</script>

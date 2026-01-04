@@ -7255,6 +7255,26 @@ $csrfToken = \App\Auth::generateToken();
                         }
                         exit;
                     }
+                    // Click-to-call from customer pages
+                    if ($action === 'originate_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+                        header('Content-Type: application/json');
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $phone = $_POST['phone'] ?? '';
+                        $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                        $userExt = $callCenter->getExtensionByUserId($_SESSION['user_id']);
+                        if (!$userExt) {
+                            echo json_encode(['success' => false, 'error' => 'No extension assigned to your account. Contact admin to assign an extension.']);
+                            exit;
+                        }
+                        if (empty($phone)) {
+                            echo json_encode(['success' => false, 'error' => 'No phone number provided']);
+                            exit;
+                        }
+                        $result = $callCenter->originateCall($userExt['extension'], $phone, $customerId);
+                        echo json_encode($result);
+                        exit;
+                    }
                     if ($action === 'get_extension') {
                         header('Content-Type: application/json');
                         require_once __DIR__ . '/../src/CallCenter.php';
