@@ -1929,17 +1929,35 @@ class HuaweiOLT {
             $name = trim($m[1]);
         }
         
-        // Save the optical data to database if we got valid readings
-        if ($rxPower !== null || $txPower !== null) {
-            // Find ONU by serial number and update
-            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
-            $stmt->execute([$sn]);
-            $dbOnu = $stmt->fetch(\PDO::FETCH_ASSOC);
-            if ($dbOnu) {
-                $this->updateONUOpticalInDB($dbOnu['id'], $rxPower, $txPower, $distance);
-                if ($status) {
-                    $this->updateONUStatus($dbOnu['id'], $status);
+        // Get TR-069 WAN IP via display ont wan-info command
+        $tr069Ip = null;
+        $wanCmd = "display ont wan-info {$port} {$onuId}\r\nquit";
+        $wanResult = $this->executeCommand($oltId, $wanCmd);
+        if ($wanResult['success']) {
+            $wanOutput = $wanResult['output'] ?? '';
+            // Parse IP address from output: "IP address : 10.200.0.x"
+            if (preg_match('/IP\s*(?:address)?\s*:\s*([\d.]+)/i', $wanOutput, $m)) {
+                $ip = $m[1];
+                if ($ip && $ip !== '0.0.0.0') {
+                    $tr069Ip = $ip;
                 }
+            }
+        }
+        
+        // Save the optical data to database if we got valid readings
+        $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
+        $stmt->execute([$sn]);
+        $dbOnu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($dbOnu) {
+            if ($rxPower !== null || $txPower !== null) {
+                $this->updateONUOpticalInDB($dbOnu['id'], $rxPower, $txPower, $distance);
+            }
+            if ($status) {
+                $this->updateONUStatus($dbOnu['id'], $status);
+            }
+            // Update TR-069 IP if found
+            if ($tr069Ip) {
+                $this->updateONU($dbOnu['id'], ['tr069_ip' => $tr069Ip]);
             }
         }
         
@@ -1956,6 +1974,7 @@ class HuaweiOLT {
                 'rx_power' => $rxPower,
                 'tx_power' => $txPower,
                 'distance' => $distance,
+                'tr069_ip' => $tr069Ip,
             ]
         ];
     }

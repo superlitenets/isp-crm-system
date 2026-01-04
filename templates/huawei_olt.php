@@ -6314,6 +6314,13 @@ try {
                             txEl.textContent = onu.tx_power.toFixed(2) + ' dBm';
                         }
                         
+                        // Update TR-069 WAN IP
+                        const tr069El = document.getElementById('tr069IpDisplay');
+                        if (tr069El && onu.tr069_ip) {
+                            tr069El.textContent = onu.tr069_ip;
+                            tr069El.className = 'text-success fw-bold';
+                        }
+                        
                         const toast = document.createElement('div');
                         toast.className = 'position-fixed bottom-0 end-0 p-3';
                         toast.style.zIndex = '9999';
