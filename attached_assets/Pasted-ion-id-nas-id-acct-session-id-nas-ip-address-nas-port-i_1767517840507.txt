@@ -1,0 +1,540 @@
+ion_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (2) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32100 seconds', '0'::bigint * 4294967296 + '618964'::bigint, '0'::bigint * 4294967296 + '13938'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (2) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32100 seconds', '0'::bigint * 4294967296 + '618964'::bigint, '0'::bigint * 4294967296 + '13938'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (2) sql: SQL query returned: success
+isp_crm_freeradius      | (2) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (7), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1735
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (6) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (2)     [sql] = ok
+isp_crm_freeradius      | (2)     [exec] = noop
+isp_crm_freeradius      | (2) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (2) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (2) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (2)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (2)   } # accounting = updated
+isp_crm_freeradius      | (2) Sent Accounting-Response Id 228 from 172.18.0.5:1813 to 10.200.0.5:41913 length 20
+isp_crm_freeradius      | (2) Finished request
+isp_crm_freeradius      | (2) Cleaning up request packet ID 228 with timestamp +674 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (3) Received Accounting-Request Id 229 from 10.200.0.5:49589 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (3)   Service-Type = Framed-User
+isp_crm_freeradius      | (3)   Framed-Protocol = PPP
+isp_crm_freeradius      | (3)   NAS-Port = 15728657
+isp_crm_freeradius      | (3)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (3)   User-Name = "SFL001"
+isp_crm_freeradius      | (3)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (3)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (3)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (3)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (3)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (3)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (3)   Event-Timestamp = "Jan  4 2026 09:02:01 UTC"
+isp_crm_freeradius      | (3)   Acct-Session-Time = 32400
+isp_crm_freeradius      | (3)   Idle-Timeout = 0
+isp_crm_freeradius      | (3)   Session-Timeout = 2592000
+isp_crm_freeradius      | (3)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (3)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (3)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (3)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (3)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (3)   Acct-Input-Octets = 620644
+isp_crm_freeradius      | (3)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (3)   Acct-Input-Packets = 7393
+isp_crm_freeradius      | (3)   Acct-Output-Octets = 15618
+isp_crm_freeradius      | (3)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (3)   Acct-Output-Packets = 191
+isp_crm_freeradius      | (3)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (3)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (3)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (3)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (3) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (3)   preacct {
+isp_crm_freeradius      | (3)     [preprocess] = ok
+isp_crm_freeradius      | (3) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (3) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (3) suffix: No such realm "NULL"
+isp_crm_freeradius      | (3)     [suffix] = noop
+isp_crm_freeradius      | (3)     [files] = noop
+isp_crm_freeradius      | (3)   } # preacct = ok
+isp_crm_freeradius      | (3) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (3)   accounting {
+isp_crm_freeradius      | (3) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (3) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (3) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (3) detail: EXPAND %t
+isp_crm_freeradius      | (3) detail:    --> Sun Jan  4 09:02:01 2026
+isp_crm_freeradius      | (3)     [detail] = ok
+isp_crm_freeradius      | (3)     [unix] = noop
+isp_crm_freeradius      | (3) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (3) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (3) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (3) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (3) sql:    --> SFL001
+isp_crm_freeradius      | (3) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (3) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (3) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32400 seconds', '0'::bigint * 4294967296 + '620644'::bigint, '0'::bigint * 4294967296 + '15618'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (3) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32400 seconds', '0'::bigint * 4294967296 + '620644'::bigint, '0'::bigint * 4294967296 + '15618'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (3) sql: SQL query returned: success
+isp_crm_freeradius      | (3) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (8), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1774
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (7) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (3)     [sql] = ok
+isp_crm_freeradius      | (3)     [exec] = noop
+isp_crm_freeradius      | (3) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (3) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (3) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (3)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (3)   } # accounting = updated
+isp_crm_freeradius      | (3) Sent Accounting-Response Id 229 from 172.18.0.5:1813 to 10.200.0.5:49589 length 20
+isp_crm_freeradius      | (3) Finished request
+isp_crm_freeradius      | (3) Cleaning up request packet ID 229 with timestamp +974 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_freeradius      | (4) Received Accounting-Request Id 230 from 10.200.0.5:56623 to 172.18.0.5:1813 length 241
+isp_crm_freeradius      | (4)   Service-Type = Framed-User
+isp_crm_freeradius      | (4)   Framed-Protocol = PPP
+isp_crm_freeradius      | (4)   NAS-Port = 15728657
+isp_crm_freeradius      | (4)   NAS-Port-Type = Ethernet
+isp_crm_freeradius      | (4)   User-Name = "SFL001"
+isp_crm_freeradius      | (4)   Calling-Station-Id = "D8:32:14:2C:B5:00"
+isp_crm_freeradius      | (4)   Called-Station-Id = "TEST"
+isp_crm_freeradius      | (4)   NAS-Port-Id = "ether5"
+isp_crm_freeradius      | (4)   Acct-Session-Id = "81300011"
+isp_crm_freeradius      | (4)   Framed-IP-Address = 10.31.255.255
+isp_crm_freeradius      | (4)   Acct-Authentic = RADIUS
+isp_crm_freeradius      | (4)   Event-Timestamp = "Jan  4 2026 09:07:01 UTC"
+isp_crm_freeradius      | (4)   Acct-Session-Time = 32700
+isp_crm_freeradius      | (4)   Idle-Timeout = 0
+isp_crm_freeradius      | (4)   Session-Timeout = 2592000
+isp_crm_freeradius      | (4)   X-Ascend-Data-Rate = 50000000
+isp_crm_freeradius      | (4)   Ascend-Xmit-Rate = 50000000
+isp_crm_freeradius      | (4)   X-Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (4)   Ascend-Data-Rate = 25000000
+isp_crm_freeradius      | (4)   Mikrotik-Rate-Limit = "25M/50M"
+isp_crm_freeradius      | (4)   Acct-Input-Octets = 622324
+isp_crm_freeradius      | (4)   Acct-Input-Gigawords = 0
+isp_crm_freeradius      | (4)   Acct-Input-Packets = 7413
+isp_crm_freeradius      | (4)   Acct-Output-Octets = 17298
+isp_crm_freeradius      | (4)   Acct-Output-Gigawords = 0
+isp_crm_freeradius      | (4)   Acct-Output-Packets = 211
+isp_crm_freeradius      | (4)   Acct-Status-Type = Interim-Update
+isp_crm_freeradius      | (4)   NAS-Identifier = "ERP"
+isp_crm_freeradius      | (4)   Acct-Delay-Time = 0
+isp_crm_freeradius      | (4)   NAS-IP-Address = 10.200.0.5
+isp_crm_freeradius      | (4) # Executing section preacct from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (4)   preacct {
+isp_crm_freeradius      | (4)     [preprocess] = ok
+isp_crm_freeradius      | (4) suffix: Checking for suffix after "@"
+isp_crm_freeradius      | (4) suffix: No '@' in User-Name = "SFL001", looking up realm NULL
+isp_crm_freeradius      | (4) suffix: No such realm "NULL"
+isp_crm_freeradius      | (4)     [suffix] = noop
+isp_crm_freeradius      | (4)     [files] = noop
+isp_crm_freeradius      | (4)   } # preacct = ok
+isp_crm_freeradius      | (4) # Executing section accounting from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | (4)   accounting {
+isp_crm_freeradius      | (4) detail: EXPAND /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d
+isp_crm_freeradius      | (4) detail:    --> /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (4) detail: /var/log/freeradius/radacct/%{%{Packet-Src-IP-Address}:-%{Packet-Src-IPv6-Address}}/detail-%Y%m%d expands to /var/log/freeradius/radacct/10.200.0.5/detail-20260104
+isp_crm_freeradius      | (4) detail: EXPAND %t
+isp_crm_freeradius      | (4) detail:    --> Sun Jan  4 09:07:01 2026
+isp_crm_freeradius      | (4)     [detail] = ok
+isp_crm_freeradius      | (4)     [unix] = noop
+isp_crm_freeradius      | (4) sql: EXPAND %{tolower:type.%{Acct-Status-Type}.query}
+isp_crm_freeradius      | (4) sql:    --> type.interim-update.query
+isp_crm_freeradius      | (4) sql: Using query template 'query'
+isp_crm_freeradius      | rlm_sql (sql): Reserved connection (0)
+isp_crm_freeradius      | (4) sql: EXPAND %{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}
+isp_crm_freeradius      | (4) sql:    --> SFL001
+isp_crm_freeradius      | (4) sql: SQL-User-Name set to 'SFL001'
+isp_crm_freeradius      | (4) sql: EXPAND INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '%{Acct-Session-Id}', '%{NAS-IP-Address}', '%{NAS-Port}', NULLIF('%{Framed-IP-Address}', ''), NULLIF('%{Calling-Station-Id}', ''), NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', '%{%{Acct-Input-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Input-Octets}:-0}'::bigint, '%{%{Acct-Output-Gigawords}:-0}'::bigint * 4294967296 + '%{%{Acct-Output-Octets}:-0}'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '%{NAS-IP-Address}' WHERE rs.username = '%{SQL-User-Name}' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (4) sql:    --> INSERT INTO radius_sessions (subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id,
+rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32700 seconds', '0'::bigint * 4294967296 + '622324'::bigint, '0'::bigint * 4294967296 + '17298'::bigint, 'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | (4) sql: Executing query: INSERT INTO radius_sessions
+(subscription_id, nas_id, acct_session_id, nas_ip_address, nas_port_id, framed_ip_address, mac_address, session_start, input_octets, output_octets, status) SELECT rs.id, rn.id, '81300011', '10.200.0.5', '15728657', NULLIF('10.31.255.255', ''), NULLIF('D8:32:14:2C:B5:00', ''), NOW() - INTERVAL '32700 seconds', '0'::bigint * 4294967296 + '622324'::bigint, '0'::bigint * 4294967296 + '17298'::bigint,
+'active' FROM radius_subscriptions rs LEFT JOIN radius_nas rn ON rn.ip_address = '10.200.0.5' WHERE rs.username = 'SFL001' ON CONFLICT (acct_session_id) DO UPDATE SET input_octets = EXCLUDED.input_octets, output_octets = EXCLUDED.output_octets, framed_ip_address = COALESCE(NULLIF(EXCLUDED.framed_ip_address, ''), radius_sessions.framed_ip_address)
+isp_crm_freeradius      | rlm_sql_postgresql: Status: PGRES_COMMAND_OK
+isp_crm_freeradius      | rlm_sql_postgresql: query affected rows = 1
+isp_crm_freeradius      | (4) sql: SQL query returned: success
+isp_crm_freeradius      | (4) sql: 1 record(s) updated
+isp_crm_freeradius      | rlm_sql (sql): Released connection (0)
+isp_crm_freeradius      | Need 1 more connections to reach min connections (3)
+isp_crm_freeradius      | Need more connections to reach 10 spares
+isp_crm_freeradius      | rlm_sql (sql): Opening additional connection (9), 1 of 30 pending slots used
+isp_crm_freeradius      | rlm_sql_postgresql: Connecting using parameters: dbname='isp_crm' host='isp_crm_db' port=5432 user='crm' password='Mgathoni.2016'
+isp_crm_freeradius      | Connected to database 'isp_crm' on 'isp_crm_db' server version 150015, protocol version 3, backend PID 1813
+isp_crm_freeradius      | rlm_sql (sql): You probably need to lower "min"
+isp_crm_freeradius      | rlm_sql (sql): Closing expired connection (8) - Hit idle_timeout limit
+isp_crm_freeradius      | rlm_sql_postgresql: Socket destructor called, closing
+socket
+isp_crm_freeradius      | (4)     [sql] = ok
+isp_crm_freeradius      | (4)     [exec] = noop
+isp_crm_freeradius      | (4) attr_filter.accounting_response: EXPAND %{User-Name}
+isp_crm_freeradius      | (4) attr_filter.accounting_response:    --> SFL001
+isp_crm_freeradius      | (4) attr_filter.accounting_response: Matched entry DEFAULT at line 12
+isp_crm_freeradius      | (4)     [attr_filter.accounting_response] = updated
+isp_crm_freeradius      | (4)   } # accounting = updated
+isp_crm_freeradius      | (4) Sent Accounting-Response Id 230 from 172.18.0.5:1813 to 10.200.0.5:56623 length 20
+isp_crm_freeradius      | (4) Finished request
+isp_crm_freeradius      | (4) Cleaning up request packet ID 230 with timestamp +1274 due to done
+isp_crm_freeradius      | Ready to process requests
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:07:27.173+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517647:173119][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 738, snapshot max: 738 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_nginx           | 193.142.147.209 - - [04/Jan/2026:09:07:29 +0000] "GET
+/ HTTP/1.1" 499 0 "http://102.205.236.243:80" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "-"
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_db              | 2026-01-04 09:07:33.146 UTC [26] LOG:  checkpoint complete: wrote 95 buffers (0.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=9.445 s, sync=0.008 s, total=9.460 s; sync files=23, longest=0.005 s, average=0.001 s; distance=458 kB, estimate=458 kB
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 77ms - Success: 2, Failed: 0
+isp_crm_nginx           | 105.160.10.107 - - [04/Jan/2026:09:07:53 +0000] "GET / HTTP/2.0" 499 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_nginx           | 104.28.202.178 - - [04/Jan/2026:09:08:14 +0000] "GET /style.php HTTP/2.0" 499 0 "http://superlite.co.ke/style.php" "Go-http-client/2.0" "-"
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 81ms - Success: 2, Failed: 0
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:08:27.183+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517707:183648][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 741, snapshot max: 741 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 87ms - Success: 2, Failed: 0
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 100ms - Success: 2, Failed: 0
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-04T09:09:27.197+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767517767:197780][1:0x714a23c26700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 744, snapshot max: 744 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 71542"}}
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+isp_crm_php             | NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6
+bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 79ms - Success: 2, Failed: 0
+^C
+root@superlitecrm:~/isp# # Check which containers are running/stopped
+docker ps -a
+# Check PHP container logs
+docker logs isp_crm_php --tail 100
+# Check nginx logs
+docker logs isp_crm_nginx --tail 100
+# Restart all containers
+docker compose restart
+CONTAINER ID   IMAGE                           COMMAND                  CREATED
+         STATUS          PORTS
+                                              NAMES
+24e91aa62f6d   isp-php                         "docker-php-entrypoi…"   24 minutes ago   Up 24 minutes
+                                              isp_crm_php
+b9ccb44661ee   isp-whatsapp                    "docker-entrypoint.s…"   24 minutes ago   Up 24 minutes   0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp
+                                              isp_crm_whatsapp
+be2a5d5fcbe0   isp-freeradius                  "/docker-entrypoint.…"   24 minutes ago   Up 24 minutes   0.0.0.0:1812-1813->1812-1813/udp, [::]:1812-1813->1812-1813/udp, 0.0.0.0:3799->3799/udp, [::]:3799->3799/udp
+                                              isp_crm_freeradius
+fbc4224ab59d   isp-olt-service                 "docker-entrypoint.s…"   24 minutes ago   Up 24 minutes
+                                              isp_crm_olt_service
+01801ac63345   nginx:stable-alpine             "/docker-entrypoint.…"   4 hours
+ago      Up 4 hours      0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+                                              isp_crm_nginx
+caa1597dc33a   drumsergio/genieacs:latest      "/usr/bin/supervisor…"   4 hours
+ago      Up 4 hours      0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp, 0.0.0.0:7547->7547/tcp, [::]:7547->7547/tcp, 0.0.0.0:7557->7557/tcp, [::]:7557->7557/tcp,
+0.0.0.0:7567->7567/tcp, [::]:7567->7567/tcp   isp_crm_genieacs
+ed1b97cfc03c   postgres:15-alpine              "docker-entrypoint.s…"   4 hours
+ago      Up 4 hours      127.0.0.1:5433->5432/tcp
+                                              isp_crm_db
+1ceec216ec32   mongo:4.4                       "docker-entrypoint.s…"   4 hours
+ago      Up 4 hours      27017/tcp
+                                              isp_crm_genieacs_mongo
+178829caad84   lscr.io/linuxserver/wireguard   "/init"                  4 hours
+ago      Up 4 hours
+                                              isp_crm_wireguard
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4771
+NOTICE: PHP message: PHP Notice:  fwrite(): Send of 6 bytes failed with errno=32 Broken pipe in /var/www/html/src/HuaweiOLT.php on line 4773
+102.205.236.243 - - [04/Jan/2026:08:44:00 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:44:01 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:44:31 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:44:31 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+2026/01/04 08:45:02 [error] 41#41: *538 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:08:45:02 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+2026/01/04 08:45:02 [error] 41#41: *537 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:08:45:02 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+102.205.236.243 - - [04/Jan/2026:08:45:36 +0000] "GET /api/oms-notify.php HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+2026/01/04 08:45:36 [error] 41#41: *551 recv() failed (104: Connection reset by
+peer) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+2026/01/04 08:45:36 [error] 42#42: *550 recv() failed (104: Connection reset by
+peer) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:08:45:36 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 502 157 "-" "curl/8.5.0" "-"
+102.205.236.243 - - [04/Jan/2026:08:45:36 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 502 157 "-" "curl/8.5.0" "-"
+172.18.0.1 - - [04/Jan/2026:08:45:52 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:46:22 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:29 +0000] "GET / HTTP/2.0" 499 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:29 +0000] "GET / HTTP/2.0" 200 78868 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+2026/01/04 08:46:31 [error] 42#42: *557 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 105.160.10.107, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/2.0", host: "crm.superlite.co.ke", referrer: "https://crm.superlite.co.ke/"
+105.160.10.107 - - [04/Jan/2026:08:46:31 +0000] "GET /favicon.ico HTTP/2.0" 404
+555 "https://crm.superlite.co.ke/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:32 +0000] "GET /?page=login HTTP/2.0" 200
+2865 "https://crm.superlite.co.ke/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:35 +0000] "POST /?page=login HTTP/2.0" 302 0 "https://crm.superlite.co.ke/?page=login" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:36 +0000] "GET /?page=dashboard HTTP/2.0"
+200 40965 "https://crm.superlite.co.ke/?page=login" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+2026/01/04 08:46:40 [warn] 42#42: *561 an upstream response is buffered to a temporary file /var/cache/nginx/fastcgi_temp/4/00/0000000004 while reading upstream, client: 105.160.10.107, server: crm.superlite.co.ke, request: "GET /?page=huawei-olt HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke", referrer: "https://crm.superlite.co.ke/?page=dashboard"
+105.160.10.107 - - [04/Jan/2026:08:46:41 +0000] "GET /?page=huawei-olt HTTP/2.0" 200 255545 "https://crm.superlite.co.ke/?page=dashboard" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:41 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:41 +0000] "GET /?page=huawei-olt&ajax=get_customers_for_auth HTTP/2.0" 200 7853 "https://crm.superlite.co.ke/?page=huawei-olt" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko)
+Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+2026/01/04 08:46:50 [warn] 42#42: *561 an upstream response is buffered to a temporary file /var/cache/nginx/fastcgi_temp/5/00/0000000005 while reading upstream, client: 105.160.10.107, server: crm.superlite.co.ke, request: "GET /?page=huawei-olt&view=onus HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke", referrer: "https://crm.superlite.co.ke/?page=huawei-olt"
+105.160.10.107 - - [04/Jan/2026:08:46:50 +0000] "GET /?page=huawei-olt&view=onus HTTP/2.0" 200 253023 "https://crm.superlite.co.ke/?page=huawei-olt" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:51 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:51 +0000] "GET /?page=huawei-olt&ajax=get_customers_for_auth HTTP/2.0" 200 7853 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:57 +0000] "GET /?page=huawei-olt&view=onus&unconfigured=1 HTTP/2.0" 200 253707 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:58 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:08:46:58 +0000] "GET /?page=huawei-olt&ajax=get_customers_for_auth HTTP/2.0" 200 7853 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+172.18.0.1 - - [04/Jan/2026:08:47:08 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+105.160.10.107 - - [04/Jan/2026:08:47:14 +0000] "GET /?page=huawei-olt&ajax=realtime_onus&unconfigured=1 HTTP/2.0" 200 430 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+143.198.85.239 - - [04/Jan/2026:08:47:26 +0000] "PROPFIND / HTTP/1.1" 405 157 "http://102.205.236.243:443/" "-" "-"
+102.205.236.243 - - [04/Jan/2026:08:47:38 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:48:24 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:48:24 +0000] "GET /api/oms-notify.php HTTP/1.1" 405 57 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:48:30 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:49:00 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:49:01 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:49:31 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:49:32 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:49:32 +0000] "GET /api/oms-notify.php HTTP/1.1" 405 57 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:50:01 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:50:02 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 403 24 "-" "curl/8.5.0" "-"
+102.205.236.243 - - [04/Jan/2026:08:50:09 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 200 430 "-" "curl/8.5.0" "-"
+102.205.236.243 - - [04/Jan/2026:08:50:31 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:50:31 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:51:01 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:51:02 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:51:02 +0000] "GET /api/oms-notify.php HTTP/1.1" 405 57 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:51:30 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:52:00 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:52:00 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:52:30 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:52:31 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:08:52:31 +0000] "GET /api/oms-notify.php HTTP/1.1" 405 57 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:53:00 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+115.231.78.3 - - [04/Jan/2026:08:53:05 +0000] "GET / HTTP/1.1" 301 169 "-" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.2623.112 Safari/537.36" "-"
+115.231.78.3 - - [04/Jan/2026:08:53:28 +0000] "GET / HTTP/1.1" 499 0 "-" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.2623.112 Safari/537.36" "-"
+102.205.236.243 - - [04/Jan/2026:08:53:30 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:53:31 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+115.231.78.3 - - [04/Jan/2026:08:53:53 +0000] "GET /favicon.ico HTTP/1.1" 301 169 "-" "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36 QIHU 360SE" "-"
+115.231.78.3 - - [04/Jan/2026:08:53:56 +0000] "GET /favicon.ico HTTP/1.1" 404 555 "http://102.205.236.243:80/favicon.ico" "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36 QIHU 360SE" "-"
+2026/01/04 08:53:56 [error] 43#43: *622 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 115.231.78.3, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "crm.superlite.co.ke", referrer: "http://102.205.236.243:80/favicon.ico"
+102.205.236.243 - - [04/Jan/2026:08:54:01 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:54:01 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+115.231.78.3 - - [04/Jan/2026:08:54:21 +0000] "GET / HTTP/1.1" 499 0 "-" "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36 QIHU 360SE" "-"
+115.231.78.3 - - [04/Jan/2026:08:54:25 +0000] "GET /robots.txt HTTP/1.1" 301 169 "-" "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36 QIHU 360SE" "-"
+159.65.7.27 - - [04/Jan/2026:08:55:35 +0000] "PROPFIND / HTTP/1.1" 405 157 "http://102.205.236.243:443/" "-" "-"
+2026/01/04 08:59:02 [error] 43#43: *626 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /api/oms-notify.php HTTP/1.1", upstream:
+"fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:08:59:02 +0000] "GET /api/oms-notify.php HTTP/1.1" 504 167 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:08:59:30 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:09:00:00 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:09:00:01 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+2026/01/04 09:00:02 [error] 43#43: *629 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:09:00:02 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+102.205.236.243 - - [04/Jan/2026:09:00:02 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+2026/01/04 09:00:02 [error] 43#43: *630 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:09:00:31 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:09:00:32 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:09:05:01 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+2026/01/04 09:05:01 [error] 44#44: *647 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+2026/01/04 09:05:01 [error] 44#44: *648 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0", upstream: "fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:09:05:01 +0000] "GET /cron.php?action=scheduled_summaries&secret=YOUR_SECRET HTTP/2.0" 504 167 "-" "curl/8.5.0" "-"
+2026/01/04 09:05:32 [error] 44#44: *655 upstream timed out (110: Operation timed out) while reading response header from upstream, client: 102.205.236.243, server: crm.superlite.co.ke, request: "GET /api/oms-notify.php HTTP/1.1", upstream:
+"fastcgi://172.17.0.1:9000", host: "crm.superlite.co.ke"
+102.205.236.243 - - [04/Jan/2026:09:05:32 +0000] "GET /api/oms-notify.php HTTP/1.1" 504 167 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:09:06:00 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:09:06:30 +0000] "GET /api/snmp-discovery.php?olt_id=1 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:09:06:31 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+102.205.236.243 - - [04/Jan/2026:09:07:01 +0000] "GET /api/snmp-discovery.php?olt_id=2 HTTP/1.1" 499 0 "-" "axios/1.13.2" "-"
+172.18.0.1 - - [04/Jan/2026:09:07:01 +0000] "POST /api/oms-notify.php HTTP/1.1"
+301 169 "-" "axios/1.13.2" "-"
+105.160.10.107 - - [04/Jan/2026:09:07:08 +0000] "GET /?page=login HTTP/2.0" 499
+0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:09:07:16 +0000] "GET / HTTP/2.0" 499 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+193.142.147.209 - - [04/Jan/2026:09:07:24 +0000] "POST / HTTP/1.1" 301 169 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "-"
+193.142.147.209 - - [04/Jan/2026:09:07:29 +0000] "GET / HTTP/1.1" 499 0 "http://102.205.236.243:80" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "-"
+105.160.10.107 - - [04/Jan/2026:09:07:53 +0000] "GET / HTTP/2.0" 499 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36" "-"
+104.28.202.178 - - [04/Jan/2026:09:08:14 +0000] "GET /style.php HTTP/2.0" 499 0
+"http://superlite.co.ke/style.php" "Go-http-client/2.0" "-"
+ [+] restart 0/9
+root@superlitecrm:~/isp#            Restarting                            10.7s  ⠦ Container isp_crm_db             Restarting                            10.7s  ⠦ Container isp_crm_freeradius     Restarting                            10.7s  ⠦ Container isp_crm_nginx          Restarting                            10.7s  ⠦ Container isp_crm_olt_service    Restarting                            10.7s  ⠦ Container isp_crm_wireguard      Restarting                            10.7s  ⠦ Container isp_crm_genieacs       Restarting                            10.7s  ⠦ Container isp_crm_genieacs_mongo Restarting                            10.7s  ⠦ Container isp_crm_whatsapp       Restarting                            10.7s
