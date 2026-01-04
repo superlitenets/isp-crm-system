@@ -1860,9 +1860,77 @@ class HuaweiOLT {
     }
     
     /**
-     * Get live data for a single ONU from OLT using CLI via OLT Session Service
+     * Get live data for a single ONU - returns cached data from database (fast, non-blocking)
+     * For live OLT queries, use triggerBackgroundRefresh() then poll the database
      */
     public function getSingleONULiveData(int $oltId, int $frame, ?int $slot, ?int $port, ?int $onuId, string $sn = ''): array {
+        // FAST PATH: Return cached data from database instead of blocking CLI queries
+        // The background SNMP polling worker keeps the database up to date
+        
+        $onu = null;
+        if (!empty($sn)) {
+            $stmt = $this->db->prepare("SELECT * FROM huawei_onus WHERE sn = ?");
+            $stmt->execute([$sn]);
+            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$onu && $oltId && $slot !== null && $port !== null && $onuId !== null) {
+            $stmt = $this->db->prepare("SELECT * FROM huawei_onus WHERE olt_id = ? AND frame = ? AND slot = ? AND port = ? AND onu_id = ?");
+            $stmt->execute([$oltId, $frame, $slot, $port, $onuId]);
+            $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        }
+        
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found in database'];
+        }
+        
+        // Trigger a background refresh via the OLT Session Service (non-blocking)
+        $this->triggerBackgroundRefresh($oltId, $onu['id']);
+        
+        // Return cached data immediately
+        return [
+            'success' => true,
+            'onu' => [
+                'status' => $onu['status'] ?? 'unknown',
+                'rx_power' => $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null,
+                'tx_power' => $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null,
+                'distance' => $onu['distance'] !== null ? (int)$onu['distance'] : null,
+                'name' => $onu['name'] ?? '',
+                'tr069_ip' => $onu['tr069_ip'] ?? null,
+                'updated_at' => $onu['updated_at'] ?? null,
+                'cached' => true
+            ]
+        ];
+    }
+    
+    /**
+     * Trigger a background refresh for a specific ONU via the OLT Session Service
+     * This is non-blocking - the service will update the database asynchronously
+     */
+    private function triggerBackgroundRefresh(int $oltId, int $onuDbId): void {
+        try {
+            $serviceUrl = getenv('OLT_SERVICE_URL') ?: 'http://localhost:3002';
+            $ch = curl_init("{$serviceUrl}/refresh-onu");
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode(['oltId' => $oltId, 'onuDbId' => $onuDbId]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT_MS => 500, // Very short timeout - fire and forget
+                CURLOPT_CONNECTTIMEOUT_MS => 200
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Throwable $e) {
+            // Ignore errors - this is best-effort background refresh
+        }
+    }
+    
+    /**
+     * Get live data for a single ONU via CLI (BLOCKING - use only for manual refresh)
+     * This method makes synchronous OLT queries and should not be used for Live Mode
+     */
+    public function getSingleONULiveDataCLI(int $oltId, int $frame, ?int $slot, ?int $port, ?int $onuId, string $sn = ''): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];

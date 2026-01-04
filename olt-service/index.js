@@ -129,6 +129,91 @@ app.get('/snmp/status', async (req, res) => {
     }
 });
 
+// Background ONU refresh endpoint (fire-and-forget from PHP)
+app.post('/refresh-onu', async (req, res) => {
+    const { oltId, onuDbId } = req.body;
+    res.json({ success: true, message: 'Refresh queued' }); // Respond immediately
+    
+    // Run refresh in background
+    if (oltId && onuDbId) {
+        refreshSingleONU(oltId, onuDbId).catch(err => {
+            console.log(`[RefreshONU] Error: ${err.message}`);
+        });
+    }
+});
+
+// Background refresh function for single ONU
+async function refreshSingleONU(oltId, onuDbId) {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    
+    try {
+        // Get ONU details from database
+        const onuResult = await pool.query(
+            'SELECT * FROM huawei_onus WHERE id = $1', [onuDbId]
+        );
+        if (onuResult.rows.length === 0) return;
+        
+        const onu = onuResult.rows[0];
+        const { frame, slot, port, onu_id } = onu;
+        
+        if (slot === null || port === null || onu_id === null) return;
+        
+        // Execute CLI commands via session manager
+        const interfaceCmd = `interface gpon ${frame}/${slot}`;
+        await sessionManager.execute(oltId.toString(), interfaceCmd, { timeout: 10000 });
+        
+        // Get optical info
+        const opticalCmd = `display ont optical-info ${port} ${onu_id}`;
+        const opticalResult = await sessionManager.execute(oltId.toString(), opticalCmd, { timeout: 15000 });
+        
+        // Parse optical data
+        let rxPower = null, txPower = null;
+        const cleanOutput = (opticalResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        
+        const rxMatch = cleanOutput.match(/Rx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (rxMatch) rxPower = parseFloat(rxMatch[1]);
+        
+        const txMatch = cleanOutput.match(/Tx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i);
+        if (txMatch) txPower = parseFloat(txMatch[1]);
+        
+        // Get status
+        const infoCmd = `display ont info ${port} ${onu_id}`;
+        const infoResult = await sessionManager.execute(oltId.toString(), infoCmd, { timeout: 15000 });
+        const cleanInfo = (infoResult || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        
+        let status = 'offline';
+        const statusMatch = cleanInfo.match(/Run\s+state\s*:\s*(\w+)/i);
+        if (statusMatch) {
+            const state = statusMatch[1].toLowerCase();
+            if (state === 'online') status = 'online';
+            else if (state.includes('los')) status = 'los';
+        }
+        if (status === 'offline' && rxPower !== null && rxPower > -35) {
+            status = 'online';
+        }
+        
+        // Exit interface
+        await sessionManager.execute(oltId.toString(), 'quit', { timeout: 5000 });
+        
+        // Update database
+        await pool.query(`
+            UPDATE huawei_onus 
+            SET rx_power = COALESCE($1, rx_power),
+                tx_power = COALESCE($2, tx_power),
+                status = COALESCE($3, status),
+                updated_at = NOW()
+            WHERE id = $4
+        `, [rxPower, txPower, status, onuDbId]);
+        
+        console.log(`[RefreshONU] Updated ONU ${onu.sn}: status=${status}, rx=${rxPower}`);
+    } catch (err) {
+        console.log(`[RefreshONU] Error refreshing ONU ${onuDbId}: ${err.message}`);
+    } finally {
+        await pool.end();
+    }
+}
+
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
@@ -310,14 +395,14 @@ app.post('/wireguard/apply', async (req, res) => {
 });
 
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
-const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '*/30 * * * * *';
-const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 30;
+const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '*/30 * * * * *'; // CLI autofind every 30s
+const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 60; // SNMP polling every 60s (reduced load)
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
     discoveryWorker.start(DISCOVERY_INTERVAL);
     snmpWorker.start(SNMP_INTERVAL);
-    console.log(`[Discovery] Auto-discovery started (${DISCOVERY_INTERVAL})`);
+    console.log(`[Discovery] CLI autofind started (${DISCOVERY_INTERVAL})`);
     console.log(`[SNMP] Background polling started (every ${SNMP_INTERVAL}s)`);
 });
 
