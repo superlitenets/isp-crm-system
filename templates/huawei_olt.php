@@ -5984,6 +5984,9 @@ try {
                         </div>
                         <h5 data-live-status class="mt-2 mb-0 text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>"><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></h5>
                         <small class="text-muted">Device Status</small>
+                        <?php if (!empty($currentOnu['uptime'])): ?>
+                        <div class="mt-1 small text-muted" data-live-uptime><i class="bi bi-clock me-1"></i><?= htmlspecialchars($currentOnu['uptime']) ?></div>
+                        <?php endif; ?>
                     </div>
                     <div class="col-md-9">
                         <div class="row g-3">
@@ -6099,6 +6102,21 @@ try {
                                 <span data-live-status class="text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?> fw-bold">
                                     <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
                                 </span>
+                                <?php if (!empty($currentOnu['uptime'])): ?>
+                                <span class="ms-2 text-muted small" data-live-uptime title="ONU Uptime">
+                                    <i class="bi bi-clock"></i> <?= htmlspecialchars($currentOnu['uptime']) ?>
+                                </span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-primary">TR-069 IP</span><br>
+                                <?php if (!empty($currentOnu['tr069_ip'])): ?>
+                                <span class="text-success fw-bold" id="tr069IpDisplay"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></span>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise"></i></a>
+                                <?php else: ?>
+                                <span class="text-muted" id="tr069IpDisplay">Not connected</span>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise"></i></a>
+                                <?php endif; ?>
                             </div>
                             <div class="mb-2">
                                 <span class="text-primary">ONU/OLT Rx signal</span><br>

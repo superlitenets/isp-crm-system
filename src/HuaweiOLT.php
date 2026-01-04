@@ -6849,7 +6849,7 @@ class HuaweiOLT {
         ];
     }
     
-    public function deleteONUFromOLT(int $onuId): array {
+    public function deleteONUFromOLT(int $onuId, bool $async = true): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
@@ -6860,6 +6860,34 @@ class HuaweiOLT {
         $port = $onu['port'];
         $onuIdNum = $onu['onu_id'];
         $oltId = $onu['olt_id'];
+        
+        // Build combined command for delete (with service-port cleanup and confirmation)
+        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
+        
+        if ($async && $this->isOLTServiceAvailable()) {
+            // Fast async execution - delete from DB immediately, OLT command runs in background
+            $this->deleteONU($onuId);
+            
+            $result = $this->executeAsyncViaService($oltId, $command);
+            
+            $this->addLog([
+                'olt_id' => $oltId,
+                'onu_id' => $onuId,
+                'action' => 'delete',
+                'status' => ($result['success'] ?? false) ? 'success' : 'failed',
+                'message' => ($result['success'] ?? false) ? "ONU {$onu['sn']} delete command sent (async)" : ($result['error'] ?? 'Failed'),
+                'command_sent' => $command,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return [
+                'success' => $result['success'] ?? false, 
+                'message' => ($result['success'] ?? false) ? "Delete command sent for ONU {$onu['sn']}" : ('Delete failed: ' . ($result['error'] ?? 'Unknown error')),
+                'async' => true
+            ];
+        }
+        
+        // Synchronous execution
         $allOutput = '';
         
         // Step 1: Find and delete all service-ports for this ONU
@@ -6869,7 +6897,6 @@ class HuaweiOLT {
         $allOutput .= "[Find Service-Ports]\n{$spOutput}\n";
         
         // Parse service-port IDs from output
-        // Format: "  0   0   gpon  0/1/0       0   1    vlan   ..."
         $servicePortIds = [];
         if (preg_match_all('/^\s*(\d+)\s+\d+\s+gpon\s+/m', $spOutput, $matches)) {
             $servicePortIds = array_map('intval', $matches[1]);
@@ -6882,11 +6909,9 @@ class HuaweiOLT {
             $allOutput .= "[Delete SP {$spId}]\n" . ($undoResult['output'] ?? '') . "\n";
         }
         
-        // Step 2: Delete the ONU (requires "y" confirmation)
-        $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
+        // Step 2: Delete the ONU
         $result = $this->executeCommand($oltId, $command);
         
-        // Check for success indicators in output
         $output = $result['output'] ?? '';
         $allOutput .= "[Delete ONU]\n{$output}";
         $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
@@ -6914,7 +6939,7 @@ class HuaweiOLT {
         return ['success' => $success, 'message' => $message, 'output' => $allOutput, 'service_ports_deleted' => $spCount];
     }
     
-    public function resetONUConfig(int $onuId): array {
+    public function resetONUConfig(int $onuId, bool $async = true): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
@@ -6927,6 +6952,28 @@ class HuaweiOLT {
         
         // Huawei MA5683T requires interface context (requires "y" confirmation)
         $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\ny\r\nquit";
+        
+        if ($async && $this->isOLTServiceAvailable()) {
+            // Fast async execution - returns immediately
+            $result = $this->executeAsyncViaService($onu['olt_id'], $command);
+            
+            $this->addLog([
+                'olt_id' => $onu['olt_id'],
+                'onu_id' => $onuId,
+                'action' => 'reset_config',
+                'status' => ($result['success'] ?? false) ? 'success' : 'failed',
+                'message' => ($result['success'] ?? false) ? "ONU {$onu['sn']} reset command sent (async)" : ($result['error'] ?? 'Failed'),
+                'command_sent' => $command,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return [
+                'success' => $result['success'] ?? false, 
+                'message' => ($result['success'] ?? false) ? "Reset command sent to ONU {$onu['sn']}" : ('Reset failed: ' . ($result['error'] ?? 'Unknown error')),
+                'async' => true
+            ];
+        }
+        
         $result = $this->executeCommand($onu['olt_id'], $command);
         
         $this->addLog([
