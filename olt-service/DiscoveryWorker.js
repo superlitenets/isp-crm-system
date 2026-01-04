@@ -121,29 +121,77 @@ class DiscoveryWorker {
     }
 
     async updateOnuFromSNMP(oltId, snmpData) {
-        // Update ONU optical power and distance from SNMP data
         try {
             const serial = snmpData.sn?.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
             if (!serial) return;
 
-            await this.pool.query(`
-                UPDATE huawei_onus 
-                SET rx_power = COALESCE($1, rx_power),
-                    tx_power = COALESCE($2, tx_power),
-                    distance = COALESCE($3, distance),
-                    status = COALESCE($4, status),
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE olt_id = $5 AND UPPER(REPLACE(sn, '-', '')) = $6
-            `, [
-                snmpData.rx_power || null,
-                snmpData.tx_power || null,
-                snmpData.distance || null,
-                snmpData.status || null,
-                oltId,
-                serial
-            ]);
+            const existingResult = await this.pool.query(`
+                SELECT id FROM huawei_onus 
+                WHERE olt_id = $1 AND UPPER(REPLACE(sn, '-', '')) = $2
+            `, [oltId, serial]);
+
+            if (existingResult.rows.length > 0) {
+                await this.pool.query(`
+                    UPDATE huawei_onus 
+                    SET rx_power = COALESCE($1, rx_power),
+                        tx_power = COALESCE($2, tx_power),
+                        distance = COALESCE($3, distance),
+                        status = COALESCE($4, status),
+                        frame = COALESCE($5, frame),
+                        slot = COALESCE($6, slot),
+                        port = COALESCE($7, port),
+                        onu_id = COALESCE($8, onu_id),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = $9
+                `, [
+                    snmpData.rx_power || null,
+                    snmpData.tx_power || null,
+                    snmpData.distance || null,
+                    snmpData.status || null,
+                    snmpData.frame || 0,
+                    snmpData.slot || null,
+                    snmpData.port || null,
+                    snmpData.onu_id || null,
+                    existingResult.rows[0].id
+                ]);
+            } else {
+                let onuName = '';
+                const desc = snmpData.description || '';
+                if (desc) {
+                    const match = desc.match(/^(SNS\d+|SFL\d+)/i);
+                    if (match) {
+                        onuName = match[1].toUpperCase();
+                    } else {
+                        const parts = desc.split('_');
+                        onuName = parts[0];
+                    }
+                }
+                if (!onuName) {
+                    onuName = `Port ${snmpData.slot || 0}/${snmpData.port || 0} ONU #${snmpData.onu_id || 0}`;
+                }
+
+                await this.pool.query(`
+                    INSERT INTO huawei_onus (olt_id, sn, name, description, frame, slot, port, onu_id, 
+                        rx_power, tx_power, distance, status, is_authorized, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                `, [
+                    oltId,
+                    snmpData.sn,
+                    onuName,
+                    desc,
+                    snmpData.frame || 0,
+                    snmpData.slot || 0,
+                    snmpData.port || 0,
+                    snmpData.onu_id || 0,
+                    snmpData.rx_power || null,
+                    snmpData.tx_power || null,
+                    snmpData.distance || null,
+                    snmpData.status || 'online'
+                ]);
+                console.log(`[Discovery] Added new ONU: ${onuName} (${snmpData.sn})`);
+            }
         } catch (error) {
-            // Ignore update errors - ONU might not exist in DB yet
+            console.error(`[Discovery] Error saving ONU ${snmpData.sn}:`, error.message);
         }
     }
 
