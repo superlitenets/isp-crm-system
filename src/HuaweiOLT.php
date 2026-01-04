@@ -780,8 +780,9 @@ class HuaweiOLT {
         }
         
         // Huawei optical power OIDs - index format: ponIndex.onuId
-        // ponIndex = frame*8192 + slot*256 + port
-        $ponIndex = $frame * 8192 + $slot * 256 + $port;
+        // MA5800 series: ponIndex = 4194304000 + slot*8192 + port*256
+        // Legacy: ponIndex = frame*8192 + slot*256 + port
+        $ponIndex = 4194304000 + $slot * 8192 + $port * 256;
         $indexSuffix = "{$ponIndex}.{$onuId}";
         
         // Use short timeout (500ms) and no retries since CLI is primary
@@ -2304,11 +2305,19 @@ class HuaweiOLT {
             $ponIndex = (int)$parts[0];
             $onuId = (int)$parts[1];
             
-            // Decode ponIndex: frame*8192 + slot*256 + port
-            $frame = intdiv($ponIndex, 8192);
-            $remainder = $ponIndex % 8192;
-            $slot = intdiv($remainder, 256);
-            $port = $remainder % 256;
+            // MA5800 series uses ifIndex-based ponIndex starting at 4194304000
+            // ponIndex = 4194304000 + slot*8192 + port*256
+            if ($ponIndex >= 4194304000) {
+                $offset = $ponIndex - 4194304000;
+                $slot = intdiv($offset, 8192);
+                $port = intdiv($offset % 8192, 256);
+            } else {
+                // Legacy format: ponIndex = frame*8192 + slot*256 + port
+                $frame = intdiv($ponIndex, 8192);
+                $remainder = $ponIndex % 8192;
+                $slot = intdiv($remainder, 256);
+                $port = $remainder % 256;
+            }
             
             // Return key format: slot.port.onuId (matching buildOpticalKey format)
             return "{$slot}.{$port}.{$onuId}";
