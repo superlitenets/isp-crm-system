@@ -498,12 +498,19 @@ class HuaweiOLT {
         
         // Correct Huawei MA5680T OIDs:
         // .43.1.9 = hwGponDeviceOntSn (Serial Number)
-        // .43.1.3 = hwGponOntOpticalDdmRxPower (RX Power - NOT serial!)
-        // .46.1.15 = hwGponDeviceOntControlRunStatus (Status)
         // .43.1.2 = hwGponDeviceOntDespt (Description)
+        // .43.1.10 = hwGponDeviceOntEquipmentId (Equipment/Model ID like "HG8546M")
+        // .46.1.15 = hwGponDeviceOntControlRunStatus (Status)
+        // .51.1.4 = hwGponOntOpticalDdmRxPower (RX Power in 0.01dBm)
+        // .51.1.5 = hwGponOntOpticalDdmTxPower (TX Power in 0.01dBm)
+        // .46.1.20 = hwGponDeviceOntControlRanging (Distance in meters)
         $huaweiONTSerialBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.9';
         $huaweiONTStatusBase = '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.15';
         $huaweiONTDescBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.2';
+        $huaweiONTEquipIdBase = '1.3.6.1.4.1.2011.6.128.1.1.2.43.1.10';
+        $huaweiONTRxPowerBase = '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.4';
+        $huaweiONTTxPowerBase = '1.3.6.1.4.1.2011.6.128.1.1.2.51.1.5';
+        $huaweiONTDistanceBase = '1.3.6.1.4.1.2011.6.128.1.1.2.46.1.20';
         
         $serials = @snmprealwalk($host, $community, $huaweiONTSerialBase, 10000000, 2);
         
@@ -546,6 +553,14 @@ class HuaweiOLT {
         
         $statuses = @snmprealwalk($host, $community, $huaweiONTStatusBase, 10000000, 2);
         $descriptions = @snmprealwalk($host, $community, $huaweiONTDescBase, 10000000, 2);
+        $equipIds = @snmprealwalk($host, $community, $huaweiONTEquipIdBase, 10000000, 2);
+        $rxPowers = @snmprealwalk($host, $community, $huaweiONTRxPowerBase, 10000000, 2);
+        $txPowers = @snmprealwalk($host, $community, $huaweiONTTxPowerBase, 10000000, 2);
+        $distances = @snmprealwalk($host, $community, $huaweiONTDistanceBase, 10000000, 2);
+        
+        error_log("SNMP Bulk Fetch: equipIds=" . ($equipIds !== false ? count($equipIds) : 'FAILED') . 
+                  ", rxPowers=" . ($rxPowers !== false ? count($rxPowers) : 'FAILED') .
+                  ", distances=" . ($distances !== false ? count($distances) : 'FAILED'));
         
         $onus = [];
         $debugCount = 0;
@@ -692,6 +707,26 @@ class HuaweiOLT {
             $descOid = $huaweiONTDescBase . '.' . $indexPart;
             $desc = isset($descriptions[$descOid]) ? $this->cleanSnmpValue($descriptions[$descOid]) : '';
             
+            // Equipment ID (model like "HG8546M")
+            $equipIdOid = $huaweiONTEquipIdBase . '.' . $indexPart;
+            $equipId = isset($equipIds[$equipIdOid]) ? $this->cleanSnmpValue($equipIds[$equipIdOid]) : '';
+            
+            // RX/TX Power (in 0.01 dBm units, need to divide by 100)
+            // Use status table index format for optical data (.46 instead of .43)
+            $statusIndex = $indexPart;
+            $rxPowerOid = $huaweiONTRxPowerBase . '.' . $statusIndex;
+            $txPowerOid = $huaweiONTTxPowerBase . '.' . $statusIndex;
+            $distanceOid = $huaweiONTDistanceBase . '.' . $statusIndex;
+            
+            $rxPowerRaw = isset($rxPowers[$rxPowerOid]) ? (int)$this->cleanSnmpValue($rxPowers[$rxPowerOid]) : null;
+            $txPowerRaw = isset($txPowers[$txPowerOid]) ? (int)$this->cleanSnmpValue($txPowers[$txPowerOid]) : null;
+            $distanceRaw = isset($distances[$distanceOid]) ? (int)$this->cleanSnmpValue($distances[$distanceOid]) : null;
+            
+            // Convert power from 0.01 dBm to dBm (divide by 100)
+            $rxPower = ($rxPowerRaw !== null && $rxPowerRaw != 0 && $rxPowerRaw != 2147483647) ? round($rxPowerRaw / 100, 2) : null;
+            $txPower = ($txPowerRaw !== null && $txPowerRaw != 0 && $txPowerRaw != 2147483647) ? round($txPowerRaw / 100, 2) : null;
+            $distance = ($distanceRaw !== null && $distanceRaw >= 0 && $distanceRaw < 100000) ? $distanceRaw : null;
+            
             // If slot/port are still 0, try to extract from description
             // SmartOLT often stores location in description like "SNS001328_zone_name_0/9/5" or "_0_9_5_"
             if ($slot == 0 && $port == 0 && !empty($desc)) {
@@ -719,7 +754,11 @@ class HuaweiOLT {
                 'onu_id' => $onuId,
                 'status' => $status,
                 'description' => $desc,
-                'index' => $indexPart
+                'index' => $indexPart,
+                'equipment_id' => $equipId,
+                'rx_power' => $rxPower,
+                'tx_power' => $txPower,
+                'distance' => $distance
             ];
         }
         
@@ -1101,14 +1140,13 @@ class HuaweiOLT {
                 $onuName = "ONU {$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
             }
             
-            // Detect ONU type from serial number prefix
+            // Detect ONU type from equipment_id (model from SNMP like "HG8546M")
             $onuTypeId = null;
-            $sn = $onu['sn'] ?? '';
-            if (strlen($sn) >= 4) {
-                $prefix = strtoupper(substr($sn, 0, 4));
-                // Common prefixes: HWTC (Huawei), ZTEG (ZTE), ALCL (Nokia/Alcatel), VSOL, TPLN (TP-Link)
-                $stmt = $this->db->prepare("SELECT id FROM huawei_onu_types WHERE UPPER(LEFT(vendor_id, 4)) = ? LIMIT 1");
-                $stmt->execute([$prefix]);
+            $equipmentId = $onu['equipment_id'] ?? '';
+            if (!empty($equipmentId)) {
+                // Match by model name (case-insensitive)
+                $stmt = $this->db->prepare("SELECT id FROM huawei_onu_types WHERE LOWER(model) = LOWER(?) OR LOWER(name) = LOWER(?) LIMIT 1");
+                $stmt->execute([$equipmentId, $equipmentId]);
                 $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
                 $onuTypeId = $typeRow['id'] ?? null;
             }
@@ -1161,6 +1199,11 @@ class HuaweiOLT {
             if ($zoneId) $data['zone_id'] = $zoneId;
             if ($onuTypeId) $data['onu_type_id'] = $onuTypeId;
             if (!empty($address)) $data['address'] = $address;
+            
+            // Add optical power and distance from SNMP
+            if ($onu['rx_power'] !== null) $data['rx_power'] = $onu['rx_power'];
+            if ($onu['tx_power'] !== null) $data['tx_power'] = $onu['tx_power'];
+            if ($onu['distance'] !== null) $data['distance'] = $onu['distance'];
             
             try {
                 if ($existing) {
