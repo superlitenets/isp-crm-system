@@ -57,6 +57,23 @@ app.post('/execute', async (req, res) => {
     }
 });
 
+app.post('/execute-async', async (req, res) => {
+    try {
+        const { oltId, command, timeout } = req.body;
+        if (!oltId || !command) {
+            return res.status(400).json({ success: false, error: 'Missing oltId or command' });
+        }
+        sessionManager.execute(oltId, command, { timeout }).then(result => {
+            console.log(`[Async] Command completed for OLT ${oltId}: ${command.substring(0, 50)}...`);
+        }).catch(err => {
+            console.log(`[Async] Command failed for OLT ${oltId}: ${err.message}`);
+        });
+        res.json({ success: true, message: 'Command queued for execution' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.post('/execute-batch', async (req, res) => {
     try {
         const { oltId, commands, timeout } = req.body;

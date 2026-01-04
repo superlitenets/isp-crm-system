@@ -5207,6 +5207,41 @@ class HuaweiOLT {
         return ['success' => false, 'message' => $result['error'] ?? 'Command execution failed'];
     }
     
+    public function executeAsyncViaService(int $oltId, string $command, int $timeout = 30000): array {
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        // Check if session exists, if not establish one
+        $status = $this->getOLTSessionStatus($oltId);
+        if (!($status['connected'] ?? false)) {
+            $connectResult = $this->connectToOLTSession($oltId);
+            if (!($connectResult['success'] ?? false)) {
+                return ['success' => false, 'error' => 'Failed to establish session: ' . ($connectResult['error'] ?? 'Unknown error')];
+            }
+        }
+        
+        // Execute command via async endpoint (fire-and-forget)
+        $result = $this->callOLTService('/execute-async', [
+            'oltId' => (string)$oltId,
+            'command' => $command,
+            'timeout' => $timeout
+        ]);
+        
+        // Log the command
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'command_async',
+            'status' => ($result['success'] ?? false) ? 'success' : 'failed',
+            'message' => ($result['success'] ?? false) ? 'Command queued for execution' : ($result['error'] ?? 'Failed'),
+            'command_sent' => $command,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return $result;
+    }
+    
     public function executeBatchViaService(int $oltId, array $commands, int $timeout = 30000): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
@@ -6752,7 +6787,7 @@ class HuaweiOLT {
         return $localResult;
     }
     
-    public function rebootONU(int $onuId): array {
+    public function rebootONU(int $onuId, bool $async = true): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
@@ -6766,6 +6801,29 @@ class HuaweiOLT {
         // Huawei MA5683T requires interface context for ont reset
         // The reset command requires "y" confirmation: "Are you sure to reset the ONT(s)? (y/n)[n]:"
         $command = "interface gpon {$frame}/{$slot}\r\nont reset {$port} {$onuIdNum}\r\ny\r\nquit";
+        
+        if ($async && $this->isOLTServiceAvailable()) {
+            // Fast async execution - returns immediately
+            $result = $this->executeAsyncViaService($onu['olt_id'], $command);
+            
+            $this->addLog([
+                'olt_id' => $onu['olt_id'],
+                'onu_id' => $onuId,
+                'action' => 'reboot',
+                'status' => ($result['success'] ?? false) ? 'success' : 'failed',
+                'message' => ($result['success'] ?? false) ? "ONU {$onu['sn']} reboot command sent (async)" : ($result['error'] ?? 'Failed'),
+                'command_sent' => $command,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return [
+                'success' => $result['success'] ?? false, 
+                'message' => ($result['success'] ?? false) ? "Reboot command sent to ONU {$onu['sn']}" : ('Reboot failed: ' . ($result['error'] ?? 'Unknown error')),
+                'async' => true
+            ];
+        }
+        
+        // Synchronous execution - waits for result
         $result = $this->executeCommand($onu['olt_id'], $command, true);
         
         // Check for success indicators in output
