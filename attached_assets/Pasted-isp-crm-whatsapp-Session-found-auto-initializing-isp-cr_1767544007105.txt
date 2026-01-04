@@ -1,0 +1,22 @@
+isp_crm_whatsapp        | Session found, auto-initializing...
+isp_crm_whatsapp        | Using Chromium at: /usr/bin/chromium
+isp_crm_whatsapp        | WhatsApp service running on 0.0.0.0:3001
+isp_crm_whatsapp        | API Secret: Configured
+isp_crm_whatsapp        | /app/node_modules/puppeteer-core/lib/cjs/puppeteer/node/BrowserRunner.js:299
+isp_crm_whatsapp        |             reject(new Error([
+isp_crm_whatsapp        |                    ^
+isp_crm_whatsapp        |
+isp_crm_whatsapp        | Error: Failed to launch the browser process!
+isp_crm_whatsapp        | [14:14:0104/162626.915325:ERROR:chrome/browser/process_singleton_posix.cc:358] The profile appears to be in use by another Chromium process (14) on another computer (7c069fc97f9d). Chromium has locked the profile so that it doesn't get corrupted. If you are sure no other processes are using this profile, you can unlock the profile and relaunch Chromium.
+isp_crm_whatsapp        | [14:14:0104/162626.915619:ERROR:chrome/browser/ui/views/message_box_dialog.cc:199] Unable to show message box: Chromium - The profile appears to be in use by another Chromium process (14) on another computer (7c069fc97f9d). Chromium has locked the profile so that it doesn't get corrupted. If you are sure no other processes are using this profile, you can unlock the profile and relaunch Chromium.
+isp_crm_whatsapp        |
+isp_crm_whatsapp        |
+isp_crm_whatsapp        | TROUBLESHOOTING: https://github.com/puppeteer/puppeteer/blob/main/docs/troubleshooting.md
+isp_crm_whatsapp        |
+isp_crm_whatsapp        |     at onClose (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/node/BrowserRunner.js:299:20)
+isp_crm_whatsapp        |     at ChildProcess.<anonymous> (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/node/BrowserRunner.js:290:24)
+isp_crm_whatsapp        |     at ChildProcess.emit (node:events:536:35)
+isp_crm_whatsapp        |     at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+isp_crm_whatsapp        |
+isp_crm_whatsapp        | Node.js v20.19.6
+isp_crm_whatsapp exited with code 1 (restarting)
