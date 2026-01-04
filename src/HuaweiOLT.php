@@ -1884,8 +1884,8 @@ class HuaweiOLT {
             $opticalOutput = $opticalResult['output'] ?? '';
         }
         
-        // Get ONU info
-        $infoCmd = "display ont info {$port} {$onuId}";
+        // Get ONU info (needs interface context)
+        $infoCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} {$onuId}\r\nquit";
         $infoResult = $this->executeCommand($oltId, $infoCmd);
         
         $infoOutput = '';
@@ -1906,8 +1906,9 @@ class HuaweiOLT {
             $txPower = (float)$m[1];
         }
         
-        // Parse status from info output
+        // Parse status from info output - try multiple patterns
         $status = 'offline';
+        // Try "Run state : online" pattern
         if (preg_match('/Run\s+state\s*:\s*(\w+)/i', $infoOutput, $m)) {
             $state = strtolower($m[1]);
             if ($state === 'online') {
@@ -1915,6 +1916,11 @@ class HuaweiOLT {
             } elseif (stripos($state, 'los') !== false) {
                 $status = 'los';
             }
+        }
+        // Also try optical output which may indicate online status
+        if ($status === 'offline' && $rxPower !== null && $rxPower > -35) {
+            // If we got valid RX power, ONU is online
+            $status = 'online';
         }
         
         // Parse distance from info output
