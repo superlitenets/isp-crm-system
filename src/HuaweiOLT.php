@@ -2847,9 +2847,20 @@ class HuaweiOLT {
         
         $previousStatus = $onu['status'] ?? 'unknown';
         
-        // Update status
-        $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $updateStmt->execute([$status, $onuId]);
+        // Track online_since for uptime calculation
+        if ($status === 'online' && $previousStatus !== 'online') {
+            // ONU just came online - set online_since timestamp
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, online_since = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $onuId]);
+        } elseif ($status !== 'online' && $previousStatus === 'online') {
+            // ONU went offline - clear online_since
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, online_since = NULL, uptime = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $onuId]);
+        } else {
+            // Regular status update
+            $updateStmt = $this->db->prepare("UPDATE huawei_onus SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $updateStmt->execute([$status, $onuId]);
+        }
         
         // Send LOS notification if status changed to 'los' from a non-los state
         if ($status === 'los' && $previousStatus !== 'los') {
@@ -5208,8 +5219,17 @@ class HuaweiOLT {
     }
     
     public function executeAsyncViaService(int $oltId, string $command, int $timeout = 30000): array {
-        // Fire-and-forget: No session check, fast curl timeout
-        // The OLT service will auto-connect if needed
+        // Quick session check and connect if needed
+        $status = $this->getOLTSessionStatusFast($oltId);
+        if (!($status['connected'] ?? false)) {
+            // Need to connect first - do it quickly
+            $connectResult = $this->connectToOLTSession($oltId);
+            if (!($connectResult['success'] ?? false)) {
+                return ['success' => false, 'error' => 'Failed to establish session: ' . ($connectResult['error'] ?? 'Unknown error')];
+            }
+        }
+        
+        // Now fire the async command
         $url = $this->getOLTServiceUrl() . '/execute-async';
         
         $ch = curl_init();
@@ -5242,6 +5262,18 @@ class HuaweiOLT {
         ]);
         
         return $result;
+    }
+    
+    private function getOLTSessionStatusFast(int $oltId): array {
+        $url = $this->getOLTServiceUrl() . '/status/' . $oltId;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        return $response ? json_decode($response, true) : ['connected' => false];
     }
     
     public function executeBatchViaService(int $oltId, array $commands, int $timeout = 30000): array {
@@ -6807,6 +6839,12 @@ class HuaweiOLT {
         if ($async && $this->isOLTServiceAvailable()) {
             // Fast async execution - returns immediately
             $result = $this->executeAsyncViaService($onu['olt_id'], $command);
+            
+            if ($result['success'] ?? false) {
+                // Set ONU status to offline immediately (it will come back online after reboot)
+                $stmt = $this->db->prepare("UPDATE huawei_onus SET status = 'offline', uptime = NULL WHERE id = ?");
+                $stmt->execute([$onuId]);
+            }
             
             $this->addLog([
                 'olt_id' => $onu['olt_id'],

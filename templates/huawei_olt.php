@@ -5974,6 +5974,23 @@ try {
             </div>
             <?php endif; ?>
             
+            <?php 
+            // Calculate uptime for display
+            $uptimeDisplay = '';
+            if (!empty($currentOnu['online_since']) && $currentOnu['status'] === 'online') {
+                $onlineSince = new DateTime($currentOnu['online_since']);
+                $now = new DateTime();
+                $diff = $now->diff($onlineSince);
+                if ($diff->d > 0) {
+                    $uptimeDisplay = $diff->d . 'd ' . $diff->h . 'h ' . $diff->i . 'm';
+                } elseif ($diff->h > 0) {
+                    $uptimeDisplay = $diff->h . 'h ' . $diff->i . 'm';
+                } else {
+                    $uptimeDisplay = $diff->i . 'm';
+                }
+            }
+            ?>
+            
             <!-- Hero Status Card -->
             <div class="onu-hero p-4 mb-4">
                 <div class="row align-items-center">
@@ -5984,8 +6001,8 @@ try {
                         </div>
                         <h5 data-live-status class="mt-2 mb-0 text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>"><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></h5>
                         <small class="text-muted">Device Status</small>
-                        <?php if (!empty($currentOnu['uptime'])): ?>
-                        <div class="mt-1 small text-muted" data-live-uptime><i class="bi bi-clock me-1"></i><?= htmlspecialchars($currentOnu['uptime']) ?></div>
+                        <?php if ($uptimeDisplay): ?>
+                        <div class="mt-1 small text-muted" data-live-uptime><i class="bi bi-clock me-1"></i><?= $uptimeDisplay ?></div>
                         <?php endif; ?>
                     </div>
                     <div class="col-md-9">
@@ -6102,9 +6119,9 @@ try {
                                 <span data-live-status class="text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?> fw-bold">
                                     <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
                                 </span>
-                                <?php if (!empty($currentOnu['uptime'])): ?>
+                                <?php if ($uptimeDisplay): ?>
                                 <span class="ms-2 text-muted small" data-live-uptime title="ONU Uptime">
-                                    <i class="bi bi-clock"></i> <?= htmlspecialchars($currentOnu['uptime']) ?>
+                                    <i class="bi bi-clock"></i> <?= $uptimeDisplay ?>
                                 </span>
                                 <?php endif; ?>
                             </div>
