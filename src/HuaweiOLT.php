@@ -1882,6 +1882,8 @@ class HuaweiOLT {
         $opticalOutput = '';
         if ($opticalResult['success']) {
             $opticalOutput = $opticalResult['output'] ?? '';
+            // Strip ANSI escape codes
+            $opticalOutput = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $opticalOutput);
         }
         
         // Get ONU info (needs interface context)
@@ -1891,11 +1893,13 @@ class HuaweiOLT {
         $infoOutput = '';
         if ($infoResult['success']) {
             $infoOutput = $infoResult['output'] ?? '';
+            // Strip ANSI escape codes
+            $infoOutput = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $infoOutput);
         }
         
         // Parse optical power - ONU's Rx power (what ONU receives from OLT)
         $rxPower = null;
-        // Parse: Rx optical power(dBm)  : -22.85
+        // Parse: Rx optical power(dBm)                  : -0.68
         if (preg_match('/Rx\s+optical\s+power\s*\([^)]*\)\s*:\s*([-\d.]+)/i', $opticalOutput, $m)) {
             $rxPower = (float)$m[1];
         }
@@ -1943,19 +1947,14 @@ class HuaweiOLT {
             $name = trim($m[1]);
         }
         
-        // Get TR-069 WAN IP via display ont wan-info command (needs interface context)
+        // Note: TR-069 WAN IP is fetched separately via refresh button to keep live refresh fast
+        // Get existing tr069_ip from database
         $tr069Ip = null;
-        $wanCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont wan-info {$port} {$onuId}\r\nquit";
-        $wanResult = $this->executeCommand($oltId, $wanCmd);
-        if ($wanResult['success']) {
-            $wanOutput = $wanResult['output'] ?? '';
-            // Parse IP address from output: "IP address : 10.200.0.x"
-            if (preg_match('/IP\s*(?:address)?\s*:\s*([\d.]+)/i', $wanOutput, $m)) {
-                $ip = $m[1];
-                if ($ip && $ip !== '0.0.0.0') {
-                    $tr069Ip = $ip;
-                }
-            }
+        $stmt = $this->db->prepare("SELECT tr069_ip FROM huawei_onus WHERE sn = ?");
+        $stmt->execute([$sn]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($row && !empty($row['tr069_ip'])) {
+            $tr069Ip = $row['tr069_ip'];
         }
         
         // Save the optical data to database if we got valid readings
@@ -6363,10 +6362,12 @@ class HuaweiOLT {
         
         $result = $this->executeCommand($oltId, $cmd);
         $output = $result['output'] ?? '';
+        // Strip ANSI escape codes
+        $output = preg_replace('/\x1b\[[0-9;]*[A-Za-z]|\[[\d;]*[A-Za-z]/', '', $output);
         
         // Parse IP address from output
-        // Format: IP address : 10.200.0.x or similar
-        if (preg_match('/IP\s*(?:address)?\s*:\s*([\d.]+)/i', $output, $m)) {
+        // Format: IPv4 address : 10.97.132.28 (Huawei MA5683T)
+        if (preg_match('/IPv4\s+address\s*:\s*([\d.]+)/i', $output, $m)) {
             $ip = $m[1];
             if ($ip && $ip !== '0.0.0.0') {
                 // Update the ONU record with the TR-069 IP
