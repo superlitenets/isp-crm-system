@@ -1917,6 +1917,14 @@ class HuaweiOLT {
                 $status = 'los';
             }
         }
+        // Try from optical output - "ONT online duration" or output structure indicates online
+        if ($status === 'offline' && preg_match('/ONT\s+online\s+duration|online\s+duration/i', $opticalOutput)) {
+            $status = 'online';
+        }
+        // Also check for "Last up time" pattern in info output
+        if ($status === 'offline' && preg_match('/Last\s+up\s+time\s*:/i', $infoOutput)) {
+            $status = 'online';
+        }
         // Also try optical output which may indicate online status
         if ($status === 'offline' && $rxPower !== null && $rxPower > -35) {
             // If we got valid RX power, ONU is online
