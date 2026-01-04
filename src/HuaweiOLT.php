@@ -5208,28 +5208,30 @@ class HuaweiOLT {
     }
     
     public function executeAsyncViaService(int $oltId, string $command, int $timeout = 30000): array {
-        $olt = $this->getOLT($oltId);
-        if (!$olt) {
-            return ['success' => false, 'error' => 'OLT not found'];
-        }
+        // Fire-and-forget: No session check, fast curl timeout
+        // The OLT service will auto-connect if needed
+        $url = $this->getOLTServiceUrl() . '/execute-async';
         
-        // Check if session exists, if not establish one
-        $status = $this->getOLTSessionStatus($oltId);
-        if (!($status['connected'] ?? false)) {
-            $connectResult = $this->connectToOLTSession($oltId);
-            if (!($connectResult['success'] ?? false)) {
-                return ['success' => false, 'error' => 'Failed to establish session: ' . ($connectResult['error'] ?? 'Unknown error')];
-            }
-        }
-        
-        // Execute command via async endpoint (fire-and-forget)
-        $result = $this->callOLTService('/execute-async', [
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);        // 3 seconds max - just queue the command
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2); // 2 second connect
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
             'oltId' => (string)$oltId,
             'command' => $command,
             'timeout' => $timeout
-        ]);
+        ]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         
-        // Log the command
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $result = $response ? json_decode($response, true) : ['success' => false, 'error' => 'No response'];
+        
+        // Log asynchronously (fire-and-forget logging)
         $this->addLog([
             'olt_id' => $oltId,
             'action' => 'command_async',
