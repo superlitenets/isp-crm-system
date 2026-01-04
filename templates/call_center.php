@@ -519,8 +519,8 @@ if (isset($_SESSION['user_id'])) {
                         <select class="form-select" name="user_id" id="ext_user_id">
                             <option value="">-- None --</option>
                             <?php 
-                            $usersResult = pg_query($db, "SELECT id, name FROM users WHERE status = 'active' ORDER BY name");
-                            while ($user = pg_fetch_assoc($usersResult)):
+                            $usersStmt = $db->query("SELECT id, name FROM users WHERE status = 'active' ORDER BY name");
+                            while ($user = $usersStmt->fetch(PDO::FETCH_ASSOC)):
                             ?>
                             <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['name']) ?></option>
                             <?php endwhile; ?>
