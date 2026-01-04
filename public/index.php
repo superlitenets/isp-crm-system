@@ -6808,6 +6808,13 @@ $csrfToken = \App\Auth::generateToken();
                     </a>
                 </li>
                 <?php endif; ?>
+                <?php if (\App\Auth::can('settings.view')): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
+                        <i class="bi bi-telephone-fill text-success"></i> Call Center
+                    </a>
+                </li>
+                <?php endif; ?>
                 <?php if (\App\Auth::can('reports.view')): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'reports' ? 'active' : '' ?>" href="?page=reports">
@@ -6955,6 +6962,13 @@ $csrfToken = \App\Auth::generateToken();
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'isp' ? 'active' : '' ?>" href="?page=isp">
                     <i class="bi bi-broadcast text-info"></i> ISP
+                </a>
+            </li>
+            <?php endif; ?>
+            <?php if (\App\Auth::can('settings.view')): ?>
+            <li class="nav-item">
+                <a class="nav-link <?= $page === 'call_center' ? 'active' : '' ?>" href="?page=call_center">
+                    <i class="bi bi-telephone-fill text-success"></i> Call Center
                 </a>
             </li>
             <?php endif; ?>
@@ -7221,6 +7235,77 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             case 'my-hr':
                 include __DIR__ . '/../templates/my-hr.php';
+                break;
+            case 'call_center':
+                if (!\App\Auth::can('settings.view')) {
+                    $accessDenied = true;
+                } else {
+                    // Handle call center AJAX actions
+                    if ($action === 'originate' && isset($_GET['ajax'])) {
+                        header('Content-Type: application/json');
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $input = json_decode(file_get_contents('php://input'), true);
+                        $userExt = $callCenter->getExtensionByUserId($_SESSION['user_id']);
+                        if ($userExt) {
+                            $result = $callCenter->originateCall($userExt['extension'], $input['destination']);
+                            echo json_encode($result);
+                        } else {
+                            echo json_encode(['success' => false, 'error' => 'No extension assigned']);
+                        }
+                        exit;
+                    }
+                    if ($action === 'get_extension') {
+                        header('Content-Type: application/json');
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        echo json_encode($callCenter->getExtension($_GET['id']));
+                        exit;
+                    }
+                    if ($action === 'get_trunk') {
+                        header('Content-Type: application/json');
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        echo json_encode($callCenter->getTrunk($_GET['id']));
+                        exit;
+                    }
+                    if ($action === 'save_extension' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $callCenter->saveExtension($_POST);
+                        header('Location: ?page=call_center&tab=extensions');
+                        exit;
+                    }
+                    if ($action === 'save_trunk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $callCenter->saveTrunk($_POST);
+                        header('Location: ?page=call_center&tab=trunks');
+                        exit;
+                    }
+                    if ($action === 'save_queue' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $callCenter->saveQueue($_POST);
+                        header('Location: ?page=call_center&tab=queues');
+                        exit;
+                    }
+                    if ($action === 'delete_extension') {
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $callCenter->deleteExtension($_GET['id']);
+                        header('Location: ?page=call_center&tab=extensions');
+                        exit;
+                    }
+                    if ($action === 'delete_trunk') {
+                        require_once __DIR__ . '/../src/CallCenter.php';
+                        $callCenter = new CallCenter($db);
+                        $callCenter->deleteTrunk($_GET['id']);
+                        header('Location: ?page=call_center&tab=trunks');
+                        exit;
+                    }
+                    include __DIR__ . '/../templates/call_center.php';
+                }
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
