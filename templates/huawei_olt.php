@@ -6126,13 +6126,13 @@ try {
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">TR-069 IP</span><br>
+                                <span class="text-primary">TR-069 WAN IP</span><br>
                                 <?php if (!empty($currentOnu['tr069_ip'])): ?>
                                 <span class="text-success fw-bold" id="tr069IpDisplay"><?= htmlspecialchars($currentOnu['tr069_ip']) ?></span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise"></i></a>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
                                 <?php else: ?>
-                                <span class="text-muted" id="tr069IpDisplay">Not connected</span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise"></i></a>
+                                <span class="text-muted" id="tr069IpDisplay">Click refresh to fetch</span>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
