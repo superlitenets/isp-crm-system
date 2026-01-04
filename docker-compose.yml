@@ -63,6 +63,11 @@ services:
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-}
       - OLT_SERVICE_URL=http://localhost:3002
+      - FREEPBX_HOST=isp_crm_freepbx
+      - FREEPBX_AMI_PORT=5038
+      - FREEPBX_AMI_USER=${FREEPBX_AMI_USER:-crmadmin}
+      - FREEPBX_AMI_PASS=${FREEPBX_AMI_PASS:-crmami2025}
+      - FREEPBX_URL=http://isp_crm_freepbx:8080
     volumes:
       - ./logs:/var/www/html/logs
       - ./public/uploads:/var/www/html/public/uploads
@@ -188,6 +193,74 @@ services:
     networks:
       - crm_network
 
+  # FreePBX Call Center Solution
+  freepbx:
+    image: tiredofit/freepbx:latest
+    container_name: isp_crm_freepbx
+    restart: unless-stopped
+    hostname: pbx.local
+    cap_add:
+      - NET_ADMIN
+    privileged: true
+    environment:
+      - VIRTUAL_HOST=pbx.local
+      - VIRTUAL_NETWORK=crm_network
+      - VIRTUAL_PORT=80
+      - ZABBIX_HOSTNAME=freepbx-app
+      - DB_HOST=freepbx-db
+      - DB_PORT=3306
+      - DB_NAME=asterisk
+      - DB_USER=asterisk
+      - DB_PASS=${FREEPBX_DB_PASS:-freepbx2025}
+      - ADMIN_DIRECTORY=/admin
+      - UCP_ENABLE=true
+      - ENABLE_FAIL2BAN=true
+      - TIMEZONE=${APP_TIMEZONE:-Africa/Nairobi}
+      - HTTP_PORT=8080
+      - HTTPS_PORT=8443
+      - RTP_START=18000
+      - RTP_FINISH=18999
+      - AMI_ENABLED=true
+      - AMI_PORT=5038
+      - AMI_USER=${FREEPBX_AMI_USER:-crmadmin}
+      - AMI_PASSWORD=${FREEPBX_AMI_PASS:-crmami2025}
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/udp"
+      - "5061:5061/tcp"
+      - "5160:5160/udp"
+      - "5160:5160/tcp"
+      - "5038:5038"
+      - "18000-18100:18000-18100/udp"
+    volumes:
+      - freepbx_certs:/certs
+      - freepbx_data:/data
+      - freepbx_logs:/var/log
+      - freepbx_www:/var/www/html
+      - freepbx_spool:/var/spool/asterisk
+    depends_on:
+      - freepbx-db
+    networks:
+      - crm_network
+
+  freepbx-db:
+    image: mariadb:10.6
+    container_name: isp_crm_freepbx_db
+    restart: unless-stopped
+    command: --max-allowed-packet=64M --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      - MYSQL_ROOT_PASSWORD=${FREEPBX_DB_ROOT_PASS:-freepbxroot2025}
+      - MYSQL_DATABASE=asterisk
+      - MYSQL_USER=asterisk
+      - MYSQL_PASSWORD=${FREEPBX_DB_PASS:-freepbx2025}
+    volumes:
+      - freepbx_db_data:/var/lib/mysql
+    networks:
+      - crm_network
+
 networks:
   crm_network:
     driver: bridge
@@ -197,6 +270,12 @@ volumes:
   whatsapp_session:
   whatsapp_secret:
   genieacs_mongo_data:
+  freepbx_certs:
+  freepbx_data:
+  freepbx_logs:
+  freepbx_www:
+  freepbx_spool:
+  freepbx_db_data:
   genieacs_ext:
   genieacs_logs:
   wireguard_config:
