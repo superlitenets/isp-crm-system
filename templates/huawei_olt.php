@@ -6298,15 +6298,16 @@ try {
                     
                     if (data.success && data.onu) {
                         const onu = data.onu;
-                        const statusEl = document.querySelector('[data-live-status]');
+                        const statusEls = document.querySelectorAll('[data-live-status]');
                         const rxEl = document.querySelector('[data-live-rx]');
                         const txEl = document.querySelector('[data-live-tx]');
                         
-                        if (statusEl) {
+                        // Update ALL status elements
+                        statusEls.forEach(statusEl => {
                             const statusClass = {'online': 'success', 'offline': 'secondary', 'los': 'danger'}[onu.status] || 'secondary';
-                            statusEl.className = 'text-' + statusClass + ' fw-bold';
+                            statusEl.className = statusEl.className.replace(/text-\w+/g, 'text-' + statusClass);
                             statusEl.textContent = onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown';
-                        }
+                        });
                         if (rxEl && onu.rx_power !== null) {
                             rxEl.textContent = onu.rx_power.toFixed(2) + ' dBm';
                         }
