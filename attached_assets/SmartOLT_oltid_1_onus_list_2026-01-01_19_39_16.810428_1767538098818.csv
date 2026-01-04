@@ -1,0 +1,919 @@
+"ONU external ID","PON Type",SN,"Onu Type",Name,OLT,Board,Port,"Allocated ONU",Zone,Address,Latitude,Longitude,"ODB (Splitter)","ODB Port",Mode,"WAN mode","IP address","Subnet mask","Default gateway",DNS1,DNS2,Username,Password,CATV,"Administrative status","Auth date",Status,Signal,"Signal 1310","Signal 1490",Distance(m),"Service port","Service port VLAN","Service port CVLAN","Service port SVLAN","Service port tag transform mode","Service port upload speed","Service port download speed",Contact
+HWTCF2D53A8B,gpon,HWTCF2D53A8B,HG8546M,"TEST ONU REPLIT",GITHURAI_MA5683T_G45,1,0,1,RIFLO,,,,,,Routing,"Setup via ONU webpage",,,,,,,,"Not supported by ONU-Type",Enabled,,Online,-,-50,-0.71,10,,,,,,1G,1G,
+HWTC2B4043A3,gpon,HWTC2B4043A3,HG8145V,SNS000150,GITHURAI_MA5683T_G45,2,0,0,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS000150,SNS000150,"Not supported by ONU-Type",Enabled,,Online,"Very good",-17.6,-11.52,3558,252,902,,,translate,1G,1G,
+HWTC4654DD9B,gpon,HWTC4654DD9B,HG8546M,SNS001328,GITHURAI_MA5683T_G45,2,0,1,DYKAAN,"Abdul Swabulu",,,,,Routing,PPPoE,,,,,,SNS001328,SNS001328,"Not supported by ONU-Type",Enabled,"2025-10-16 11:24:02",Online,"Very good",-30.46,-27.44,3807,1229,902,,,translate,1G,1G,
+HWTC632F759A,gpon,HWTC632F759A,HG8546M,SNS000850,GITHURAI_MA5683T_G45,2,0,2,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS000850,SNS000850,"Not supported by ONU-Type",Enabled,"2024-09-16 12:39:16",Offline,"Very good",-28.54,-21.61,3704,235,902,,,translate,1G,1G,
+,,HWTC632F759A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,467,901,,,translate,1G,1G
+HWTC57B41B12,gpon,HWTC57B41B12,HS8546V,SNS000771,GITHURAI_MA5683T_G45,2,0,3,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS000771,SNS000771,"Not supported by ONU-Type",Enabled,"2024-07-24 20:48:31",Online,"Very good",-29.59,-23.41,3922,112,902,,,translate,1G,1G,
+,,HWTC57B41B12,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,90,901,,,translate,1G,1G
+HWTC5D3951F4,gpon,HWTC5D3951F4,HG8546M,SNS000582,GITHURAI_MA5683T_G45,2,0,4,CARWASH,,,,,,Routing,PPPoE,,,,,,SNS000582,SNS000582,"Not supported by ONU-Type",Enabled,"2024-09-14 18:38:19",Online,"Very good",-22.37,-19.58,3656,543,902,,,translate,1G,1G,
+,,HWTC5D3951F4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,557,901,,,translate,1G,1G
+HWTCA33C829C,gpon,HWTCA33C829C,HG8145V,SNS000535,GITHURAI_MA5683T_G45,2,0,5,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS000535,SNS000535,"Not supported by ONU-Type",Enabled,"2024-09-14 10:50:17","Power fail","Very good",-20.09,-14.21,3539,470,902,,,translate,1G,1G,
+,,HWTCA33C829C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,515,901,,,translate,1G,1G
+HWTC368CCF9B,gpon,HWTC368CCF9B,HG8546M,SNS001035,GITHURAI_MA5683T_G45,2,0,6,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS001035,SNS001035,"Not supported by ONU-Type",Enabled,"2024-11-11 17:48:37",Offline,"Very good",-21.74,-13.76,3747,182,902,,,translate,1G,1G,
+,,HWTC368CCF9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,497,901,,,translate,1G,1G
+HWTCF2DB000B,gpon,HWTCF2DB000B,HG8546M,SNS001110,GITHURAI_MA5683T_G45,2,0,7,DYKAAN,"Peter muchoki",,,,,Routing,PPPoE,,,,,,SNS001110,SNS001110,"Not supported by ONU-Type",Enabled,"2025-12-03 15:32:00",Online,"Very good",-33.98,-22.52,3784,155,902,,,translate,1G,1G,
+,,HWTCF2DB000B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,175,1995,,,translate,1G,1G
+HWTC57B09095,gpon,HWTC57B09095,HG8546M,SNS001125,GITHURAI_MA5683T_G45,2,0,8,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS001125,SNS001125,"Not supported by ONU-Type",Enabled,"2024-12-23 19:26:53",Online,"Very good",-29.21,-22.59,4017,754,902,,,translate,1G,1G,
+,,HWTC57B09095,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,855,901,,,translate,1G,1G
+HWTCF2D554EB,gpon,HWTCF2D554EB,HG8546M,SNS001304,GITHURAI_MA5683T_G45,2,0,9,DYKAAN,"Peter Morias",,,,,Routing,PPPoE,,,,,,SNS001304,SNS001304,"Not supported by ONU-Type",Enabled,"2025-04-22 13:10:51",Online,"Very good",-28.87,-23.1,3848,1387,902,,,translate,1G,1G,
+HWTCF2D5536B,gpon,HWTCF2D5536B,HG8546M,SNS001312,GITHURAI_MA5683T_G45,2,0,10,DYKAAN,"Caxton Manzi",,,,,Routing,PPPoE,,,,,,SNS001312,SNS001312,"Not supported by ONU-Type",Enabled,"2025-04-26 13:50:03","Power fail","Very good",-28.54,-21.61,3815,1273,902,,,translate,1G,1G,
+HWTCF2D553FB,gpon,HWTCF2D553FB,HG8546M,SNS001317,GITHURAI_MA5683T_G45,2,0,11,DYKAAN,"Joyce Tangati",,,,,Routing,PPPoE,,,,,,SNS001317,SNS001317,"Not supported by ONU-Type",Enabled,"2025-05-01 16:56:15",Online,"Very good",-19.11,-14.81,3603,1295,902,,,translate,1G,1G,
+HWTCF2D52BC3,gpon,HWTCF2D52BC3,HG8546M,SNS001321,GITHURAI_MA5683T_G45,2,0,12,PROGRESSIVE,"Stephen Nzioki",,,,,Routing,PPPoE,,,,,,SNS001321,SNS001321,"Not supported by ONU-Type",Enabled,"2025-05-03 10:19:34",Online,"Very good",-32.22,-28.86,3829,1080,902,,,translate,1G,1G,
+HWTC196F229E,gpon,HWTC196F229E,HG8546M,SNS001336,GITHURAI_MA5683T_G45,2,0,13,DYKAAN,"Mary Wambui",,,,,Routing,PPPoE,,,,,,SNS001336,SNS001336,"Not supported by ONU-Type",Enabled,"2025-05-09 18:49:49",Online,"Very good",-29.59,-21.3,3862,648,902,,,translate,1G,1G,
+HWTCD689649F,gpon,HWTCD689649F,HG8145V5,SNS001381,GITHURAI_MA5683T_G45,2,0,14,DYKAAN,"Peter Gatimu",,,,,Routing,PPPoE,,,,,,SNS001381,SNS001381,"Not supported by ONU-Type",Enabled,"2025-12-13 15:16:42",Online,Critical,-35.23,-26.99,3657,300,902,,,translate,1G,1G,
+,,HWTCD689649F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,304,1995,,,translate,1G,1G
+HWTC949CC487,gpon,HWTC949CC487,HG8546M,SNS000363,GITHURAI_MA5683T_G45,2,0,15,DYKAAN,,,,,,Routing,PPPoE,,,,,,SNS000363,SNS000363,"Not supported by ONU-Type",Enabled,"2025-06-09 14:05:37",Online,"Very good",-29.59,-21.55,3961,1526,902,,,translate,1G,1G,
+,,HWTC949CC487,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1498,901,,,translate,1G,1G
+HWTCF2D55D4B,gpon,HWTCF2D55D4B,HG8546M,SNS001437,GITHURAI_MA5683T_G45,2,0,16,DYKAAN,"Margaret  Ngina",,,,,Routing,PPPoE,,,,,,SNS001437,SNS001437,"Not supported by ONU-Type",Enabled,"2025-07-12 18:26:12",Online,Critical,-35.23,-26.99,3706,1572,902,,,translate,1G,1G,
+,,HWTCF2D55D4B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1398,1995,,,translate,1G,1G
+HWTCF2D9035B,gpon,HWTCF2D9035B,HG8546M,SNS000212,GITHURAI_MA5683T_G45,2,0,17,DYKAAN,"Michael muriithi",,,,,Routing,PPPoE,,,,,,SNS000212,SNS000212,"Not supported by ONU-Type",Enabled,"2025-09-10 16:15:47","Power fail",Critical,-35.23,-28.24,3808,501,902,,,translate,1G,1G,
+,,HWTCF2D9035B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1795,1995,,,translate,1G,1G
+HWTCF2D90253,gpon,HWTCF2D90253,HG8546M,SNS001530,GITHURAI_MA5683T_G45,2,0,18,DYKAAN,"Pascal Chuwa",,,,,Routing,PPPoE,,,,,,SNS001530,SNS001530,"Not supported by ONU-Type",Enabled,"2025-09-13 12:40:08",Online,"Very good",-29.59,-22.75,3679,47,902,,,translate,1G,1G,
+,,HWTCF2D90253,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1917,1995,,,translate,1G,1G
+HWTCF2D8F3C3,gpon,HWTCF2D8F3C3,HG8546M,SNS001559,GITHURAI_MA5683T_G45,2,0,19,DYKAAN,"Peter Maina",,,,,Routing,PPPoE,,,,,,SNS001559,SNS001559,"Not supported by ONU-Type",Enabled,"2025-10-03 14:45:12",LOS,Critical,-35.23,-27.44,3842,443,902,,,translate,1G,1G,
+,,HWTCF2D8F3C3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,622,1995,,,translate,1G,1G
+HWTC020CB19C,gpon,HWTC020CB19C,HG8546M,"Zimmerman_Kwa Judy",GITHURAI_MA5683T_G45,2,4,0,"Roysambu Primary",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-08-23 18:59:04",Online,"Very good",-26.78,-23.56,3739,330,902,,,translate,1G,1G,
+,,HWTC020CB19C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,399,901,,,translate,1G,1G
+HWTC143E299B,gpon,HWTC143E299B,HG8546M,"Lower Tuners Block A",GITHURAI_MA5683T_G45,2,4,1,"Roysambu Primary",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-10-04 10:43:25","Power fail","Very good",-33.98,-26.99,3975,250,902,,,translate,1G,1G,
+,,HWTC143E299B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,510,901,,,translate,1G,1G
+HWTC2959BD9D,gpon,HWTC2959BD9D,HG8546M,SNS000596-01,GITHURAI_MA5683T_G45,2,4,2,ABUNDANT,,,,,,Routing,PPPoE,,,,,,SNS000596-01,SNS000596-01,"Not supported by ONU-Type",Enabled,"2024-12-21 15:57:59",Online,"Very good",-33.02,-25.85,4430,875,902,,,translate,1G,1G,
+,,HWTC2959BD9D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,171,901,,,translate,1G,1G
+HWTC3A8BC99B,gpon,HWTC3A8BC99B,HG8546M,SNS000530-01,GITHURAI_MA5683T_G45,2,4,3,ABUNDANT,,,,,,Routing,PPPoE,,,,,,SNS000530-01,SNS000530-01,"Not supported by ONU-Type",Enabled,"2025-02-25 12:55:15",Online,"Very good",-33.98,-27.96,4439,1095,902,,,translate,1G,1G,
+,,HWTC3A8BC99B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,271,1995,,,translate,1G,1G
+HWTC3B31C69B,gpon,HWTC3B31C69B,HG8546M,SNS000790,GITHURAI_MA5683T_G45,2,4,4,ABUNDANT,,,,,,Routing,PPPoE,,,,,,SNS000790,SNS000790,"Not supported by ONU-Type",Enabled,"2025-02-15 20:26:28",Online,"Very good",-33.98,-26.38,4517,1060,902,,,translate,1G,1G,
+HWTC999F7E9B,gpon,HWTC999F7E9B,HG8546M,"Lower Tuners Block B",GITHURAI_MA5683T_G45,2,4,5,"Lower Tuners",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-10-05 14:56:28",Online,"Very good",-33.98,-26.19,3931,527,902,,,translate,1G,1G,
+,,HWTC999F7E9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,353,901,,,translate,1G,1G
+HWTCF2D8F633,gpon,HWTCF2D8F633,HG8546M,SNS000130,GITHURAI_MA5683T_G45,2,4,6,"Zimmerna Brooks",,,,,,Routing,PPPoE,,,,,,SNS000130,SNS000130,"Not supported by ONU-Type",Enabled,"2025-09-22 12:39:16",Online,"Very good",-32.22,-23.1,3488,495,902,,,translate,1G,1G,
+HWTCC5AEFD9B,gpon,HWTCC5AEFD9B,HG8546M,SNS000446-01,GITHURAI_MA5683T_G45,2,4,7,"Roysambu Primary",,,,,,Routing,PPPoE,,,,,,SNS000446-01,SNS000446-01,"Not supported by ONU-Type",Enabled,"2024-12-21 15:11:17",Online,"Very good",-24.09,-24.09,4214,790,902,,,translate,1G,1G,
+,,HWTCC5AEFD9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,365,901,,,translate,1G,1G
+HWTCEBDFAA9A,gpon,HWTCEBDFAA9A,HG8546M,SNS000113,GITHURAI_MA5683T_G45,2,4,8,"Roysambu Primary",,,,,,Routing,PPPoE,,,,,,SNS000113,SNS000113,"Not supported by ONU-Type",Enabled,"2024-08-26 15:58:44",Online,"Very good",-33.98,-30.96,3871,139,902,,,translate,1G,1G,
+,,HWTCEBDFAA9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,538,901,,,translate,1G,1G
+HWTCF2D5342B,gpon,HWTCF2D5342B,HG8546M,"SNS001325 Pamela Muthoni",GITHURAI_MA5683T_G45,2,4,9,G44,,,,,,Routing,PPPoE,,,,,,SNS001325,SNS001325,"Not supported by ONU-Type",Enabled,"2025-05-05 13:49:28",Online,"Very good",-30.97,-18.24,4634,1201,902,,,translate,1G,1G,
+HWTCF2D53F83,gpon,HWTCF2D53F83,HG8546M,SNS001444,GITHURAI_MA5683T_G45,2,4,10,"Lower Tuners","Daniel Mwangi",,,,,Routing,PPPoE,,,,,,SNS001444,SNS001444,"Not supported by ONU-Type",Enabled,"2025-07-17 17:33:18","Power fail","Very good",-19.32,-15.65,4212,1528,902,,,translate,1G,1G,
+,,HWTCF2D53F83,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1429,1995,,,translate,1G,1G
+HWTCF2D53AA3,gpon,HWTCF2D53AA3,HG8546M,SNS000578,GITHURAI_MA5683T_G45,2,4,11,"Lower Tuners","Christine Makena",,,,,Routing,PPPoE,,,,,,SNS000578,SNS000578,"Not supported by ONU-Type",Enabled,"2025-07-01 12:31:47",Online,"Very good",-27.96,-22.67,3968,1467,902,,,translate,1G,1G,
+HWTCF2D9020B,gpon,HWTCF2D9020B,HG8546M,"Roysambu Primary Bridge",GITHURAI_MA5683T_G45,2,4,12,"Roysambu Primary",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-08-16 18:05:31","Power fail","Very good",-19.96,-16.11,3309,1463,902,,,translate,1G,1G,
+,,HWTCF2D9020B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,904,1995,,,translate,1G,1G
+HWTCF2D55D1B,gpon,HWTCF2D55D1B,HG8546M,SNS001426,GITHURAI_MA5683T_G45,2,4,13,ABUNDANT,"Winfred Ogolo",,,,,Routing,PPPoE,,,,,,SNS001426,SNS001426,"Not supported by ONU-Type",Enabled,"2025-07-08 16:04:44","Power fail","Very good",-33.02,-26.19,4536,1530,902,,,translate,1G,1G,
+,,HWTCF2D55D1B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1535,1995,,,translate,1G,1G
+HWTCE458747C,gpon,HWTCE458747C,HG8546M,"Lower Tuners Switch 2",GITHURAI_MA5683T_G45,2,4,14,SAMERK,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-09-27 19:31:47",Online,"Very good",-31.55,-24.81,3893,569,902,,,translate,1G,1G,
+,,HWTCE458747C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,586,901,,,translate,1G,1G
+HWTCF2D55353,gpon,HWTCF2D55353,HG8546M,SNS000576,GITHURAI_MA5683T_G45,2,4,15,ABUNDANT,Wavelites,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-05-01 13:11:21",Online,"Very good",-27.45,-22.36,4131,1383,140,,,translate,1G,1G,
+HWTC4656DB9B,gpon,HWTC4656DB9B,HG8546M,SNS000812,GITHURAI_MA5683T_G45,2,4,16,ABUNDANT,"Anthony Sabato",,,,,Routing,PPPoE,,,,,,SNS000812,SNS000812,"Not supported by ONU-Type",Enabled,"2025-11-07 13:37:57",Online,"Very good",-33.02,-26.38,4607,75,902,,,translate,1G,1G,
+,,HWTC4656DB9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,366,1995,,,translate,1G,1G
+HWTCF2D553DB,gpon,HWTCF2D553DB,HG8546M,SNS000495,GITHURAI_MA5683T_G45,2,4,17,ABUNDANT,"Rose Mwangi",,,,,Routing,PPPoE,,,,,,SNS000495,SNS000495,"Not supported by ONU-Type",Enabled,"2025-10-01 10:42:01","Power fail","Very good",-33.98,-27.69,4437,1321,902,,,translate,1G,1G,
+,,HWTCF2D553DB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1347,1995,,,translate,1G,1G
+HWTCF2D9029B,gpon,HWTCF2D9029B,HG8546M,SNS000640,GITHURAI_MA5683T_G45,2,4,18,"Roysambu Primary","Pastor Joseph",,,,,Routing,PPPoE,,,,,,SNS000640,SNS000640,"Not supported by ONU-Type",Enabled,"2025-09-05 18:26:48","Power fail","Very good",-33.98,-23.56,3483,1804,902,,,translate,1G,1G,
+,,HWTCF2D9029B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1911,1995,,,translate,1G,1G
+,,HWTCF2D9029B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1452,901,,,translate,1G,1G
+HWTCD877739C,gpon,HWTCD877739C,HG8546M,"Ogema Bridge",GITHURAI_MA5683T_G45,2,4,19,"Roysambu Primary",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-08-23 18:30:31","Power fail","Very good",-19.04,,3613,518,902,,,translate,1G,1G,
+,,HWTCD877739C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,40,901,,,translate,1G,1G
+HWTC46FE719D,gpon,HWTC46FE719D,HG8546M,"BLOCK A",GITHURAI_MA5683T_G45,2,4,20,"Lower Tuners",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-12-15 17:19:11",Online,"Very good",-33.98,-25.53,3974,332,902,,,translate,1G,1G,
+,,HWTC46FE719D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,334,1995,,,translate,1G,1G
+HWTCF2D558A3,gpon,HWTCF2D558A3,HG8546M,"Riflo Mlika Bridge",GITHURAI_MA5683T_G45,2,5,0,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-03-18 13:56:52",Online,"Very good",-23.38,-18.18,238,662,901,,,translate,1G,1G,
+HWTCF2D55423,gpon,HWTCF2D55423,HG8546M,SNS001255,GITHURAI_MA5683T_G45,2,5,1,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS001255,SNS001255,"Not supported by ONU-Type",Enabled,"2025-04-03 11:07:56",Online,"Very good",-26.2,-25.53,288,1315,902,,,translate,1G,1G,
+,,HWTCF2D55423,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1310,1995,,,translate,1G,1G
+HWTCF2D534F3,gpon,HWTCF2D534F3,HG8546M,Meruit,GITHURAI_MA5683T_G45,2,5,2,RIFLO,"Riflo Garrage",,,,,Routing,PPPoE,,,,,,meruit,meruit,"Not supported by ONU-Type",Enabled,"2025-05-28 20:39:27","Power fail","Very good",-26.03,-21.3,282,1421,902,,,translate,1G,1G,
+,,HWTCF2D534F3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1468,1995,,,translate,1G,1G
+HWTC9588C9AD,gpon,HWTC9588C9AD,HG8145V5,"Shalom 11",GITHURAI_MA5683T_G45,2,5,3,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-06-27 12:03:04",Online,"Very good",-25.09,-19.03,268,148,902,,,translate,1G,1G,
+,,HWTC9588C9AD,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1241,1995,,,translate,1G,1G
+HWTCF2D52DFB,gpon,HWTCF2D52DFB,HG8546M,SNS001290,GITHURAI_MA5683T_G45,2,5,4,RIFLO,"Eric Kayihura",,,,,Routing,PPPoE,,,,,,SNS001290,SNS001290,"Not supported by ONU-Type",Enabled,"2025-04-15 12:38:48",Online,"Very good",-21.25,-15.62,359,1240,902,,,translate,1G,1G,
+,,HWTCF2D52DFB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1561,1995,,,translate,1G,1G
+HWTCE9A3459A,gpon,HWTCE9A3459A,HG8546M,SNS000245,GITHURAI_MA5683T_G45,2,5,5,RIFLO,"Furniture Shop",,,,,Routing,PPPoE,,,,,,SNS000245,SNS000245,"Not supported by ONU-Type",Enabled,"2025-07-19 14:36:46","Power fail","Very good",-22.3,-15.85,400,1542,902,,,translate,1G,1G,
+,,HWTCE9A3459A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1565,1995,,,translate,1G,1G
+HWTC54544F9B,gpon,HWTC54544F9B,HG8546M,Wakesho,GITHURAI_MA5683T_G45,2,5,6,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-07-29 18:04:16",Online,"Very good",-26.2,-21.87,263,1738,902,,,translate,1G,1G,
+,,HWTC54544F9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1683,901,,,translate,1G,1G
+HWTCF2D904AB,gpon,HWTCF2D904AB,HG8546M,SNS001501,GITHURAI_MA5683T_G45,2,5,7,RIFLO,"Sarah  njeri",,,,,Routing,PPPoE,,,,,,SNS001501,SNS001501,"Not supported by ONU-Type",Enabled,"2025-08-16 16:08:14",Online,"Very good",-29.21,-21.67,298,1519,902,,,translate,1G,1G,
+,,HWTCF2D904AB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1777,1995,,,translate,1G,1G
+HWTCF2D90383,gpon,HWTCF2D90383,HG8546M,SNS001513,GITHURAI_MA5683T_G45,2,5,8,RIFLO,"Rosalia mburu",,,,,Routing,PPPoE,,,,,,SNS001513,SNS001513,"Not supported by ONU-Type",Enabled,"2025-08-23 11:44:23",Online,"Very good",-23.77,-17.49,330,1671,902,,,translate,1G,1G,
+,,HWTCF2D90383,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1697,1995,,,translate,1G,1G
+HWTCF2D8F3AB,gpon,HWTCF2D8F3AB,HG8546M,SNS000172,GITHURAI_MA5683T_G45,2,5,9,CARWASH,"Benjamin Kingori",,,,,Routing,PPPoE,,,,,,SNS000172,SNS000172,"Not supported by ONU-Type",Enabled,"2025-09-25 11:52:05",Online,"Very good",-23.47,-19.83,735,50,902,,,translate,1G,1G,
+HWTCF2D8F40B,gpon,HWTCF2D8F40B,HG8546M,SNS001550,GITHURAI_MA5683T_G45,2,5,10,RIFLO,"George mulandi",,,,,Routing,PPPoE,,,,,,SNS001550,SNS001550,"Not supported by ONU-Type",Enabled,"2025-09-27 15:56:21","Power fail","Very good",-30,-18.76,307,956,902,,,translate,1G,1G,
+,,HWTCF2D8F40B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1431,1995,,,translate,1G,1G
+HWTCF2D8F3EB,gpon,HWTCF2D8F3EB,HG8546M,SNS001555,GITHURAI_MA5683T_G45,2,5,11,RIFLO,"Egide furniture shop 2",,,,,Routing,PPPoE,,,,,,SNS001555,SNS001555,"Not supported by ONU-Type",Enabled,"2025-10-02 12:20:47",LOS,"Very good",-33.98,-28.54,624,45,902,,,translate,1G,1G,
+,,HWTCF2D8F3EB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,584,1995,,,translate,1G,1G
+HWTC0932287D,gpon,HWTC0932287D,HG8546M,"Shalom 3",GITHURAI_MA5683T_G45,2,5,12,RIFLO,"Shalom 3 Switch",,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-10-19 11:56:28",Online,"Very good",-24.21,-20.6,295,1621,902,,,translate,1G,1G,
+,,HWTC0932287D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1666,1995,,,translate,1G,1G
+HWTC4678AA9B,gpon,HWTC4678AA9B,HG8546M,SNS001577,GITHURAI_MA5683T_G45,2,5,13,RIFLO,"Eric  furniture shop 2",,,,,Routing,PPPoE,,,,,,SNS001577,SNS001577,"Not supported by ONU-Type",Enabled,"2025-10-21 12:46:56",Online,"Very good",-20.56,-14.58,341,1700,902,,,translate,1G,1G,
+HWTCF2DAFE93,gpon,HWTCF2DAFE93,HG8546M,SNS000698,GITHURAI_MA5683T_G45,2,5,14,RIFLO,"Daniel Thuo",,,,,Routing,PPPoE,,,,,,SNS000698,SNS000698,"Not supported by ONU-Type",Enabled,"2025-12-11 10:43:20","Power fail","Very good",-23.02,-16.86,433,262,902,,,translate,1G,1G,
+,,HWTCF2DAFE93,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,270,1995,,,translate,1G,1G
+HWTC360A5E9B,gpon,HWTC360A5E9B,HG8546M,SNS000467,GITHURAI_MA5683T_G45,2,6,0,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000467,SNS000467,"Not supported by ONU-Type",Enabled,"2024-11-11 13:43:41","Power fail","Very good",-33.98,-26.99,2769,688,902,,,translate,1G,1G,
+,,HWTC360A5E9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,654,901,,,translate,1G,1G
+HWTCF2D55853,gpon,HWTCF2D55853,HG8546M,SNS001384,GITHURAI_MA5683T_G45,2,6,1,DISCOVERY,"Loise njeri",,,,,Routing,PPPoE,,,,,,SNS001384,SNS001384,"Not supported by ONU-Type",Enabled,"2025-06-12 13:04:14",Online,"Very good",-29.21,-25.53,2764,1406,902,,,translate,1G,1G,
+HWTC363CCD9B,gpon,HWTC363CCD9B,HG8546M,SNS001033,GITHURAI_MA5683T_G45,2,6,2,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS001033,SNS001033,"Not supported by ONU-Type",Enabled,"2024-11-11 14:37:52","Power fail",Critical,-35.23,-30,2728,240,902,,,translate,1G,1G,
+HWTC18BA2F9B,gpon,HWTC18BA2F9B,HG8245H,SNS001044,GITHURAI_MA5683T_G45,2,6,3,DISCOVERY,"Nicolas Njoroge",,,,,Routing,PPPoE,,,,,,SNS001044,SNS001044,"Not supported by ONU-Type",Enabled,"2025-06-12 16:05:38",Online,Critical,-35.23,-28.24,2495,1379,902,,,translate,1G,1G,
+HWTCF2DB7B33,gpon,HWTCF2DB7B33,HG8546M,SNS001608,GITHURAI_MA5683T_G45,2,6,4,DISCOVERY,"Alex wairia",,,,,Routing,PPPoE,,,,,,SNS001608,SNS001608,"Not supported by ONU-Type",Enabled,"2025-11-07 18:42:30",Online,"Very good",-33.02,-27.44,2729,1785,901,,,translate,1G,1G,
+,,HWTCF2DB7B33,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1797,1995,,,translate,1G,1G
+HWTC3662619B,gpon,HWTC3662619B,HG8546M,SNS000994,GITHURAI_MA5683T_G45,2,6,5,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000994,SNS000994,"Not supported by ONU-Type",Enabled,"2024-10-25 11:36:13",Online,"Very good",-30.46,-26.57,2928,643,902,,,translate,1G,1G,
+HWTCF2D5584B,gpon,HWTCF2D5584B,HG8546M,SNS000270,GITHURAI_MA5683T_G45,2,6,6,"Roysambu Primary",,,,,,Routing,PPPoE,,,,,,SNS000270,SNS000270,"Not supported by ONU-Type",Enabled,"2025-06-29 12:06:09","Power fail","Very good",-23.28,-18.69,3315,1380,902,,,translate,1G,1G,
+HWTC39BD909B,gpon,HWTC39BD909B,HG8546M,SNS000893,GITHURAI_MA5683T_G45,2,6,7,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000893,SNS000893,"Not supported by ONU-Type",Enabled,"2025-01-30 13:50:33",Online,"Very good",-29.21,-22.44,2698,887,902,,,translate,1G,1G,
+,,HWTC39BD909B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,865,1995,,,translate,1G,1G
+HWTC3996979B,gpon,HWTC3996979B,HG8546M,SNS000893-01,GITHURAI_MA5683T_G45,2,6,8,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000893-01,SNS000893-01,"Not supported by ONU-Type",Enabled,"2025-01-30 14:04:51",Online,"Very good",-31.55,-25.53,2703,1019,902,,,translate,1G,1G,
+,,HWTC3996979B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,806,1995,,,translate,1G,1G
+HWTCF2D53D6B,gpon,HWTCF2D53D6B,HG8546M,SNS001237,GITHURAI_MA5683T_G45,2,6,9,DISCOVERY,"Samuel Gitau",,,,,Routing,PPPoE,,,,,,SNS001237,SNS001237,"Not supported by ONU-Type",Enabled,"2025-04-27 22:23:43",Online,"Very good",-33.98,-26.77,2769,1330,902,,,translate,1G,1G,
+HWTC7E1726E3,gpon,HWTC7E1726E3,HG8546M,SNS000432,GITHURAI_MA5683T_G45,2,6,10,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000432,SNS000432,"Not supported by ONU-Type",Enabled,"2024-08-06 16:50:57",Online,"Very good",-33.98,-25.85,2699,233,902,,,translate,1G,1G,
+,,HWTC7E1726E3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,183,901,,,translate,1G,1G
+HWTC605A6CA4,gpon,HWTC605A6CA4,HG8145V5,SNS000513,GITHURAI_MA5683T_G45,2,6,11,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000513,SNS000513,"Not supported by ONU-Type",Enabled,,Online,"Very good",-18.05,-13.68,2698,102,902,,,translate,10M,10M,
+,,HWTC605A6CA4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,341,901,,,translate,10M,10M
+,,HWTC605A6CA4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,879,903,,,translate,10M,10M
+HWTC75870B91,gpon,HWTC75870B91,HG8546M,SNS001052,GITHURAI_MA5683T_G45,2,6,12,DISCOVERY,"Abanas kivui",,,,,Routing,PPPoE,,,,,,SNS001052,SNS001052,"Not supported by ONU-Type",Enabled,"2025-04-02 16:55:33",Online,"Very good",-33.98,-27.69,2765,1300,902,,,translate,1G,1G,
+HWTCA33E749C,gpon,HWTCA33E749C,HG8145V,SNS000446,GITHURAI_MA5683T_G45,2,6,13,Red_Roses,,,,,,Routing,PPPoE,,,,,,SNS000446,SNS000446,"Not supported by ONU-Type",Enabled,"2025-03-07 18:56:57",Offline,"Very good",-23.67,-21.36,4669,1122,902,,,translate,1G,1G,
+,,HWTCA33E749C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1063,1995,,,translate,1G,1G
+HWTC79026391,gpon,HWTC79026391,HG8546M,SNS000041,GITHURAI_MA5683T_G45,2,6,14,DISCOVERY-RELI,,,,,,Routing,PPPoE,,,,,,SNS000041,SNS000041,"Not supported by ONU-Type",Enabled,,Online,"Very good",-28.54,-23.1,2750,149,902,,,translate,1G,1G,
+,,HWTC79026391,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,210,901,,,translate,1G,1G
+HWTCE5E6E795,gpon,HWTCE5E6E795,HG8546M,SNS001146,GITHURAI_MA5683T_G45,2,6,15,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS001146,SNS001146,"Not supported by ONU-Type",Enabled,"2025-01-07 16:54:19","Power fail","Very good",-24.09,-17.28,2730,807,902,,,translate,1G,1G,
+,,HWTCE5E6E795,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1006,1995,,,translate,1G,1G
+HWTCF2D53D5B,gpon,HWTCF2D53D5B,HG8546M,SNS001245,GITHURAI_MA5683T_G45,2,6,16,DISCOVERY,"Judith Achieng",,,,,Routing,PPPoE,,,,,,SNS001245,SNS001245,"Not supported by ONU-Type",Enabled,"2025-03-29 16:55:28",Online,"Very good",-30.97,-23.28,2758,910,902,,,translate,1G,1G,
+HWTCF2D5358B,gpon,HWTCF2D5358B,HG8546M,SNS000953-01,GITHURAI_MA5683T_G45,2,6,17,Africana,,,,,,Routing,PPPoE,,,,,,SNS000953-01,SNS000953-01,"Not supported by ONU-Type",Enabled,"2025-05-27 18:45:45","Power fail","Very good",-26.99,-30,4439,1381,902,,,translate,1G,1G,
+HWTCAACC7B9A,gpon,HWTCAACC7B9A,HG8546M,SNS000965,GITHURAI_MA5683T_G45,2,6,18,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000965,SNS000965,"Not supported by ONU-Type",Enabled,"2024-10-15 11:00:10",Online,Critical,-35.23,-28.24,2755,113,902,,,translate,1G,1G,
+HWTCF2D52C53,gpon,HWTCF2D52C53,HG8546M,SNS001016,GITHURAI_MA5683T_G45,2,6,19,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS001016,SNS001016,"Not supported by ONU-Type",Enabled,"2025-05-28 14:03:45",Online,"Very good",-28.24,-23.98,2986,1472,902,,,translate,1G,1G,
+HWTC3645F59B,gpon,HWTC3645F59B,HG8546M,SNS000515,GITHURAI_MA5683T_G45,2,6,20,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000515,SNS000515,"Not supported by ONU-Type",Enabled,"2024-10-27 13:07:53","Power fail",Critical,-35.23,-31.54,2789,5,902,,,translate,1G,1G,
+,,HWTC3645F59B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1045,1995,,,translate,1G,1G
+HWTCBA25A98B,gpon,HWTCBA25A98B,HG8546M,SNS001236,GITHURAI_MA5683T_G45,2,6,21,DISCOVERY,"Cecilia Maina",,,,,Routing,PPPoE,,,,,,SNS001236,SNS001236,"Not supported by ONU-Type",Enabled,"2025-03-22 10:23:46",Online,"Very good",-19.36,-12.44,2599,1021,902,,,translate,1G,1G,
+,,HWTCBA25A98B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,298,1995,,,translate,1G,1G
+HWTC3613F99B,gpon,HWTC3613F99B,HG8546M,SNS000866,GITHURAI_MA5683T_G45,2,6,22,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000866,SNS000866,"Not supported by ONU-Type",Enabled,"2024-11-11 15:59:47",Online,"Very good",-33.02,-25.68,2752,576,902,,,translate,1G,1G,
+HWTCF2D90203,gpon,HWTCF2D90203,HG8546M,SNS001051,GITHURAI_MA5683T_G45,2,6,23,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS001051,SNS001051,"Not supported by ONU-Type",Enabled,"2025-08-29 13:56:23",Online,"Very good",-33.98,-27.69,2755,1629,902,,,translate,1G,1G,
+,,HWTCF2D90203,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1796,1995,,,translate,1G,1G
+HWTC2B036209,gpon,HWTC2B036209,HG8247,SNS000028,GITHURAI_MA5683T_G45,2,6,24,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS000028,SNS000028,"Not supported by ONU-Type",Enabled,"2024-11-18 18:46:50","Power fail","Very good",-33.98,-26.12,2749,209,902,,,translate,1G,1G,
+HWTC01306E09,gpon,HWTC01306E09,HG8247,SNS001070,GITHURAI_MA5683T_G45,2,6,25,DISCOVERY,,,,,,Routing,PPPoE,,,,,,SNS001070,SNS001070,"Not supported by ONU-Type",Enabled,"2024-12-02 16:38:52",Online,"Very good",-27.7,-20.85,2736,411,902,,,translate,1G,1G,
+HWTCF2D9028B,gpon,HWTCF2D9028B,HG8546M,SNS000750,GITHURAI_MA5683T_G45,2,6,26,"Dream Land","Naftaly Mwaura",,,,,Routing,PPPoE,,,,,,SNS000750,SNS000750,"Not supported by ONU-Type",Enabled,"2025-09-06 16:22:45","Power fail","Very good",-32.22,-27.44,2787,1814,902,,,translate,1G,1G,
+HWTC1A2DED95,gpon,HWTC1A2DED95,HG8546M,SFL001,GITHURAI_MA5683T_G45,2,7,0,G44,,,,,,Routing,PPPoE,,,,,,SFL0001,SFL0001,"Not supported by ONU-Type",Enabled,"2025-01-11 14:54:26",Online,"Very good",-19.29,-17.03,2853,963,903,,,translate,1G,1G,
+,,HWTC1A2DED95,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,998,901,,,translate,1G,1G
+HWTCF2D901EB,gpon,HWTCF2D901EB,HG8546M,SNS000551,GITHURAI_MA5683T_G45,2,7,1,"mwafrica Road",,,,,,Routing,PPPoE,,,,,,SNS000551,SNS000551,"Not supported by ONU-Type",Enabled,"2025-08-25 15:44:46",Online,"Very good",-16.26,-9.81,2698,1854,902,,,translate,1G,1G,
+,,HWTCF2D901EB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1473,1995,,,translate,1G,1G
+HWTC35D71DAC,gpon,HWTC35D71DAC,HG8145V5,SNS-BR-0006,GITHURAI_MA5683T_G45,2,8,0,"PCEA KIMBO",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,,Online,"Very good",-18.93,-14.29,5047,2,902,,,translate,1G,1G,
+HWTC46E5019B,gpon,HWTC46E5019B,HG8546M,SNS001561,GITHURAI_MA5683T_G45,2,8,1,MUMBI,"Kenneth mzungu",,,,,Routing,PPPoE,,,,,,SNS001561,SNS001561,"Not supported by ONU-Type",Enabled,"2025-10-04 14:19:23","Power fail","Very good",-30,-23.1,4428,1062,902,,,translate,1G,1G,
+,,HWTC46E5019B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1086,1995,,,translate,1G,1G
+HWTC46814F9A,gpon,HWTC46814F9A,HG8546M,SNS000504,GITHURAI_MA5683T_G45,2,8,2,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000504,SNS000504,"Not supported by ONU-Type",Enabled,"2024-10-11 12:20:36",Online,"Very good",-30.97,-23.56,4365,426,902,,,translate,1G,1G,
+,,HWTC46814F9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,34,901,,,translate,1G,1G
+HWTC36C3FA9B,gpon,HWTC36C3FA9B,HG8546M,SNS001039,GITHURAI_MA5683T_G45,2,8,3,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS001039,SNS001039,"Not supported by ONU-Type",Enabled,"2024-11-12 20:37:38",Online,"Very good",-33.02,-30,4302,303,902,,,translate,1G,1G,
+HWTCF2D53C5B,gpon,HWTCF2D53C5B,HG8546M,SNS000741-01,GITHURAI_MA5683T_G45,2,8,4,"RUBIS MWIHOKO",,,,,,Routing,PPPoE,,,,,,SNS000741-01,SNS000741-01,"Not supported by ONU-Type",Enabled,"2025-03-21 13:10:40",Online,"Very good",-30.46,-23.66,4120,695,902,,,translate,1G,1G,
+HWTCE344EA07,gpon,HWTCE344EA07,HG8247,SNS001093,GITHURAI_MA5683T_G45,2,8,5,"RUBIS MWIHOKO",,,,,,Routing,PPPoE,,,,,,SNS001093,SNS001093,"Not supported by ONU-Type",Enabled,"2024-12-11 19:08:18",Online,"Very good",-32.22,-23.27,4097,831,902,,,translate,1G,1G,
+HWTC02A4F910,gpon,HWTC02A4F910,HG8546M,SNS000179,GITHURAI_MA5683T_G45,2,8,6,"KWA NGETHE",,,,,,Routing,PPPoE,,,,,,SNS000179,SNS000179,"Not supported by ONU-Type",Enabled,,"Power fail",Critical,-35.23,-30,5575,101,902,,,translate,1G,1G,
+,,HWTC02A4F910,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,382,901,,,translate,1G,1G
+HWTCF2D53A43,gpon,HWTCF2D53A43,HG8546M,SNS000485,GITHURAI_MA5683T_G45,2,8,7,"RUBIS MWIHOKO",,,,,,Routing,PPPoE,,,,,,SNS000485,SNS000485,"Not supported by ONU-Type",Enabled,"2025-06-09 15:13:25",Online,"Very good",-20.71,-14.64,4181,1037,902,,,translate,1G,1G,
+HWTCF2D53A3B,gpon,HWTCF2D53A3B,HG8546M,SNS000784-01,GITHURAI_MA5683T_G45,2,8,8,"RUBIS MWIHOKO",,,,,,Routing,PPPoE,,,,,,SNS000784-01,SNS000784-01,"Not supported by ONU-Type",Enabled,"2025-06-09 15:45:46",Online,"Very good",-20.27,-14.08,4086,1394,902,,,translate,1G,1G,
+HWTC3A990D9B,gpon,HWTC3A990D9B,HG8546M,SNS000138,GITHURAI_MA5683T_G45,2,8,9,TAVISA,"Tabitha Gathaiya",,,,,Routing,PPPoE,,,,,,SNS000138,SNS000138,"Not supported by ONU-Type",Enabled,"2025-03-01 15:01:52",Offline,-,,,,110,902,,,translate,1G,1G,
+,,HWTC3A990D9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1177,1995,,,translate,1G,1G
+HWTCF2D53D4B,gpon,HWTCF2D53D4B,HG8546M,SNS001407,GITHURAI_MA5683T_G45,2,8,10,"RUBIS MUMBI","Julius kariuki",,,,,Routing,PPPoE,,,,,,SNS001407,SNS001407,"Not supported by ONU-Type",Enabled,"2025-09-09 16:51:45",Online,"Very good",-31.55,-24.43,4109,1604,902,,,translate,1G,1G,
+,,HWTCF2D53D4B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1677,1995,,,translate,1G,1G
+HWTC64198E8B,gpon,HWTC64198E8B,HG8546M,SNS000268,GITHURAI_MA5683T_G45,2,8,11,"PCEA KIMBO",,,,,,Routing,PPPoE,,,,,,SNS000268,SNS000268,"Not supported by ONU-Type",Enabled,,Online,"Very good",-31.55,-23.37,5305,107,902,,,translate,1G,1G,
+,,HWTC64198E8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,319,901,,,translate,1G,1G
+HWTC2D43999B,gpon,HWTC2D43999B,HG8245H,SNS000587-01,GITHURAI_MA5683T_G45,2,8,12,MUMBI,"Miriam Maina",,,,,Routing,PPPoE,,,,,,SNS000587-01,SNS000587-01,"Not supported by ONU-Type",Enabled,"2025-09-24 14:46:20",Online,"Very good",-33.98,-24.95,4359,424,902,,,translate,1G,1G,
+,,HWTC2D43999B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1098,1995,,,translate,1G,1G
+HWTCC6C7AF9C,gpon,HWTCC6C7AF9C,HG8546M,SNS001610,GITHURAI_MA5683T_G45,2,8,13,"RUBIS MUMBI","Nancy Oyoga",,,,,Routing,PPPoE,,,,,,SNS001610,SNS001610,"Not supported by ONU-Type",Enabled,"2025-11-08 13:39:59",Online,Critical,-35.23,-25.08,4301,1817,902,,,translate,1G,1G,
+,,HWTCC6C7AF9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1819,1995,,,translate,1G,1G
+HWTCF2DB5D5B,gpon,HWTCF2DB5D5B,HG8546M,SNS000155,GITHURAI_MA5683T_G45,2,8,14,"RUBIS MUMBI","Eliud Kariuki",,,,,Routing,PPPoE,,,,,,SNS000155,SNS000155,"Not supported by ONU-Type",Enabled,"2025-11-14 17:28:36",Online,"Very good",-25.69,-22.22,4393,1783,902,,,translate,1G,1G,
+,,HWTCF2DB5D5B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1820,1995,,,translate,1G,1G
+HWTC0C2BE60E,gpon,HWTC0C2BE60E,HG8546M,SNS000963,GITHURAI_MA5683T_G45,2,9,0,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000963,SNS000963,"Not supported by ONU-Type",Enabled,"2024-10-12 15:24:03","Power fail","Very good",-16.06,-8.61,4242,164,902,,,translate,1G,1G,
+HWTC36102F9B,gpon,HWTC36102F9B,HG8546M,SNS001011,GITHURAI_MA5683T_G45,2,9,1,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS001011,SNS001011,"Not supported by ONU-Type",Enabled,"2024-11-02 16:43:43",Online,"Very good",-15.32,-9.76,3719,549,902,,,translate,1G,1G,
+,,HWTC36102F9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,701,901,,,translate,1G,1G
+HWTCFCFE989A,gpon,HWTCFCFE989A,HG8546M,SNS000967,GITHURAI_MA5683T_G45,2,9,2,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000967,SNS000967,"Not supported by ONU-Type",Enabled,"2024-10-12 19:13:52",Online,"Very good",-18.3,-12.63,3982,540,902,,,translate,1G,1G,
+,,HWTCFCFE989A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1803,1995,,,translate,1G,1G
+HWTC7D4069D1,gpon,HWTC7D4069D1,HG6143D,SNS000964,GITHURAI_MA5683T_G45,2,9,3,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000964,SNS000964,"Not supported by ONU-Type",Enabled,"2024-10-12 17:01:02",Online,"Very good",-30,-27.69,4466,553,902,,,translate,1G,1G,
+,,HWTC7D4069D1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,490,901,,,translate,1G,1G
+HWTC2969EC9C,gpon,HWTC2969EC9C,HG8546M,SNS000324,GITHURAI_MA5683T_G45,2,9,4,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000324,SNS000324,"Not supported by ONU-Type",Enabled,"2024-10-08 17:38:02",Online,"Very good",-13.11,-6.44,3745,369,902,,,translate,1G,1G,
+,,HWTC2969EC9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,631,901,,,translate,1G,1G
+HWTT1EF578A9,gpon,HWTT1EF578A9,HG8546M,SNS001569,GITHURAI_MA5683T_G45,2,9,5,MUMBI,"Charity Maggie",,,,,Routing,PPPoE,,,,,,SNS001569,SNS001569,"Not supported by ONU-Type",Enabled,"2025-10-18 12:56:28",Online,"Very good",-31.55,-24.31,4290,1511,902,,,translate,1G,1G,
+,,HWTT1EF578A9,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,546,1995,,,translate,1G,1G
+HWTC3B86069B,gpon,HWTC3B86069B,HG8546M,SNS000572,GITHURAI_MA5683T_G45,2,9,6,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS000572,SNS000572,"Not supported by ONU-Type",Enabled,"2025-02-10 14:34:52",Online,"Very good",-30,-24.81,4687,977,902,,,translate,1G,1G,
+,,HWTC3B86069B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,314,1995,,,translate,1G,1G
+HWTCDBAB34A3,gpon,HWTCDBAB34A3,HG8145V5,"Zeta Hub Jasmin",GITHURAI_MA5683T_G45,2,10,1,"Jasmin Apartment",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-03-10 18:19:08",Online,"Very good",-33.98,-24.95,1914,1208,1037,,,translate,1G,1G,
+HWTC3BC6AD9B,gpon,HWTC3BC6AD9B,HG8546M,"Zeta Spot",GITHURAI_MA5683T_G45,2,10,2,CLAYCITY,,,,,,Routing,PPPoE,,,,,,AcaciaLounge,2fpLxthn,"Not supported by ONU-Type",Enabled,"2025-02-07 20:16:39",Online,"Very good",-33.98,-24.43,2415,967,1037,,,translate,1G,1G,
+HWTCC11A7CA2,gpon,HWTCC11A7CA2,HG8145V5,"Zetaspot kwa maina",GITHURAI_MA5683T_G45,2,10,3,CLAYCITY,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-03-11 19:50:06",Online,"Very good",-21.14,-14.84,1986,260,1037,,,translate,1G,1G,
+HWTCE80AA0AA,gpon,HWTCE80AA0AA,HG8145V5,SNS000160,GITHURAI_MA5683T_G45,2,10,4,SEASONS,,,,,,Routing,PPPoE,,,,,,SNS000160,SNS000160,"Not supported by ONU-Type",Enabled,"2025-03-25 22:04:31",Online,"Very good",-33.98,-24.31,2987,1282,902,,,translate,1G,1G,
+HWTCE820F59E,gpon,HWTCE820F59E,HG8145V5,Wazaire,GITHURAI_MA5683T_G45,2,10,5,CLAYCITY,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-03-14 11:28:34",Online,"Very good",-25.86,-17.28,1825,290,1037,,,translate,1G,1G,
+HWTCF2D90373,gpon,HWTCF2D90373,HG8546M,SNS000362,GITHURAI_MA5683T_G45,2,10,6,CLAYCITY,"Christine Nyambura",,,,,Routing,PPPoE,,,,,,SNS000362,SNS000362,"Not supported by ONU-Type",Enabled,"2025-09-09 14:51:36",Online,"Very good",-23.28,-16.88,2454,1838,902,,,translate,1G,1G,
+,,HWTCF2D90373,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1852,1995,,,translate,1G,1G
+HWTCF2D554F3,gpon,HWTCF2D554F3,HG8546M,SNS001320,GITHURAI_MA5683T_G45,2,10,7,CARWASH,"Veronicah malala",,,,,Routing,PPPoE,,,,,,SNS001320,SNS001320,"Not supported by ONU-Type",Enabled,"2025-05-02 19:19:32","Power fail","Very good",-27.96,-23.28,2480,1389,902,,,translate,1G,1G,
+,,HWTCF2D554F3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,555,1995,,,translate,1G,1G
+HWTC3EDAF99B,gpon,HWTC3EDAF99B,HG8546M,II000138,GITHURAI_MA5683T_G45,2,10,8,CLAYCITY,,,,,,Routing,PPPoE,,,,,,II000138,II000138,"Not supported by ONU-Type",Enabled,"2025-05-11 17:33:45",Online,"Very good",-25.09,-18.63,2503,1210,26,,,translate,1G,1G,
+HWTC20FCFAAA,gpon,HWTC20FCFAAA,HG8145V5,SNS-BR-0015,GITHURAI_MA5683T_G45,2,10,9,SEASONS,,,,,,Routing,PPPoE,,,,,,cctv,cctv,"Not supported by ONU-Type",Enabled,,Online,"Very good",-14.08,-8.18,2725,284,902,,,translate,1G,1G,
+,,HWTC20FCFAAA,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1417,1995,,,translate,1G,1G
+HWTC666350AD,gpon,HWTC666350AD,HG8145V5,SNS000605,GITHURAI_MA5683T_G45,2,10,10,CLAYCITY,,,,,,Routing,PPPoE,,,,,,SNS000605,SNS000605,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-24.69,-20,1995,275,902,,,translate,1G,1G,
+HWTCF2D902A3,gpon,HWTCF2D902A3,HG8546M,SNS000056,GITHURAI_MA5683T_G45,2,10,11,SEASONS,"Njathi Home",,,,,Routing,PPPoE,,,,,,SNS000056,SNS000056,"Not supported by ONU-Type",Enabled,"2025-09-09 17:49:53",Online,"Very good",-24.95,-17.4,3902,1670,902,,,translate,1G,1G,
+HWTC7A280109,gpon,HWTC7A280109,HG8247,SNS000296,GITHURAI_MA5683T_G45,2,10,12,CLAYCITY,,,,,,Routing,PPPoE,,,,,,SNS000296,SNS000296,"Not supported by ONU-Type",Enabled,"2024-11-20 15:59:59",Online,"Very good",-33.98,-29.25,2109,547,902,,,translate,1G,1G,
+HWTCF2D90423,gpon,HWTCF2D90423,HG8546M,SNS001588,GITHURAI_MA5683T_G45,2,10,13,CARWASH,"Hotomark Odero",,,,,Routing,PPPoE,,,,,,SNS001588,SNS001588,"Not supported by ONU-Type",Enabled,"2025-10-25 18:30:00",LOS,"Very good",-27.45,-23.28,2127,587,902,,,translate,1G,1G,
+HWTC06D6348A,gpon,HWTC06D6348A,HG8546M,"ZETA HUB Bridge",GITHURAI_MA5683T_G45,2,10,14,ENTUMOTO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-09-16 11:36:57",Online,"Very good",-24.69,-18.35,1980,1434,1037,,,translate,1G,1G,
+HWTCA7EEDF9A,gpon,HWTCA7EEDF9A,HG8546M,SNS000649,GITHURAI_MA5683T_G45,2,11,0,Zimmerman_Crucial,,,,,,Routing,PPPoE,,,,,,SNS000649,SNS000649,"Not supported by ONU-Type",Enabled,"2024-08-14 11:54:33",Online,"Very good",-33.98,-26.02,2967,344,902,,,translate,1G,1G,
+,,HWTCA7EEDF9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,318,901,,,translate,1G,1G
+HWTC3B03AC9B,gpon,HWTC3B03AC9B,HG8546M,SNS000811,GITHURAI_MA5683T_G45,2,11,1,Zimmerman_Crucial,,,,,,Routing,PPPoE,,,,,,SNS000811,SNS000811,"Not supported by ONU-Type",Enabled,"2025-02-13 12:55:57",Online,"Very good",-32.22,-25.37,2977,969,902,,,translate,1G,1G,
+,,HWTC3B03AC9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1038,1995,,,translate,1G,1G
+HWTC6ABB151D,gpon,HWTC6ABB151D,HG8247,SNS000050,GITHURAI_MA5683T_G45,2,11,2,Zimmerman_Crucial,,,,,,Routing,PPPoE,,,,,,SNS000050,SNS000050,"Not supported by ONU-Type",Enabled,,Online,"Very good",-25.69,-19.83,3426,387,902,,,translate,1G,1G,
+HWTCE1C55F81,gpon,HWTCE1C55F81,HG8546M,SNS000528,GITHURAI_MA5683T_G45,2,11,3,"Zimmerna Brooks",,,,,,Routing,PPPoE,,,,,,SNS000528,SNS000528,"Not supported by ONU-Type",Enabled,"2025-03-29 09:57:45",Online,"Very good",-20.14,-16.16,2889,317,902,,,translate,1G,1G,
+HWTCDC588D9A,gpon,HWTCDC588D9A,HG8546M,SNS001061,GITHURAI_MA5683T_G45,2,13,0,MUMBI,"Stanely Kigo Z corner",,,,,Routing,PPPoE,,,,,,SNS001061,SNS001061,"Not supported by ONU-Type",Enabled,"2024-11-26 16:41:01",Online,"Very good",-33.98,-29.21,4727,768,902,,,translate,1G,1G,"+254 725033385"
+,,HWTCDC588D9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,554,903,,,translate,1G,1G
+HWTC1A849495,gpon,HWTC1A849495,HG8546M,SNS000690-01,GITHURAI_MA5683T_G45,2,13,1,KIZITO,"Kelvin Kangethe shop",,,,,Routing,PPPoE,,,,,,SNS000690-01,SNS000690-01,"Not supported by ONU-Type",Enabled,"2025-04-21 08:50:39",Online,"Very good",-33.98,-26.99,5891,1162,902,,,translate,1G,1G,
+,,HWTC1A849495,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,189,1995,,,translate,1G,1G
+HWTC9CFE219A,gpon,HWTC9CFE219A,HG8546M,SNS000752-01,GITHURAI_MA5683T_G45,2,13,2,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000752-01,SNS000752-01,"Not supported by ONU-Type",Enabled,"2024-08-26 18:02:41",Online,"Very good",-33.98,-26.19,4677,70,902,,,translate,1G,1G,
+,,HWTC9CFE219A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,170,903,,,translate,1G,1G
+HWTCF2D53A53,gpon,HWTCF2D53A53,HG8546M,SNS001434,GITHURAI_MA5683T_G45,2,13,4,KIZITO,"Peris Njoroge",,,,,Routing,PPPoE,,,,,,SNS001434,SNS001434,"Not supported by ONU-Type",Enabled,"2025-07-12 11:20:48",Online,"Very good",-33.98,-30.45,5891,1647,902,,,translate,1G,1G,
+,,HWTCF2D53A53,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1507,1995,,,translate,1G,1G
+HWTC9D93DA8C,gpon,HWTC9D93DA8C,HG8546M,SNS000025,GITHURAI_MA5683T_G45,2,13,5,"RUBIS MWIHOKO",,,,,,Routing,PPPoE,,,,,,SNS000025,SNS000025,"Not supported by ONU-Type",Enabled,"2024-09-12 11:37:48",Online,"Very good",-33.98,-26.57,4875,464,902,,,translate,1G,1G,
+,,HWTC9D93DA8C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,534,901,,,translate,1G,1G
+HWTCF2D90513,gpon,HWTCF2D90513,HG8546M,SNS001463,GITHURAI_MA5683T_G45,2,13,6,MUMBI,"Vincent oluoch",,,,,Routing,PPPoE,,,,,,SNS001463,SNS001463,"Not supported by ONU-Type",Enabled,"2025-07-29 14:40:15",Online,"Very good",-33.98,-25.23,4878,1568,902,,,translate,1G,1G,
+,,HWTCF2D90513,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1630,1995,,,translate,1G,1G
+HWTCF2D909DB,gpon,HWTCF2D909DB,HG8546M,SNS000503,GITHURAI_MA5683T_G45,2,13,7,MUMBI,"Ian Keli",,,,,Routing,PPPoE,,,,,,SNS000503,SNS000503,"Not supported by ONU-Type",Enabled,"2025-08-13 13:25:52",Online,"Very good",-25.09,-19.35,4666,720,902,,,translate,1G,1G,
+,,HWTCF2D909DB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1605,1995,,,translate,1G,1G
+HWTC46E66D9B,gpon,HWTC46E66D9B,HG8546M,SNS001570,GITHURAI_MA5683T_G45,2,13,8,MUMBI,"Lily Wanjiru",,,,,Routing,PPPoE,,,,,,SNS001570,SNS001570,"Not supported by ONU-Type",Enabled,"2025-10-18 15:22:36",Online,"Very good",-28.87,-27.21,4730,500,902,,,translate,1G,1G,
+,,HWTC46E66D9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1328,1995,,,translate,1G,1G
+HWTC71D72A09,gpon,HWTC71D72A09,HG8546M,SNS001102,GITHURAI_MA5683T_G45,2,13,9,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS001102,SNS001102,"Not supported by ONU-Type",Enabled,"2024-12-14 15:14:47",Online,"Very good",-33.98,-29.46,5377,838,902,,,translate,1G,1G,
+,,HWTC71D72A09,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,774,903,,,translate,1G,1G
+HWTCF2DAFE8B,gpon,HWTCF2DAFE8B,HG8546M,SNS000231,GITHURAI_MA5683T_G45,2,13,10,MUMBI,"Erick Momanyi",,,,,Routing,PPPoE,,,,,,SNS000231,SNS000231,"Not supported by ONU-Type",Enabled,"2025-12-02 12:03:50","Power fail","Very good",-33.98,-26.57,5015,135,902,,,translate,1G,1G,
+,,HWTCF2DAFE8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,140,1995,,,translate,1G,1G
+HWTC3DE19B83,gpon,HWTC3DE19B83,HG8546M,SNS000405-01,GITHURAI_MA5683T_G45,2,13,11,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000405-01,SNS000405-01,"Not supported by ONU-Type",Enabled,,Online,"Very good",-33.98,-29.58,5391,392,902,,,translate,1G,1G,
+,,HWTC3DE19B83,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,226,69,,,translate,1G,1G
+,,HWTC3DE19B83,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,26,901,,,translate,1G,1G
+HWTC4686E69B,gpon,HWTC4686E69B,HG8546M,SNS000292,GITHURAI_MA5683T_G45,2,13,12,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000292,SNS000292,"Not supported by ONU-Type",Enabled,"2025-11-18 15:21:49",Online,"Very good",-33.98,-28.54,4862,377,902,,,translate,1G,1G,
+,,HWTC4686E69B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1088,1995,,,translate,1G,1G
+HWTCF2DAFF33,gpon,HWTCF2DAFF33,HG8546M,SNS001056,GITHURAI_MA5683T_G45,2,13,13,MUMBI,"Maru Njeri",,,,,Routing,PPPoE,,,,,,SNS001056,SNS001056,"Not supported by ONU-Type",Enabled,"2025-11-26 19:41:45",Online,"Very good",-26.78,-19.13,5198,85,902,,,translate,1G,1G,
+HWTCF2D9099B,gpon,HWTCF2D9099B,HG8546M,SNS001496,GITHURAI_MA5683T_G45,2,14,19,CHAMOS,"Bob Ogweno",,,,,Routing,PPPoE,,,,,,SNS001496,SNS001496,"Not supported by ONU-Type",Enabled,"2025-08-15 16:53:44","Power fail","Very good",-33.98,-26.57,7044,1791,902,,,translate,1G,1G,
+,,HWTCF2D9099B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,221,1995,,,translate,1G,1G
+HWTCD9CF3E92,gpon,HWTCD9CF3E92,HG8546M,SNS000827,GITHURAI_MA5683T_G45,2,15,0,"Lower Tuners",,,,,,Routing,PPPoE,,,,,,SNS000827,SNS000827,"Not supported by ONU-Type",Enabled,"2024-08-27 16:34:25",Online,"Very good",-18.67,-13.69,5271,67,902,,,translate,1G,1G,
+,,HWTCD9CF3E92,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,280,901,,,translate,1G,1G
+HWTCE3294F09,gpon,HWTCE3294F09,HG8546M,SNS001557,GITHURAI_MA5683T_G45,2,15,1,MUMBI,"Josephat Kinywa",,,,,Routing,PPPoE,,,,,,SNS001557,SNS001557,"Not supported by ONU-Type",Enabled,"2025-10-02 14:18:28",Online,"Very good",-18.67,-23.66,5174,11,902,,,translate,1G,1G,
+,,HWTCE3294F09,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1024,1995,,,translate,1G,1G
+HWTCC3160E2A,gpon,HWTCC3160E2A,HG8546M,SNS000684,GITHURAI_MA5683T_G45,2,15,2,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000684,SNS000684,"Not supported by ONU-Type",Enabled,"2024-09-16 17:08:53","Power fail","Very good",-20.76,-17.28,5797,396,902,,,translate,1G,1G,
+HWTC3B3AF89B,gpon,HWTC3B3AF89B,HG8546M,SNS001182,GITHURAI_MA5683T_G45,2,15,3,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS001182,SNS001182,"Not supported by ONU-Type",Enabled,"2025-10-27 14:28:37","Power fail","Very good",-19.75,-15,5298,1709,902,,,translate,1G,1G,
+,,HWTC3B3AF89B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,127,1995,,,translate,1G,1G
+HWTCF22EECA8,gpon,HWTCF22EECA8,HG8145V5,SNS000925,GITHURAI_MA5683T_G45,2,15,4,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000925,hm5mgYS4,"Not supported by ONU-Type",Enabled,"2024-09-18 16:56:54",Offline,"Very good",-23.28,-17.28,5710,211,902,,,translate,1G,1G,
+,,HWTCF22EECA8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,177,901,,,translate,1G,1G
+HWTCE3D2969E,gpon,HWTCE3D2969E,HG8145V5,SNS001025,GITHURAI_MA5683T_G45,2,15,5,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS001025,SNS001025,"Not supported by ONU-Type",Enabled,"2024-11-08 18:30:36",Online,"Very good",-24.44,-20.45,5180,486,902,,,translate,1G,1G,
+HWTC5C050B8B,gpon,HWTC5C050B8B,HG8546M,SNS000587-02,GITHURAI_MA5683T_G45,2,15,6,MANGUO,,,,,,Routing,PPPoE,,,,,,SNS000587-02,SNS000587-02,"Not supported by ONU-Type",Enabled,"2025-02-03 14:49:46",Online,Critical,-35.23,-30,5754,1069,902,,,translate,1G,1G,
+HWTC34DAD59B,gpon,HWTC34DAD59B,HG8546M,SNS000332,GITHURAI_MA5683T_G45,2,15,7,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000332,SNS000332,"Not supported by ONU-Type",Enabled,"2025-02-26 12:52:30",Online,Critical,-35.23,-27.69,5911,744,902,,,translate,1G,1G,
+,,HWTC34DAD59B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1151,1995,,,translate,1G,1G
+HWTC3AB24D9B,gpon,HWTC3AB24D9B,HG8546M,SNS001199,GITHURAI_MA5683T_G45,2,15,8,MANGUO,,,,,,Routing,PPPoE,,,,,,SNS001199,SNS001199,"Not supported by ONU-Type",Enabled,"2025-02-26 14:29:32",Online,Critical,-35.23,-27.96,5629,1074,902,,,translate,1G,1G,
+,,HWTC3AB24D9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,563,1995,,,translate,1G,1G
+HWTC4261A095,gpon,HWTC4261A095,HG8546M,SNS001268,GITHURAI_MA5683T_G45,2,15,9,MUMBI,Levis,,,,,Routing,PPPoE,,,,,,SNS001268,SNS001268,"Not supported by ONU-Type",Enabled,"2025-04-05 16:57:34","Power fail",Critical,-35.23,-33,5735,1303,902,,,translate,1G,1G,
+,,HWTC4261A095,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1299,1995,,,translate,1G,1G
+HWTC36DB1C9B,gpon,HWTC36DB1C9B,HG8546M,SNS001014,GITHURAI_MA5683T_G45,2,15,10,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS001014,SNS001014,"Not supported by ONU-Type",Enabled,"2024-11-04 14:17:22",Online,"Very good",-26.99,-22.29,6180,390,902,,,translate,1G,1G,
+,,HWTC36DB1C9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,562,901,,,translate,1G,1G
+HWTC7A5F5B9C,gpon,HWTC7A5F5B9C,HG8546M,SNS000023,GITHURAI_MA5683T_G45,2,15,11,MANGUO,"Titus Kilonzi",,,,,Routing,PPPoE,,,,,,SNS000023,SNS000023,"Not supported by ONU-Type",Enabled,"2025-09-03 21:27:43",Online,"Very good",-29.21,-27.21,6109,1460,902,,,translate,1G,1G,
+,,HWTC7A5F5B9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,857,1995,,,translate,1G,1G
+HWTCE332B607,gpon,HWTCE332B607,HG8247,SNS000868,GITHURAI_MA5683T_G45,2,15,12,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000868,SNS000868,"Not supported by ONU-Type",Enabled,"2024-12-02 14:32:41",Online,"Very good",-21.94,-17.61,6181,705,902,,,translate,1G,1G,
+HWTCAF86D19C,gpon,HWTCAF86D19C,HG8145V,SNS000987,GITHURAI_MA5683T_G45,2,15,14,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000987,SNS000987,"Not supported by ONU-Type",Enabled,"2024-10-21 16:41:57","Power fail","Very good",-24.95,-21.3,6600,556,902,,,translate,1G,1G,
+HWTCF2D52ECB,gpon,HWTCF2D52ECB,HG8546M,SNS000802,GITHURAI_MA5683T_G45,2,15,15,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000802,SNS000802,"Not supported by ONU-Type",Enabled,"2025-05-26 18:45:36",Online,Critical,-35.23,-30.45,6207,1341,902,,,translate,1G,1G,
+HWTCF2D53A7B,gpon,HWTCF2D53A7B,HG8546M,SNS001378,GITHURAI_MA5683T_G45,2,15,16,"PIMA GAS","Marvin Junior",,,,,Routing,PPPoE,,,,,,SNS001378,SNS001378,"Not supported by ONU-Type",Enabled,"2025-06-10 13:44:53","Power fail",Critical,-35.23,-24.31,6200,1538,902,,,translate,1G,1G,
+,,HWTCF2D53A7B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1426,1995,,,translate,1G,1G
+HWTCF240FFA8,gpon,HWTCF240FFA8,HG8145V5,SNS001260,GITHURAI_MA5683T_G45,2,15,17,"PIMA GAS","Peter Mwangi",,,,,Routing,PPPoE,,,,,,SNS001260,SNS001260,"Not supported by ONU-Type",Enabled,"2025-11-10 21:12:37",Online,"Very good",-25.86,-22.07,6196,775,902,,,translate,1G,1G,
+,,HWTCF240FFA8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,974,1995,,,translate,1G,1G
+HWTT1EE9AFA9,gpon,HWTT1EE9AFA9,HG8546M,SNS000780,GITHURAI_MA5683T_G45,2,15,18,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000780,SNS000780,"Not supported by ONU-Type",Enabled,"2025-05-26 16:50:56",Online,"Very good",-21.81,-18.09,6042,266,902,,,translate,1G,1G,
+HWTCF2D541DB,gpon,HWTCF2D541DB,HG8546M,SNS001457,GITHURAI_MA5683T_G45,2,15,19,"PIMA GAS","Patrick  kamau",,,,,Routing,PPPoE,,,,,,SNS001457,SNS001457,"Not supported by ONU-Type",Enabled,"2025-07-25 16:33:08",Online,"Very good",-26.39,-20.97,6139,1673,902,,,translate,1G,1G,
+,,HWTCF2D541DB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1646,1995,,,translate,1G,1G
+HWTCEC00FE9B,gpon,HWTCEC00FE9B,HG8546M,SNS001169,GITHURAI_MA5683T_G45,2,15,20,Carwash_Rurii,,,,,,Routing,PPPoE,,,,,,SNS001169,SNS001169,"Not supported by ONU-Type",Enabled,"2024-08-27 18:38:54",Online,Critical,-35.23,-28.86,6258,172,902,,,translate,1G,1G,
+,,HWTCEC00FE9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,513,901,,,translate,1G,1G
+HWTC7074D895,gpon,HWTC7074D895,HG8546M,SNS001094,GITHURAI_MA5683T_G45,2,15,21,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS001094,SNS001094,"Not supported by ONU-Type",Enabled,"2024-12-12 15:05:44",Online,Critical,-35.23,-29.58,6530,824,902,,,translate,1G,1G,
+,,HWTC7074D895,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,713,903,,,translate,1G,1G
+HWTCF2DAFFE3,gpon,HWTCF2DAFFE3,HG8546M,SNS000663,GITHURAI_MA5683T_G45,2,15,22,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000663,SNS000663,"Not supported by ONU-Type",Enabled,"2025-11-27 15:09:11",LOS,Critical,-35.23,-32.21,6463,97,902,,,translate,1G,1G,
+HWTCC671649A,gpon,HWTCC671649A,HG8546M,SNS000395,GITHURAI_MA5683T_G45,3,0,0,"MWIHOKO PEFA",,,,,,Routing,PPPoE,,,,,,SNS000395,SNS000395,"Not supported by ONU-Type",Enabled,"2024-10-10 16:46:43",Online,"Very good",-31.55,-26.38,8143,575,902,,,translate,1G,1G,
+,,HWTCC671649A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,362,901,,,translate,1G,1G
+HWTC3698EB9B,gpon,HWTC3698EB9B,HG8546M,SNS001038,GITHURAI_MA5683T_G45,3,0,1,"Kenya Lite FAT 1","Patrick  Muturi",,,,,Routing,PPPoE,,,,,,SNS001038,SNS001038,"Not supported by ONU-Type",Enabled,"2025-08-04 14:04:26",Online,"Very good",-29.59,-24.09,8078,1512,902,,,translate,1G,1G,
+HWTC141032A6,gpon,HWTC141032A6,HG8145V5,SNS000346,GITHURAI_MA5683T_G45,3,0,2,"Kenya Lite FAT 4 St Francis Mwihoko",,,,,,Routing,PPPoE,,,,,,SNS000346,SNS000346,"Not supported by ONU-Type",Enabled,"2024-11-12 18:07:43",Offline,"Very good",-32.22,-25.37,8559,425,902,,,translate,1G,1G,
+HWTC3674A89B,gpon,HWTC3674A89B,HG8546M,"INTACT MUM",GITHURAI_MA5683T_G45,3,0,3,"Kenya Lite FAT 1","Intact Child _Mum",,,,,Routing,PPPoE,,,,,,II000093-01,II000093-01,"Not supported by ONU-Type",Enabled,"2024-11-28 17:16:54",Online,"Very good",-20.32,-14.92,7823,769,26,,,translate,10M,10M,
+HWTCF2D53C03,gpon,HWTCF2D53C03,HG8546M,SNS000260,GITHURAI_MA5683T_G45,3,0,4,"MWIKI PRIMARY",,,,,,Routing,PPPoE,,,,,,SNS000260,SNS000260,"Not supported by ONU-Type",Enabled,"2025-03-26 18:06:09",Online,"Very good",-21.03,-15.97,8764,1184,902,,,translate,1G,1G,
+HWTCC9B681AB,gpon,HWTCC9B681AB,HG8145V5,Smart_solutions,GITHURAI_MA5683T_G45,3,0,5,"Kenya Lite FAT 1",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-04-11 18:14:41",Online,"Very good",-30,-22.59,14157,1313,1600,,,translate,1G,1G,
+HWTCD4F0D69C,gpon,HWTCD4F0D69C,HG8145V,ATTIC,GITHURAI_MA5683T_G45,3,0,6,"Kenya Lite FAT 4 St Francis Mwihoko",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-04-07 11:34:54",Online,"Very good",-31.55,-27.44,8559,1215,115,,,translate,1G,1G,
+HWTCF2D53AAB,gpon,HWTCF2D53AAB,HG8546M,SNS001390,GITHURAI_MA5683T_G45,3,0,7,INFINITY,"Dunford ngari",,,,,Routing,PPPoE,,,,,,SNS001390,SNS001390,"Not supported by ONU-Type",Enabled,"2025-06-13 19:00:02",Online,"Very good",-23.1,-15.56,9143,1397,902,,,translate,1G,1G,
+,,HWTCF2D53AAB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1089,1995,,,translate,1G,1G
+HWTCF2D55CE3,gpon,HWTCF2D55CE3,HG8546M,SNS001441,GITHURAI_MA5683T_G45,3,0,8,"Baraka Hardware_Volleball","John Kamau",,,,,Routing,PPPoE,,,,,,SNS001441,SNS001441,"Not supported by ONU-Type",Enabled,"2025-07-17 16:54:12",Online,"Very good",-33.98,-25.53,9708,1616,902,,,translate,1G,1G,
+,,HWTCF2D55CE3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1483,1995,,,translate,1G,1G
+HWTCF2D53F73,gpon,HWTCF2D53F73,HG8546M,SNS001443,GITHURAI_MA5683T_G45,3,0,9,"Mwihoko Discovery","Joyce Mukami",,,,,Routing,PPPoE,,,,,,SNS001443,SNS001443,"Not supported by ONU-Type",Enabled,"2025-07-16 15:46:32",Online,"Very good",-33.98,-27.44,9746,1543,902,,,translate,1G,1G,
+,,HWTCF2D53F73,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1593,1995,,,translate,1G,1G
+HWTCF2D54053,gpon,HWTCF2D54053,HG8546M,SNS000255,GITHURAI_MA5683T_G45,3,0,10,"Baraka Hardware_Volleball","Kennedy Barasa",,,,,Routing,PPPoE,,,,,,SNS000255,SNS000255,"Not supported by ONU-Type",Enabled,"2025-07-17 17:33:51","Power fail","Very good",-32.22,-23.76,10054,1559,902,,,translate,1G,1G,
+HWTCF2D903FB,gpon,HWTCF2D903FB,HG8546M,SNS001455,GITHURAI_MA5683T_G45,3,0,11,DISCOVERY_MWIHOKO,"Caroline Muema",,,,,Routing,PPPoE,,,,,,SNS001455,SNS001455,"Not supported by ONU-Type",Enabled,"2025-07-23 15:30:07",Online,"Very good",-33.02,-25.68,8779,1534,902,,,translate,1G,1G,
+,,HWTCF2D903FB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1564,1995,,,translate,1G,1G
+HWTC37FA8D9B,gpon,HWTC37FA8D9B,HG8546M,SNS001490,GITHURAI_MA5683T_G45,3,0,12,DISCOVERY_MWIHOKO,"James Churchill",,,,,Routing,PPPoE,,,,,,SNS001490,SNS001490,"Not supported by ONU-Type",Enabled,"2025-08-12 18:33:21","Power fail","Very good",-33.02,-27.96,8958,1668,902,,,translate,1G,1G,
+,,HWTC37FA8D9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1815,1995,,,translate,1G,1G
+HWTCF2D902EB,gpon,HWTCF2D902EB,HG8546M,SNS000727,GITHURAI_MA5683T_G45,3,0,13,MWIHOKO_MWITIRITHIA,"Marianne mzungu",,,,,Routing,PPPoE,,,,,,SNS000727,SNS000727,"Not supported by ONU-Type",Enabled,"2025-12-08 12:48:00","Power fail","Very good",-25.53,-21.19,10176,129,902,,,translate,1G,1G,
+,,HWTCF2D902EB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,231,1995,,,translate,1G,1G
+HWTCF2D8F3B3,gpon,HWTCF2D8F3B3,HG8546M,SNS000471,GITHURAI_MA5683T_G45,3,0,14,MWIHOKO_MWITIRITHIA,,,,,,Routing,PPPoE,,,,,,SNS000471,SNS000471,"Not supported by ONU-Type",Enabled,"2025-10-07 18:55:09","Power fail","Very good",-22.01,-15.67,10278,1495,902,,,translate,1G,1G,
+,,HWTCF2D8F3B3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1574,901,,,translate,1G,1G
+HWTCF2D9017B,gpon,HWTCF2D9017B,HG8546M,SNS000556,GITHURAI_MA5683T_G45,3,0,15,"Mwihoko Discovery","James Kahiga",,,,,Routing,PPPoE,,,,,,SNS000556,SNS000556,"Not supported by ONU-Type",Enabled,"2025-10-09 16:08:02","Power fail","Very good",-33.98,-30.45,10632,1551,902,,,translate,1G,1G,
+,,HWTCF2D9017B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1486,1995,,,translate,1G,1G
+HWTC46C2DF9D,gpon,HWTC46C2DF9D,HG8546M,SNS000885,GITHURAI_MA5683T_G45,3,0,17,"MWIHOKO SDA","sammy Fredrick",,,,,Routing,PPPoE,,,,,,SNS000885,SNS000885,"Not supported by ONU-Type",Enabled,"2025-12-12 13:35:03","Power fail","Very good",-33.98,-27.69,10477,278,902,,,translate,1G,1G,
+,,HWTC46C2DF9D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,288,1995,,,translate,1G,1G
+HWTC466FEF9D,gpon,HWTC466FEF9D,HG8546M,SNS001623,GITHURAI_MA5683T_G45,3,0,18,"MWIHOKO SDA","Dennis Muigai",,,,,Routing,PPPoE,,,,,,SNS001623,SNS001623,"Not supported by ONU-Type",Enabled,"2025-12-18 14:22:22",Online,"Very good",-33.98,-28.24,10191,263,902,,,translate,1G,1G,
+HWTCF2D909F3,gpon,HWTCF2D909F3,HG8546M,"Consolata School Kiambu",GITHURAI_MA5683T_G45,3,2,0,Consolata,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-08-06 17:56:28",Online,"Very good",-17.8,-11.37,6561,1457,902,,,translate,1G,1G,
+,,HWTCF2D909F3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1066,901,,,translate,1G,1G
+HWTC3BEE689B,gpon,HWTC3BEE689B,HG8546M,SNS000228,GITHURAI_MA5683T_G45,3,3,0,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS000228,SNS000228,"Not supported by ONU-Type",Enabled,"2025-02-14 13:38:56",Online,"Very good",-21.49,-16.73,585,949,902,,,translate,1G,1G,
+,,HWTC3BEE689B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,729,1995,,,translate,1G,1G
+HWTCCBC238AB,gpon,HWTCCBC238AB,HG8145V5,SNS000722,GITHURAI_MA5683T_G45,3,3,1,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS000722,SNS000722,"Not supported by ONU-Type",Enabled,,Offline,"Very good",-26.03,-22.52,565,74,902,,,translate,1G,1G,
+,,HWTCCBC238AB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,51,69,,,translate,1G,1G
+HWTCF2D8F623,gpon,HWTCF2D8F623,HG8546M,SNS001285,GITHURAI_MA5683T_G45,3,3,2,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS001285,SNS001285,"Not supported by ONU-Type",Enabled,"2025-10-16 13:15:16","Power fail","Very good",-26.58,-21.8,723,1266,902,,,translate,1G,1G,
+HWTC5490728B,gpon,HWTC5490728B,HG8546M,SNS000844,GITHURAI_MA5683T_G45,3,3,3,"MT. KENYA",,,,,,Routing,PPPoE,,,,,,SNS000844,SNS000844,"Not supported by ONU-Type",Enabled,"2025-02-17 18:25:57",Online,"Very good",-27.7,-25.53,3611,1150,902,,,translate,1G,1G,
+,,HWTC5490728B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1027,1995,,,translate,1G,1G
+HWTCC9C497AA,gpon,HWTCC9C497AA,HG8145V5,SNS000123-02,GITHURAI_MA5683T_G45,3,3,4,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS000123-02,SNS000123-02,"Not supported by ONU-Type",Enabled,"2024-11-20 15:29:44",Online,"Very good",-27.22,-28.54,623,606,902,,,translate,1G,1G,
+HWTC3A2B7E9B,gpon,HWTC3A2B7E9B,HG8546M,SNS000673,GITHURAI_MA5683T_G45,3,3,5,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS000673,SNS000673,"Not supported by ONU-Type",Enabled,"2025-02-24 18:18:57",Online,"Very good",-33.98,-25.23,736,1087,902,,,translate,1G,1G,
+,,HWTC3A2B7E9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1175,1995,,,translate,1G,1G
+HWTCF2D553A3,gpon,HWTCF2D553A3,HG8546M,SNS001253,GITHURAI_MA5683T_G45,3,3,6,Siloam,,,,,,Routing,PPPoE,,,,,,SNS001253,SNS001253,"Not supported by ONU-Type",Enabled,"2025-04-02 13:50:43",Online,"Very good",-14.3,-10.51,3551,1044,902,,,translate,1G,1G,
+,,HWTCF2D553A3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,947,1995,,,translate,1G,1G
+HWTCF2D53FD3,gpon,HWTCF2D53FD3,HG8546M,SNS001449,GITHURAI_MA5683T_G45,3,3,7,RIFLO,"Riflo jonan erick shop",,,,,Routing,PPPoE,,,,,,SNS001449,SNS001449,"Not supported by ONU-Type",Enabled,"2025-07-19 17:03:34","Power fail","Very good",-24.09,-18.12,673,1641,902,,,translate,1G,1G,
+HWTCA566A13D,gpon,HWTCA566A13D,HG8546M,SNS000389-01,GITHURAI_MA5683T_G45,3,3,8,"KINGDOM SACCO","Daniel kimani",,,,,Routing,PPPoE,,,,,,SNS000389-01,SNS000389-01,"Not supported by ONU-Type",Enabled,"2025-06-30 11:08:36","Power fail","Very good",-30.97,-30,504,1492,902,,,translate,1G,1G,
+HWTCE81F069E,gpon,HWTCE81F069E,HG8145V5,SFL_KINGDOMSACCO,GITHURAI_MA5683T_G45,3,3,10,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,makena,makena,"Not supported by ONU-Type",Enabled,"2024-11-06 17:50:03",Online,"Very good",-27.45,-27.44,477,42,903,,,translate,1G,1G,
+,,HWTCE81F069E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,854,1995,,,translate,1G,1G
+HWTC874E748C,gpon,HWTC874E748C,HG8546M,SNS000165,GITHURAI_MA5683T_G45,3,3,11,KIZITO,,,,,,Routing,PPPoE,,,,,,SNS000165,SNS000165,"Not supported by ONU-Type",Enabled,"2025-02-25 11:20:17",Offline,"Very good",-33.02,-26.19,614,436,902,,,translate,1G,1G,
+HWTCF2D90983,gpon,HWTCF2D90983,HG8546M,SNS001484,GITHURAI_MA5683T_G45,3,3,12,GITHURAI-KIMBO-STATION,"Elijah nduge",,,,,Routing,PPPoE,,,,,,SNS001484,SNS001484,"Not supported by ONU-Type",Enabled,"2025-08-08 17:58:42","Power fail","Very good",-18.22,-13.37,4045,1789,902,,,translate,1G,1G,
+,,HWTCF2D90983,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1546,1995,,,translate,1G,1G
+HWTC45DE1A12,gpon,HWTC45DE1A12,HG8546M,SNS001108,GITHURAI_MA5683T_G45,3,3,13,"MT. KENYA",,,,,,Routing,PPPoE,,,,,,SNS001108,SNS001108,"Not supported by ONU-Type",Enabled,"2024-12-17 15:08:52",Online,"Very good",-24.56,-18.68,3358,580,902,,,translate,1G,1G,
+,,HWTC45DE1A12,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,197,903,,,translate,1G,1G
+HWTCC621A695,gpon,HWTCC621A695,HG8546M,SNS001147,GITHURAI_MA5683T_G45,3,3,14,"Stable Anchor",,,,,,Routing,PPPoE,,,,,,SNS001147,SNS001147,"Not supported by ONU-Type",Enabled,"2025-01-08 16:39:38",Online,"Very good",-31.55,-24.68,3851,799,902,,,translate,1G,1G,
+,,HWTCC621A695,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,965,1995,,,translate,1G,1G
+,,HWTCC621A695,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,881,901,,,translate,1G,1G
+HWTC46CF549B,gpon,HWTC46CF549B,HG8546M,"Riflo containers bridge",GITHURAI_MA5683T_G45,3,3,15,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-12-01 11:53:41",Online,"Very good",-31.55,-29.58,713,100,902,,,translate,1G,1G,
+,,HWTC46CF549B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,116,1995,,,translate,1G,1G
+HWTCF2D9052B,gpon,HWTCF2D9052B,HG8546M,SNS001573,GITHURAI_MA5683T_G45,3,3,16,RIFLO,"Pius Chege",,,,,Routing,PPPoE,,,,,,SNS001573,SNS001573,"Not supported by ONU-Type",Enabled,"2025-10-20 14:52:05","Power fail","Very good",-25.69,-20.17,827,1304,902,,,translate,1G,1G,
+,,HWTCF2D9052B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1688,1995,,,translate,1G,1G
+HWTCF2D53A5B,gpon,HWTCF2D53A5B,HG8546M,SNS001402,GITHURAI_MA5683T_G45,3,3,17,RIFLO,"Daniel Njuguna",,,,,Routing,PPPoE,,,,,,SNS001402,SNS001402,"Not supported by ONU-Type",Enabled,"2025-06-19 13:00:11",Online,"Very good",-29.21,-23.46,798,1359,902,,,translate,1G,1G,
+,,HWTCF2D53A5B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1557,1995,,,translate,1G,1G
+HWTCF2DB0013,gpon,HWTCF2DB0013,HG8546M,SNS001332,GITHURAI_MA5683T_G45,3,3,18,RIFLO,"David wanyama infinity furniture",,,,,Routing,PPPoE,,,,,,SNS001332,SNS001332,"Not supported by ONU-Type",Enabled,"2025-12-03 14:18:23",Online,"Very good",-25.53,-20.31,714,152,902,,,translate,1G,1G,
+,,HWTCF2DB0013,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,163,1995,,,translate,1G,1G
+HWTCF2D541F3,gpon,HWTCF2D541F3,HG8546M,"Shalom 8 and 9 Bridge",GITHURAI_MA5683T_G45,3,3,19,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-07-19 10:17:23",Online,"Very good",-22.93,-18.5,805,1396,901,,,translate,1G,1G,
+,,HWTCF2D541F3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,394,1995,,,translate,1G,1G
+HWTC8BC61DA4,gpon,HWTC8BC61DA4,HG8145V5,SNS001331,GITHURAI_MA5683T_G45,3,3,20,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS001331,SNS001331,"Not supported by ONU-Type",Enabled,"2025-05-08 13:20:37",Online,"Very good",-29.21,-30,669,1433,902,,,translate,1G,1G,
+HWTCF2D52AD3,gpon,HWTCF2D52AD3,HG8546M,SNS001340,GITHURAI_MA5683T_G45,3,3,21,RIFLO,"Levi Owino",,,,,Routing,PPPoE,,,,,,SNS001340,SNS001340,"Not supported by ONU-Type",Enabled,"2025-05-12 15:43:25",LOS,"Very good",-24.44,-18.82,729,1370,902,,,translate,1G,1G,
+HWTCF2D53A4B,gpon,HWTCF2D53A4B,HG8546M,SNS001408,GITHURAI_MA5683T_G45,3,3,22,RIFLO,"Jackson Soledad Furniture",,,,,Routing,PPPoE,,,,,,SNS001408,SNS001408,"Not supported by ONU-Type",Enabled,"2025-06-21 18:29:00",Online,"Very good",-23.88,-18.27,731,1384,902,,,translate,1G,1G,
+,,HWTCF2D53A4B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,7,1995,,,translate,1G,1G
+HWTCF2D904C3,gpon,HWTCF2D904C3,HG8546M,SNS001267,GITHURAI_MA5683T_G45,3,3,23,"Stable Anchor","ENOC OTIENO",,,,,Routing,PPPoE,,,,,,SNS001267,SNS001267,"Not supported by ONU-Type",Enabled,"2025-07-31 18:54:45","Power fail","Very good",-31.55,-24.2,3678,1758,902,,,translate,1G,1G,
+,,HWTCF2D904C3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1377,1995,,,translate,1G,1G
+HWTC46733D9B,gpon,HWTC46733D9B,HG8546M,SNS001581,GITHURAI_MA5683T_G45,3,3,24,RIFLO,"Stephan Maina",,,,,Routing,PPPoE,,,,,,SNS001581,SNS001581,"Not supported by ONU-Type",Enabled,"2025-10-22 13:46:01",Online,"Very good",-23.98,-19.91,744,1693,902,,,translate,1G,1G,
+,,HWTC46733D9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1756,1995,,,translate,1G,1G
+HWTCE80C38AA,gpon,HWTCE80C38AA,HG8145V5,SNS001433,GITHURAI_MA5683T_G45,3,4,0,"CORNER YA BATA","Boniface Maina",,,,,Routing,PPPoE,,,,,,SNS001433,SNS001433,"Not supported by ONU-Type",Enabled,"2025-07-11 13:49:49","Power fail","Very good",-24.95,-19.58,3065,1642,902,,,translate,1G,1G,
+HWTCC5CAB586,gpon,HWTCC5CAB586,HG8546M,SNS000690,GITHURAI_MA5683T_G45,3,4,1,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000690,SNS000690,"Not supported by ONU-Type",Enabled,,Online,"Very good",-33.98,-28.54,3665,95,902,,,translate,1G,1G,
+,,HWTCC5CAB586,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,191,901,,,translate,1G,1G
+HWTCF2D5357B,gpon,HWTCF2D5357B,HG8546M,SNS001120,GITHURAI_MA5683T_G45,3,4,2,IMANI_Progressive,"Fidel Masawe",,,,,Routing,PPPoE,,,,,,SNS001120,SNS001120,"Not supported by ONU-Type",Enabled,"2025-06-04 19:22:05",Online,"Very good",-33.98,-25.23,3164,526,902,,,translate,1G,1G,
+,,HWTCF2D5357B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,909,1995,,,translate,1G,1G
+HWTC19D518AA,gpon,HWTC19D518AA,HG8145V5,SNS000048,GITHURAI_MA5683T_G45,3,4,3,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000048,SNS000048,"Not supported by ONU-Type",Enabled,,Online,"Very good",-33.98,-26.57,3321,111,902,,,translate,1G,1G,
+HWTC8BC5AFA6,gpon,HWTC8BC5AFA6,HG8546M,SNS000813,GITHURAI_MA5683T_G45,3,4,4,"MAZIWA_BEHIND 3D",,,,,,Routing,PPPoE,,,,,,SNS000813,SNS000813,"Not supported by ONU-Type",Enabled,"2024-08-02 12:09:24","Power fail","Very good",-33.98,-27.96,3321,320,902,,,translate,1G,1G,
+,,HWTC8BC5AFA6,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,375,901,,,translate,1G,1G
+HWTC901946A6,gpon,HWTC901946A6,HG8546M,SNS000509,GITHURAI_MA5683T_G45,3,4,5,"MAZIWA_BEHIND 3D",,,,,,Routing,PPPoE,,,,,,SNS000509,SNS000509,"Not supported by ONU-Type",Enabled,"2024-08-02 14:40:42",Offline,"Very good",-27.96,-26.38,3175,325,902,,,translate,1G,1G,
+,,HWTC901946A6,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,220,901,,,translate,1G,1G
+HWTC72C2138B,gpon,HWTC72C2138B,HG8546M,SNS000658,GITHURAI_MA5683T_G45,3,4,6,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000658,SNS000658,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-33.98,-22.59,3378,208,902,,,translate,1G,1G,
+,,HWTC72C2138B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,186,901,,,translate,1G,1G
+HWTC9C42C49A,gpon,HWTC9C42C49A,HG8245H,SNS000075,GITHURAI_MA5683T_G45,3,4,7,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS000075,SNS000075,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-33.98,-28.86,3318,246,902,,,translate,1G,1G,
+,,HWTC9C42C49A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,265,901,,,translate,1G,1G
+HWTC03D07B0F,gpon,HWTC03D07B0F,HG8546M,SNS001379,GITHURAI_MA5683T_G45,3,4,8,"MAZIWA_BEHIND 3D","Susan Mwangi",,,,,Routing,PPPoE,,,,,,SNS001379,SNS001379,"Not supported by ONU-Type",Enabled,"2025-06-10 15:08:43",Online,"Very good",-33.98,-28.54,3262,1430,902,,,translate,1G,1G,
+,,HWTC03D07B0F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1469,1995,,,translate,1G,1G
+HWTC2230D6AA,gpon,HWTC2230D6AA,HG8145V5,SNS000027,GITHURAI_MA5683T_G45,3,4,9,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000027,SNS000027,"Not supported by ONU-Type",Enabled,,Online,"Very good",-33.98,-27.44,3747,66,902,,,translate,1G,1G,
+HWTCA5820B3D,gpon,HWTCA5820B3D,HG8546M,SNS000222,GITHURAI_MA5683T_G45,3,4,10,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000222,SNS000222,"Not supported by ONU-Type",Enabled,"2024-08-05 14:40:29",Online,"Very good",-33.98,-25.68,3126,427,902,,,translate,1G,1G,
+,,HWTCA5820B3D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,20,901,,,translate,1G,1G
+HWTCF2D90173,gpon,HWTCF2D90173,HG8546M,SNS000145,GITHURAI_MA5683T_G45,3,4,11,"LILLY ACADEMY","Moses Maina",,,,,Routing,PPPoE,,,,,,SNS000145,SNS000145,"Not supported by ONU-Type",Enabled,"2025-08-26 18:03:08",Online,"Very good",-33.98,-30,3431,1374,902,,,translate,1G,1G,
+,,HWTCF2D90173,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1702,1995,,,translate,1G,1G
+HWTCDE278CAC,gpon,HWTCDE278CAC,HG8145V5,SNS000176,GITHURAI_MA5683T_G45,3,4,12,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000176,SNS000176,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-33.98,-25.68,3772,19,902,,,translate,1G,1G,
+HWTC8FAFB08D,gpon,HWTC8FAFB08D,HG8546M,SNS000079,GITHURAI_MA5683T_G45,3,4,13,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000079,SNS000079,"Not supported by ONU-Type",Enabled,"2024-10-16 19:15:27",Online,"Very good",-33.98,-26.77,3532,644,902,,,translate,1G,1G,
+HWTC1A30488B,gpon,HWTC1A30488B,HG8546M,SNS001114,GITHURAI_MA5683T_G45,3,4,14,"LILLY ACADEMY","Edwin Munene",,,,,Routing,PPPoE,,,,,,SNS001114,SNS001114,"Not supported by ONU-Type",Enabled,"2025-08-08 21:17:17",Online,"Very good",-33.98,-27.69,3546,1745,902,,,translate,1G,1G,
+,,HWTC1A30488B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1735,1995,,,translate,1G,1G
+HWTCF2D53F8B,gpon,HWTCF2D53F8B,HG8546M,SNS001452,GITHURAI_MA5683T_G45,3,4,15,"CORNER YA BATA","Tirus muiruri",,,,,Routing,PPPoE,,,,,,SNS001452,SNS001452,"Not supported by ONU-Type",Enabled,"2025-07-21 16:17:38",Online,"Very good",-33.98,-26.19,3122,1424,902,,,translate,1G,1G,
+,,HWTCF2D53F8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1187,1995,,,translate,1G,1G
+HWTC47ABCC6E,gpon,HWTC47ABCC6E,HG8546M,SNS000356,GITHURAI_MA5683T_G45,3,4,16,"CORNER YA BATA",,,,,,Routing,PPPoE,,,,,,SNS000356,SNS000356,"Not supported by ONU-Type",Enabled,"2025-01-13 18:51:28",Offline,"Very good",-33.98,-26.57,3497,866,902,,,translate,1G,1G,
+,,HWTC47ABCC6E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,763,1995,,,translate,1G,1G
+HWTCF2D9037B,gpon,HWTCF2D9037B,HG8546M,SNS001515,GITHURAI_MA5683T_G45,3,4,17,SERENE,"Martin Jones",,,,,Routing,PPPoE,,,,,,SNS001515,SNS001515,"Not supported by ONU-Type",Enabled,"2025-09-23 18:06:07",Online,"Very good",-21.49,-14.2,3125,559,902,,,translate,1G,1G,
+HWTCC777B891,gpon,HWTCC777B891,HG8546M,SNS000691,GITHURAI_MA5683T_G45,3,4,18,"MAZIWA_BEHIND 3D",,,,,,Routing,PPPoE,,,,,,SNS000691,SNS000691,"Not supported by ONU-Type",Enabled,"2025-01-27 19:10:34",Online,"Very good",-33.98,-29.58,3230,851,902,,,translate,1G,1G,
+,,HWTCC777B891,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1031,1995,,,translate,1G,1G
+HWTC3B548B9B,gpon,HWTC3B548B9B,HG8546M,SNS000489,GITHURAI_MA5683T_G45,3,4,19,"LILLY ACADEMY","Stephen Wachira",,,,,Routing,PPPoE,,,,,,SNS000489,SNS000489,"Not supported by ONU-Type",Enabled,"2025-02-08 14:56:31","Power fail","Very good",-33.98,-27.96,3267,1106,902,,,translate,1G,1G,
+,,HWTC3B548B9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1034,1995,,,translate,1G,1G
+HWTCF2D53D3B,gpon,HWTCF2D53D3B,HG8546M,SNS000526,GITHURAI_MA5683T_G45,3,4,20,"MAZIWA_BEHIND 3D",,,,,,Routing,PPPoE,,,,,,SNS000526,SNS000526,"Not supported by ONU-Type",Enabled,"2025-03-30 12:11:53",Online,"Very good",-33.98,-29.21,3275,1188,902,,,translate,1G,1G,
+HWTCF2D53AE3,gpon,HWTCF2D53AE3,HG8546M,SNS001392,GITHURAI_MA5683T_G45,3,4,21,IMANI_Progressive,"Cecilia Riungu",,,,,Routing,PPPoE,,,,,,SNS001392,SNS001392,"Not supported by ONU-Type",Enabled,"2025-06-14 14:47:01",Online,"Very good",-33.98,-25.08,3105,1590,902,,,translate,1G,1G,
+,,HWTCF2D53AE3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1442,1995,,,translate,1G,1G
+HWTCF2D9061B,gpon,HWTCF2D9061B,HG8546M,SNS000692,GITHURAI_MA5683T_G45,3,4,22,"CORNER YA BATA","Trizah Mukami",,,,,Routing,PPPoE,,,,,,SNS000692,SNS000692,"Not supported by ONU-Type",Enabled,"2025-08-02 19:13:41","Power fail","Very good",-33.98,-29.21,3448,703,902,,,translate,1G,1G,
+,,HWTCF2D9061B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1351,1995,,,translate,1G,1G
+HWTCF2D9094B,gpon,HWTCF2D9094B,HG8546M,SNS000075,GITHURAI_MA5683T_G45,3,4,23,IMANI_Progressive,"Joachim Mungai",,,,,Routing,PPPoE,,,,,,SNS000075,SNS000075,"Not supported by ONU-Type",Enabled,"2025-08-07 14:54:56",Online,"Very good",-31.55,-24.81,3320,1734,902,,,translate,1G,1G,
+HWTCF2D9048B,gpon,HWTCF2D9048B,HG8546M,SNS000929,GITHURAI_MA5683T_G45,3,4,24,SERENE,"Kelvin Mwenda",,,,,Routing,PPPoE,,,,,,SNS000929,SNS000929,"Not supported by ONU-Type",Enabled,"2025-09-23 10:52:30","Power fail","Very good",-27.96,-18.92,3818,216,902,,,translate,1G,1G,
+,,HWTCF2D9048B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,422,1995,,,translate,1G,1G
+HWTCF2D90293,gpon,HWTCF2D90293,HG8546M,SNS001278,GITHURAI_MA5683T_G45,3,4,25,SERENE,"John Ndolo",,,,,Routing,PPPoE,,,,,,SNS001278,SNS001278,"Not supported by ONU-Type",Enabled,"2025-09-15 18:54:33","Power fail","Very good",-23.77,-15.65,3326,1953,902,,,translate,1G,1G,
+,,HWTCF2D90293,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1979,1995,,,translate,1G,1G
+HWTCF2D8F5FB,gpon,HWTCF2D8F5FB,HG8546M,SNS001542,GITHURAI_MA5683T_G45,3,4,26,SERENE,"Lee Mwangi",,,,,Routing,PPPoE,,,,,,SNS001542,SNS001542,"Not supported by ONU-Type",Enabled,"2025-09-23 13:43:16","Power fail","Very good",-33.98,-30.45,3242,296,902,,,translate,1G,1G,
+,,HWTCF2D8F5FB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,56,1995,,,translate,1G,1G
+HWTCF2D8F5E3,gpon,HWTCF2D8F5E3,HG8546M,SNS001564,GITHURAI_MA5683T_G45,3,4,27,"CORNER YA BATA","Josephat Makumi",,,,,Routing,PPPoE,,,,,,SNS001564,SNS001564,"Not supported by ONU-Type",Enabled,"2025-10-06 15:03:25",Online,"Very good",-33.98,-27.44,3105,1115,902,,,translate,1G,1G,
+,,HWTCF2D8F5E3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,885,1995,,,translate,1G,1G
+HWTCF2D8F61B,gpon,HWTCF2D8F61B,HG8546M,SNS001571,GITHURAI_MA5683T_G45,3,4,28,"CORNER YA BATA","Joseph muhoro",,,,,Routing,PPPoE,,,,,,SNS001571,SNS001571,"Not supported by ONU-Type",Enabled,"2025-10-20 13:44:17","Power fail","Very good",-22.52,-15.8,3039,1661,902,,,translate,1G,1G,
+,,HWTCF2D8F61B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1625,1995,,,translate,1G,1G
+HWTC0904C810,gpon,HWTC0904C810,HG8546M,SNS000541,GITHURAI_MA5683T_G45,3,5,0,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000541,SNS000541,"Not supported by ONU-Type",Enabled,"2024-08-08 18:50:24",Offline,Critical,-35.23,-29.58,2808,196,902,,,translate,1G,1G,
+,,HWTC0904C810,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,141,901,,,translate,1G,1G
+HWTC1628489B,gpon,HWTC1628489B,HG8546M,SNS000184,GITHURAI_MA5683T_G45,3,5,1,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000184,SNS000184,"Not supported by ONU-Type",Enabled,"2024-08-10 14:38:05",Online,"Very good",-29.21,-24.43,2328,452,902,,,translate,1G,1G,
+,,HWTC1628489B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,125,901,,,translate,1G,1G
+HWTC7F280A9C,gpon,HWTC7F280A9C,HG8546M,SNS000749,GITHURAI_MA5683T_G45,3,5,2,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000749,SNS000749,"Not supported by ONU-Type",Enabled,"2025-02-05 16:56:39",Online,"Very good",-17.8,-11.81,2749,826,902,,,translate,1G,1G,
+,,HWTC7F280A9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1011,1995,,,translate,1G,1G
+HWTC47555A9C,gpon,HWTC47555A9C,HG8546M,SNS000750,GITHURAI_MA5683T_G45,3,5,3,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000750,SNS000750,"Not supported by ONU-Type",Enabled,"2024-10-04 11:17:44",Offline,"Very good",-26.78,-20.97,2220,626,902,,,translate,1G,1G,
+,,HWTC47555A9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,342,901,,,translate,1G,1G
+HWTC96613295,gpon,HWTC96613295,HG8546M,SNS000970,GITHURAI_MA5683T_G45,3,5,4,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000970,SNS000970,"Not supported by ONU-Type",Enabled,"2024-10-14 18:40:35",Online,"Very good",-15.72,-12.44,2131,585,902,,,translate,1G,1G,
+,,HWTC96613295,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,595,901,,,translate,1G,1G
+HWTC3908759B,gpon,HWTC3908759B,HG8546M,SNS000293,GITHURAI_MA5683T_G45,3,5,5,"EXCEL ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000293,SNS000293,"Not supported by ONU-Type",Enabled,"2025-03-07 13:17:05",Online,"Very good",-22.84,-16.09,3166,1014,902,,,translate,1G,1G,
+,,HWTC3908759B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1180,903,,,translate,1G,1G
+HWTC7A3CE709,gpon,HWTC7A3CE709,HG8247,SNS000993,GITHURAI_MA5683T_G45,3,5,6,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS000993,SNS000993,"Not supported by ONU-Type",Enabled,"2024-10-24 13:13:41",Offline,Critical,-35.23,-22.71,2844,653,902,,,translate,1G,1G,
+,,HWTC7A3CE709,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,639,901,,,translate,1G,1G
+HWTC14F8F981,gpon,HWTC14F8F981,HG8546M,SNS000643,GITHURAI_MA5683T_G45,3,5,7,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS000643,SNS000643,"Not supported by ONU-Type",Enabled,,"Power fail",Critical,-35.23,-13.52,2033,331,902,,,translate,1G,1G,
+,,HWTC14F8F981,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,968,1995,,,translate,1G,1G
+HWTCF2D5343B,gpon,HWTCF2D5343B,HG8546M,SNS001329,GITHURAI_MA5683T_G45,3,5,8,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS001329,SNS001329,"Not supported by ONU-Type",Enabled,"2025-05-07 11:54:01","Power fail",Critical,-35.23,-24.09,2661,1243,902,,,translate,1G,1G,
+HWTC36B9939B,gpon,HWTC36B9939B,HG8546M,SNS001009,GITHURAI_MA5683T_G45,3,5,9,CLAYCITY,,,,,,Routing,PPPoE,,,,,,SNS001009,SNS001009,"Not supported by ONU-Type",Enabled,"2024-11-02 12:53:44",Online,"Very good",-21.49,-17.21,2066,611,902,,,translate,1G,1G,
+,,HWTC36B9939B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,289,901,,,translate,1G,1G
+HWTCF2D53FE3,gpon,HWTCF2D53FE3,HG8546M,SNS000907,GITHURAI_MA5683T_G45,3,5,10,"LILLY ACADEMY","Mary Kajuju",,,,,Routing,PPPoE,,,,,,SNS000907,SNS000907,"Not supported by ONU-Type",Enabled,"2025-11-26 13:53:20","Power fail",Critical,-35.23,-25.85,2033,54,902,,,translate,1G,1G,
+,,HWTCF2D53FE3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,71,1995,,,translate,1G,1G
+HWTCF2D5393B,gpon,HWTCF2D5393B,HG8546M,SNS001370,GITHURAI_MA5683T_G45,3,5,11,PCEA_MUKINYI,"Mercy wacu",,,,,Routing,PPPoE,,,,,,SNS001370,SNS001370,"Not supported by ONU-Type",Enabled,"2025-06-05 16:08:59",Online,Critical,-35.23,-27.44,2671,1294,902,,,translate,1G,1G,
+,,HWTCF2D5393B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1231,1995,,,translate,1G,1G
+HWTCF2D5581B,gpon,HWTCF2D5581B,HG8546M,SNS000437,GITHURAI_MA5683T_G45,3,5,12,PCEA_MUKINYI,,,,,,Routing,PPPoE,,,,,,SNS000437,SNS000437,"Not supported by ONU-Type",Enabled,"2025-06-09 15:41:07",Online,Critical,-35.23,-27.69,2848,1518,902,,,translate,1G,1G,
+HWTCF2D901FB,gpon,HWTCF2D901FB,HG8546M,SNS001522,GITHURAI_MA5683T_G45,3,5,13,DISCOVERY-RELI,"Mary Kori",,,,,Routing,PPPoE,,,,,,SNS001522,SNS001522,"Not supported by ONU-Type",Enabled,"2025-08-28 17:24:42","Power fail","Very good",-21.74,-12.36,2518,894,902,,,translate,1G,1G,
+,,HWTCF2D901FB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1869,1995,,,translate,1G,1G
+HWTCF2D9041B,gpon,HWTCF2D9041B,HG8546M,SNS001606,GITHURAI_MA5683T_G45,3,5,14,"NEW CANAN RELI","EdiEsther kache",,,,,Routing,PPPoE,,,,,,SNS001606,SNS001606,"Not supported by ONU-Type",Enabled,"2025-11-07 14:13:07","Power fail","Very good",-32.22,-12.39,2595,533,902,,,translate,1G,1G,
+,,HWTCF2D9041B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,579,1995,,,translate,1G,1G
+HWTC46A0819D,gpon,HWTC46A0819D,HG8546M,SNS000921,GITHURAI_MA5683T_G45,3,5,15,ABUNDANT,,,,,,Routing,PPPoE,,,,,,SNS000921,SNS000921,"Not supported by ONU-Type",Enabled,"2025-12-23 12:12:02",Online,Critical,-35.23,-26.57,2647,323,902,,,translate,1G,1G,
+HWTCF1093979,gpon,HWTCF1093979,HG8546M,SNS000423,GITHURAI_MA5683T_G45,3,5,16,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS000423,SNS000423,"Not supported by ONU-Type",Enabled,,Online,"Very good",-23.02,-15.53,2496,162,902,,,translate,1G,1G,
+,,HWTCF1093979,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,232,69,,,translate,1G,1G
+,,HWTCF1093979,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,460,901,,,translate,1G,1G
+HWTC462DD89D,gpon,HWTC462DD89D,HG8546M,SNS001629,GITHURAI_MA5683T_G45,3,5,17,PCEA_MUKINYI,"Stephen ogutu",,,,,Routing,PPPoE,,,,,,SNS001629,SNS001629,"Not supported by ONU-Type",Enabled,"2025-12-29 16:02:54",Online,Critical,-35.23,-18.04,2675,410,902,,,translate,1G,1G,
+,,HWTC462DD89D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,417,1995,,,translate,1G,1G
+HWTC782FCB8B,gpon,HWTC782FCB8B,HG8546M,SNS001053,GITHURAI_MA5683T_G45,3,5,23,"LILLY ACADEMY",,,,,,Routing,PPPoE,,,,,,SNS001053,SNS001053,"Not supported by ONU-Type",Enabled,"2025-01-17 16:06:45",Online,Critical,-35.23,-23.87,2646,326,902,,,translate,1G,1G,
+,,HWTC782FCB8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,982,1995,,,translate,1G,1G
+HWTC02A4EC0F,gpon,HWTC02A4EC0F,HG8546M,SNS000374,GITHURAI_MA5683T_G45,3,6,0,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000374,SNS000374,"Not supported by ONU-Type",Enabled,,Online,"Very good",-25.23,-19.79,3637,132,902,,,translate,1G,1G,
+,,HWTC02A4EC0F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,430,901,,,translate,1G,1G
+HWTC093BE7AA,gpon,HWTC093BE7AA,HG8145V5,SNS-BR-0013,GITHURAI_MA5683T_G45,3,6,1,RIFLO,,,,,,Routing,"Setup via ONU webpage",,,,,,,,"Not supported by ONU-Type",Enabled,,Online,"Very good",-27.96,-20.75,5126,68,69,,,translate,1G,1G,
+,,HWTC093BE7AA,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,131,26,,,translate,1G,1G
+HWTC0EFB4180,gpon,HWTC0EFB4180,HG8546M,SNS000505,GITHURAI_MA5683T_G45,3,6,2,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000505,SNS000505,"Not supported by ONU-Type",Enabled,,Online,"Very good",-28.87,-23.66,3700,96,902,,,translate,1G,1G,
+,,HWTC0EFB4180,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,174,901,,,translate,1G,1G
+HWTC46B4239D,gpon,HWTC46B4239D,HG8546M,SNS000782,GITHURAI_MA5683T_G45,3,6,3,MUMBI,"Samuel Ndirangu",,,,,Routing,PPPoE,,,,,,SNS000782,SNS000782,"Not supported by ONU-Type",Enabled,"2025-12-15 12:51:23",Online,Critical,-35.23,-24.81,5255,313,902,,,translate,1G,1G,
+HWTC3966619B,gpon,HWTC3966619B,HG8546M,SNS000816,GITHURAI_MA5683T_G45,3,6,4,"KIMBO PRIMARY",,,,,,Routing,PPPoE,,,,,,SNS000816,SNS000816,"Not supported by ONU-Type",Enabled,"2025-01-29 20:00:07",Online,"Very good",-33.98,-20.45,3923,126,902,,,translate,1G,1G,
+,,HWTC3966619B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1013,1995,,,translate,1G,1G
+HWTCD5A6B4A3,gpon,HWTCD5A6B4A3,HG8145V5,SNS000135,GITHURAI_MA5683T_G45,3,6,5,RIFLO,,,,,,Routing,PPPoE,,,,,,SNS000135,SNS000135,"Not supported by ONU-Type",Enabled,,Online,"Very good",-26.99,-20.41,3649,223,902,,,translate,1G,1G,
+HWTCA344159C,gpon,HWTCA344159C,HG8145V,SNS000109,GITHURAI_MA5683T_G45,3,6,6,FOUNTAIN_JUNIOR,"Emily Kuto",,,,,Routing,PPPoE,,,,,,SNS000109,SNS000109,"Not supported by ONU-Type",Enabled,"2025-09-15 13:21:18",Online,"Very good",-28.54,-23.98,3755,1718,902,,,translate,1G,1G,
+,,HWTCA344159C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1503,1995,,,translate,1G,1G
+HWTCF2DAFEBB,gpon,HWTCF2DAFEBB,HG8546M,SNS000093,GITHURAI_MA5683T_G45,3,6,7,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000093,SNS000093,"Not supported by ONU-Type",Enabled,"2025-12-31 18:26:52",Online,"Very good",-32.22,-19.79,3702,441,902,,,translate,1G,1G,
+HWTC9FB85E29,gpon,HWTC9FB85E29,HG8447,SNS000093,GITHURAI_MA5683T_G45,3,6,8,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000093,SNS000093,"Not supported by ONU-Type",Enabled,,LOS,"Very good",-30,-24.08,3693,157,902,,,translate,1G,1G,
+HWTCF2D53A6B,gpon,HWTCF2D53A6B,HG8546M,SNS000375,GITHURAI_MA5683T_G45,3,6,9,"KIMBO PRIMARY",,,,,,Routing,PPPoE,,,,,,SNS000375,SNS000375,"Not supported by ONU-Type",Enabled,"2025-06-23 14:59:27",Online,"Very good",-30,-23.56,3898,1207,902,,,translate,1G,1G,
+HWTC0F205016,gpon,HWTC0F205016,HG8546M,SNS001040,GITHURAI_MA5683T_G45,3,6,10,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS001040,SNS001040,"Not supported by ONU-Type",Enabled,"2024-11-12 21:37:58",Offline,Critical,-35.23,-26.77,3686,687,902,,,translate,1G,1G,
+HWTC0BAA0D0A,gpon,HWTC0BAA0D0A,HG8546M,SNS001579,GITHURAI_MA5683T_G45,3,6,11,FOUNTAIN_JUNIOR,"Raphael Mwangi",,,,,Routing,PPPoE,,,,,,SNS001579,SNS001579,"Not supported by ONU-Type",Enabled,"2025-10-22 11:32:43",Online,"Very good",-26.2,-19.39,3627,496,902,,,translate,1G,1G,
+,,HWTC0BAA0D0A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1725,1995,,,translate,1G,1G
+HWTC67F43F9C,gpon,HWTC67F43F9C,HG8546M,SNS000741,GITHURAI_MA5683T_G45,3,6,12,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000741,SNS000741,"Not supported by ONU-Type",Enabled,"2024-08-21 16:29:34","Power fail","Very good",-27.22,-19.87,4974,463,902,,,translate,1G,1G,
+,,HWTC67F43F9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,432,901,,,translate,1G,1G
+HWTC947287AD,gpon,HWTC947287AD,HS8145V,SNS000111,GITHURAI_MA5683T_G45,3,6,13,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000111,SNS000111,"Not supported by ONU-Type",Enabled,"2024-08-20 23:06:27",Online,"Very good",-30,-21.42,3666,242,902,,,translate,1G,1G,
+,,HWTC947287AD,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,440,901,,,translate,1G,1G
+HWTCF2D9039B,gpon,HWTCF2D9039B,HG8546M,SNS000497,GITHURAI_MA5683T_G45,3,6,14,PROGRESSIVE,"James mwaniki",,,,,Routing,PPPoE,,,,,,SNS000497,SNS000497,"Not supported by ONU-Type",Enabled,"2025-09-09 13:24:00","Power fail","Very good",-29.59,-22.52,3774,1447,902,,,translate,1G,1G,
+,,HWTCF2D9039B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,279,1995,,,translate,1G,1G
+HWTC8C14F39B,gpon,HWTC8C14F39B,HG8546M,SNS000752,GITHURAI_MA5683T_G45,3,6,15,"KIMBO PRIMARY",,,,,,Routing,PPPoE,,,,,,SNS000752,SNS000752,"Not supported by ONU-Type",Enabled,"2024-08-26 15:13:44",Online,"Very good",-17.55,-13.42,3928,483,902,,,translate,1G,1G,
+,,HWTC8C14F39B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,58,901,,,translate,1G,1G
+HWTC39D4C59B,gpon,HWTC39D4C59B,HG8546M,SNS000680,GITHURAI_MA5683T_G45,3,6,16,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000680,SNS000680,"Not supported by ONU-Type",Enabled,"2025-01-31 17:06:36","Power fail","Very good",-33.98,-23.98,5238,983,902,,,translate,1G,1G,
+,,HWTC39D4C59B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,874,1995,,,translate,1G,1G
+HWTCF2D90553,gpon,HWTCF2D90553,HG8546M,SNS001587,GITHURAI_MA5683T_G45,3,6,17,FOUNTAIN_JUNIOR,"Rehab Njeri",,,,,Routing,PPPoE,,,,,,SNS001587,SNS001587,"Not supported by ONU-Type",Enabled,"2025-10-25 14:22:52","Power fail","Very good",-20.97,-29.21,4239,1769,902,,,translate,1G,1G,
+HWTCB0E550A6,gpon,HWTCB0E550A6,HG8145V5,SNS000450,GITHURAI_MA5683T_G45,3,6,19,"PCEA KIMBO",,,,,,Routing,PPPoE,,,,,,SNS000450,SNS000450,"Not supported by ONU-Type",Enabled,,Offline,Critical,-35.23,-27.69,4945,230,902,,,translate,1G,1G,
+HWTC36A99B9B,gpon,HWTC36A99B9B,HG8546M,SNS000985,GITHURAI_MA5683T_G45,3,6,22,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000985,SNS000985,"Not supported by ONU-Type",Enabled,"2024-10-21 12:47:49",Online,"Very good",-30.46,-26.57,3709,709,902,,,translate,1G,1G,
+HWTC3B7B279B,gpon,HWTC3B7B279B,HG8546M,SNS000523,GITHURAI_MA5683T_G45,3,6,23,"MAUA - Fountain",,,,,,Routing,PPPoE,,,,,,SNS000523,SNS000523,"Not supported by ONU-Type",Enabled,"2025-02-12 16:57:46",Online,"Very good",-19.32,-18.57,3638,932,902,,,translate,1G,1G,
+,,HWTC3B7B279B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,535,1995,,,translate,1G,1G
+HWTC84532492,gpon,HWTC84532492,HG8546M,SNS000131,GITHURAI_MA5683T_G45,3,6,24,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000131,SNS000131,"Not supported by ONU-Type",Enabled,"2024-09-30 16:42:28","Power fail","Very good",-25.86,-23.76,3684,619,902,,,translate,1G,1G,
+HWTC2D23BA9B,gpon,HWTC2D23BA9B,HG8546M,SNS000980,GITHURAI_MA5683T_G45,3,6,25,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000980,SNS000980,"Not supported by ONU-Type",Enabled,"2024-10-17 15:49:10",Online,"Very good",-28.87,-26.57,3703,473,902,,,translate,1G,1G,
+,,HWTC2D23BA9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,185,901,,,translate,1G,1G
+HWTCE34B0207,gpon,HWTCE34B0207,HG8247,SNS000479,GITHURAI_MA5683T_G45,3,6,26,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000479,SNS000479,"Not supported by ONU-Type",Enabled,"2024-12-02 11:56:01",Online,"Very good",-31.55,-23.72,3772,837,902,,,translate,1G,1G,
+HWTC3A83B49B,gpon,HWTC3A83B49B,HG8546M,SNS001200,GITHURAI_MA5683T_G45,3,6,28,FOUNTAIN_JUNIOR,"Beatrice Karanja",,,,,Routing,PPPoE,,,,,,SNS001200,SNS001200,"Not supported by ONU-Type",Enabled,"2025-02-27 11:59:20",Online,"Very good",-30.46,-21.55,3595,1111,902,,,translate,1G,1G,
+,,HWTC3A83B49B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1194,1995,,,translate,1G,1G
+HWTC07F9DD6D,gpon,HWTC07F9DD6D,HG8245H,SNS000944,GITHURAI_MA5683T_G45,3,6,29,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000944,SNS000944,"Not supported by ONU-Type",Enabled,"2024-10-02 12:47:39",Offline,"Very good",-28.24,-24.31,3685,493,902,,,translate,1G,1G,
+HWTC3A32849B,gpon,HWTC3A32849B,HG8546M,SNS000971,GITHURAI_MA5683T_G45,3,6,30,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000971,SNS000971,"Not supported by ONU-Type",Enabled,"2025-03-04 05:58:21",Online,"Very good",-32.22,-23.37,5000,898,902,,,translate,1G,1G,
+,,HWTC3A32849B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,819,1995,,,translate,1G,1G
+HWTCD1E2169C,gpon,HWTCD1E2169C,HG8145V,SFL0031,GITHURAI_MA5683T_G45,3,6,31,"KIMBO PRIMARY",,,,,,Routing,PPPoE,,,,,,SFL0031,SFL0031,"Not supported by ONU-Type",Enabled,"2025-08-01 15:00:28",Online,"Very good",-27.45,-20.55,3769,1237,903,,,translate,1G,1G,
+HWTCF2D53AB3,gpon,HWTCF2D53AB3,HG8546M,"Slf_hotspot Mumbi",GITHURAI_MA5683T_G45,3,6,32,MUMBI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-06-14 18:40:01","Power fail",Critical,-35.23,-26.02,4880,1104,903,,,translate,1G,1G,
+HWTCF2D53583,gpon,HWTCF2D53583,HG8546M,SNS000346,GITHURAI_MA5683T_G45,3,6,33,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000346,SNS000346,"Not supported by ONU-Type",Enabled,"2025-05-27 13:14:41","Power fail",Critical,-35.23,-25.37,5197,478,902,,,translate,1G,1G,
+HWTCF2D53FEB,gpon,HWTCF2D53FEB,HG8546M,SNS001421,GITHURAI_MA5683T_G45,3,6,34,"KIMBO PRIMARY","Robert nderitu",,,,,Routing,PPPoE,,,,,,SNS001421,SNS001421,"Not supported by ONU-Type",Enabled,"2025-07-05 12:40:22","Power fail",Critical,-35.23,-30.96,3763,1610,902,,,translate,1G,1G,
+,,HWTCF2D53FEB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1484,1995,,,translate,1G,1G
+HWTCF2D9045B,gpon,HWTCF2D9045B,HG8546M,SNS000490,GITHURAI_MA5683T_G45,3,6,35,"MAUA - Fountain","Miriam Nyambura",,,,,Routing,PPPoE,,,,,,SNS000490,SNS000490,"Not supported by ONU-Type",Enabled,"2025-07-26 14:11:30",Online,Critical,-35.23,-30,3778,756,902,,,translate,1G,1G,
+,,HWTCF2D9045B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1714,1995,,,translate,1G,1G
+HWTC7D1644C9,gpon,HWTC7D1644C9,HG8546M,SNS001473,GITHURAI_MA5683T_G45,3,6,36,FOUNTAIN_JUNIOR,"Mercy Maina",,,,,Routing,PPPoE,,,,,,SNS001473,SNS001473,"Not supported by ONU-Type",Enabled,"2025-08-04 17:03:06",Online,"Very good",-28.87,-24.68,3636,647,902,,,translate,1G,1G,
+HWTCF2D904A3,gpon,HWTCF2D904A3,HG8546M,SNS001497,GITHURAI_MA5683T_G45,3,6,37,FOUNTAIN_JUNIOR,"PAul Njeri",,,,,Routing,PPPoE,,,,,,SNS001497,SNS001497,"Not supported by ONU-Type",Enabled,"2025-08-16 11:50:06","Power fail","Very good",-26.03,-18.5,3658,1748,902,,,translate,1G,1G,
+,,HWTCF2D904A3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1829,1995,,,translate,1G,1G
+HWTCE7FE69AA,gpon,HWTCE7FE69AA,HG8145V5,SNS-BR-0010,GITHURAI_MA5683T_G45,3,7,0,SAMERK,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,,Offline,"Very good",-22.08,-13.41,7478,439,902,,,translate,1G,1G,
+,,HWTCE7FE69AA,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,121,69,,,translate,1G,1G
+HWTC4FBC3C9B,gpon,HWTC4FBC3C9B,HG8546M,SNS-BR-0011,GITHURAI_MA5683T_G45,3,7,1,RIFLO,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,,Online,"Very good",-23.88,-16.53,7891,119,26,,,translate,1G,1G,
+,,HWTC4FBC3C9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,337,901,,,translate,1G,1G
+HWTC02A9A510,gpon,HWTC02A9A510,HG8546M,SNS000123,GITHURAI_MA5683T_G45,3,7,2,"Mwihoko_Kwa Jeshi",,,,,,Routing,PPPoE,,,,,,SNS000123,SNS000123,"Not supported by ONU-Type",Enabled,,Online,Critical,-35.23,-26.38,8436,418,902,,,translate,1G,1G,
+,,HWTC02A9A510,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,60,901,,,translate,1G,1G
+HWTCA53F8D60,gpon,HWTCA53F8D60,HG8546M,CharlesMother,GITHURAI_MA5683T_G45,3,7,3,"Mwihoko_Kwa Jeshi",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-08-14 19:49:48",Online,Critical,-35.23,-27.69,9160,43,26,,,translate,1G,1G,
+HWTC089AE17C,gpon,HWTC089AE17C,HG8546M,INTACT,GITHURAI_MA5683T_G45,3,7,4,"Mwihoko Discovery",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-12-28 17:34:59",Online,"Very good",-26.99,-19.5,8620,395,26,,,translate,1G,1G,
+HWTC36B3029B,gpon,HWTC36B3029B,HG8546M,II000101,GITHURAI_MA5683T_G45,3,7,5,"Mwihoko_Kwa Jeshi",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-01-16 21:19:42",Online,"Very good",-28.24,-25.08,8932,959,26,,,translate,1G,1G,
+HWTC383A5A9B,gpon,HWTC383A5A9B,HG8546M,II000111,GITHURAI_MA5683T_G45,3,7,6,"Mwihoko_Kwa Jeshi",INTACT,,,,,Routing,PPPoE,,,,,,II000111,II000111,"Not supported by ONU-Type",Enabled,"2025-01-13 19:09:46",Online,"Very good",-33.98,-24.31,9285,588,26,,,translate,1G,1G,
+HWTC3BEF2A9B,gpon,HWTC3BEF2A9B,HG8546M,II000133,GITHURAI_MA5683T_G45,3,7,7,"MWIHOKO PEFA",,,,,,Routing,PPPoE,,,,,,II000133,II000133,"Not supported by ONU-Type",Enabled,"2025-03-21 19:21:01",Online,Critical,-35.23,-29.21,9427,1270,26,,,translate,1G,1G,
+HWTCF2D9040B,gpon,HWTCF2D9040B,HG8546M,SNS001456,GITHURAI_MA5683T_G45,3,7,8,"Mwihoko_Kwa Jeshi","Caroline Maina",,,,,Routing,PPPoE,,,,,,SNS001456,SNS001456,"Not supported by ONU-Type",Enabled,"2025-07-23 17:22:10",Online,Critical,-35.23,-25.68,8443,1462,902,,,translate,1G,1G,
+,,HWTCF2D9040B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1558,1995,,,translate,1G,1G
+TDTC3B0098B8,gpon,TDTC3B0098B8,IGD,II000148,GITHURAI_MA5683T_G45,3,7,9,"Mwihoko_Kwa Jeshi",,,,,,Routing,PPPoE,,,,,,II000148,II000148,"Not supported by ONU-Type",Enabled,"2025-09-17 19:03:20",Online,Critical,-35.23,-29.58,8344,479,26,,,translate,1G,1G,
+HWTCF2D52D73,gpon,HWTCF2D52D73,HG8546M,SNS001296,GITHURAI_MA5683T_G45,3,8,0,"Kwa Nyanya","John Muindi",,,,,Routing,PPPoE,,,,,,SNS001296,SNS001296,"Not supported by ONU-Type",Enabled,"2025-04-17 14:46:11",Offline,"Very good",-33.98,-32.21,1407,1117,902,,,translate,1G,1G,
+,,HWTCF2D52D73,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,267,1995,,,translate,1G,1G
+HWTC3A4A329B,gpon,HWTC3A4A329B,HG8546M,SNS001212,GITHURAI_MA5683T_G45,3,8,1,"EXCEL ACADEMY","Mawa Star",,,,,Routing,PPPoE,,,,,,SNS001212,SNS001212,"Not supported by ONU-Type",Enabled,"2025-03-08 12:29:26","Power fail","Very good",-27.96,-21.25,1423,1203,902,,,translate,1G,1G,
+,,HWTC3A4A329B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1142,1995,,,translate,1G,1G
+HWTC396B6B9B,gpon,HWTC396B6B9B,HG8546M,SNS000872-01,GITHURAI_MA5683T_G45,3,8,2,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000872-01,SNS000872-01,"Not supported by ONU-Type",Enabled,"2025-01-24 13:57:36","Power fail","Very good",-27.96,-23.01,1193,848,902,,,translate,1G,1G,
+,,HWTC396B6B9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,997,1995,,,translate,1G,1G
+HWTC3619989B,gpon,HWTC3619989B,HG8546M,SNS001027,GITHURAI_MA5683T_G45,3,8,3,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS001027,SNS001027,"Not supported by ONU-Type",Enabled,"2024-11-09 12:32:19",Online,"Very good",-26.03,-21.67,1220,670,902,,,translate,1G,1G,
+,,HWTC3619989B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,488,901,,,translate,1G,1G
+HWTCE1B6CC81,gpon,HWTCE1B6CC81,HG8546M,Cooperative,GITHURAI_MA5683T_G45,3,8,4,CARWASH,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-08-07 16:10:17",Online,"Very good",-33.02,-27.96,1285,339,902,,,translate,1G,1G,
+,,HWTCE1B6CC81,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,355,901,,,translate,1G,1G
+HWTCD8C1AE8C,gpon,HWTCD8C1AE8C,HG8546M,SNS000931,GITHURAI_MA5683T_G45,3,8,5,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000931,SNS000931,"Not supported by ONU-Type",Enabled,,Online,"Very good",-27.45,-24.43,1243,592,902,,,translate,1G,1G,
+HWTC3929319B,gpon,HWTC3929319B,HG8546M,SNS000046,GITHURAI_MA5683T_G45,3,8,6,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000046,SNS000046,"Not supported by ONU-Type",Enabled,"2025-02-01 15:27:00","Power fail","Very good",-27.96,-22.44,1172,1020,902,,,translate,1G,1G,
+,,HWTC3929319B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1058,1995,,,translate,1G,1G
+HWTC363EF49B,gpon,HWTC363EF49B,HG8546M,II000097-01,GITHURAI_MA5683T_G45,3,8,7,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,II000097-01,II000097-01,"Not supported by ONU-Type",Enabled,"2024-11-02 17:31:35",Online,"Very good",-24.09,-20.08,1112,668,26,,,translate,10M,10M,
+,,HWTC363EF49B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,682,903,,,translate,1G,1G
+HWTC3B41B89B,gpon,HWTC3B41B89B,HG8546M,SNS000583,GITHURAI_MA5683T_G45,3,8,8,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000583,SNS000583,"Not supported by ONU-Type",Enabled,"2025-02-25 17:21:03",Online,"Very good",-26.39,-20.5,1212,305,902,,,translate,1G,1G,
+,,HWTC3B41B89B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,871,1995,,,translate,1G,1G
+HWTC3A3AE49B,gpon,HWTC3A3AE49B,HG8546M,SNS000822,GITHURAI_MA5683T_G45,3,8,9,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000822,SNS000822,"Not supported by ONU-Type",Enabled,"2025-02-25 19:03:22","Power fail","Very good",-28.24,-22.59,1167,1103,902,,,translate,1G,1G,
+,,HWTC3A3AE49B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1287,903,,,translate,1G,1G
+HWTC3A66C09B,gpon,HWTC3A66C09B,HG8546M,SNS000249,GITHURAI_MA5683T_G45,3,8,10,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000249,SNS000249,"Not supported by ONU-Type",Enabled,"2025-03-08 14:03:58",Online,"Very good",-29.59,-24.09,1294,1205,902,,,translate,1G,1G,
+,,HWTC3A66C09B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,180,1995,,,translate,1G,1G
+HWTCF2D53BBB,gpon,HWTCF2D53BBB,HG8546M,SNS000807,GITHURAI_MA5683T_G45,3,8,11,"KINGDOM SACCO",RUBEN,,,,,Routing,PPPoE,,,,,,SNS000807,SNS000807,"Not supported by ONU-Type",Enabled,"2025-03-15 12:43:45",Online,"Very good",-30.97,-26.77,1359,1242,902,,,translate,1G,1G,
+,,HWTCF2D53BBB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1096,1995,,,translate,1G,1G
+HWTCF2D55863,gpon,HWTCF2D55863,HG8546M,SNS000940,GITHURAI_MA5683T_G45,3,8,12,"SOKO YA MAHINDI","Catherine Wanjiku",,,,,Routing,PPPoE,,,,,,SNS000940,SNS000940,"Not supported by ONU-Type",Enabled,"2025-06-11 13:12:06",Online,"Very good",-27.96,-21.3,1250,1289,902,,,translate,1G,1G,
+HWTC7E2037E2,gpon,HWTC7E2037E2,HG8546M,SNS001000,GITHURAI_MA5683T_G45,3,8,13,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS001000,SNS001000,"Not supported by ONU-Type",Enabled,"2024-11-22 16:39:31","Power fail","Very good",-26.39,-21.08,1271,723,902,,,translate,1G,1G,
+,,HWTC7E2037E2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,762,901,,,translate,1G,1G
+HWTCF2D533E3,gpon,HWTCF2D533E3,HG8546M,SNS001328,GITHURAI_MA5683T_G45,3,8,14,"EXCEL ACADEMY","Nancy Muthoni",,,,,Routing,PPPoE,,,,,,SNS001328,SNS001328,"Not supported by ONU-Type",Enabled,"2025-05-06 12:57:43",Offline,"Very good",-27.96,-25.08,1208,407,902,,,translate,1G,1G,
+,,HWTCF2D533E3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,523,1995,,,translate,1G,1G
+HWTCF2D55833,gpon,HWTCF2D55833,HG8546M,SNS000256-01,GITHURAI_MA5683T_G45,3,8,15,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SNS000256-01,SNS000256-01,"Not supported by ONU-Type",Enabled,"2025-07-14 15:27:27",Online,"Very good",-27.22,-22.92,1308,1550,902,,,translate,1G,1G,
+HWTCF2D90413,gpon,HWTCF2D90413,HG8546M,SNS001454,GITHURAI_MA5683T_G45,3,8,16,"Kwa Nyanya","Joyce Wangui",,,,,Routing,PPPoE,,,,,,SNS001454,SNS001454,"Not supported by ONU-Type",Enabled,"2025-07-23 14:06:26","Power fail","Very good",-29.21,-22.59,1500,63,902,,,translate,1G,1G,
+HWTCF2D902DB,gpon,HWTCF2D902DB,HG8546M,SNS001523-01,GITHURAI_MA5683T_G45,3,8,17,"FAMILY BANK",,,,,,Routing,PPPoE,,,,,,SNS001523-01,SNS001523-01,"Not supported by ONU-Type",Enabled,"2025-08-29 16:28:08",Online,"Very good",-28.87,-22.52,1447,1708,902,,,translate,1G,1G,
+HWTCF2D8F563,gpon,HWTCF2D8F563,HG8546M,"AzureNet Solutions Ltd",GITHURAI_MA5683T_G45,3,8,18,"Kwa Nyanya","Wajukuu Shop",,,,,Routing,PPPoE,,,,,,AzureNet,AzureNet,"Not supported by ONU-Type",Enabled,"2025-09-24 11:28:46",Online,"Very good",-25.09,-18.38,1183,286,902,,,translate,1G,1G,
+,,HWTCF2D8F563,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,150,3001,,,translate,1G,1G
+,,HWTCF2D8F563,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1562,660,,,translate,1G,1G
+,,HWTCF2D8F563,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,561,903,,,translate,1G,1G
+HWTCF2D8F47B,gpon,HWTCF2D8F47B,HG8546M,SNS0052,GITHURAI_MA5683T_G45,3,8,19,ABUNDANT,,,,,,Routing,PPPoE,,,,,,SFL0052,SFL0052,"Not supported by ONU-Type",Enabled,"2025-09-24 15:13:47","Power fail","Very good",-29.21,-20.65,1249,1116,900,,,translate,1G,1G,
+HWTC040DB902,gpon,HWTC040DB902,HG8546M,"Attic G Town",GITHURAI_MA5683T_G45,3,8,20,"G TOWN",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-09-26 11:45:11",Online,"Very good",-30,-23.1,1425,869,115,,,translate,20M,20M,
+HWTC460EB29B,gpon,HWTC460EB29B,HG8546M,SFL0062,GITHURAI_MA5683T_G45,3,8,21,"Kwa Nyanya",,,,,,Routing,PPPoE,,,,,,SFL0062,SFL0062,"Not supported by ONU-Type",Enabled,"2025-09-29 18:25:13",Online,"Very good",-25.23,-19.13,1249,1516,903,,,translate,1G,1G,
+HWTT1EFAB8A9,gpon,HWTT1EFAB8A9,HG8546M,SNS001593,GITHURAI_MA5683T_G45,3,8,22,"Kwa Nyanya","Moses Wanjau",,,,,Routing,PPPoE,,,,,,SNS001593,SNS001593,"Not supported by ONU-Type",Enabled,"2025-10-29 13:25:47","Power fail","Very good",-31.55,,1360,1743,902,,,translate,1G,1G,
+,,HWTT1EFAB8A9,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1685,1995,,,translate,1G,1G
+HWTCF2D904D3,gpon,HWTCF2D904D3,HG8546M,SNS000303,GITHURAI_MA5683T_G45,3,8,23,G44,"Eric Maina",,,,,Routing,PPPoE,,,,,,SNS000303,SNS000303,"Not supported by ONU-Type",Enabled,"2025-09-02 14:25:42",Online,"Very good",-33.98,-30,1371,1874,902,,,translate,1G,1G,
+,,HWTCF2D904D3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1631,1995,,,translate,1G,1G
+HWTC4644C59B,gpon,HWTC4644C59B,HG8546M,SNS001598,GITHURAI_MA5683T_G45,3,8,24,"Kwa Nyanya","Caroline wangechi",,,,,Routing,PPPoE,,,,,,SNS001598,SNS001598,"Not supported by ONU-Type",Enabled,"2025-10-31 16:02:25",Online,"Very good",-33.98,-28.86,1346,1793,902,,,translate,1G,1G,
+,,HWTC4644C59B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1813,1995,,,translate,1G,1G
+HWTCF2D534E3,gpon,HWTCF2D534E3,HG8546M,SNS001359,GITHURAI_MA5683T_G45,3,10,0,Majengo_Kiangiciri,"Caroline Njeri",,,,,Routing,PPPoE,,,,,,SNS001359,SNS001359,"Not supported by ONU-Type",Enabled,"2025-05-30 15:26:32",Online,"Very good",-16.66,-13.9,1623,1450,902,,,translate,1G,1G,
+HWTCF2D5344B,gpon,HWTCF2D5344B,HG8546M,SNS001362,GITHURAI_MA5683T_G45,3,10,1,Majengo_Kiangiciri,"Emmannuel wafula",,,,,Routing,PPPoE,,,,,,SNS001362,SNS001362,"Not supported by ONU-Type",Enabled,"2025-05-31 16:51:47","Power fail","Very good",-15.94,-14.17,1720,120,902,,,translate,1G,1G,
+HWTC52E8D19D,gpon,HWTC52E8D19D,HG8546M,SNS001438,GITHURAI_MA5683T_G45,3,10,2,Majengo_Kiangiciri,"James matara",,,,,Routing,PPPoE,,,,,,SNS001438,SNS001438,"Not supported by ONU-Type",Enabled,"2025-07-12 19:34:42",Online,"Very good",-29.21,-23.87,1791,853,902,,,translate,1G,1G,
+,,HWTC52E8D19D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,919,1995,,,translate,1G,1G
+HWTCF2D9043B,gpon,HWTCF2D9043B,HG8546M,SNS001461,GITHURAI_MA5683T_G45,3,10,3,Majengo_Kiangiciri,"Edwin Kecha",,,,,Routing,PPPoE,,,,,,SNS001461,SNS001461,"Not supported by ONU-Type",Enabled,"2025-07-28 17:43:34","Power fail","Very good",-16.93,-13.44,1780,1329,902,,,translate,1G,1G,
+,,HWTCF2D9043B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,872,1995,,,translate,1G,1G
+HWTCF2D90613,gpon,HWTCF2D90613,HG8546M,SNS000140,GITHURAI_MA5683T_G45,3,10,4,Majengo_Kiangiciri,"James Kariuki",,,,,Routing,PPPoE,,,,,,SNS000140,SNS000140,"Not supported by ONU-Type",Enabled,"2025-08-05 14:10:26",Online,Critical,-35.23,-29.58,1726,1552,902,,,translate,1G,1G,
+HWTCF2D15493,gpon,HWTCF2D15493,HG8546M,SNS000618,GITHURAI_MA5683T_G45,3,10,5,Majengo_Kiangiciri,"Harun Mutethya",,,,,Routing,PPPoE,,,,,,SNS000618,SNS000618,"Not supported by ONU-Type",Enabled,"2025-02-05 13:38:34",Online,"Very good",-28.24,-24.68,1768,711,902,,,translate,1G,1G,
+,,HWTCF2D15493,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1039,1995,,,translate,1G,1G
+HWTC2B8227A3,gpon,HWTC2B8227A3,HG8145V5,SNS001548,GITHURAI_MA5683T_G45,3,10,6,Majengo_Kiangiciri,"Lydia Wangari",,,,,Routing,PPPoE,,,,,,SNS001548,SNS001548,"Not supported by ONU-Type",Enabled,"2025-09-26 13:29:14",Online,"Very good",-22.6,-19.06,1594,1271,902,,,translate,1G,1G,
+,,HWTC2B8227A3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,550,1995,,,translate,1G,1G
+HWTCF2DB417B,gpon,HWTCF2DB417B,HG8546M,SNS000697,GITHURAI_MA5683T_G45,3,10,7,Majengo_Kiangiciri,"Alice Wanjiku",,,,,Routing,PPPoE,,,,,,SNS000697,SNS000697,"Not supported by ONU-Type",Enabled,"2025-11-25 10:54:03",Online,"Very good",-29.59,-29.58,1803,22,902,,,translate,1G,1G,
+,,HWTCF2DB417B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,32,1995,,,translate,1G,1G
+HWTCF2D8F573,gpon,HWTCF2D8F573,HG8546M,SNS000800,GITHURAI_MA5683T_G45,3,10,8,Majengo_Kiangiciri,"Enacy kangai",,,,,Routing,PPPoE,,,,,,SNS000800,SNS000800,"Not supported by ONU-Type",Enabled,"2025-11-25 13:41:29","Power fail","Very good",-29.21,-26.19,1801,37,902,,,translate,1G,1G,
+,,HWTCF2D8F573,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,52,1995,,,translate,1G,1G
+HWTC28A7639A,gpon,HWTC28A7639A,HG8546M,gichuki_tech_hotspot,GITHURAI_MA5683T_G45,3,10,9,Iruga,"Charles Gichuki",,,,,Routing,PPPoE,,,,,,gichuki,gichuki,"Not supported by ONU-Type",Enabled,"2025-12-03 18:39:50",Online,"Very good",-24.32,-28.24,1764,190,901,,,translate,1G,1G,
+,,HWTC28A7639A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,192,903,,,translate,1G,1G
+HWTCF2DB00FB,gpon,HWTCF2DB00FB,HG8546M,SNS000475,GITHURAI_MA5683T_G45,3,10,10,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000475,SNS000475,"Not supported by ONU-Type",Enabled,"2025-12-07 14:43:48",Online,"Very good",-20.92,-21.02,1919,206,902,,,translate,1G,1G,
+HWTCF2DB00DB,gpon,HWTCF2DB00DB,HG8546M,SNS001318,GITHURAI_MA5683T_G45,3,10,11,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001318,SNS001318,"Not supported by ONU-Type",Enabled,"2025-12-17 18:50:17",Online,"Very good",-26.39,-23.87,1721,358,902,,,translate,1G,1G,
+HWTC46C6499D,gpon,HWTC46C6499D,HG8546M,SNS001628,GITHURAI_MA5683T_G45,3,10,12,Majengo_Kiangiciri,"Joseph kamau",,,,,Routing,PPPoE,,,,,,SNS001628,SNS001628,"Not supported by ONU-Type",Enabled,"2025-12-24 13:20:58",Online,"Very good",-30.46,-29.58,1720,373,902,,,translate,1G,1G,
+,,HWTC46C6499D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,386,1995,,,translate,1G,1G
+HWTC3AA2EB9B,gpon,HWTC3AA2EB9B,HG8546M,SNS001149,GITHURAI_MA5683T_G45,3,10,13,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001149,SNS001149,"Not supported by ONU-Type",Enabled,"2025-12-24 18:47:22",Online,"Very good",-26.39,-23.56,1729,389,902,,,translate,1G,1G,
+HWTC8B774400,gpon,HWTC8B774400,HG8546M,SNS000659,GITHURAI_MA5683T_G45,3,10,14,Majengo_Kiangiciri,"Joseph muchachi",,,,,Routing,PPPoE,,,,,,SNS000659,SNS000659,"Not supported by ONU-Type",Enabled,"2025-12-27 14:24:43",Online,"Very good",-31.55,-29.58,1717,400,902,,,translate,1G,1G,
+HWTC4696769D,gpon,HWTC4696769D,HG8546M,SNS000061,GITHURAI_MA5683T_G45,3,10,15,Majengo_Kiangiciri,"Agnes wanjiru",,,,,Routing,PPPoE,,,,,,SNS000061,SNS000061,"Not supported by ONU-Type",Enabled,"2025-12-27 12:20:48",Online,"Very good",-29.21,-30.45,1817,405,902,,,translate,1G,1G,
+,,HWTC4696769D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,409,1995,,,translate,1G,1G
+HWTC0261CA04,gpon,HWTC0261CA04,HG8546M,SNS000596-02,GITHURAI_MA5683T_G45,3,12,0,Sonic,,,,,,Routing,PPPoE,,,,,,SNS000596-02,SNS000596-02,"Not supported by ONU-Type",Enabled,"2024-09-04 18:46:44",Online,"Very good",-27.7,-20.45,2584,184,902,,,translate,1G,1G,
+,,HWTC0261CA04,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,343,901,,,translate,1G,1G
+HWTC3686559B,gpon,HWTC3686559B,HG8546M,SNS001037,GITHURAI_MA5683T_G45,3,12,1,G44,,,,,,Routing,PPPoE,,,,,,SNS001037,SNS001037,"Not supported by ONU-Type",Enabled,"2024-11-12 12:12:49",Online,"Very good",-23.77,-17.95,2295,686,902,,,translate,1G,1G,
+HWTCF2D53F6B,gpon,HWTCF2D53F6B,HG8546M,SNS001475,GITHURAI_MA5683T_G45,3,12,2,Sonic,"Sharon Mwangi",,,,,Routing,PPPoE,,,,,,SNS001475,SNS001475,"Not supported by ONU-Type",Enabled,"2025-11-01 10:05:23",Online,"Very good",-13.36,-8.6,2293,1726,902,,,translate,1G,1G,
+,,HWTCF2D53F6B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1816,1995,,,translate,1G,1G
+HWTC69556E9C,gpon,HWTC69556E9C,HG8546M,SNS000647,GITHURAI_MA5683T_G45,3,12,3,Sonic,,,,,,Routing,PPPoE,,,,,,SNS000647,SNS000647,"Not supported by ONU-Type",Enabled,"2024-09-03 13:06:42",Offline,"Very good",-17.48,-10.37,2147,62,902,,,translate,1G,1G,
+,,HWTC69556E9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,329,901,,,translate,1G,1G
+HWTC8D87AF9B,gpon,HWTC8D87AF9B,HG8546M,SNS000397,GITHURAI_MA5683T_G45,3,12,4,Sonic,,,,,,Routing,PPPoE,,,,,,SNS000397,SNS000397,"Not supported by ONU-Type",Enabled,"2024-09-24 14:31:04","Power fail","Very good",-14.68,-11.21,2203,437,902,,,translate,1G,1G,
+HWTCD37C3870,gpon,HWTCD37C3870,HG8546M,II000040,GITHURAI_MA5683T_G45,3,12,5,Sonic,,,,,,Routing,PPPoE,,,,,,II000040,II000040,"Not supported by ONU-Type",Enabled,"2025-12-09 09:11:07",Online,"Very good",-12.77,-7.35,2296,236,26,,,translate,1G,1G,
+HWTCF2D53A93,gpon,HWTCF2D53A93,HG8546M,SNS000806,GITHURAI_MA5683T_G45,3,12,6,Sonic,Hyperlink,,,,,Routing,PPPoE,,,,,,SNS000806,SNS000806,"Not supported by ONU-Type",Enabled,"2025-06-12 19:09:19","Power fail","Very good",-12.34,-10.16,2248,1093,902,,,translate,1G,1G,
+HWTCF2D540CB,gpon,HWTCF2D540CB,HG8546M,SNS001442,GITHURAI_MA5683T_G45,3,12,7,Sonic,"Gladys Wambui",,,,,Routing,PPPoE,,,,,,SNS001442,SNS001442,"Not supported by ONU-Type",Enabled,"2025-07-16 14:59:15","Power fail","Very good",-31.55,-23.01,2298,1441,902,,,translate,1G,1G,
+,,HWTCF2D540CB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1655,1995,,,translate,1G,1G
+HWTCF2DAFE9B,gpon,HWTCF2DAFE9B,HG8546M,SNS000944,GITHURAI_MA5683T_G45,3,12,8,Sonic,"John Njuguna",,,,,Routing,PPPoE,,,,,,SNS000944,SNS000944,"Not supported by ONU-Type",Enabled,"2025-12-10 16:21:09",Online,"Very good",-16.95,-10.92,2751,245,902,,,translate,1G,1G,
+,,HWTCF2DAFE9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,257,1995,,,translate,1G,1G
+HWTC46017C9D,gpon,HWTC46017C9D,HG8546M,SNS000535,GITHURAI_MA5683T_G45,3,12,9,Sonic,"Rachel Njeri",,,,,Routing,PPPoE,,,,,,SNS000535,SNS000535,"Not supported by ONU-Type",Enabled,"2025-12-13 18:26:53",Online,"Very good",-18.87,-13.73,2455,307,902,,,translate,1G,1G,
+,,HWTC46017C9D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,310,1995,,,translate,1G,1G
+HWTCF2D55D2B,gpon,HWTCF2D55D2B,HG8546M,SNS001348,GITHURAI_MA5683T_G45,3,13,2,GITHURAI-KIMBO-STATION,"Titus Njoroge",,,,,Routing,PPPoE,,,,,,SNS001348,SNS001348,"Not supported by ONU-Type",Enabled,"2025-07-16 19:10:20","Power fail","Very good",-28.54,-24.2,4896,1665,902,,,translate,1G,1G,
+,,HWTCF2D55D2B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1342,1995,,,translate,1G,1G
+HWTCF2D53BB3,gpon,HWTCF2D53BB3,HG8546M,SNS001230,GITHURAI_MA5683T_G45,3,13,3,"KIMBO PRIMARY",,,,,,Routing,PPPoE,,,,,,SNS001230,SNS001230,"Not supported by ONU-Type",Enabled,"2025-03-17 17:39:57","Power fail","Very good",-31.55,-31.54,4999,1262,902,,,translate,1G,1G,
+,,HWTCF2D53BB3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1255,1995,,,translate,1G,1G
+HWTC53DA2E2A,gpon,HWTC53DA2E2A,HG8546M,SFL0037,GITHURAI_MA5683T_G45,3,14,0,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0037,SFL0037,"Not supported by ONU-Type",Enabled,"2025-08-28 15:57:14",Online,"Very good",-29.21,-21.13,6025,1780,900,,,translate,1G,1G,
+HWTC12A5F99A,gpon,HWTC12A5F99A,HG8546M,SFL0041,GITHURAI_MA5683T_G45,3,14,1,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0041,SFL0041,"Not supported by ONU-Type",Enabled,"2025-08-28 15:58:46","Power fail","Very good",-30,-22.44,6010,1662,900,,,translate,1G,1G,
+,,HWTC12A5F99A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1112,903,,,translate,1G,1G
+HWTC93D5A382,gpon,HWTC93D5A382,HG8546M,SFL0038,GITHURAI_MA5683T_G45,3,14,2,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0038,SFL0038,"Not supported by ONU-Type",Enabled,"2025-08-28 19:13:01",Online,"Very good",-33.98,-22.36,6026,1713,900,,,translate,1G,1G,
+HWTC403D1D93,gpon,HWTC403D1D93,HG8546M,SFL0039,GITHURAI_MA5683T_G45,3,14,3,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0039,SFL0039,"Not supported by ONU-Type",Enabled,"2025-08-28 19:21:36",Online,"Very good",-32.22,-21.55,6040,1779,900,,,translate,1G,1G,
+HWTC71A2D79A,gpon,HWTC71A2D79A,HG8546M,SFL0040,GITHURAI_MA5683T_G45,3,14,4,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0040,SFL0040,"Not supported by ONU-Type",Enabled,"2025-08-28 19:41:30",Online,"Very good",-33.98,-23.37,6028,1443,900,,,translate,1G,1G,
+HWTCE19F5A96,gpon,HWTCE19F5A96,HG8546M,SFL0042,GITHURAI_MA5683T_G45,3,14,5,"KANO ESTATE","Modern Paradise Landlord",,,,,Routing,PPPoE,,,,,,SFL0042,SFL0042,"Not supported by ONU-Type",Enabled,"2025-08-29 15:35:55",Online,"Very good",-30.97,-21.87,6196,1846,900,,,translate,1G,1G,
+HWTC1E1F189B,gpon,HWTC1E1F189B,HG8546M,SFL0043,GITHURAI_MA5683T_G45,3,14,6,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0043,SFL0043,"Not supported by ONU-Type",Enabled,"2025-08-29 19:17:45",Online,"Very good",-33.98,-22.59,6013,1837,900,,,translate,1G,1G,
+HWTCA7E4858B,gpon,HWTCA7E4858B,HG8546M,SFL0044,GITHURAI_MA5683T_G45,3,14,7,"Modern Paradise",F1,,,,,Routing,PPPoE,,,,,,SFL0044,SFL0044,"Not supported by ONU-Type",Enabled,"2025-08-29 19:40:07",Online,"Very good",-32.22,-21.74,6023,505,900,,,translate,1G,1G,
+HWTCF2D9038B,gpon,HWTCF2D9038B,HG8546M,SFL0058,GITHURAI_MA5683T_G45,3,14,8,KIAMUMBI,"John Changiru",,,,,Routing,PPPoE,,,,,,SFL0058,SFL0058,"Not supported by ONU-Type",Enabled,"2025-09-06 12:24:08",Online,"Very good",-33.98,-26.19,6535,1841,900,,,translate,1G,1G,
+,,HWTCF2D9038B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1839,901,,,translate,1G,1G
+HWTC10CFD316,gpon,HWTC10CFD316,HG8546M,SFL0045,GITHURAI_MA5683T_G45,3,14,9,KIAMUMBI,"Siphira kiruka E2",,,,,Routing,PPPoE,,,,,,SFL0045,SFL0045,"Not supported by ONU-Type",Enabled,"2025-09-03 21:51:55",Online,"Very good",-33.98,-22.84,6029,1896,900,,,translate,1G,1G,
+HWTC5D2B498D,gpon,HWTC5D2B498D,HG8546M,SFL0047,GITHURAI_MA5683T_G45,3,14,10,"Modern Paradise",D4,,,,,Routing,PPPoE,,,,,,SFL0047,SFL0047,"Not supported by ONU-Type",Enabled,"2025-08-29 20:14:52",Online,"Very good",-33.02,-22.29,6036,1730,900,,,translate,1G,1G,
+HWTC40E215A2,gpon,HWTC40E215A2,HG8546M,SNS000446,GITHURAI_MA5683T_G45,3,14,11,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SNS000446,SNS000446,"Not supported by ONU-Type",Enabled,"2025-08-30 12:41:17",Online,"Very good",-33.98,-22.75,6017,1888,902,,,translate,1G,1G,
+HWTC7DB9C38C,gpon,HWTC7DB9C38C,HG8546M,SFL0048,GITHURAI_MA5683T_G45,3,14,12,"Modern Paradise",B1,,,,,Routing,PPPoE,,,,,,SFL0048,SFL0048,"Not supported by ONU-Type",Enabled,"2025-08-30 13:12:30",Online,"Very good",-29.59,-21.13,6033,1766,900,,,translate,1G,1G,
+HWTC77551B8B,gpon,HWTC77551B8B,HG8546M,SFL0049,GITHURAI_MA5683T_G45,3,14,13,"Modern Paradise",C1,,,,,Routing,PPPoE,,,,,,SFL0049,SFL0049,"Not supported by ONU-Type",Enabled,"2025-08-30 13:47:58","Power fail","Very good",-30.46,-22.29,6032,1475,900,,,translate,1G,1G,
+HWTC1ED21C9B,gpon,HWTC1ED21C9B,HG8546M,SFL0050,GITHURAI_MA5683T_G45,3,14,14,"Modern Paradise",D1,,,,,Routing,PPPoE,,,,,,SFL0050,SFL0050,"Not supported by ONU-Type",Enabled,"2025-08-30 14:22:51",Online,"Very good",-33.02,-23.46,6034,514,900,,,translate,1G,1G,
+HWTCA3BD23EA,gpon,HWTCA3BD23EA,HG8546M,SFL0051,GITHURAI_MA5683T_G45,3,14,15,"Modern Paradise",E3,,,,,Routing,PPPoE,,,,,,SFL0051,SFL0051,"Not supported by ONU-Type",Enabled,"2025-08-30 18:35:11",Online,"Very good",-29.21,-21.48,6014,1805,900,,,translate,1G,1G,
+HWTCF2D902E3,gpon,HWTCF2D902E3,HG8546M,SFL0055,GITHURAI_MA5683T_G45,3,14,16,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0055,SFL0055,"Not supported by ONU-Type",Enabled,"2025-09-03 15:46:35",Online,"Very good",-33.98,-22.59,6034,1855,900,,,translate,1G,1G,
+HWTC1DBED09B,gpon,HWTC1DBED09B,HG8546M,SFL0053,GITHURAI_MA5683T_G45,3,14,17,"Modern Paradise",A3,,,,,Routing,PPPoE,,,,,,SFL0053,SFL0053,"Not supported by ONU-Type",Enabled,"2025-08-30 20:40:30",Online,"Very good",-33.98,-22.59,6032,1190,903,,,translate,1G,1G,
+HWTC02EE05A2,gpon,HWTC02EE05A2,HG8546M,SFL0054,GITHURAI_MA5683T_G45,3,14,18,"Modern Paradise",A2,,,,,Routing,PPPoE,,,,,,SFL0054,SFL0054,"Not supported by ONU-Type",Enabled,"2025-08-30 20:46:17","Power fail","Very good",-33.02,-24.95,6039,1541,900,,,translate,1G,1G,
+,,HWTC02EE05A2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1378,903,,,translate,1G,1G
+HWTC147A5A8F,gpon,HWTC147A5A8F,EG8141A5,SFL0056,GITHURAI_MA5683T_G45,3,14,19,"Modern Paradise",,,,,,Routing,PPPoE,,,,,,SFL0056,SFL0056,"Not supported by ONU-Type",Enabled,"2025-09-03 19:28:52",Online,"Very good",-31.55,-21.42,6037,1879,900,,,translate,1G,1G,
+HWTCF2D9022B,gpon,HWTCF2D9022B,HG8546M,SFL0054,GITHURAI_MA5683T_G45,3,14,20,KIAMUMBI,"Michael obanda",,,,,Routing,PPPoE,,,,,,SFL0054,SFL0054,"Not supported by ONU-Type",Enabled,"2025-09-03 19:49:00",Online,"Very good",-31.55,-22,6040,1827,900,,,translate,1G,1G,
+HWTC749CD643,gpon,HWTC749CD643,HG8546M,SFL0059,GITHURAI_MA5683T_G45,3,14,21,KIAMUMBI,"Faith Rono",,,,,Routing,PPPoE,,,,,,SFL0059,SFL0059,"Not supported by ONU-Type",Enabled,"2025-09-08 18:38:33","Power fail","Very good",-33.98,-22.14,6026,151,900,,,translate,1G,1G,
+HWTCF2D90483,gpon,HWTCF2D90483,HG8546M,SFL0060,GITHURAI_MA5683T_G45,3,14,22,KIAMUMBI,"Linet Odhiambo",,,,,Routing,PPPoE,,,,,,SFL0060,SFL0060,"Not supported by ONU-Type",Enabled,"2025-09-08 19:28:02",Online,"Very good",-29.59,-22.07,6007,1245,900,,,translate,1G,1G,
+HWTCF2D8F403,gpon,HWTCF2D8F403,HG8546M,SFL0033,GITHURAI_MA5683T_G45,3,14,23,KIAMUMBI,,,,,,Routing,PPPoE,,,,,,SFL0033,SFL0033,"Not supported by ONU-Type",Enabled,"2025-09-29 14:52:44",Online,"Very good",-30,-21.08,5957,1346,900,,,translate,1G,1G,
+,,HWTCF2D8F403,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1366,1995,,,translate,1G,1G
+HWTC46CB0B9B,gpon,HWTC46CB0B9B,HG8546M,SFL0067,GITHURAI_MA5683T_G45,3,14,24,KIAMUMBI,"Walter Njangiro",,,,,Routing,PPPoE,,,,,,SFL0067,SFL0067,"Not supported by ONU-Type",Enabled,"2025-10-16 14:20:55","Power fail","Very good",-19.04,-14.99,5858,1404,900,,,translate,1G,1G,
+HWTC46C1609B,gpon,HWTC46C1609B,HG8546M,SFL0068,GITHURAI_MA5683T_G45,3,14,25,KIAMUMBI,"Anthony Mwangi",,,,,Routing,PPPoE,,,,,,SFL0068,SFL0068,"Not supported by ONU-Type",Enabled,"2025-10-16 15:41:45",Online,"Very good",-33.98,-24.43,6032,942,900,,,translate,1G,1G,
+HWTCF2D55373,gpon,HWTCF2D55373,HG8546M,SFL0069,GITHURAI_MA5683T_G45,3,14,26,KIAMUMBI,"Zachariah Mwangi",,,,,Routing,PPPoE,,,,,,SFL0069,SFL0069,"Not supported by ONU-Type",Enabled,"2025-10-18 11:35:10",Online,"Very good",-28.87,-20.91,6029,690,900,,,translate,1G,1G,
+HWTC0FCC810C,gpon,HWTC0FCC810C,HG8546M,SFL0070,GITHURAI_MA5683T_G45,3,14,27,KIAMUMBI,"Boniface Maina",,,,,Routing,PPPoE,,,,,,SFL0070,SFL0070,"Not supported by ONU-Type",Enabled,"2025-10-18 13:09:49","Power fail","Very good",-32.22,-21.3,5934,571,900,,,translate,1G,1G,
+,,HWTC0FCC810C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1643,1995,,,translate,1G,1G
+HWTC46DBD89B,gpon,HWTC46DBD89B,HG8546M,SFL0071,GITHURAI_MA5683T_G45,3,14,28,KIAMUMBI,"Catherine Kariuki",,,,,Routing,PPPoE,,,,,,SFL0071,SFL0071,"Not supported by ONU-Type",Enabled,"2025-10-21 15:57:10","Power fail","Very good",-29.59,-21.13,5930,1689,900,,,translate,1G,1G,
+,,HWTC46DBD89B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1707,1995,,,translate,1G,1G
+HWTCF2D53BC3,gpon,HWTCF2D53BC3,HG8546M,SNS001035,GITHURAI_MA5683T_G45,3,14,29,Rurii,"Rose Wanjiku",,,,,Routing,PPPoE,,,,,,SNS001035,SNS001035,"Not supported by ONU-Type",Enabled,"2025-04-28 13:36:29",Online,"Very good",-33.98,-21.61,6570,1386,902,,,translate,1G,1G,
+,,HWTCF2D53BC3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1032,1995,,,translate,1G,1G
+HWTC35948B8C,gpon,HWTC35948B8C,HG8546M,SFL0076,GITHURAI_MA5683T_G45,3,14,30,KIAMUMBI,,,,,,Routing,PPPoE,,,,,,SFL0076,SFL0076,"Not supported by ONU-Type",Enabled,"2025-12-13 13:10:30",Online,"Very good",-33.98,-22,6038,292,900,,,translate,1G,1G,
+HWTC706F029B,gpon,HWTC706F029B,HG8546M,SNS001062,GITHURAI_MA5683T_G45,3,15,0,LUMWA,"Elizabeth Lumwa",,,,,Routing,PPPoE,,,,,,SNS001062,SNS001062,"Not supported by ONU-Type",Enabled,"2024-11-26 18:25:24","Power fail","Very good",-29.59,-28.54,2649,283,902,,,translate,1G,1G,
+,,HWTC706F029B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,168,903,,,translate,1G,1G
+HWTCF2DB7A0B,gpon,HWTCF2DB7A0B,HG8546M,SNS001592,GITHURAI_MA5683T_G45,3,15,1,"Mt_Kenya Towezi","Lewis Katheru",,,,,Routing,PPPoE,,,,,,SNS001592,SNS001592,"Not supported by ONU-Type",Enabled,"2025-11-10 13:54:36",Online,"Very good",-16.41,-16.63,2267,661,902,,,translate,1G,1G,
+,,HWTCF2DB7A0B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,845,1995,,,translate,1G,1G
+HWTCBF0A0C07,gpon,HWTCBF0A0C07,HG8447,SNS000613,GITHURAI_MA5683T_G45,3,15,2,DISCOVERY-RELI,,,,,,Routing,PPPoE,,,,,,SNS000613,SNS000613,"Not supported by ONU-Type",Enabled,"2025-01-04 15:24:35","Power fail","Very good",-28.54,-25.85,2416,128,902,,,translate,1G,1G,
+HWTCF2D53C2B,gpon,HWTCF2D53C2B,HG8546M,SNS000814,GITHURAI_MA5683T_G45,3,15,4,"Mt_Kenya Towezi",,,,,,Routing,PPPoE,,,,,,SNS000814,SNS000814,"Not supported by ONU-Type",Enabled,"2025-03-25 12:21:01","Power fail","Very good",-17.33,-17.21,2131,1253,902,,,translate,1G,1G,
+HWTCF2DB7933,gpon,HWTCF2DB7933,HG8546M,SNS001615,GITHURAI_MA5683T_G45,3,15,5,Chumambili,"Pius chege",,,,,Routing,PPPoE,,,,,,SNS001615,SNS001615,"Not supported by ONU-Type",Enabled,"2025-11-12 16:19:58","Power fail","Very good",-28.24,-30.96,2873,1030,902,,,translate,1G,1G,
+,,HWTCF2DB7933,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1311,1995,,,translate,1G,1G
+HWTCEF1B42B1,gpon,HWTCEF1B42B1,HG8145V6,ZetaHub_Wangacourt,GITHURAI_MA5683T_G45,3,15,6,ABUNDANT,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-11-12 19:27:29",Online,"Very good",-18.9,-16.34,2056,1363,1037,,,translate,100M,100M,
+HWTCF2DAEC8B,gpon,HWTCF2DAEC8B,HG8546M,SNS000119,GITHURAI_MA5683T_G45,3,15,7,"Wanga Coat","Geoffrey Giriama",,,,,Routing,PPPoE,,,,,,SNS000119,SNS000119,"Not supported by ONU-Type",Enabled,"2025-11-14 10:42:12",Online,"Very good",-20.23,-15.56,2106,1775,902,,,translate,1G,1G,
+HWTC6E50E2A2,gpon,HWTC6E50E2A2,HS8145V,SNS000791,GITHURAI_MA5683T_G45,4,0,0,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000791,SNS000791,"Not supported by ONU-Type",Enabled,"2024-09-11 16:06:02",Online,"Very good",-28.87,-30.45,4389,201,902,,,translate,1G,1G,
+,,HWTC6E50E2A2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,53,901,,,translate,1G,1G
+HWTC3AD7AC9B,gpon,HWTC3AD7AC9B,HG8546M,SNS000481,GITHURAI_MA5683T_G45,4,0,1,FOUNTAIN_JUNIOR,,,,,,Routing,PPPoE,,,,,,SNS000481,SNS000481,"Not supported by ONU-Type",Enabled,"2025-03-04 06:04:48",Offline,"Very good",-27.22,-26.02,4572,1127,902,,,translate,1G,1G,
+,,HWTC3AD7AC9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,256,1995,,,translate,1G,1G
+HWTC5444981D,gpon,HWTC5444981D,HG8247,SNS000992,GITHURAI_MA5683T_G45,4,0,2,PROGRESSIVE,,,,,,Routing,PPPoE,,,,,,SNS000992,SNS000992,"Not supported by ONU-Type",Enabled,"2024-10-23 15:59:15",Online,"Very good",-29.21,-27.46,4688,727,902,,,translate,1G,1G,
+HWTCE4DCBF9E,gpon,HWTCE4DCBF9E,HG8145V5,SNS000389,GITHURAI_MA5683T_G45,4,0,3,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS000389,SNS000389,"Not supported by ONU-Type",Enabled,"2024-11-25 14:38:13",Online,"Very good",-30,-28.24,4177,656,902,,,translate,1G,1G,
+HWTC3932009B,gpon,HWTC3932009B,HG8546M,SNS000161,GITHURAI_MA5683T_G45,4,0,4,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS000161,SNS000161,"Not supported by ONU-Type",Enabled,"2025-01-25 14:25:00",Offline,"Very good",-21.43,-16.19,4212,458,902,,,translate,1G,1G,
+,,HWTC3932009B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1059,1995,,,translate,1G,1G
+HWTCE3D5BD9E,gpon,HWTCE3D5BD9E,HG8145V5,SNS-BR-0016,GITHURAI_MA5683T_G45,4,0,5,LOFTY,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,,Online,"Very good",-26.58,-22.22,4031,1592,903,,,translate,1G,1G,
+HWTCF2E668A8,gpon,HWTCF2E668A8,HG8546M,"Imani Bridge",GITHURAI_MA5683T_G45,4,0,6,IMANI_Progressive,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-01-03 10:21:59",Online,"Very good",-29.21,-26.38,4671,966,902,,,translate,1G,1G,
+,,HWTCF2E668A8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,64,901,,,translate,1G,1G
+HWTCA512060E,gpon,HWTCA512060E,HG8546M,SNS000104,GITHURAI_MA5683T_G45,4,0,7,IMANI_Progressive,"Leonard Nganga",,,,,Routing,PPPoE,,,,,,SNS000104,SNS000104,"Not supported by ONU-Type",Enabled,"2025-04-15 16:05:26","Power fail","Very good",-29.21,-30.96,4720,1220,902,,,translate,1G,1G,
+HWTCF2D52E03,gpon,HWTCF2D52E03,HG8546M,SNS001298,GITHURAI_MA5683T_G45,4,0,8,IMANI_Progressive,"Isaac kirirtu",,,,,Routing,PPPoE,,,,,,SNS001298,SNS001298,"Not supported by ONU-Type",Enabled,"2025-04-18 13:54:15",Online,"Very good",-28.24,-26.99,4640,1110,902,,,translate,1G,1G,
+,,HWTCF2D52E03,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1298,1995,,,translate,1G,1G
+HWTCF2D53A83,gpon,HWTCF2D53A83,HG8546M,SNS000481,GITHURAI_MA5683T_G45,4,0,9,LOFTY,"James Macharia",,,,,Routing,PPPoE,,,,,,SNS000481,SNS000481,"Not supported by ONU-Type",Enabled,"2025-06-27 10:54:07",Online,"Very good",-27.22,-29.21,4591,1390,902,,,translate,1G,1G,
+HWTCF2DAFF3B,gpon,HWTCF2DAFF3B,HG8546M,SNS001166,GITHURAI_MA5683T_G45,4,0,10,LOFTY,"John Nganga",,,,,Routing,PPPoE,,,,,,SNS001166,SNS001166,"Not supported by ONU-Type",Enabled,"2025-11-26 16:27:39",Online,"Very good",-24.69,-20.45,4341,72,902,,,translate,1G,1G,
+,,HWTCF2DAFF3B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,84,1995,,,translate,1G,1G
+HWTCF2D9021B,gpon,HWTCF2D9021B,HG8546M,SNS000857,GITHURAI_MA5683T_G45,4,0,11,LOFTY,"Margaret Njoroge",,,,,Routing,PPPoE,,,,,,SNS000857,SNS000857,"Not supported by ONU-Type",Enabled,"2025-09-06 18:21:30",Online,"Very good",-24.82,-20.55,4115,1904,902,,,translate,1G,1G,
+,,HWTCF2D9021B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1809,1995,,,translate,1G,1G
+HWTCE4FDFF9A,gpon,HWTCE4FDFF9A,HG8245H,SNS001528,GITHURAI_MA5683T_G45,4,0,12,LOFTY,"Reynish Lubanga",,,,,Routing,PPPoE,,,,,,SNS001528,SNS001528,"Not supported by ONU-Type",Enabled,"2025-09-11 16:56:23",Online,"Very good",-23.98,-18.92,4338,1505,902,,,translate,1G,1G,
+,,HWTCE4FDFF9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1878,1995,,,translate,1G,1G
+HWTCF2D8F5D3,gpon,HWTCF2D8F5D3,HG8546M,SNS001549,GITHURAI_MA5683T_G45,4,0,13,PROGRESSIVE,"Dennis Mbugua",,,,,Routing,PPPoE,,,,,,SNS001549,SNS001549,"Not supported by ONU-Type",Enabled,"2025-09-27 13:34:53",Online,"Very good",-23.98,-18.29,4163,1157,902,,,translate,1G,1G,
+,,HWTCF2D8F5D3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,693,1995,,,translate,1G,1G
+HWTC46FBBA9B,gpon,HWTC46FBBA9B,HG8546M,SNS001585,GITHURAI_MA5683T_G45,4,0,14,LOFTY,"Alex Maina",,,,,Routing,PPPoE,,,,,,SNS001585,SNS001585,"Not supported by ONU-Type",Enabled,"2025-10-24 13:57:34",Online,"Very good",-24.32,-22.75,4395,1741,902,,,translate,1G,1G,
+,,HWTC46FBBA9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1723,1995,,,translate,1G,1G
+HWTC3BF4C29B,gpon,HWTC3BF4C29B,HG8546M,SNS000007,GITHURAI_MA5683T_G45,4,0,15,"PIMA GAS",,,,,,Routing,PPPoE,,,,,,SNS000007,SNS000007,"Not supported by ONU-Type",Enabled,"2025-02-12 13:42:52",Online,"Very good",-20.97,-14.04,4806,915,902,,,translate,1G,1G,
+,,HWTC3BF4C29B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1097,1995,,,translate,1G,1G
+HWTCF2DB0103,gpon,HWTCF2DB0103,HG8546M,SNS001296,GITHURAI_MA5683T_G45,4,0,16,LOFTY,"Anastasia Irungu",,,,,Routing,PPPoE,,,,,,SNS001296,SNS001296,"Not supported by ONU-Type",Enabled,"2025-12-05 12:29:14",Online,"Very good",-25.23,-21.3,4535,178,902,,,translate,1G,1G,
+,,HWTCF2DB0103,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,198,1995,,,translate,1G,1G
+HWTC46987B9D,gpon,HWTC46987B9D,HG8546M,SNS001617,GITHURAI_MA5683T_G45,4,0,17,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS001617,SNS001617,"Not supported by ONU-Type",Enabled,"2025-12-16 11:24:04","Power fail","Very good",-24.44,,4214,338,902,,,translate,1G,1G,
+HWTC46653C9D,gpon,HWTC46653C9D,HG8546M,SNS001617,GITHURAI_MA5683T_G45,4,0,18,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS001617,SNS001617,"Not supported by ONU-Type",Enabled,"2025-12-17 11:56:31",Online,"Very good",-23.98,-19.32,4212,346,902,,,translate,1G,1G,
+HWTC0592114A,gpon,HWTC0592114A,HG8346M,"Charles SNS000468-01",GITHURAI_MA5683T_G45,4,1,0,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,II000016,II000016,"Not supported by ONU-Type",Enabled,"2024-08-02 16:58:26",Online,"Very good",-26.03,-23.98,1292,13,26,,,translate,10M,10M,
+,,HWTC0592114A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,39,901,,,translate,100M,100M
+HWTC08F3B802,gpon,HWTC08F3B802,HG8546M,SNS000650,GITHURAI_MA5683T_G45,4,1,1,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000650,SNS000650,"Not supported by ONU-Type",Enabled,"2024-08-01 19:38:59",Online,"Very good",-26.78,-22.36,1249,14,902,,,translate,1G,1G,
+,,HWTC08F3B802,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,69,901,,,translate,1G,1G
+HWTC140D06A6,gpon,HWTC140D06A6,HG8145V5,SNS000712,GITHURAI_MA5683T_G45,4,1,2,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000712,SNS000712,"Not supported by ONU-Type",Enabled,"2024-09-13 12:41:34",Online,"Very good",-24.69,-25.37,1517,176,902,,,translate,1G,1G,
+HWTC63CA6C8C,gpon,HWTC63CA6C8C,HG8546M,Savatia,GITHURAI_MA5683T_G45,4,1,3,Majengo_Kiangiciri,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-08-02 11:04:23",Online,"Very good",-22.6,-19.87,1172,17,902,,,translate,1G,1G,
+,,HWTC63CA6C8C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,106,901,,,translate,1G,1G
+HWTCF365F184,gpon,HWTCF365F184,HG8546M,"Julius Kimani",GITHURAI_MA5683T_G45,4,1,4,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,jkimani,jkimani,"Not supported by ONU-Type",Enabled,"2024-08-01 19:21:41",Offline,"Very good",-26.99,-26.99,1174,27,902,,,translate,1G,1G,
+,,HWTCF365F184,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,55,901,,,translate,1G,1G
+HWTCA547FD52,gpon,HWTCA547FD52,HG8546M,SNS000460,GITHURAI_MA5683T_G45,4,1,5,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000460,SNS000460,"Not supported by ONU-Type",Enabled,"2024-08-17 12:18:36","Power fail","Very good",-28.87,-26.02,1436,159,902,,,translate,1G,1G,
+,,HWTCA547FD52,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,336,901,,,translate,1G,1G
+HWTCCC7C1C9B,gpon,HWTCCC7C1C9B,HG8546M,SNS000835,GITHURAI_MA5683T_G45,4,1,6,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000835,SNS000835,"Not supported by ONU-Type",Enabled,"2024-08-31 14:07:45",Online,"Very good",-23.67,-23.18,1414,86,902,,,translate,1G,1G,
+,,HWTCCC7C1C9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,384,901,,,translate,1G,1G
+HWTCCF2CFF07,gpon,HWTCCF2CFF07,HG8247,Carol,GITHURAI_MA5683T_G45,4,1,7,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,CarolineW,CarolineW,"Not supported by ONU-Type",Enabled,,Online,"Very good",-24.95,-23.72,1536,590,902,,,translate,1G,1G,
+HWTCBAC92A8C,gpon,HWTCBAC92A8C,HG8546M,SNS000927,GITHURAI_MA5683T_G45,4,1,8,CARWASH,,,,,,Routing,PPPoE,,,,,,SNS000927,DZrghOic,"Not supported by ONU-Type",Enabled,"2024-09-19 14:21:43","Power fail","Very good",-26.2,-23.66,1379,73,902,,,translate,1G,1G,
+HWTC3AA5579B,gpon,HWTC3AA5579B,HG8546M,SNS000732,GITHURAI_MA5683T_G45,4,1,9,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000732,SNS000732,"Not supported by ONU-Type",Enabled,"2025-03-04 05:41:43",Online,"Very good",-30.97,-29.21,1717,753,902,,,translate,1G,1G,
+,,HWTC3AA5579B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1200,1995,,,translate,1G,1G
+HWTC863B187E,gpon,HWTC863B187E,HG8546M,"Nito Apartment",GITHURAI_MA5683T_G45,4,1,10,Majengo_Kiangiciri,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-09-24 13:01:48",Online,"Very good",-30.97,-27.96,1665,312,902,,,translate,1G,1G,
+,,HWTC863B187E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,222,901,,,translate,1G,1G
+HWTC83084B9A,gpon,HWTC83084B9A,HG8546M,SNS000977,GITHURAI_MA5683T_G45,4,1,11,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000977,SNS000977,"Not supported by ONU-Type",Enabled,"2024-10-17 11:36:39",Online,"Very good",-28.24,-23.28,891,476,902,,,translate,1G,1G,
+HWTC3396349B,gpon,HWTC3396349B,HG8546M,SNS000768,GITHURAI_MA5683T_G45,4,1,12,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS000768,SNS000768,"Not supported by ONU-Type",Enabled,"2024-10-18 18:02:32","Power fail","Very good",-22.6,-18.82,816,678,902,,,translate,1G,1G,
+HWTCE7ADDA9A,gpon,HWTCE7ADDA9A,HG8546M,SNS000779,GITHURAI_MA5683T_G45,4,1,13,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS000779,SNS000779,"Not supported by ONU-Type",Enabled,"2024-10-18 18:17:27",Online,"Very good",-11.13,-8.52,707,618,902,,,translate,1G,1G,
+HWTCFC357F7A,gpon,HWTCFC357F7A,HG8546M,SNS000984,GITHURAI_MA5683T_G45,4,1,14,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000984,SNS000984,"Not supported by ONU-Type",Enabled,"2024-10-19 15:18:27",Online,"Very good",-23.19,-19.5,1934,600,902,,,translate,1G,1G,
+HWTC368D179B,gpon,HWTC368D179B,HG8546M,SNS000989,GITHURAI_MA5683T_G45,4,1,15,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000989,SNS000989,"Not supported by ONU-Type",Enabled,"2024-10-22 18:43:55",Online,"Very good",-23.88,-19.95,1929,525,902,,,translate,1G,1G,
+,,HWTC368D179B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1353,1995,,,translate,1G,1G
+HWTC8D9B5B9A,gpon,HWTC8D9B5B9A,HG8546M,"Soko ya Mawe",GITHURAI_MA5683T_G45,4,1,16,PCEA_GITHURAI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-11-19 13:31:46",Online,"Very good",-25.23,-22.07,1069,612,902,,,translate,1G,1G,
+,,HWTC8D9B5B9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1075,1995,,,translate,1G,1G
+,,HWTC8D9B5B9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,629,903,,,translate,1G,1G
+HWTCE6C87683,gpon,HWTCE6C87683,HG865,"Manchester Bridge",GITHURAI_MA5683T_G45,4,1,17,PCEA_GITHURAI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-11-20 10:49:15","Power fail","Very good",-23.57,-20.17,839,747,902,,,translate,1G,1G,
+,,HWTCE6C87683,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,169,903,,,translate,1G,1G
+HWTC0EB5760E,gpon,HWTC0EB5760E,HG8546M,SNS000162,GITHURAI_MA5683T_G45,4,1,18,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS000162,SNS000162,"Not supported by ONU-Type",Enabled,"2024-11-20 17:43:01","Power fail","Very good",-23.98,-19.87,827,594,902,,,translate,1G,1G,
+,,HWTC0EB5760E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,784,903,,,translate,1G,1G
+HWTC6CD50A9D,gpon,HWTC6CD50A9D,HG8546M,SNS001054,GITHURAI_MA5683T_G45,4,1,19,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS001054,SNS001054,"Not supported by ONU-Type",Enabled,"2024-11-23 13:50:52","Power fail","Very good",-26.03,-22.59,918,114,902,,,translate,1G,1G,
+,,HWTC6CD50A9D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,737,901,,,translate,1G,1G
+HWTC993DB69B,gpon,HWTC993DB69B,HG8546M,SNS001059,GITHURAI_MA5683T_G45,4,1,20,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS001059,SNS001059,"Not supported by ONU-Type",Enabled,"2024-11-25 17:59:25","Power fail","Very good",-25.09,-22.92,1215,733,902,,,translate,1G,1G,
+,,HWTC993DB69B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,739,901,,,translate,1G,1G
+,,HWTC993DB69B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,683,903,,,translate,1G,1G
+HWTC475D8912,gpon,HWTC475D8912,HG8247,SNS001075,GITHURAI_MA5683T_G45,4,1,21,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001075,SNS001075,"Not supported by ONU-Type",Enabled,"2024-12-03 16:01:34",Online,"Very good",-29.59,-30.81,1201,368,902,,,translate,1G,1G,
+HWTC57B53D12,gpon,HWTC57B53D12,HG8247,SNS001079,GITHURAI_MA5683T_G45,4,1,22,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001079,SNS001079,"Not supported by ONU-Type",Enabled,"2024-12-04 17:29:02",Online,"Very good",-29.59,-30.5,1212,813,902,,,translate,1G,1G,
+HWTC093FB228,gpon,HWTC093FB228,HG8447,SNS001081,GITHURAI_MA5683T_G45,4,1,23,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001081,SNS001081,"Not supported by ONU-Type",Enabled,"2024-12-07 15:24:05",Online,"Very good",-26.2,-23.12,1836,59,902,,,translate,1G,1G,
+HWTC9268B220,gpon,HWTC9268B220,HG8247,SNS000579,GITHURAI_MA5683T_G45,4,1,24,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000579,SNS000579,"Not supported by ONU-Type",Enabled,"2024-12-07 14:56:09","Power fail","Very good",-28.54,-27.63,1815,817,902,,,translate,1G,1G,
+HWTCEA4B72A6,gpon,HWTCEA4B72A6,AHD1704NU,SNS001273,GITHURAI_MA5683T_G45,4,1,25,Iruga,"Kelvin Kariuki",,,,,Routing,PPPoE,,,,,,SNS001273,SNS001273,"Not supported by ONU-Type",Enabled,"2025-08-11 15:43:18",Online,"Very good",-29.21,-26.57,1320,1749,902,,,translate,1G,1G,
+,,HWTCEA4B72A6,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1703,1995,,,translate,1G,1G
+HWTC7D9E591D,gpon,HWTC7D9E591D,HG8546M,"Dominic Superlite",GITHURAI_MA5683T_G45,4,1,26,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,dominic,superlite,"Not supported by ONU-Type",Enabled,"2024-12-13 18:55:47",Online,"Very good",-26.99,-24.47,1335,243,902,,,translate,1G,1G,
+,,HWTC7D9E591D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,843,903,,,translate,1G,1G
+HWTCAC51A295,gpon,HWTCAC51A295,HG8546M,SNS001121,GITHURAI_MA5683T_G45,4,1,27,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001121,SNS001121,"Not supported by ONU-Type",Enabled,"2024-12-23 16:31:02",Online,"Very good",-30.46,-27.69,1517,599,902,,,translate,1G,1G,
+,,HWTCAC51A295,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,530,901,,,translate,1G,1G
+HWTCEAF9749E,gpon,HWTCEAF9749E,HG8546M,SNS001130,GITHURAI_MA5683T_G45,4,1,28,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001130,SNS001130,"Not supported by ONU-Type",Enabled,"2024-12-28 14:18:38",Online,"Very good",-26.2,-20.75,1706,716,902,,,translate,1G,1G,
+,,HWTCEAF9749E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,908,901,,,translate,1G,1G
+HWTCD6921E9F,gpon,HWTCD6921E9F,HG8145V5,SNS001144,GITHURAI_MA5683T_G45,4,1,29,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS001144,SNS001144,"Not supported by ONU-Type",Enabled,"2025-01-06 15:35:16",Online,"Very good",-29.21,-29.21,1387,593,902,,,translate,1G,1G,
+HWTC0393C600,gpon,HWTC0393C600,HG8546M,"Intact Index",GITHURAI_MA5683T_G45,4,1,30,PCEA_GITHURAI,"St Marys",,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-01-09 11:22:40",Online,"Very good",-26.03,-22.07,922,840,26,,,translate,10M,5_Mbps,
+HWTCD37C49CE,gpon,HWTCD37C49CE,HG8546M,"INTACT HOME",GITHURAI_MA5683T_G45,4,1,31,PCEA_GITHURAI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-11-07 14:49:41",Online,"Very good",-26.58,-22.84,852,1724,26,,,translate,20M,20M,
+HWTCFE508FA5,gpon,HWTCFE508FA5,HG8145V5,SNS000689,GITHURAI_MA5683T_G45,4,1,32,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000689,SNS000689,"Not supported by ONU-Type",Enabled,"2025-01-21 09:56:38","Power fail","Very good",-30.97,-27.69,1391,158,902,,,translate,1G,1G,
+HWTC101B4B8B,gpon,HWTC101B4B8B,HG8546M,SNS000198-01,GITHURAI_MA5683T_G45,4,1,33,Iruga,,,,,,Routing,PPPoE,,,,,,SNS000198-01,SNS000198-01,"Not supported by ONU-Type",Enabled,"2025-01-22 11:23:33",Online,"Very good",-25.09,-22.36,1200,785,902,,,translate,1G,1G,
+,,HWTC101B4B8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,946,1995,,,translate,1G,1G
+HWTC3923CE9B,gpon,HWTC3923CE9B,HG8546M,"Kassmart Bridge",GITHURAI_MA5683T_G45,4,1,34,PCEA_GITHURAI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-02-03 10:50:17",Online,"Very good",-15.69,-12.43,959,502,1995,,,translate,1G,1G,
+,,HWTC3923CE9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1092,901,,,translate,1G,1G
+,,HWTC3923CE9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1048,903,,,translate,1G,1G
+HWTC3B936F9B,gpon,HWTC3B936F9B,HG8546M,"YEV BLOCK C SWITCH",GITHURAI_MA5683T_G45,4,1,35,"YEV Block C",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-02-03 18:38:50",Online,"Very good",-26.2,-25.23,1046,883,902,,,translate,1G,1G,
+,,HWTC3B936F9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,640,1995,,,translate,1G,1G
+HWTC79C29988,gpon,HWTC79C29988,HG8546M,"Intact index office",GITHURAI_MA5683T_G45,4,1,36,PCEA_GITHURAI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-02-04 21:02:45",Online,"Very good",-17.62,-14.93,1012,878,26,,,translate,1G,1G,
+HWTCF2DB00E3,gpon,HWTCF2DB00E3,HG8546M,SNS000460,GITHURAI_MA5683T_G45,4,1,37,Majengo_Kiangiciri,"Charles omega",,,,,Routing,PPPoE,,,,,,SNS000460,SNS000460,"Not supported by ONU-Type",Enabled,"2025-11-24 14:25:54",Online,"Very good",-30,-25.08,1437,0,902,,,translate,1G,1G,
+,,HWTCF2DB00E3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,12,1995,,,translate,1G,1G
+HWTC02A5C909,gpon,HWTC02A5C909,HG8546M,SNS000731,GITHURAI_MA5683T_G45,4,1,38,Majengo_Kiangiciri,"Hellen Wanja",,,,,Routing,PPPoE,,,,,,SNS000731,SNS000731,"Not supported by ONU-Type",Enabled,"2025-02-05 17:12:58","Power fail","Very good",-25.69,-24.95,1273,924,902,,,translate,1G,1G,
+,,HWTC02A5C909,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,367,1995,,,translate,1G,1G
+HWTC3BE2B09B,gpon,HWTC3BE2B09B,HG8546M,SNS000155,GITHURAI_MA5683T_G45,4,1,39,PCEA_GITHURAI,"Christine Muturi",,,,,Routing,PPPoE,,,,,,SNS000155,SNS000155,"Not supported by ONU-Type",Enabled,"2025-02-08 11:45:50","Power fail","Very good",-24.21,-25.53,831,801,902,,,translate,1G,1G,
+,,HWTC3BE2B09B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,978,1995,,,translate,1G,1G
+HWTC3B85BA9B,gpon,HWTC3B85BA9B,HG8546M,SNS000216,GITHURAI_MA5683T_G45,4,1,40,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000216,SNS000216,"Not supported by ONU-Type",Enabled,"2025-02-08 13:02:39",Online,"Very good",-26.78,-27.21,1195,607,902,,,translate,1G,1G,
+,,HWTC3B85BA9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,937,1995,,,translate,1G,1G
+HWTC3B7CE59B,gpon,HWTC3B7CE59B,HG8546M,SNS001119,GITHURAI_MA5683T_G45,4,1,41,PCEA_GITHURAI,"Benson Chumba",,,,,Routing,PPPoE,,,,,,SNS001119,SNS001119,"Not supported by ONU-Type",Enabled,"2025-02-10 21:47:23",Online,"Very good",-23.77,-19.7,813,573,902,,,translate,1G,1G,
+,,HWTC3B7CE59B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1067,1995,,,translate,1G,1G
+HWTC6E65E9A2,gpon,HWTC6E65E9A2,HG8145V5,SNS000347,GITHURAI_MA5683T_G45,4,1,42,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS000347,SNS000347,"Not supported by ONU-Type",Enabled,"2025-03-14 10:46:11","Power fail","Very good",-29.59,-27.44,777,77,902,,,translate,1G,1G,
+,,HWTC6E65E9A2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,876,1995,,,translate,1G,1G
+HWTC3A23039B,gpon,HWTC3A23039B,HG8546M,SNS001228,GITHURAI_MA5683T_G45,4,1,43,Majengo_Kiangiciri,"Paul chege",,,,,Routing,PPPoE,,,,,,SNS001228,SNS001228,"Not supported by ONU-Type",Enabled,"2025-03-15 14:08:42","Power fail","Very good",-23.98,-19.06,1097,1181,902,,,translate,1G,1G,
+,,HWTC3A23039B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1046,1995,,,translate,1G,1G
+HWTCF2D5587B,gpon,HWTCF2D5587B,HG8546M,SNS000932,GITHURAI_MA5683T_G45,4,1,44,PCEA_GITHURAI,"Lucy Ngatha",,,,,Routing,PPPoE,,,,,,SNS000932,SNS000932,"Not supported by ONU-Type",Enabled,"2025-03-17 12:07:38",Online,"Very good",-26.78,-23.98,1247,981,902,,,translate,1G,1G,
+,,HWTCF2D5587B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1195,1995,,,translate,1G,1G
+HWTCF2D53E13,gpon,HWTCF2D53E13,HG8546M,SNS000369,GITHURAI_MA5683T_G45,4,1,45,PCEA_GITHURAI,"Beatrice Muhandia",,,,,Routing,PPPoE,,,,,,SNS000369,SNS000369,"Not supported by ONU-Type",Enabled,"2025-03-20 14:22:07","Power fail","Very good",-26.2,-22.52,893,1250,902,,,translate,1G,1G,
+,,HWTCF2D53E13,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1254,1995,,,translate,1G,1G
+HWTCF2D53CC3,gpon,HWTCF2D53CC3,HG8546M,SNS001243,GITHURAI_MA5683T_G45,4,1,46,Iruga,,,,,,Routing,PPPoE,,,,,,SNS001243,SNS001243,"Not supported by ONU-Type",Enabled,"2025-03-28 12:42:23",Online,"Very good",-26.03,-24.09,1353,1182,902,,,translate,1G,1G,
+HWTC2D32BB9B,gpon,HWTC2D32BB9B,HG8245H,SNS001273,GITHURAI_MA5683T_G45,4,1,48,Iruga,"Kelvin Kariuki",,,,,Routing,PPPoE,,,,,,SNS001273,SNS001273,"Not supported by ONU-Type",Enabled,"2025-04-08 11:52:34","Power fail","Very good",-28.24,-24.09,1333,1292,902,,,translate,1G,1G,
+HWTCF2D5530B,gpon,HWTCF2D5530B,HG8546M,SNS000198-02,GITHURAI_MA5683T_G45,4,1,49,Iruga,"YEV Cyber",,,,,Routing,PPPoE,,,,,,SNS000198-02,SNS000198-02,"Not supported by ONU-Type",Enabled,"2025-04-08 17:40:58","Power fail","Very good",-30,-31.54,1199,268,902,,,translate,1G,1G,
+,,HWTCF2D5530B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1223,1995,,,translate,1G,1G
+HWTCF2D552F3,gpon,HWTCF2D552F3,HG8546M,SNS001275,GITHURAI_MA5683T_G45,4,1,50,Majengo_Kiangiciri,"Morgan Monari",,,,,Routing,PPPoE,,,,,,SNS001275,SNS001275,"Not supported by ONU-Type",Enabled,"2025-04-09 11:10:24","Power fail","Very good",-33.02,-30.96,1216,667,902,,,translate,1G,1G,
+HWTCF2D55333,gpon,HWTCF2D55333,HG8546M,SNS001276,GITHURAI_MA5683T_G45,4,1,51,Majengo_Kiangiciri,"Magdaline kimani",,,,,Routing,PPPoE,,,,,,SNS001276,SNS001276,"Not supported by ONU-Type",Enabled,"2025-04-09 12:08:55",Online,"Very good",-28.54,-26.38,1531,1306,902,,,translate,1G,1G,
+,,HWTCF2D55333,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,931,1995,,,translate,1G,1G
+HWTC3AB58C9B,gpon,HWTC3AB58C9B,HG8546M,SNS000874,GITHURAI_MA5683T_G45,4,1,52,Majengo_Kiangiciri,"Steve Mwangi",,,,,Routing,PPPoE,,,,,,SNS000874,SNS000874,"Not supported by ONU-Type",Enabled,"2025-04-24 17:53:35",Online,"Very good",-28.54,-23.37,1015,1159,902,,,translate,1G,1G,
+TDTC354312A8,gpon,TDTC354312A8,IGD,"SNS000185 Timothy Kamande",GITHURAI_MA5683T_G45,4,1,53,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS000185,SNS000185,"Not supported by ONU-Type",Enabled,"2025-05-09 12:46:21",Online,"Very good",-14.94,-10.4,820,475,902,,,translate,1G,1G,
+HWTCF2D533FB,gpon,HWTCF2D533FB,HG8546M,SNS001337,GITHURAI_MA5683T_G45,4,1,54,Majengo_Kiangiciri,"John Kibuya",,,,,Routing,PPPoE,,,,,,SNS001337,SNS001337,"Not supported by ONU-Type",Enabled,"2025-05-10 15:55:20",Online,"Very good",-29.21,-28.54,1195,1400,902,,,translate,1G,1G,
+HWTCF2D52BB3,gpon,HWTCF2D52BB3,HG8546M,SNS001338,GITHURAI_MA5683T_G45,4,1,55,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS001338,SNS001338,"Not supported by ONU-Type",Enabled,"2025-05-10 18:01:08","Power fail","Very good",-29.59,-27.44,1548,1206,902,,,translate,1G,1G,
+HWTC39CFC79B,gpon,HWTC39CFC79B,HG8546M,SNS001344,GITHURAI_MA5683T_G45,4,1,56,PCEA_GITHURAI,,,,,,Routing,PPPoE,,,,,,SNS001344,SNS001344,"Not supported by ONU-Type",Enabled,"2025-05-14 15:56:04",Online,"Very good",-24.82,-23.66,1205,347,902,,,translate,1G,1G,
+HWTCC46B8568,gpon,HWTCC46B8568,HG8546M,SNS001353,GITHURAI_MA5683T_G45,4,1,57,Majengo_Kiangiciri,"Moris isiya",,,,,Routing,PPPoE,,,,,,SNS001353,SNS001353,"Not supported by ONU-Type",Enabled,"2025-05-24 12:56:28",Online,"Very good",-30.97,-26.02,1376,1168,902,,,translate,1G,1G,
+HWTC4001839B,gpon,HWTC4001839B,HG8546M,SNS000861,GITHURAI_MA5683T_G45,4,1,58,Majengo_Kiangiciri,"Dennis Maina",,,,,Routing,PPPoE,,,,,,SNS000861,SNS000861,"Not supported by ONU-Type",Enabled,"2025-06-01 16:53:28","Power fail","Very good",-26.58,-26.99,1212,1466,902,,,translate,1G,1G,
+,,HWTC4001839B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1307,1995,,,translate,1G,1G
+HWTC6E6480A2,gpon,HWTC6E6480A2,HG8145V5,SNS001388,GITHURAI_MA5683T_G45,4,1,59,Majengo_Kiangiciri,"Stephen Nganga",,,,,Routing,PPPoE,,,,,,SNS001388,SNS001388,"Not supported by ONU-Type",Enabled,"2025-06-12 18:06:49",Online,"Very good",-32.22,-30,1298,1532,902,,,translate,1G,1G,
+HWTCF2D8F413,gpon,HWTCF2D8F413,HG8546M,SNS000384,GITHURAI_MA5683T_G45,4,1,61,Majengo_Kiangiciri,"Dickson chege",,,,,Routing,PPPoE,,,,,,SNS000384,SNS000384,"Not supported by ONU-Type",Enabled,"2025-09-25 15:16:36",Online,"Very good",-26.99,-23.1,1202,578,902,,,translate,1G,1G,
+,,HWTCF2D8F413,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1171,1995,,,translate,1G,1G
+HWTCF2D7FC93,gpon,HWTCF2D7FC93,HG8546M,SNS000689,GITHURAI_MA5683T_G45,4,1,62,Majengo_Kiangiciri,"Fidelis Muthoni",,,,,Routing,PPPoE,,,,,,SNS000689,SNS000689,"Not supported by ONU-Type",Enabled,"2025-10-01 09:08:40",Online,"Very good",-29.59,-26.77,1407,481,902,,,translate,1G,1G,
+,,HWTCF2D7FC93,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,165,1995,,,translate,1G,1G
+HWTC465CDF9D,gpon,HWTC465CDF9D,HG8546M,SFL0004,GITHURAI_MA5683T_G45,4,2,0,SEASONS,,,,,,Routing,PPPoE,,,,,,SFL0004,SFL0004,"Not supported by ONU-Type",Enabled,"2025-12-31 14:11:36",Online,"Very good",-28.54,-29.21,3400,225,900,,,translate,1G,1G,
+,,HWTC465CDF9D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,419,903,,,translate,1G,1G
+HWTC46801A9D,gpon,HWTC46801A9D,HG8546M,SFL0078,GITHURAI_MA5683T_G45,4,2,1,SEASONS,,,,,,Routing,PPPoE,,,,,,SFL0078,SFL0078,"Not supported by ONU-Type",Enabled,"2025-12-31 15:19:56","Power fail","Very good",-26.78,-21.61,3397,420,900,,,translate,1G,1G,
+HWTC46FD549D,gpon,HWTC46FD549D,HG8546M,SFL0079,GITHURAI_MA5683T_G45,4,2,2,SEASONS,"Kenneth Mburu",,,,,Routing,PPPoE,,,,,,SFL0079,SFL0079,"Not supported by ONU-Type",Enabled,"2026-01-01 18:26:01",Online,"Very good",-28.54,,3394,444,900,,,translate,1G,1G,
+HWTC4649E29D,gpon,HWTC4649E29D,HG8546M,SFL0080,GITHURAI_MA5683T_G45,4,2,3,SEASONS,"Jane Kimaru",,,,,Routing,PPPoE,,,,,,SFL0080,SFL0080,"Not supported by ONU-Type",Enabled,"2026-01-01 18:57:13",Online,"Very good",-27.96,,3397,447,900,,,translate,1G,1G,
+HWTC4623179D,gpon,HWTC4623179D,HG8546M,SFL0081,GITHURAI_MA5683T_G45,4,2,4,SEASONS,"Dennis Ndungu",,,,,Routing,PPPoE,,,,,,SFL0081,SFL0081,"Not supported by ONU-Type",Enabled,"2026-01-01 19:31:53",Online,"Very good",-26.99,,3401,450,900,,,translate,1G,1G,
+HWTC60633C2E,gpon,HWTC60633C2E,HG8447,SNS001074,GITHURAI_MA5683T_G45,4,3,0,Sonic,,,,,,Routing,PPPoE,,,,,,SNS001074,SNS001074,"Not supported by ONU-Type",Enabled,"2024-12-03 13:05:21","Power fail","Very good",-9.66,-6.09,2664,572,902,,,translate,1G,1G,
+HWTCF2D90263,gpon,HWTCF2D90263,HG8546M,SNS001042,GITHURAI_MA5683T_G45,4,3,1,G44,"Christine baka",,,,,Routing,PPPoE,,,,,,SNS001042,SNS001042,"Not supported by ONU-Type",Enabled,"2025-08-21 13:55:37",Online,"Very good",-12.76,-9.4,2663,1451,902,,,translate,1G,1G,
+,,HWTCF2D90263,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1800,1995,,,translate,1G,1G
+HWTC5D5651F1,gpon,HWTC5D5651F1,HG8546M,SNS000405,GITHURAI_MA5683T_G45,4,4,0,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS000405,SNS000405,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-18.48,-9.52,4141,455,902,,,translate,1G,1G,
+,,HWTC5D5651F1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,213,69,,,translate,1G,1G
+HWTCEC5E79AC,gpon,HWTCEC5E79AC,HG8145V5,SNS000410,GITHURAI_MA5683T_G45,4,4,1,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS000410,SNS000410,"Not supported by ONU-Type",Enabled,,"Power fail","Very good",-27.22,-28.86,4238,274,902,,,translate,1G,1G,
+,,HWTCEC5E79AC,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,194,69,,,translate,1G,1G
+HWTCA33B6E9C,gpon,HWTCA33B6E9C,HG8145V,"Loft Bajuna",GITHURAI_MA5683T_G45,4,4,2,LOFTY,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-03-11 16:49:36",Online,"Very good",-28.54,-23.66,4088,1232,144,,,translate,1G,1G,
+,,HWTCA33B6E9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1005,903,,,translate,1G,1G
+HWTC4932099D,gpon,HWTC4932099D,HG8546M,SNS000949,GITHURAI_MA5683T_G45,4,4,3,LOFTY,,,,,,Routing,PPPoE,,,,,,SNS000949,SNS000949,"Not supported by ONU-Type",Enabled,"2024-10-03 14:40:46",Online,"Very good",-29.59,-26.99,4326,604,902,,,translate,1G,1G,
+,,HWTC4932099D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,610,901,,,translate,1G,1G
+HWTCF2DB0023,gpon,HWTCF2DB0023,HG8546M,SNS000214,GITHURAI_MA5683T_G45,4,4,4,"PIMA GAS","Abednego Mwasi",,,,,Routing,PPPoE,,,,,,SNS000214,SNS000214,"Not supported by ONU-Type",Enabled,"2025-11-15 14:59:54","Power fail","Very good",-30.46,-31.54,4512,1822,902,,,translate,1G,1G,
+,,HWTCF2DB0023,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1824,1995,,,translate,1G,1G
+HWTC33081BA6,gpon,HWTC33081BA6,HG8145V5,SNS001124,GITHURAI_MA5683T_G45,4,4,5,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS001124,SNS001124,"Not supported by ONU-Type",Enabled,"2024-12-23 18:36:53","Power fail","Very good",-29.59,-27.69,4599,890,902,,,translate,1G,1G,
+HWTC33A7539B,gpon,HWTC33A7539B,HG8546M,SNS001077,GITHURAI_MA5683T_G45,4,4,6,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS001077,SNS001077,"Not supported by ONU-Type",Enabled,"2024-12-04 13:59:21",Offline,"Very good",-26.99,-26.19,4282,832,902,,,translate,1G,1G,
+HWTC3936569B,gpon,HWTC3936569B,HG8546M,SNS000716,GITHURAI_MA5683T_G45,4,4,7,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS000716,SNS000716,"Not supported by ONU-Type",Enabled,"2025-01-22 18:35:22",Online,"Very good",-28.24,-25.37,4356,428,902,,,translate,1G,1G,
+,,HWTC3936569B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,598,1995,,,translate,1G,1G
+HWTCD696FA9F,gpon,HWTCD696FA9F,HG8145V5,SNS001170,GITHURAI_MA5683T_G45,4,4,8,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS001170,SNS001170,"Not supported by ONU-Type",Enabled,"2025-01-25 13:40:48",Online,"Very good",-26.39,-21.13,4239,459,902,,,translate,1G,1G,
+,,HWTCD696FA9F,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,802,1995,,,translate,1G,1G
+HWTC8BD4C2A4,gpon,HWTC8BD4C2A4,HG8145V5,SNS001470,GITHURAI_MA5683T_G45,4,4,10,MAINLAND,"Lucy Wangari",,,,,Routing,PPPoE,,,,,,SNS001470,SNS001470,"Not supported by ONU-Type",Enabled,"2025-08-02 16:17:45",Online,"Very good",-29.21,-27.21,4314,1626,902,,,translate,1G,1G,
+,,HWTC8BD4C2A4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1496,1995,,,translate,1G,1G
+HWTC3A703E9B,gpon,HWTC3A703E9B,HG8546M,SNS000834,GITHURAI_MA5683T_G45,4,4,11,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS000834,SNS000834,"Not supported by ONU-Type",Enabled,"2025-02-26 16:48:26",Offline,"Very good",-28.87,-23.87,4247,1169,902,,,translate,1G,1G,
+,,HWTC3A703E9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1234,1995,,,translate,1G,1G
+HWTC3AFA309B,gpon,HWTC3AFA309B,HG8546M,SNS000461,GITHURAI_MA5683T_G45,4,4,12,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS000461,SNS000461,"Not supported by ONU-Type",Enabled,"2025-03-01 16:32:30","Power fail","Very good",-30,-28.24,4511,1166,902,,,translate,1G,1G,
+,,HWTC3AFA309B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,30,1995,,,translate,1G,1G
+HWTC46C30F9B,gpon,HWTC46C30F9B,HG8546M,SNS001576,GITHURAI_MA5683T_G45,4,4,13,MAINLAND,"Shelmith kinyanjui",,,,,Routing,PPPoE,,,,,,SNS001576,SNS001576,"Not supported by ONU-Type",Enabled,"2025-10-21 12:05:05",Online,"Very good",-28.24,-31.54,4254,1664,902,,,translate,1G,1G,
+HWTC32B35CA6,gpon,HWTC32B35CA6,HG8145V5,SNS001250,GITHURAI_MA5683T_G45,4,4,14,MAINLAND,"Patricia Kamau",,,,,Routing,PPPoE,,,,,,SNS001250,SNS001250,"Not supported by ONU-Type",Enabled,"2025-04-01 16:21:09","Power fail","Very good",-18.97,-15.13,4278,1331,902,,,translate,1G,1G,
+HWTCF2D53AFB,gpon,HWTCF2D53AFB,HG8546M,SNS001412,GITHURAI_MA5683T_G45,4,4,15,LOFTY,"George Thuo",,,,,Routing,PPPoE,,,,,,SNS001412,SNS001412,"Not supported by ONU-Type",Enabled,"2025-06-27 16:41:02",Online,"Very good",-24.09,-18.69,4315,1109,902,,,translate,1G,1G,
+,,HWTCF2D53AFB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1405,1995,,,translate,1G,1G
+HWTCF2D52AF3,gpon,HWTCF2D52AF3,HG8546M,SNS000152,GITHURAI_MA5683T_G45,4,4,16,MAINLAND,,,,,,Routing,PPPoE,,,,,,SNS000152,SNS000152,"Not supported by ONU-Type",Enabled,"2025-06-28 19:20:13",Online,"Very good",-23.77,-18.04,4246,24,902,,,translate,1G,1G,
+HWTCAF78549C,gpon,HWTCAF78549C,HS8145V,SNS000118,GITHURAI_MA5683T_G45,4,8,0,DISCOVERY-RELI,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-09-04 13:57:19",Online,"Very good",-19.63,-13.29,1856,1810,515,,,translate,1G,1G,
+,,HWTCAF78549C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,49,901,,,translate,1G,1G
+HWTC588F2912,gpon,HWTC588F2912,HG8247,SNS000182,GITHURAI_MA5683T_G45,4,8,1,PCEA_MUKINYI,Towezi,,,,,Routing,PPPoE,,,,,,SNS000182,SNS000182,"Not supported by ONU-Type",Enabled,"2024-07-30 16:07:34","Power fail","Very good",-26.39,-21.15,1832,15,902,,,translate,1G,1G,
+HWTC4F82CC82,gpon,HWTC4F82CC82,HG8546M,SNS001088,GITHURAI_MA5683T_G45,4,9,0,Rurii,,,,,,Routing,PPPoE,,,,,,SNS001088,SNS001088,"Not supported by ONU-Type",Enabled,"2024-12-20 19:43:26",Online,"Very good",-17.99,-14.29,2568,899,902,,,translate,1G,1G,
+,,HWTC4F82CC82,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,244,901,,,translate,1G,1G
+HWTCF2D90523,gpon,HWTCF2D90523,HG8546M,SNS000138,GITHURAI_MA5683T_G45,4,9,1,Red_Roses,,,,,,Routing,PPPoE,,,,,,SNS000138,SNS000138,"Not supported by ONU-Type",Enabled,"2025-08-02 14:12:13",Online,"Very good",-22.08,-21.87,2753,961,902,,,translate,1G,1G,
+HWTCF2D5582B,gpon,HWTCF2D5582B,HG8546M,SNS001371,GITHURAI_MA5683T_G45,4,10,1,"Stable Anchor","Jacob moses",,,,,Routing,PPPoE,,,,,,SNS001371,SNS001371,"Not supported by ONU-Type",Enabled,"2025-06-06 16:45:50",Online,"Very good",-20.56,-17.67,3648,258,902,,,translate,1G,1G,
+,,HWTCF2D5582B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1309,1995,,,translate,1G,1G
+HWTCF2D53DB3,gpon,HWTCF2D53DB3,HG8546M,SNS000784,GITHURAI_MA5683T_G45,4,10,2,"Mt_Kenya Towezi","Caroline Muraguri",,,,,Routing,PPPoE,,,,,,SNS000784,SNS000784,"Not supported by ONU-Type",Enabled,"2025-03-20 17:17:10",Online,"Very good",-24.82,-29.21,3185,1029,902,,,translate,1G,1G,
+,,HWTCF2D53DB3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,926,1995,,,translate,1G,1G
+HWTC3D9F409B,gpon,HWTC3D9F409B,HG8546M,II000149,GITHURAI_MA5683T_G45,4,10,3,"Mt_Kenya Towezi",,,,,,Routing,PPPoE,,,,,,II000149,II000149,"Not supported by ONU-Type",Enabled,"2025-06-22 15:15:33",Online,"Very good",-20.66,-18.63,2879,1105,26,,,translate,1G,1G,
+HWTCF2D539E3,gpon,HWTCF2D539E3,HG8546M,SNS000130,GITHURAI_MA5683T_G45,4,10,4,FOUNTAIN_JUNIOR,"Gloria Gakii",,,,,Routing,PPPoE,,,,,,SNS000130,SNS000130,"Not supported by ONU-Type",Enabled,"2025-06-02 12:25:18","Power fail","Very good",-26.99,-25.37,2819,1361,902,,,translate,1G,1G,
+TDTC35431288,gpon,TDTC35431288,HG6143D,SNS000170,GITHURAI_MA5683T_G45,4,11,0,G44,,,,,,Routing,PPPoE,,,,,,SNS000170,SNS000170,"Not supported by ONU-Type",Enabled,"2024-11-13 13:57:46",Online,"Very good",-22.01,-18.09,1583,466,902,,,translate,1G,1G,
+HWTC3685249B,gpon,HWTC3685249B,HG8546M,SNS000654,GITHURAI_MA5683T_G45,4,11,1,Rurii,,,,,,Routing,PPPoE,,,,,,SNS000654,SNS000654,"Not supported by ONU-Type",Enabled,"2024-12-20 11:04:01",Online,"Very good",-25.86,-20.97,2081,867,902,,,translate,1G,1G,
+,,HWTC3685249B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,955,1995,,,translate,1G,1G
+HWTCF2D53D43,gpon,HWTCF2D53D43,HG8546M,"Bella Flats",GITHURAI_MA5683T_G45,4,11,2,Rurii,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2026-01-01 14:50:58",Online,"Very good",-24.82,-30.45,1632,142,902,,,translate,1G,1G,
+,,HWTCF2D53D43,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,147,1995,,,translate,1G,1G
+HWTCD8B2AA92,gpon,HWTCD8B2AA92,HG8546M,II000051,GITHURAI_MA5683T_G45,4,11,3,Rurii,,,,,,Routing,PPPoE,,,,,,II000051,II000051,"Not supported by ONU-Type",Enabled,"2024-12-20 11:10:00","Power fail","Very good",-24.82,-20.55,1668,868,26,,,translate,1G,1G,
+HWTC505DD87F,gpon,HWTC505DD87F,HG8546M,II000084,GITHURAI_MA5683T_G45,4,11,4,Rurii,,,,,,Routing,PPPoE,,,,,,II000084,II000084,"Not supported by ONU-Type",Enabled,"2024-12-20 11:26:24",Online,"Very good",-23.77,-19.2,1373,884,26,,,translate,1G,1G,
+HWTCEFF7F89C,gpon,HWTCEFF7F89C,HG8546M,"II000002 TAMANI",GITHURAI_MA5683T_G45,4,11,5,Rurii,,,,,,Routing,PPPoE,,,,,,II000002,II000002,"Not supported by ONU-Type",Enabled,"2024-12-20 12:54:06",Online,"Very good",-22.52,-18.07,1867,847,26,,,translate,1G,1G,
+HWTCF2DB00F3,gpon,HWTCF2DB00F3,HG8546M,SNS001330,GITHURAI_MA5683T_G45,4,11,6,"GITHURAI RURII","Daniel nyoike",,,,,Routing,PPPoE,,,,,,SNS001330,SNS001330,"Not supported by ONU-Type",Enabled,"2025-12-08 12:08:37",Online,"Very good",-24.21,-19.95,1504,212,902,,,translate,1G,1G,
+,,HWTCF2DB00F3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,224,1995,,,translate,1G,1G
+HWTC3BD9509B,gpon,HWTC3BD9509B,HG8546M,SNS000262,GITHURAI_MA5683T_G45,4,11,7,Sonic,"Esther cheche",,,,,Routing,PPPoE,,,,,,SNS000262,SNS000262,"Not supported by ONU-Type",Enabled,"2025-02-17 14:14:13",Online,"Very good",-26.2,-26.02,2314,166,902,,,translate,1G,1G,
+,,HWTC3BD9509B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1133,1995,,,translate,1G,1G
+HWTCF2D53DC3,gpon,HWTCF2D53DC3,HG8546M,SNS001249,GITHURAI_MA5683T_G45,4,11,8,G44,"Carol Peter",,,,,Routing,PPPoE,,,,,,SNS001249,SNS001249,"Not supported by ONU-Type",Enabled,"2025-04-01 12:43:20",LOS,"Very good",-30.46,-30,1647,1305,902,,,translate,1G,1G,
+,,HWTCF2D53DC3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1269,1995,,,translate,1G,1G
+HWTCC0649175,gpon,HWTCC0649175,HG8546M,"Bridge_Francis Mwema",GITHURAI_MA5683T_G45,4,11,9,ABUNDANT,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2024-12-21 16:03:20",Online,"Very good",-25.53,-26.57,3051,328,902,,,translate,1G,1G,
+,,HWTCC0649175,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,882,901,,,translate,1G,1G
+HWTCE568609E,gpon,HWTCE568609E,HG8145V5,SNS000425,GITHURAI_MA5683T_G45,4,11,10,Rurii,,,,,,Routing,PPPoE,,,,,,SNS000425,SNS000425,"Not supported by ONU-Type",Enabled,"2024-12-24 14:52:59",Online,"Very good",-23.88,-17.82,1538,835,902,,,translate,1G,1G,
+HWTC9F36D386,gpon,HWTC9F36D386,HG8546M,SNS001126,GITHURAI_MA5683T_G45,4,11,11,Rurii,,,,,,Routing,PPPoE,,,,,,SNS001126,SNS001126,"Not supported by ONU-Type",Enabled,"2024-12-24 15:37:30",Online,"Very good",-21.08,-30,1642,936,902,,,translate,1G,1G,
+,,HWTC9F36D386,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,800,901,,,translate,1G,1G
+HWTC0EB74A04,gpon,HWTC0EB74A04,HG8546M,SNS000864,GITHURAI_MA5683T_G45,4,11,12,Rurii,,,,,,Routing,PPPoE,,,,,,SNS000864,SNS000864,"Not supported by ONU-Type",Enabled,"2024-12-24 16:08:34",Online,"Very good",-28.54,-28.54,2136,920,902,,,translate,1G,1G,
+,,HWTC0EB74A04,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,892,901,,,translate,1G,1G
+HWTCF2D159C3,gpon,HWTCF2D159C3,HG8546M,SNS001127,GITHURAI_MA5683T_G45,4,11,13,Rurii,,,,,,Routing,PPPoE,,,,,,SNS001127,SNS001127,"Not supported by ONU-Type",Enabled,"2024-12-24 16:49:06","Power fail","Very good",-30,-28.86,1643,761,902,,,translate,1G,1G,
+,,HWTCF2D159C3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,773,901,,,translate,1G,1G
+HWTCDBA551A3,gpon,HWTCDBA551A3,HG8145V5,SNS000096,GITHURAI_MA5683T_G45,4,11,14,Rurii,,,,,,Routing,PPPoE,,,,,,SNS000096,SNS000096,"Not supported by ONU-Type",Enabled,"2024-12-26 13:38:32",Online,"Very good",-24.56,-20.27,1513,710,902,,,translate,1G,1G,
+HWTC467F049D,gpon,HWTC467F049D,HG8546M,SNS001214-01,GITHURAI_MA5683T_G45,4,11,15,Rurii,,,,,,Routing,PPPoE,,,,,,SNS001214-01,SNS001214-01,"Not supported by ONU-Type",Enabled,"2025-12-17 14:28:36",Online,"Very good",-22.22,-17.1,1546,354,902,,,translate,1G,1G,
+HWTCF2D5538B,gpon,HWTCF2D5538B,HG8546M,SNS001258,GITHURAI_MA5683T_G45,4,11,16,Rurii,"Grace Owen",,,,,Routing,PPPoE,,,,,,SNS001258,SNS001258,"Not supported by ONU-Type",Enabled,"2025-04-03 14:09:16",Online,"Very good",-19.75,-30,1613,1246,902,,,translate,1G,1G,
+,,HWTCF2D5538B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1650,1995,,,translate,1G,1G
+HWTCF2D55323,gpon,HWTCF2D55323,HG8546M,SNS001305,GITHURAI_MA5683T_G45,4,11,17,Rurii,"Pauline Mwangi",,,,,Routing,PPPoE,,,,,,SNS001305,SNS001305,"Not supported by ONU-Type",Enabled,"2025-04-22 14:39:16","Power fail","Very good",-27.7,-23.46,1603,1213,902,,,translate,1G,1G,
+HWTCF2D909D3,gpon,HWTCF2D909D3,HG8546M,SNS001483,GITHURAI_MA5683T_G45,4,11,18,G44,"Esther Waruguru",,,,,Routing,PPPoE,,,,,,SNS001483,SNS001483,"Not supported by ONU-Type",Enabled,"2025-08-08 16:50:45",Online,"Very good",-21.03,-30.96,1644,1742,902,,,translate,1G,1G,
+,,HWTCF2D909D3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1583,1995,,,translate,1G,1G
+HWTCF2D901F3,gpon,HWTCF2D901F3,HG8546M,SNS001498,GITHURAI_MA5683T_G45,4,11,19,G44,"Erastus mazindu",,,,,Routing,PPPoE,,,,,,SNS001498,SNS001498,"Not supported by ONU-Type",Enabled,"2025-12-21 13:21:26",LOS,"Very good",-31.55,-33,1671,322,902,,,translate,1G,1G,
+HWTCF2D553E3,gpon,HWTCF2D553E3,HG8546M,SNS001259,GITHURAI_MA5683T_G45,4,11,20,Rurii,"Esther Wanjiru",,,,,Routing,PPPoE,,,,,,SNS001259,SNS001259,"Not supported by ONU-Type",Enabled,"2025-04-29 11:06:41",Online,"Very good",-22.15,-16.71,1557,1314,902,,,translate,1G,1G,
+,,HWTCF2D553E3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1391,1995,,,translate,1G,1G
+HWTC7E1195E2,gpon,HWTC7E1195E2,HG8546M,SNS000725,GITHURAI_MA5683T_G45,4,11,21,"TAMANI HOMES",,,,,,Routing,PPPoE,,,,,,SNS000725,SNS000725,"Not supported by ONU-Type",Enabled,"2025-07-01 19:33:37","Power fail","Very good",-26.03,-23.18,2191,1509,902,,,translate,1G,1G,
+HWTCF2D55D8B,gpon,HWTCF2D55D8B,HG8546M,BlueStar,GITHURAI_MA5683T_G45,4,11,22,Sonic,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-07-05 13:23:27",Online,"Very good",-26.78,-25.37,2310,403,902,,,translate,1G,1G,
+,,HWTCF2D55D8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1413,1995,,,translate,1G,1G
+,,HWTCF2D55D8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1453,901,,,translate,1G,1G
+HWTCF2D90A13,gpon,HWTCF2D90A13,HG8546M,SNS001487,GITHURAI_MA5683T_G45,4,11,23,Sonic,"NANCY JAMES",,,,,Routing,PPPoE,,,,,,SNS001487,SNS001487,"Not supported by ONU-Type",Enabled,"2025-08-11 13:53:04",Online,"Very good",-26.39,-22.92,2234,1799,902,,,translate,1G,1G,
+,,HWTCF2D90A13,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1461,1995,,,translate,1G,1G
+HWTCE2E3550B,gpon,HWTCE2E3550B,HG8546M,SNS000103,GITHURAI_MA5683T_G45,4,11,25,"TAMANI HOMES","Jess Wanjiru",,,,,Routing,PPPoE,,,,,,SNS000103,SNS000103,"Not supported by ONU-Type",Enabled,"2025-09-24 11:13:58",Online,"Very good",-23.88,-22.84,2090,1009,902,,,translate,1G,1G,
+,,HWTCE2E3550B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,764,1995,,,translate,1G,1G
+HWTCE3CAC39E,gpon,HWTCE3CAC39E,HG8145V5,SNS001175,GITHURAI_MA5683T_G45,4,12,0,"St. Augustine",,,,,,Routing,PPPoE,,,,,,SNS001175,SNS001175,"Not supported by ONU-Type",Enabled,"2025-01-27 18:54:39",Online,"Very good",-29.59,-26.77,4498,446,902,,,translate,1G,1G,
+HWTCF2D53AEB,gpon,HWTCF2D53AEB,HG8546M,SNS001401,GITHURAI_MA5683T_G45,4,12,1,"PIMA GAS","Paul Muriu",,,,,Routing,PPPoE,,,,,,SNS001401,SNS001401,"Not supported by ONU-Type",Enabled,"2025-06-18 13:30:26",Online,"Very good",-25.23,-20.5,5066,1575,902,,,translate,1G,1G,
+HWTC1673D5AA,gpon,HWTC1673D5AA,HG8145V5,"ZETA HUB HOME",GITHURAI_MA5683T_G45,4,12,2,"City Science",,,,,,Routing,PPPoE,,,,,,ZWS000001,ZWS000001,"Not supported by ONU-Type",Enabled,"2025-04-16 09:32:15",Online,"Very good",-26.99,-30.96,4631,900,1037,,,translate,100M,100M,
+HWTC20FB1AAA,gpon,HWTC20FB1AAA,HG8145V5,SNS001302,GITHURAI_MA5683T_G45,4,12,3,"St. Augustine","David Wambugu",,,,,Routing,PPPoE,,,,,,SNS001302,SNS001302,"Not supported by ONU-Type",Enabled,"2025-04-21 14:04:34",Online,"Very good",-17.57,-12.6,4427,1336,902,,,translate,1G,1G,
+HWTCF2D8F3A3,gpon,HWTCF2D8F3A3,HG8546M,SNS000744,GITHURAI_MA5683T_G45,4,12,4,PCEA_MUKINYI,"Francis Mukinyi",,,,,Routing,PPPoE,,,,,,SNS000744,SNS000744,"Not supported by ONU-Type",Enabled,"2025-10-11 13:43:19",Online,"Very good",-28.54,-24.81,5136,980,902,,,translate,1G,1G,
+,,HWTCF2D8F3A3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1601,1995,,,translate,1G,1G
+HWTCF2D552EB,gpon,HWTCF2D552EB,HG8546M,SNS001270,GITHURAI_MA5683T_G45,4,12,5,MUMBI,"Dorcas Omwega",,,,,Routing,PPPoE,,,,,,SNS001270,SNS001270,"Not supported by ONU-Type",Enabled,"2025-04-07 14:58:54","Power fail","Very good",-26.78,-21.87,6526,714,902,,,translate,1G,1G,
+,,HWTCF2D552EB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1288,1995,,,translate,1G,1G
+HWTC3667169B,gpon,HWTC3667169B,HG8546M,SNS000544,GITHURAI_MA5683T_G45,4,12,6,MUMBI,,,,,,Routing,PPPoE,,,,,,SNS000544,SNS000544,"Not supported by ONU-Type",Enabled,"2024-10-21 17:42:55",Online,"Very good",-29.59,-23.66,6538,691,902,,,translate,1G,1G,
+,,HWTC3667169B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,91,901,,,translate,1G,1G
+HWTCF2DB5E3B,gpon,HWTCF2DB5E3B,HG8546M,SNS000534,GITHURAI_MA5683T_G45,4,12,7,PCEA_MUKINYI,,,,,,Routing,PPPoE,,,,,,SNS000534,SNS000534,"Not supported by ONU-Type",Enabled,"2025-11-01 15:47:57",Online,"Very good",-25.69,-23.98,5028,1672,902,,,translate,1G,1G,
+,,HWTCF2DB5E3B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1806,1995,,,translate,1G,1G
+HWTCF2D53A9B,gpon,HWTCF2D53A9B,HG8546M,SNS001420,GITHURAI_MA5683T_G45,4,12,8,MANGUO,"Peter Mathenge",,,,,Routing,PPPoE,,,,,,SNS001420,SNS001420,"Not supported by ONU-Type",Enabled,"2025-07-04 16:26:53",Online,"Very good",-28.87,-25.53,5655,1458,902,,,translate,1G,1G,
+,,HWTCF2D53A9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1477,1995,,,translate,1G,1G
+HWTC0328AB8B,gpon,HWTC0328AB8B,HG8546M,SNS000082,GITHURAI_MA5683T_G45,4,12,9,MANGUO,,,,,,Routing,PPPoE,,,,,,SNS000082,SNS000082,"Not supported by ONU-Type",Enabled,"2025-01-15 11:50:09",Online,"Very good",-27.96,-25.68,5582,984,902,,,translate,1G,1G,
+,,HWTC0328AB8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,870,1995,,,translate,1G,1G
+HWTC6CBCCB8B,gpon,HWTC6CBCCB8B,HG8546M,SNS000631,GITHURAI_MA5683T_G45,4,12,10,MANGUO,,,,,,Routing,PPPoE,,,,,,SNS000631,SNS000631,"Not supported by ONU-Type",Enabled,"2025-01-14 17:53:40",Online,"Very good",-28.87,-24.31,5623,939,902,,,translate,1G,1G,
+,,HWTC6CBCCB8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,457,1995,,,translate,1G,1G
+HWTCF2D55823,gpon,HWTCF2D55823,HG8546M,SNS000181,GITHURAI_MA5683T_G45,4,12,11,"NEW CANAN RELI","Evanson mugo",,,,,Routing,PPPoE,,,,,,SNS000181,SNS000181,"Not supported by ONU-Type",Enabled,"2025-06-06 19:19:25",Online,"Very good",-27.22,-23.56,4968,886,902,,,translate,1G,1G,
+,,HWTCF2D55823,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1454,1995,,,translate,1G,1G
+HWTCF2D55D0B,gpon,HWTCF2D55D0B,HG8546M,SNS001432,GITHURAI_MA5683T_G45,4,12,12,"NEW CANAN RELI","Gabriel Memia",,,,,Routing,PPPoE,,,,,,SNS001432,SNS001432,"Not supported by ONU-Type",Enabled,"2025-07-11 13:41:16",Online,"Very good",-26.99,-22.84,5120,1488,902,,,translate,1G,1G,
+,,HWTCF2D55D0B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1333,1995,,,translate,1G,1G
+HWTCF2D540BB,gpon,HWTCF2D540BB,HG8546M,SNS000758,GITHURAI_MA5683T_G45,4,12,13,CHAMOS,"Lewis Kiumu",,,,,Routing,PPPoE,,,,,,SNS000758,SNS000758,"Not supported by ONU-Type",Enabled,"2025-07-19 17:27:42","Power fail","Very good",-28.87,-24.95,5689,1525,902,,,translate,1G,1G,
+HWTCF2D902B3,gpon,HWTCF2D902B3,HG8546M,SNS000077,GITHURAI_MA5683T_G45,4,12,14,MANGUO,"Evans kamau",,,,,Routing,PPPoE,,,,,,SNS000077,SNS000077,"Not supported by ONU-Type",Enabled,"2025-09-01 18:23:57","Power fail","Very good",-30.46,-23.87,5738,393,902,,,translate,1G,1G,
+,,HWTCF2D902B3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1900,1995,,,translate,1G,1G
+HWTC465B789B,gpon,HWTC465B789B,HG8546M,SNS001604,GITHURAI_MA5683T_G45,4,12,15,"St. Augustine","Jackson masesi Zawadi bar",,,,,Routing,PPPoE,,,,,,SNS001604,SNS001604,"Not supported by ONU-Type",Enabled,"2025-11-06 16:03:07",Online,"Very good",-28.87,-21.3,4389,1230,902,,,translate,1G,1G,
+,,HWTC465B789B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1716,1995,,,translate,1G,1G
+HWTCE3F7DB8B,gpon,HWTCE3F7DB8B,HG8546M,SNS000178,GITHURAI_MA5683T_G45,4,12,16,MANGUO,,,,,,Routing,PPPoE,,,,,,SNS000178,SNS000178,"Not supported by ONU-Type",Enabled,"2025-01-15 13:40:47",Online,"Very good",-26.99,-23.18,5676,985,902,,,translate,1G,1G,
+,,HWTCE3F7DB8B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1041,1995,,,translate,1G,1G
+HWTC085BAE15,gpon,HWTC085BAE15,HG8546M,SNS001000,GITHURAI_MA5683T_G45,4,12,17,MANGUO,"Edwin Mwangi",,,,,Routing,PPPoE,,,,,,SNS001000,SNS001000,"Not supported by ONU-Type",Enabled,"2025-11-25 11:34:09",Online,"Very good",-22.37,-16.9,5715,33,902,,,translate,1G,1G,
+,,HWTC085BAE15,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,36,1995,,,translate,1G,1G
+HWTCD71AB395,gpon,HWTCD71AB395,HG8546M,SNS001096,GITHURAI_MA5683T_G45,4,12,18,GITHURAI-KIMBO-STATION,,,,,,Routing,PPPoE,,,,,,SNS001096,SNS001096,"Not supported by ONU-Type",Enabled,"2024-12-12 16:39:09",Online,"Very good",-27.22,-27.21,5500,809,902,,,translate,1G,1G,
+HWTC6C9F119D,gpon,HWTC6C9F119D,HG8546M,SNS000200,GITHURAI_MA5683T_G45,4,14,0,WENDANI,,,,,,Routing,PPPoE,,,,,,SNS000200,SNS000200,"Not supported by ONU-Type",Enabled,"2024-11-18 16:33:05","Power fail","Very good",-28.87,-30.96,2195,621,902,,,translate,1G,1G,
+,,HWTC6C9F119D,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,698,901,,,translate,1G,1G
+HWTC065C3C9C,gpon,HWTC065C3C9C,HG8546M,SNS000337,GITHURAI_MA5683T_G45,4,14,1,"KINGDOM SACCO","Solomon Kuria",,,,,Routing,PPPoE,,,,,,SNS000337,SNS000337,"Not supported by ONU-Type",Enabled,"2025-02-22 15:10:09","Power fail","Very good",-28.54,-28.86,1000,536,902,,,translate,1G,1G,
+,,HWTC065C3C9C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,972,1995,,,translate,1G,1G
+HWTCCE131D07,gpon,HWTCCE131D07,HG8247,SNS000997,GITHURAI_MA5683T_G45,4,14,2,Majengo_Kiangiciri,,,,,,Routing,PPPoE,,,,,,SNS000997,SNS000997,"Not supported by ONU-Type",Enabled,"2024-10-29 14:32:03",Online,"Very good",-27.7,-25.46,1009,637,902,,,translate,1G,1G,
+HWTCD740408C,gpon,HWTCD740408C,HG8546M,SNS000973,GITHURAI_MA5683T_G45,4,14,3,"KINGDOM SACCO",,,,,,Routing,PPPoE,,,,,,SNS000973,SNS000973,"Not supported by ONU-Type",Enabled,"2024-09-11 15:42:57",Online,"Very good",-25.38,-21.08,1089,109,902,,,translate,1G,1G,
+,,HWTCD740408C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,558,901,,,translate,1G,1G
+HWTC3642BA9B,gpon,HWTC3642BA9B,HG8546M,SNS001044,GITHURAI_MA5683T_G45,4,14,4,"PCEA KIMBO",,,,,,Routing,PPPoE,,,,,,SNS001044,SNS001044,"Not supported by ONU-Type",Enabled,"2024-11-15 15:31:54",Offline,"Very good",-12.9,-7.41,1600,751,902,,,translate,1G,1G,
+,,HWTC3642BA9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,673,901,,,translate,1G,1G
+HWTC91A50D95,gpon,HWTC91A50D95,HG8546M,SNS001109,GITHURAI_MA5683T_G45,4,14,5,"ACK SHALOM FOCUS",,,,,,Routing,PPPoE,,,,,,SNS001109,SNS001109,"Not supported by ONU-Type",Enabled,"2024-12-17 19:04:55",Online,"Very good",-25.38,-22.84,2446,434,902,,,translate,1G,1G,
+,,HWTC91A50D95,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,482,901,,,translate,1G,1G
+HWTCF2D1549B,gpon,HWTCF2D1549B,HG8546M,SNS001113,GITHURAI_MA5683T_G45,4,14,6,Ebony,,,,,,Routing,PPPoE,,,,,,SNS001113,SNS001113,"Not supported by ONU-Type",Enabled,"2024-12-18 19:35:48",Online,"Very good",-28.54,-27.69,1103,532,902,,,translate,1G,1G,
+,,HWTCF2D1549B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,841,903,,,translate,1G,1G
+HWTCC06AB795,gpon,HWTCC06AB795,HG8546M,SNS000001,GITHURAI_MA5683T_G45,4,14,7,TAVISA,,,,,,Routing,PPPoE,,,,,,SNS000001,SNS000001,"Not supported by ONU-Type",Enabled,"2025-01-11 18:02:03",Online,"Very good",-29.59,-27.21,958,979,902,,,translate,1G,1G,
+,,HWTCC06AB795,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,989,901,,,translate,1G,1G
+HWTCC3BD182A,gpon,HWTCC3BD182A,HG8546M,SNS000191,GITHURAI_MA5683T_G45,4,14,8,"ACK SHALOM FOCUS",,,,,,Routing,PPPoE,,,,,,SNS000191,SNS000191,"Not supported by ONU-Type",Enabled,"2025-01-28 14:26:21",Online,"Very good",-25.86,-26.19,2274,273,902,,,translate,1G,1G,
+,,HWTCC3BD182A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1090,1995,,,translate,1G,1G
+HWTCA2D5B38C,gpon,HWTCA2D5B38C,HG8546M,SNS001196,GITHURAI_MA5683T_G45,4,14,9,"KINGDOM SACCO","Ann Ndungu",,,,,Routing,PPPoE,,,,,,SNS001196,SNS001196,"Not supported by ONU-Type",Enabled,"2025-02-20 14:13:08",Online,"Very good",-28.24,-26.77,1004,1139,902,,,translate,1G,1G,
+,,HWTCA2D5B38C,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,990,1995,,,translate,1G,1G
+HWTCF2D53ACB,gpon,HWTCF2D53ACB,HG8546M,Grazia,GITHURAI_MA5683T_G45,4,14,10,TAVISA,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-07-16 14:16:11","Power fail","Very good",-30.97,-27.69,1052,1277,902,,,translate,1G,1G,
+,,HWTCF2D53ACB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1523,1995,,,translate,1G,1G
+HWTCF2DAFE43,gpon,HWTCF2DAFE43,HG8546M,"Grazia bridge",GITHURAI_MA5683T_G45,4,14,11,"KINGDOM SACCO",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-12-08 17:54:34",Online,"Very good",-30.97,-30.96,1049,133,902,,,translate,1G,1G,
+,,HWTCF2DAFE43,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,234,1995,,,translate,1G,1G
+HWTC73546E97,gpon,HWTC73546E97,HG8546M,SNS001063,GITHURAI_MA5683T_G45,4,14,12,"Wanga Coat","John Maina Wanga Coat",,,,,Routing,PPPoE,,,,,,SNS001063,SNS001063,"Not supported by ONU-Type",Enabled,"2024-11-27 11:27:38","Power fail","Very good",-25.86,-20,2469,789,902,,,translate,1G,1G,
+,,HWTC73546E97,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,666,903,,,translate,1G,1G
+HWTCF2D5392B,gpon,HWTCF2D5392B,HG8546M,SNS000792,GITHURAI_MA5683T_G45,4,14,13,TAVISA,,,,,,Routing,PPPoE,,,,,,SNS000792,SNS000792,"Not supported by ONU-Type",Enabled,"2025-06-02 15:55:36","Power fail","Very good",-24.69,-20.45,891,1367,902,,,translate,1G,1G,
+HWTCF2DB001B,gpon,HWTCF2DB001B,HG8546M,SNS000660,GITHURAI_MA5683T_G45,4,14,14,Siloam,"Charles githinji",,,,,Routing,PPPoE,,,,,,SNS000660,SNS000660,"Not supported by ONU-Type",Enabled,"2025-12-01 13:18:15",Online,"Very good",-28.87,-22.44,3505,122,902,,,translate,1G,1G,
+,,HWTCF2DB001B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,124,1995,,,translate,1G,1G
+HWTCF2D53F9B,gpon,HWTCF2D53F9B,HG8546M,"APEX BRIDGE",GITHURAI_MA5683T_G45,4,14,15,"KINGDOM SACCO",,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-07-16 17:05:54","Power fail","Very good",-28.87,-27.44,1117,1648,902,,,translate,1G,1G,
+,,HWTCF2D53F9B,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1494,1995,,,translate,1G,1G
+HWTC3C596280,gpon,HWTC3C596280,HG8546M,SNS000136,GITHURAI_MA5683T_G45,4,14,16,"KINGDOM SACCO",Unganisha,,,,,Routing,PPPoE,,,,,,SNS000136,SNS000136,"Not supported by ONU-Type",Enabled,"2025-07-21 21:00:36",Online,"Very good",-18.36,-12.98,1261,1674,902,,,translate,1G,1G,
+HWTCF2D8F5C3,gpon,HWTCF2D8F5C3,HG8546M,SNS001535,GITHURAI_MA5683T_G45,4,14,17,Siloam,"Edmond Ochola",,,,,Routing,PPPoE,,,,,,SNS001535,SNS001535,"Not supported by ONU-Type",Enabled,"2025-09-15 16:56:57","Power fail","Very good",-26.03,-22.14,3349,1894,902,,,translate,1G,1G,
+,,HWTCF2D8F5C3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,726,1995,,,translate,1G,1G
+HWTC43A06DA2,gpon,HWTC43A06DA2,HG8546M,SNS000191,GITHURAI_MA5683T_G45,4,14,18,"ACK SHALOM FOCUS","Moses Maina",,,,,Routing,PPPoE,,,,,,SNS000191,SNS000191,"Not supported by ONU-Type",Enabled,"2025-09-23 18:54:14","Power fail","Very good",-26.78,-29.21,2265,520,902,,,translate,1G,1G,
+,,HWTC43A06DA2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,957,1995,,,translate,1G,1G
+HWTC8FBAEB9A,gpon,HWTC8FBAEB9A,HG8546M,SNS001607,GITHURAI_MA5683T_G45,4,14,19,TAVISA,"Godfrey wainaina",,,,,Routing,PPPoE,,,,,,SNS001607,SNS001607,"Not supported by ONU-Type",Enabled,"2025-11-07 16:17:25",Online,"Very good",-29.59,-24.95,879,1765,902,,,translate,1G,1G,
+,,HWTC8FBAEB9A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1784,1995,,,translate,1G,1G
+HWTCE3E5FA9E,gpon,HWTCE3E5FA9E,HG8145V5,"Zeta Hub",GITHURAI_MA5683T_G45,4,15,0,Hunters,,,,,,Bridging,,,,,,,,,"Not supported by ONU-Type",Enabled,"2025-02-19 16:38:05",Online,"Very good",-23.77,-20.81,6395,1083,1037,,,translate,1G,1G,
+,,HWTCE3E5FA9E,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1114,1995,,,translate,1G,1G

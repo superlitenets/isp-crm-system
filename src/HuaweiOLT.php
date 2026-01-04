@@ -1066,20 +1066,81 @@ class HuaweiOLT {
         $added = 0;
         $updated = 0;
         
+        // Cache for zones to avoid repeated queries
+        $zoneCache = [];
+        
         foreach ($result['onus'] as $onu) {
             $existing = $this->getONUBySN($onu['sn']);
             
-            // Generate a meaningful name from description - use first part before underscore
-            $onuName = '';
+            // Parse SmartOLT description format: NAME_zone_ZONENAME_descr_ADDRESS_authd_DATE
             $desc = $onu['description'] ?? '';
+            $onuName = '';
+            $zoneName = '';
+            $address = '';
+            
             if (!empty($desc)) {
-                // Truncate at first underscore
-                $parts = explode('_', $desc);
-                $onuName = trim($parts[0]);
+                // Try SmartOLT format: SNS001328_zone_DYKAAN_descr_Abdul_Swabulu_authd_20251016
+                if (preg_match('/^([^_]+)_zone_([^_]+)(?:_descr_(.+?))?(?:_authd_\d+)?$/i', $desc, $m)) {
+                    $onuName = trim($m[1]);
+                    $zoneName = trim($m[2]);
+                    $address = isset($m[3]) ? str_replace('_', ' ', trim($m[3])) : '';
+                } 
+                // Try simpler format: NAME_zone_ZONENAME
+                elseif (preg_match('/^([^_]+)_zone_([^_]+)/i', $desc, $m)) {
+                    $onuName = trim($m[1]);
+                    $zoneName = trim($m[2]);
+                }
+                // Try format with just zone: NAME_ZONENAME or just take first part
+                else {
+                    $parts = explode('_', $desc);
+                    $onuName = trim($parts[0]);
+                }
             }
+            
             if (empty($onuName)) {
-                // Fallback to location-based name
                 $onuName = "ONU {$onu['slot']}/{$onu['port']}:{$onu['onu_id']}";
+            }
+            
+            // Detect ONU type from serial number prefix
+            $onuTypeId = null;
+            $sn = $onu['sn'] ?? '';
+            if (strlen($sn) >= 4) {
+                $prefix = strtoupper(substr($sn, 0, 4));
+                // Common prefixes: HWTC (Huawei), ZTEG (ZTE), ALCL (Nokia/Alcatel), VSOL, TPLN (TP-Link)
+                $stmt = $this->db->prepare("SELECT id FROM huawei_onu_types WHERE UPPER(LEFT(vendor_id, 4)) = ? LIMIT 1");
+                $stmt->execute([$prefix]);
+                $typeRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                $onuTypeId = $typeRow['id'] ?? null;
+            }
+            
+            // Match or create zone
+            $zoneId = null;
+            if (!empty($zoneName)) {
+                if (isset($zoneCache[$zoneName])) {
+                    $zoneId = $zoneCache[$zoneName];
+                } else {
+                    $stmt = $this->db->prepare("SELECT id FROM huawei_zones WHERE LOWER(name) = LOWER(?) LIMIT 1");
+                    $stmt->execute([$zoneName]);
+                    $zoneRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($zoneRow) {
+                        $zoneId = $zoneRow['id'];
+                    } else {
+                        // Auto-create zone
+                        try {
+                            $stmt = $this->db->prepare("INSERT INTO huawei_zones (name, is_active, created_at) VALUES (?, true, NOW()) RETURNING id");
+                            $stmt->execute([$zoneName]);
+                            $newZone = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            $zoneId = $newZone['id'] ?? null;
+                        } catch (\Exception $e) {
+                            // Zone might already exist due to race condition
+                            $stmt = $this->db->prepare("SELECT id FROM huawei_zones WHERE LOWER(name) = LOWER(?) LIMIT 1");
+                            $stmt->execute([$zoneName]);
+                            $zoneRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+                            $zoneId = $zoneRow['id'] ?? null;
+                        }
+                    }
+                    $zoneCache[$zoneName] = $zoneId;
+                }
             }
             
             // ONUs visible via SNMP are already authorized on the OLT
@@ -1095,6 +1156,11 @@ class HuaweiOLT {
                 'description' => $desc,
                 'is_authorized' => true,
             ];
+            
+            // Only set these if we found values (don't overwrite existing data with nulls)
+            if ($zoneId) $data['zone_id'] = $zoneId;
+            if ($onuTypeId) $data['onu_type_id'] = $onuTypeId;
+            if (!empty($address)) $data['address'] = $address;
             
             try {
                 if ($existing) {
