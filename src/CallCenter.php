@@ -17,17 +17,14 @@ class CallCenter {
         $this->ami_pass = getenv('FREEPBX_AMI_PASS') ?: 'crmami2025';
     }
 
-    // AMI Connection
     public function connectAMI() {
         $this->socket = @fsockopen($this->ami_host, $this->ami_port, $errno, $errstr, 5);
         if (!$this->socket) {
             return ['success' => false, 'error' => "Failed to connect: $errstr ($errno)"];
         }
 
-        // Read welcome message
         fgets($this->socket);
 
-        // Login
         $response = $this->sendCommand([
             'Action' => 'Login',
             'Username' => $this->ami_user,
@@ -70,7 +67,6 @@ class CallCenter {
         return $response;
     }
 
-    // Originate a call (click-to-call)
     public function originateCall($extension, $destination, $customerId = null, $ticketId = null, $callerid = null) {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -106,7 +102,6 @@ class CallCenter {
         return ['success' => false, 'error' => 'Failed to originate call'];
     }
 
-    // Get queue status
     public function getQueueStatus($queue = null) {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -142,7 +137,6 @@ class CallCenter {
         return $queues;
     }
 
-    // Pause/unpause agent
     public function setAgentPaused($extension, $paused, $queue = null, $reason = '') {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -168,7 +162,6 @@ class CallCenter {
             : ['success' => false, 'error' => 'Failed to update agent status'];
     }
 
-    // Hangup a call
     public function hangupCall($channel) {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -187,7 +180,6 @@ class CallCenter {
             : ['success' => false, 'error' => 'Failed to hangup call'];
     }
 
-    // Transfer call
     public function transferCall($channel, $destination, $context = 'from-internal') {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -209,7 +201,6 @@ class CallCenter {
             : ['success' => false, 'error' => 'Failed to transfer call'];
     }
 
-    // Get active channels
     public function getActiveChannels() {
         if (!$this->connected) {
             $result = $this->connectAMI();
@@ -222,9 +213,8 @@ class CallCenter {
         return ['success' => true, 'data' => $response];
     }
 
-    // Database Operations
-    
-    // Extensions
+    // Database Operations using PDO
+
     public function getExtensions($activeOnly = true) {
         $sql = "SELECT e.*, u.name as user_name, u.email as user_email
                 FROM call_center_extensions e
@@ -234,29 +224,30 @@ class CallCenter {
         }
         $sql .= " ORDER BY e.extension";
         
-        $result = pg_query($this->db, $sql);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getExtension($id) {
-        $sql = "SELECT * FROM call_center_extensions WHERE id = $1";
-        $result = pg_query_params($this->db, $sql, [$id]);
-        return pg_fetch_assoc($result);
+        $stmt = $this->db->prepare("SELECT * FROM call_center_extensions WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function getExtensionByUserId($userId) {
-        $sql = "SELECT * FROM call_center_extensions WHERE user_id = $1 AND is_active = true";
-        $result = pg_query_params($this->db, $sql, [$userId]);
-        return pg_fetch_assoc($result);
+        $stmt = $this->db->prepare("SELECT * FROM call_center_extensions WHERE user_id = ? AND is_active = true");
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function saveExtension($data) {
         if (isset($data['id']) && $data['id']) {
             $sql = "UPDATE call_center_extensions SET 
-                    user_id = $1, extension = $2, name = $3, secret = $4, 
-                    caller_id = $5, device_type = $6, is_active = $7, updated_at = NOW()
-                    WHERE id = $8";
-            $params = [
+                    user_id = ?, extension = ?, name = ?, secret = ?, 
+                    caller_id = ?, device_type = ?, is_active = ?, updated_at = NOW()
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['user_id'] ?: null,
                 $data['extension'],
                 $data['name'],
@@ -265,14 +256,14 @@ class CallCenter {
                 $data['device_type'] ?? 'softphone',
                 $data['is_active'] ?? true,
                 $data['id']
-            ];
-            pg_query_params($this->db, $sql, $params);
+            ]);
             return $data['id'];
         } else {
             $sql = "INSERT INTO call_center_extensions 
                     (user_id, extension, name, secret, caller_id, device_type, is_active)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
-            $params = [
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['user_id'] ?: null,
                 $data['extension'],
                 $data['name'],
@@ -280,19 +271,17 @@ class CallCenter {
                 $data['caller_id'] ?? null,
                 $data['device_type'] ?? 'softphone',
                 $data['is_active'] ?? true
-            ];
-            $result = pg_query_params($this->db, $sql, $params);
-            $row = pg_fetch_assoc($result);
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
         }
     }
 
     public function deleteExtension($id) {
-        $sql = "UPDATE call_center_extensions SET is_active = false WHERE id = $1";
-        return pg_query_params($this->db, $sql, [$id]);
+        $stmt = $this->db->prepare("UPDATE call_center_extensions SET is_active = false WHERE id = ?");
+        return $stmt->execute([$id]);
     }
 
-    // Queues
     public function getQueues($activeOnly = true) {
         $sql = "SELECT q.*, 
                 (SELECT COUNT(*) FROM call_center_queue_members qm WHERE qm.queue_id = q.id AND qm.is_active = true) as member_count
@@ -302,23 +291,24 @@ class CallCenter {
         }
         $sql .= " ORDER BY q.name";
         
-        $result = pg_query($this->db, $sql);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getQueue($id) {
-        $sql = "SELECT * FROM call_center_queues WHERE id = $1";
-        $result = pg_query_params($this->db, $sql, [$id]);
-        return pg_fetch_assoc($result);
+        $stmt = $this->db->prepare("SELECT * FROM call_center_queues WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function saveQueue($data) {
         if (isset($data['id']) && $data['id']) {
             $sql = "UPDATE call_center_queues SET 
-                    name = $1, extension = $2, strategy = $3, timeout = $4,
-                    wrapup_time = $5, max_wait_time = $6, is_active = $7, updated_at = NOW()
-                    WHERE id = $8";
-            $params = [
+                    name = ?, extension = ?, strategy = ?, timeout = ?,
+                    wrapup_time = ?, max_wait_time = ?, is_active = ?, updated_at = NOW()
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['name'],
                 $data['extension'],
                 $data['strategy'] ?? 'ringall',
@@ -327,14 +317,14 @@ class CallCenter {
                 $data['max_wait_time'] ?? 300,
                 $data['is_active'] ?? true,
                 $data['id']
-            ];
-            pg_query_params($this->db, $sql, $params);
+            ]);
             return $data['id'];
         } else {
             $sql = "INSERT INTO call_center_queues 
                     (name, extension, strategy, timeout, wrapup_time, max_wait_time, is_active)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
-            $params = [
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['name'],
                 $data['extension'],
                 $data['strategy'] ?? 'ringall',
@@ -342,73 +332,64 @@ class CallCenter {
                 $data['wrapup_time'] ?? 5,
                 $data['max_wait_time'] ?? 300,
                 $data['is_active'] ?? true
-            ];
-            $result = pg_query_params($this->db, $sql, $params);
-            $row = pg_fetch_assoc($result);
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
         }
     }
 
-    // Queue Members
     public function getQueueMembers($queueId) {
         $sql = "SELECT qm.*, e.extension, e.name as extension_name, u.name as user_name
                 FROM call_center_queue_members qm
                 JOIN call_center_extensions e ON qm.extension_id = e.id
                 LEFT JOIN users u ON e.user_id = u.id
-                WHERE qm.queue_id = $1 AND qm.is_active = true
+                WHERE qm.queue_id = ? AND qm.is_active = true
                 ORDER BY qm.penalty, e.extension";
-        $result = pg_query_params($this->db, $sql, [$queueId]);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$queueId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function addQueueMember($queueId, $extensionId, $penalty = 0) {
         $sql = "INSERT INTO call_center_queue_members (queue_id, extension_id, penalty)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (queue_id, extension_id) DO UPDATE SET is_active = true, penalty = $3";
-        return pg_query_params($this->db, $sql, [$queueId, $extensionId, $penalty]);
+                VALUES (?, ?, ?)
+                ON CONFLICT (queue_id, extension_id) DO UPDATE SET is_active = true, penalty = EXCLUDED.penalty";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$queueId, $extensionId, $penalty]);
     }
 
     public function removeQueueMember($queueId, $extensionId) {
-        $sql = "UPDATE call_center_queue_members SET is_active = false 
-                WHERE queue_id = $1 AND extension_id = $2";
-        return pg_query_params($this->db, $sql, [$queueId, $extensionId]);
+        $stmt = $this->db->prepare("UPDATE call_center_queue_members SET is_active = false WHERE queue_id = ? AND extension_id = ?");
+        return $stmt->execute([$queueId, $extensionId]);
     }
 
-    // Call Logs
     public function getCalls($filters = [], $limit = 100, $offset = 0) {
         $where = ["1=1"];
         $params = [];
-        $paramNum = 1;
 
         if (!empty($filters['date_from'])) {
-            $where[] = "c.call_date >= $$paramNum";
+            $where[] = "c.call_date >= ?";
             $params[] = $filters['date_from'];
-            $paramNum++;
         }
         if (!empty($filters['date_to'])) {
-            $where[] = "c.call_date <= $$paramNum";
+            $where[] = "c.call_date <= ?";
             $params[] = $filters['date_to'];
-            $paramNum++;
         }
         if (!empty($filters['extension_id'])) {
-            $where[] = "c.extension_id = $$paramNum";
+            $where[] = "c.extension_id = ?";
             $params[] = $filters['extension_id'];
-            $paramNum++;
         }
         if (!empty($filters['customer_id'])) {
-            $where[] = "c.customer_id = $$paramNum";
+            $where[] = "c.customer_id = ?";
             $params[] = $filters['customer_id'];
-            $paramNum++;
         }
         if (!empty($filters['direction'])) {
-            $where[] = "c.direction = $$paramNum";
+            $where[] = "c.direction = ?";
             $params[] = $filters['direction'];
-            $paramNum++;
         }
         if (!empty($filters['disposition'])) {
-            $where[] = "c.disposition = $$paramNum";
+            $where[] = "c.disposition = ?";
             $params[] = $filters['disposition'];
-            $paramNum++;
         }
 
         $sql = "SELECT c.*, 
@@ -423,8 +404,9 @@ class CallCenter {
                 ORDER BY c.call_date DESC
                 LIMIT $limit OFFSET $offset";
 
-        $result = pg_query_params($this->db, $sql, $params);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getCallStats($period = 'today') {
@@ -447,18 +429,19 @@ class CallCenter {
                 FROM call_center_calls
                 WHERE $dateCondition";
 
-        $result = pg_query($this->db, $sql);
-        return pg_fetch_assoc($result);
+        $stmt = $this->db->query($sql);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function logCall($src, $dst, $direction, $data = []) {
         $sql = "INSERT INTO call_center_calls 
                 (uniqueid, call_date, src, dst, direction, disposition, duration, billsec, 
                  extension_id, customer_id, ticket_id, notes)
-                VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id";
         
-        $params = [
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
             $data['uniqueid'] ?? uniqid('call_'),
             $src,
             $dst,
@@ -470,36 +453,28 @@ class CallCenter {
             $data['customer_id'] ?? null,
             $data['ticket_id'] ?? null,
             $data['notes'] ?? null
-        ];
+        ]);
 
-        $result = pg_query_params($this->db, $sql, $params);
-        $row = pg_fetch_assoc($result);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row['id'];
     }
 
-    // Agent status
     public function logAgentStatus($extensionId, $status, $reason = null) {
-        // Close previous status
-        $sql = "UPDATE call_center_agent_status 
+        $stmt = $this->db->prepare("UPDATE call_center_agent_status 
                 SET ended_at = NOW(), duration = EXTRACT(EPOCH FROM (NOW() - started_at))::INTEGER
-                WHERE extension_id = $1 AND ended_at IS NULL";
-        pg_query_params($this->db, $sql, [$extensionId]);
+                WHERE extension_id = ? AND ended_at IS NULL");
+        $stmt->execute([$extensionId]);
 
-        // Log new status
-        $sql = "INSERT INTO call_center_agent_status (extension_id, status, status_reason)
-                VALUES ($1, $2, $3)";
-        return pg_query_params($this->db, $sql, [$extensionId, $status, $reason]);
+        $stmt = $this->db->prepare("INSERT INTO call_center_agent_status (extension_id, status, status_reason) VALUES (?, ?, ?)");
+        return $stmt->execute([$extensionId, $status, $reason]);
     }
 
     public function getAgentStatusHistory($extensionId, $limit = 50) {
-        $sql = "SELECT * FROM call_center_agent_status 
-                WHERE extension_id = $1 
-                ORDER BY started_at DESC LIMIT $2";
-        $result = pg_query_params($this->db, $sql, [$extensionId, $limit]);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->prepare("SELECT * FROM call_center_agent_status WHERE extension_id = ? ORDER BY started_at DESC LIMIT ?");
+        $stmt->execute([$extensionId, $limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    // SIP Trunks
     public function getTrunks($activeOnly = true) {
         $sql = "SELECT * FROM call_center_trunks";
         if ($activeOnly) {
@@ -507,24 +482,25 @@ class CallCenter {
         }
         $sql .= " ORDER BY name";
         
-        $result = pg_query($this->db, $sql);
-        return pg_fetch_all($result) ?: [];
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function getTrunk($id) {
-        $sql = "SELECT * FROM call_center_trunks WHERE id = $1";
-        $result = pg_query_params($this->db, $sql, [$id]);
-        return pg_fetch_assoc($result);
+        $stmt = $this->db->prepare("SELECT * FROM call_center_trunks WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     public function saveTrunk($data) {
         if (isset($data['id']) && $data['id']) {
             $sql = "UPDATE call_center_trunks SET 
-                    name = $1, trunk_type = $2, host = $3, port = $4, username = $5,
-                    secret = $6, codecs = $7, max_channels = $8, registration = $9,
-                    is_active = $10, updated_at = NOW()
-                    WHERE id = $11";
-            $params = [
+                    name = ?, trunk_type = ?, host = ?, port = ?, username = ?,
+                    secret = ?, codecs = ?, max_channels = ?, registration = ?,
+                    is_active = ?, updated_at = NOW()
+                    WHERE id = ?";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['name'],
                 $data['trunk_type'] ?? 'peer',
                 $data['host'],
@@ -536,14 +512,14 @@ class CallCenter {
                 $data['registration'] ?? false,
                 $data['is_active'] ?? true,
                 $data['id']
-            ];
-            pg_query_params($this->db, $sql, $params);
+            ]);
             return $data['id'];
         } else {
             $sql = "INSERT INTO call_center_trunks 
                     (name, trunk_type, host, port, username, secret, codecs, max_channels, registration, is_active)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id";
-            $params = [
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
                 $data['name'],
                 $data['trunk_type'] ?? 'peer',
                 $data['host'],
@@ -554,55 +530,45 @@ class CallCenter {
                 $data['max_channels'] ?? 30,
                 $data['registration'] ?? false,
                 $data['is_active'] ?? true
-            ];
-            $result = pg_query_params($this->db, $sql, $params);
-            $row = pg_fetch_assoc($result);
+            ]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
             return $row['id'];
         }
     }
 
     public function deleteTrunk($id) {
-        $sql = "UPDATE call_center_trunks SET is_active = false WHERE id = $1";
-        return pg_query_params($this->db, $sql, [$id]);
+        $stmt = $this->db->prepare("UPDATE call_center_trunks SET is_active = false WHERE id = ?");
+        return $stmt->execute([$id]);
     }
 
-    // Customer phone lookup
     public function findCustomerByPhone($phone) {
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        $sql = "SELECT id, name, phone, email, address 
+        $stmt = $this->db->prepare("SELECT id, name, phone, email, address 
                 FROM customers 
-                WHERE REPLACE(REPLACE(phone, ' ', ''), '-', '') LIKE $1
-                LIMIT 1";
-        $result = pg_query_params($this->db, $sql, ["%$phone%"]);
-        return pg_fetch_assoc($result);
+                WHERE REPLACE(REPLACE(phone, ' ', ''), '-', '') LIKE ?
+                LIMIT 1");
+        $stmt->execute(["%$phone%"]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Link call to ticket
     public function linkCallToTicket($callId, $ticketId) {
-        $sql = "UPDATE call_center_calls SET ticket_id = $1 WHERE id = $2";
-        return pg_query_params($this->db, $sql, [$ticketId, $callId]);
+        $stmt = $this->db->prepare("UPDATE call_center_calls SET ticket_id = ? WHERE id = ?");
+        return $stmt->execute([$ticketId, $callId]);
     }
 
-    // Dashboard stats
     public function getDashboardStats() {
         $stats = $this->getCallStats('today');
         
-        // Active agents
-        $sql = "SELECT COUNT(*) as count FROM call_center_extensions WHERE is_active = true";
-        $result = pg_query($this->db, $sql);
-        $row = pg_fetch_assoc($result);
+        $stmt = $this->db->query("SELECT COUNT(*) as count FROM call_center_extensions WHERE is_active = true");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $stats['active_extensions'] = $row['count'];
 
-        // Active queues
-        $sql = "SELECT COUNT(*) as count FROM call_center_queues WHERE is_active = true";
-        $result = pg_query($this->db, $sql);
-        $row = pg_fetch_assoc($result);
+        $stmt = $this->db->query("SELECT COUNT(*) as count FROM call_center_queues WHERE is_active = true");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $stats['active_queues'] = $row['count'];
 
-        // Trunks
-        $sql = "SELECT COUNT(*) as count FROM call_center_trunks WHERE is_active = true";
-        $result = pg_query($this->db, $sql);
-        $row = pg_fetch_assoc($result);
+        $stmt = $this->db->query("SELECT COUNT(*) as count FROM call_center_trunks WHERE is_active = true");
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $stats['active_trunks'] = $row['count'];
 
         return $stats;
