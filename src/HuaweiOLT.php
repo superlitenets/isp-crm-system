@@ -1589,9 +1589,9 @@ class HuaweiOLT {
             $allOnus = array_merge($allOnus, array_values($currentOnus));
         }
         
-        fwrite($socket, "quit\r\n"); usleep(200000);
-        fwrite($socket, "quit\r\n"); usleep(200000);
-        fclose($socket);
+        @fwrite($socket, "quit\r\n"); usleep(200000);
+        @fwrite($socket, "quit\r\n"); usleep(200000);
+        @fclose($socket);
         
         usort($allOnus, function($a, $b) {
             if ($a['slot'] !== $b['slot']) return $a['slot'] - $b['slot'];
