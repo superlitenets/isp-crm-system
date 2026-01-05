@@ -50,15 +50,17 @@ class RadiusClient {
         \socket_set_option($socket, SOL_SOCKET, SO_SNDTIMEO, ['sec' => $this->timeout, 'usec' => 0]);
         
         $identifier = \random_int(0, 255);
-        $authenticator = \random_bytes(16);
         
         $attrData = $this->encodeAttributes($attributes);
         
         $length = 20 + \strlen($attrData);
-        $packet = \pack('CCn', $code, $identifier, $length) . $authenticator . $attrData;
         
-        $newAuth = \md5($packet . $this->secret, true);
-        $packet = \substr($packet, 0, 4) . $newAuth . $attrData;
+        // For CoA/Disconnect, Request Authenticator = MD5(Code + ID + Length + 16 zeros + Attributes + Secret)
+        $zeroAuth = \str_repeat("\x00", 16);
+        $prePacket = \pack('CCn', $code, $identifier, $length) . $zeroAuth . $attrData;
+        $authenticator = \md5($prePacket . $this->secret, true);
+        
+        $packet = \pack('CCn', $code, $identifier, $length) . $authenticator . $attrData;
         
         $result = @\socket_sendto($socket, $packet, \strlen($packet), 0, $this->nasIp, $this->nasPort);
         if ($result === false) {
