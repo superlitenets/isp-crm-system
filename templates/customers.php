@@ -329,11 +329,10 @@ document.querySelectorAll('.click-to-call').forEach(btn => {
         const originalHtml = this.innerHTML;
         this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         
-        fetch('?page=call_center', {
+        fetch('?page=call_center&action=originate_call', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: new URLSearchParams({
-                action: 'originate_call',
                 phone: phone,
                 customer_id: customerId || '',
                 csrf_token: '<?= $csrfToken ?>'
