@@ -8145,7 +8145,10 @@ class HuaweiOLT {
         ];
         
         // Combined command - get both ONT config and service-port in one session
-        $combinedCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont {$port} {$onuId}\r\nquit\r\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
+        // Note: From interface gpon frame/slot, syntax is: display current-configuration ont <port> <ont-id>
+        $portNum = (int)$port;
+        $onuNum = (int)$onuId;
+        $combinedCmd = "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration ont " . $portNum . " " . $onuNum . "\r\nquit\r\ndisplay service-port port {$frame}/{$slot}/{$port} ont {$onuId}";
         $result = $this->executeCommand($oltId, $combinedCmd);
         
         if ($result['success']) {
