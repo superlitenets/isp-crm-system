@@ -356,12 +356,23 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command directly - single buffer write
-            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
-            console.log(`[OLT ${this.oltId}] Sending: "${command}" (${cmdBuffer.length} bytes, hex: ${cmdBuffer.toString('hex')})`);
+            // Send command character by character to simulate typing
+            // This prevents the OLT from stripping spaces on fast buffer input
+            const sendSlowly = async () => {
+                console.log(`[OLT ${this.oltId}] Typing: "${command}" (${command.length} chars)`);
+                
+                for (let i = 0; i < command.length; i++) {
+                    this.socket.write(Buffer.from(command[i], 'utf8'));
+                    // 10ms delay between characters - simulates typing
+                    await new Promise(r => setTimeout(r, 10));
+                }
+                // Send CR at the end
+                this.socket.write(Buffer.from('\r', 'utf8'));
+            };
             
-            // Write entire command in one shot
-            this.socket.write(cmdBuffer);
+            sendSlowly().catch(err => {
+                console.error(`[OLT ${this.oltId}] Send error:`, err);
+            });
         });
     }
     
