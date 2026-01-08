@@ -14,6 +14,56 @@ app.use(bodyParser.json());
 const PORT = process.env.WA_PORT || 3001;
 const BIND_HOST = process.env.WA_HOST || (process.env.DOCKER_ENV ? '0.0.0.0' : '127.0.0.1');
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
+
+function cleanupChromeLocks() {
+    const sessionDir = path.join(SESSION_PATH, 'session');
+    const chromiumDirs = [
+        path.join(sessionDir, 'Default'),
+        sessionDir
+    ];
+    
+    for (const dir of chromiumDirs) {
+        if (!fs.existsSync(dir)) continue;
+        
+        const lockFiles = ['SingletonLock', 'SingletonSocket', 'SingletonCookie'];
+        for (const lockFile of lockFiles) {
+            const lockPath = path.join(dir, lockFile);
+            if (fs.existsSync(lockPath)) {
+                try {
+                    fs.unlinkSync(lockPath);
+                    console.log(`Removed stale lock file: ${lockPath}`);
+                } catch (e) {
+                    console.warn(`Could not remove lock file ${lockPath}:`, e.message);
+                }
+            }
+        }
+    }
+    
+    try {
+        const walkDir = (dir, depth = 0) => {
+            if (depth > 3 || !fs.existsSync(dir)) return;
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                if (entry.name === 'SingletonLock' || entry.name === 'SingletonSocket') {
+                    const lockPath = path.join(dir, entry.name);
+                    try {
+                        fs.unlinkSync(lockPath);
+                        console.log(`Removed nested lock file: ${lockPath}`);
+                    } catch (e) {}
+                } else if (entry.isDirectory()) {
+                    walkDir(path.join(dir, entry.name), depth + 1);
+                }
+            }
+        };
+        if (fs.existsSync(SESSION_PATH)) {
+            walkDir(SESSION_PATH);
+        }
+    } catch (e) {
+        console.warn('Error walking session directory:', e.message);
+    }
+}
+
+cleanupChromeLocks();
 const API_SECRET_DIR = path.join(__dirname, '.api_secret_dir');
 const API_SECRET_FILE = fs.existsSync(API_SECRET_DIR) && fs.statSync(API_SECRET_DIR).isDirectory() 
     ? path.join(API_SECRET_DIR, 'secret') 
@@ -68,6 +118,8 @@ function initializeClient() {
     if (client) {
         client.destroy();
     }
+    
+    cleanupChromeLocks();
     
     const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium';
     console.log('Using Chromium at:', chromiumPath);
