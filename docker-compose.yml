@@ -107,6 +107,7 @@ services:
       - GENIEACS_FS_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-fs-access.log
       - GENIEACS_UI_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-ui-access.log
       - GENIEACS_DEBUG_FILE=/var/log/genieacs/genieacs-debug.yaml
+      - NODE_OPTIONS=--max-old-space-size=384
     ports:
       - "7547:7547"
       - "7557:7557"
@@ -119,15 +120,20 @@ services:
       - genieacs-mongo
     networks:
       - crm_network
+    mem_limit: 512m
+    memswap_limit: 512m
 
   genieacs-mongo:
     image: mongo:4.4
     container_name: isp_crm_genieacs_mongo
     restart: unless-stopped
+    command: mongod --wiredTigerCacheSizeGB 0.25
     volumes:
       - genieacs_mongo_data:/data/db
     networks:
       - crm_network
+    mem_limit: 256m
+    memswap_limit: 256m
 
   olt-service:
     build:
