@@ -51,7 +51,11 @@ class OLTSession {
                             // Critical: Reject LINEMODE to prevent space stripping
                             // Accept SGA (Suppress Go Ahead) for proper character mode
                             if (cmd === DO) {
-                                if (option === OPT_SGA) {
+                                if (option === OPT_BINARY) {
+                                    // Accept BINARY mode - critical for preserving spaces
+                                    this.socket.write(Buffer.from([IAC, WILL, option]));
+                                    console.log(`[OLT ${this.oltId}] WILL BINARY (critical)`);
+                                } else if (option === OPT_SGA) {
                                     // Accept Suppress Go Ahead - needed for character mode
                                     this.socket.write(Buffer.from([IAC, WILL, option]));
                                     console.log(`[OLT ${this.oltId}] WILL SGA`);
@@ -73,7 +77,11 @@ class OLTSession {
                                     this.socket.write(Buffer.from([IAC, WONT, option]));
                                 }
                             } else if (cmd === WILL) {
-                                if (option === OPT_ECHO || option === OPT_SGA) {
+                                if (option === OPT_BINARY) {
+                                    // Accept server BINARY mode - critical for preserving spaces
+                                    this.socket.write(Buffer.from([IAC, DO, option]));
+                                    console.log(`[OLT ${this.oltId}] DO BINARY (critical)`);
+                                } else if (option === OPT_ECHO || option === OPT_SGA) {
                                     // Accept server echo and SGA
                                     this.socket.write(Buffer.from([IAC, DO, option]));
                                 } else {
@@ -125,17 +133,21 @@ class OLTSession {
                 clearTimeout(timeout);
                 console.log(`[OLT ${this.oltId}] TCP connected to ${this.config.host}`);
                 
-                // Proactively negotiate character mode to prevent space stripping
+                // Proactively negotiate BINARY + character mode to prevent space stripping
+                // CRITICAL: Binary mode disables all character processing on the telnet layer
+                // Send: WILL/DO BINARY (request binary transmission mode)
                 // Send: WILL SGA (we want character-at-a-time mode)
                 // Send: DONT LINEMODE (reject any line editing that strips spaces)
                 // Send: DO ECHO (let server echo)
                 this.socket.write(Buffer.from([
+                    IAC, WILL, OPT_BINARY,    // We will send binary (no processing)
+                    IAC, DO, OPT_BINARY,      // Server should send binary (no processing)
                     IAC, WILL, OPT_SGA,       // We will suppress go-ahead (character mode)
                     IAC, DONT, OPT_LINEMODE,  // Don't use linemode
                     IAC, DO, OPT_ECHO,        // Server should echo
                     IAC, DO, OPT_SGA          // Server should suppress go-ahead
                 ]));
-                console.log(`[OLT ${this.oltId}] Sent proactive telnet negotiation (character mode)`);
+                console.log(`[OLT ${this.oltId}] Sent proactive telnet negotiation (BINARY + character mode)`);
             });
 
             this.socket.on('data', (data) => {
@@ -344,8 +356,11 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send telnet negotiation first to reinforce character mode
+            // Send telnet negotiation first to reinforce binary/character mode
+            // CRITICAL: Request binary mode to prevent any character processing/space stripping
             const telnetNegotiation = Buffer.from([
+                IAC, WILL, OPT_BINARY,    // We will send binary (no processing)
+                IAC, DO, OPT_BINARY,      // Server should send binary (no processing)
                 IAC, WILL, OPT_SGA,       // We will suppress go-ahead
                 IAC, DONT, OPT_LINEMODE,  // Don't use linemode (prevents space stripping)
                 IAC, DO, OPT_SGA          // Server should suppress go-ahead
