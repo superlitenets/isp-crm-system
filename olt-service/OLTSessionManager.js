@@ -362,24 +362,15 @@ class OLTSession {
             // Send command character by character to simulate typing
             // This prevents the OLT from stripping spaces on fast buffer input
             const sendSlowly = async () => {
-                // Debug: show hex of entire command to verify spaces
-                const cmdHex = Buffer.from(command, 'utf8').toString('hex');
-                console.log(`[OLT ${this.oltId}] Typing: "${command}" (${command.length} chars, hex: ${cmdHex})`);
+                console.log(`[OLT ${this.oltId}] Typing: "${command}" (${command.length} chars)`);
                 
                 for (let i = 0; i < command.length; i++) {
-                    const char = command[i];
-                    const charHex = Buffer.from(char, 'utf8').toString('hex');
-                    // Log each space to verify they're being sent
-                    if (char === ' ') {
-                        console.log(`[OLT ${this.oltId}] Sending SPACE at position ${i} (hex: ${charHex})`);
-                    }
-                    this.socket.write(Buffer.from(char, 'utf8'));
+                    this.socket.write(Buffer.from(command[i], 'utf8'));
                     // 50ms delay between characters - simulates slower typing
                     await new Promise(r => setTimeout(r, 50));
                 }
                 // Send CR at the end
                 this.socket.write(Buffer.from('\r', 'utf8'));
-                console.log(`[OLT ${this.oltId}] Sent CR to execute command`);
             };
             
             sendSlowly().catch(err => {
