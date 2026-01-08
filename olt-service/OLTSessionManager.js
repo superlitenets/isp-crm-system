@@ -356,27 +356,29 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command character by character to bypass line editing
-            // This is a workaround for OLT telnet servers that strip spaces
-            const sendCharByChar = async () => {
-                const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
-                console.log(`[OLT ${this.oltId}] Sending char-by-char: "${command}" (hex: ${cmdBuffer.toString('hex')})`);
-                
-                // Send each character with a small delay
+            // Send command with Ctrl+V escape before each space
+            // Ctrl+V (0x16) tells the terminal to insert the next character literally
+            const sendWithEscapedSpaces = async () => {
+                let escapedCommand = '';
                 for (let i = 0; i < command.length; i++) {
                     const char = command[i];
-                    this.socket.write(Buffer.from(char, 'utf8'));
-                    // Small delay between characters (5ms)
-                    await new Promise(r => setTimeout(r, 5));
+                    if (char === ' ') {
+                        // Ctrl+V (0x16) before space to escape it
+                        escapedCommand += '\x16 ';
+                    } else {
+                        escapedCommand += char;
+                    }
                 }
-                // Send CR+LF at the end
-                this.socket.write(Buffer.from('\r\n', 'utf8'));
+                
+                const cmdBuffer = Buffer.from(escapedCommand + '\r\n', 'utf8');
+                console.log(`[OLT ${this.oltId}] Sending (escaped): "${command}" (hex: ${cmdBuffer.toString('hex')})`);
+                this.socket.write(cmdBuffer);
             };
             
             // Start sending after a brief delay
             setTimeout(() => {
-                sendCharByChar().catch(err => {
-                    console.error(`[OLT ${this.oltId}] Char-by-char send error:`, err);
+                sendWithEscapedSpaces().catch(err => {
+                    console.error(`[OLT ${this.oltId}] Send error:`, err);
                 });
             }, 100);
         });

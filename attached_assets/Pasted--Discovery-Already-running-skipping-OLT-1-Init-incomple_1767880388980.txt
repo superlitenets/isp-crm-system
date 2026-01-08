@@ -1,0 +1,43 @@
+[Discovery] Already running, skipping...
+[OLT 1] Init incomplete, proceeding anyway
+[OLT 1] Sending: "display ont autofind all" (hex: 646973706c6179206f6e74206175746f66696e6420616c6c0d0a)
+[Discovery] Parsing autofind output (98 chars)
+[Discovery] Parsed 0 ONUs from autofind output
+[Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+[Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+[Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+[Discovery] Connecting to HRM_OLT...
+[Discovery] Decrypted password: on***
+[OLT 2] TCP connected to 10.98.0.2
+[OLT 2] Sent proactive telnet negotiation (BINARY + character mode)
+[OLT 2] WILL BINARY (critical)
+[OLT 2] DO BINARY (critical)
+[OLT 2] Sent username
+[OLT 2] Sent password
+[OLT 2] Login successful - prompt detected
+[OLT 2] Sending: "enable" (hex: 656e61626c650d0a)
+[OLT 2] Entered enable mode
+[OLT 2] Sending: "config" (hex: 636f6e6669670d0a)
+[OLT 2] Entered config mode
+[OLT 2] Sending: "screen-length 0 temporary" (hex: 73637265656e2d6c656e67746820302074656d706f726172790d0a)
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 90ms - Success: 2, Failed: 0
+[OLT 1] Command timeout, got 227 bytes
+[OLT 1] Last 300 chars: screen-length0temporary\n                ^\n  % Unknown command, the error locates at '^'\n\nMA5683T(config)#\n\nMA5683T(config)#display ont autofind all\n  Failure: The automatically found ONTs do not exist\n\nMA5683T(config)#
+[OLT 1] Disabled paging - ready for commands
+[OLT 1] Init incomplete, proceeding anyway
+[OLT 1] Multi-line command detected (4 lines), sending sequentially
+[OLT 1] Sending: "interface gpon 0/1" (hex: 696e746572666163652067706f6e20302f310d0a)
+[OLT 1] Sending: "display current-configuration ont 0 1" (hex: 646973706c61792063757272656e742d636f6e66696775726174696f6e206f6e74203020310d0a)
+[OLT 1] Sending: "quit" (hex: 717569740d0a)
+[OLT 1] Sending: "display service-port port 0/1/0 ont 1" (hex: 646973706c617920736572766963652d706f727420706f727420302f312f30206f6e7420310d0a)
+[Discovery] Already running, skipping...
+[SNMP] Polling 2 active OLTs...
+[SNMP] ONU status walk completed for OLT 1: 0 ONUs
+[SNMP] ONU status walk completed for OLT 2: 0 ONUs
+[SNMP] Completed in 85ms - Success: 2, Failed: 0
+[OLT 1] Command timeout, got 543 bytes
+[OLT 1] Last 300 chars: t01\n                                                          ^\n  % Too many parameters, the error locates at '^'\n\nMA5683T(config-if-gpon-0/1)#\n\nMA5683T(config-if-gpon-0/1)#quit\n\nMA5683T(config)#\n\nMA5683T(config)#display service-port port 0/1/0 ont 1\n{ <cr>|e2e<K>|gemport<K>|sort-by<K> }:
+[OLT 1] Disabled paging - ready for commands
