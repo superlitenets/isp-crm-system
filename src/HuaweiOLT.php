@@ -7026,7 +7026,8 @@ class HuaweiOLT {
         
         if ($async && $this->isOLTServiceAvailable()) {
             // Fast async execution - delete from DB immediately, OLT command runs in background
-            $this->deleteONU($onuId);
+            // Pass false to avoid infinite recursion (don't call deleteONUFromOLT again)
+            $this->deleteONU($onuId, false);
             
             $result = $this->executeAsyncViaService($oltId, $command);
             
@@ -7077,7 +7078,8 @@ class HuaweiOLT {
         $success = $result['success'] && !preg_match('/(?:Failure|Error:|failed|Invalid|Unknown command)/i', $output);
         
         if ($success) {
-            $this->deleteONU($onuId);
+            // Pass false to avoid infinite recursion (don't call deleteONUFromOLT again)
+            $this->deleteONU($onuId, false);
         }
         
         $spCount = count($servicePortIds);
