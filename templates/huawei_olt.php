@@ -12659,7 +12659,19 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Stage ' + stage + ' Failed:</strong> ' + (result.error || 'Unknown error');
                     loadingError.style.display = 'block';
                     loadingText.textContent = 'Authorization Failed';
-                    loadingSubtext.innerHTML = '<button class="btn btn-sm btn-outline-light mt-2" onclick="hideLoading()">Close</button>';
+                    loadingSubtext.innerHTML = 'Closing in <span id="closeCountdown">3</span>s... <button class="btn btn-sm btn-outline-light ms-2" onclick="hideLoading()">Close Now</button>';
+                    
+                    // Auto-close after 3 seconds
+                    let countdown = 3;
+                    const countdownEl = document.getElementById('closeCountdown');
+                    const countdownInterval = setInterval(() => {
+                        countdown--;
+                        if (countdownEl) countdownEl.textContent = countdown;
+                        if (countdown <= 0) {
+                            clearInterval(countdownInterval);
+                            hideLoading();
+                        }
+                    }, 1000);
                     return;
                 }
                 
@@ -12700,7 +12712,19 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 loadingError.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Network Error:</strong> ' + err.message;
                 loadingError.style.display = 'block';
                 loadingText.textContent = 'Authorization Failed';
-                loadingSubtext.innerHTML = '<button class="btn btn-sm btn-outline-light mt-2" onclick="hideLoading()">Close</button>';
+                loadingSubtext.innerHTML = 'Closing in <span id="closeCountdown">3</span>s... <button class="btn btn-sm btn-outline-light ms-2" onclick="hideLoading()">Close Now</button>';
+                
+                // Auto-close after 3 seconds
+                let countdown = 3;
+                const countdownEl = document.getElementById('closeCountdown');
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdownEl) countdownEl.textContent = countdown;
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        hideLoading();
+                    }
+                }, 1000);
                 return;
             }
         }
