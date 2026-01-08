@@ -133,6 +133,9 @@ class OLTSession {
                 clearTimeout(timeout);
                 console.log(`[OLT ${this.oltId}] TCP connected to ${this.config.host}`);
                 
+                // Disable Nagle's algorithm to send each character immediately
+                this.socket.setNoDelay(true);
+                
                 // Proactively negotiate BINARY + character mode to prevent space stripping
                 // CRITICAL: Binary mode disables all character processing on the telnet layer
                 // Send: WILL/DO BINARY (request binary transmission mode)
@@ -363,8 +366,9 @@ class OLTSession {
                 
                 for (let i = 0; i < command.length; i++) {
                     this.socket.write(Buffer.from(command[i], 'utf8'));
-                    // 10ms delay between characters - simulates typing
-                    await new Promise(r => setTimeout(r, 10));
+                    // 50ms delay between characters - simulates slower typing
+                    // Increased from 10ms to ensure OLT processes each character
+                    await new Promise(r => setTimeout(r, 50));
                 }
                 // Send CR at the end
                 this.socket.write(Buffer.from('\r', 'utf8'));
