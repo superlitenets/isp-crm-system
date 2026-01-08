@@ -20,12 +20,19 @@ app.get('/sessions', (req, res) => {
 
 app.post('/connect', async (req, res) => {
     try {
-        const { oltId, host, port, username, password } = req.body;
+        const { oltId, host, port, username, password, protocol, sshPort } = req.body;
         if (!oltId || !host || !username || !password) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
-        await sessionManager.connect(oltId, { host, port: port || 23, username, password });
-        res.json({ success: true, message: `Connected to OLT ${oltId}` });
+        await sessionManager.connect(oltId, { 
+            host, 
+            port: port || 23, 
+            username, 
+            password,
+            protocol: protocol || 'telnet',  // 'telnet' or 'ssh'
+            sshPort: sshPort || 22
+        });
+        res.json({ success: true, message: `Connected to OLT ${oltId} via ${protocol || 'telnet'}` });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }

@@ -5246,7 +5246,7 @@ class HuaweiOLT {
         return false;
     }
     
-    public function connectToOLTSession(int $oltId): array {
+    public function connectToOLTSession(int $oltId, ?string $protocol = null): array {
         $olt = $this->getOLT($oltId);
         if (!$olt) {
             return ['success' => false, 'error' => 'OLT not found'];
@@ -5254,12 +5254,17 @@ class HuaweiOLT {
         
         $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
         
+        // Use specified protocol or fall back to OLT's configured protocol, default to telnet
+        $useProtocol = $protocol ?? ($olt['cli_protocol'] ?? 'telnet');
+        
         $data = [
             'oltId' => (string)$oltId,
             'host' => $olt['ip_address'],
             'port' => (int)$olt['port'],
             'username' => $olt['username'],
-            'password' => $password
+            'password' => $password,
+            'protocol' => $useProtocol,
+            'sshPort' => (int)($olt['ssh_port'] ?? 22)
         ];
         
         $result = $this->callOLTService('/connect', $data);
@@ -5269,7 +5274,7 @@ class HuaweiOLT {
                 'olt_id' => $oltId,
                 'action' => 'session_connect',
                 'status' => 'success',
-                'message' => 'Persistent session established',
+                'message' => "Persistent session established via {$useProtocol}",
                 'user_id' => $_SESSION['user_id'] ?? null
             ]);
         }

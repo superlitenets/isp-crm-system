@@ -959,6 +959,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = (($result['snmp']['success'] ?? false) || ($result['cli']['success'] ?? false)) ? 'warning' : 'danger';
                 }
                 break;
+            case 'test_ssh_connection':
+                $oltId = (int)$_POST['id'];
+                $huaweiOLT->disconnectOLTSession($oltId);
+                $result = $huaweiOLT->connectToOLTSession($oltId, 'ssh');
+                if ($result['success'] ?? false) {
+                    $testResult = $huaweiOLT->executeViaService($oltId, 'display version', 15000);
+                    if ($testResult['success'] ?? false) {
+                        $message = "SSH connection successful! Spaces should now be preserved.";
+                        $messageType = 'success';
+                    } else {
+                        $message = "SSH connected but command failed: " . ($testResult['message'] ?? 'Unknown error');
+                        $messageType = 'warning';
+                    }
+                } else {
+                    $message = "SSH connection failed: " . ($result['error'] ?? 'Check if SSH is enabled on OLT');
+                    $messageType = 'danger';
+                }
+                break;
+            case 'set_cli_protocol':
+                $oltId = (int)$_POST['id'];
+                $protocol = in_array($_POST['protocol'] ?? '', ['telnet', 'ssh']) ? $_POST['protocol'] : 'telnet';
+                $db->prepare("UPDATE huawei_olts SET cli_protocol = ? WHERE id = ?")->execute([$protocol, $oltId]);
+                $huaweiOLT->disconnectOLTSession($oltId);
+                $message = "CLI protocol set to " . strtoupper($protocol);
+                $messageType = 'success';
+                break;
             case 'add_profile':
                 $huaweiOLT->addServiceProfile($_POST);
                 $message = 'Service profile added successfully';

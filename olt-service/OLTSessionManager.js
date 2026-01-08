@@ -465,6 +465,8 @@ class OLTSession {
     }
 }
 
+const SSHSession = require('./SSHSession');
+
 class OLTSessionManager {
     constructor() {
         this.sessions = new Map();
@@ -481,23 +483,35 @@ class OLTSessionManager {
             await this.disconnect(oltId);
         }
 
-        const session = new OLTSession(oltId, config);
+        let session;
+        if (config.protocol === 'ssh') {
+            console.log(`[OLT ${oltId}] Using SSH protocol`);
+            session = new SSHSession(oltId, config);
+        } else {
+            console.log(`[OLT ${oltId}] Using Telnet protocol`);
+            session = new OLTSession(oltId, config);
+        }
+        
         await session.connect();
         this.sessions.set(oltId, session);
         
-        this.startKeepalive(oltId);
+        this.startKeepalive(oltId, config.protocol);
     }
 
-    startKeepalive(oltId) {
+    startKeepalive(oltId, protocol) {
         if (this.keepaliveIntervals.has(oltId)) {
             clearInterval(this.keepaliveIntervals.get(oltId));
         }
         
         const interval = setInterval(async () => {
             const session = this.sessions.get(oltId);
-            if (session && session.connected && session.socket) {
+            if (session && session.connected) {
                 try {
-                    session.socket.write('\r\n');
+                    if (protocol === 'ssh' && session.stream) {
+                        session.stream.write('\r');
+                    } else if (session.socket) {
+                        session.socket.write('\r\n');
+                    }
                     session.lastActivity = Date.now();
                 } catch (error) {
                     console.error(`[OLT ${oltId}] Keepalive failed`);
