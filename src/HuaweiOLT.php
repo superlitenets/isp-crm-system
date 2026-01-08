@@ -6451,8 +6451,10 @@ class HuaweiOLT {
         $onuId = $onu['onu_id'];
         
         // Try display ont wan-info command
+        $p = (int)$port;
+        $o = (int)$onuId;
         $cmd = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd .= "display ont wan-info {$port} {$onuId}\r\n";
+        $cmd .= "display ont wan-info " . $p . " " . $o . "\r\n";
         $cmd .= "quit";
         
         $result = $this->executeCommand($oltId, $cmd);
@@ -6473,7 +6475,7 @@ class HuaweiOLT {
         
         // Try alternative: display ont ip-host
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "display ont ip-host-config {$port} {$onuId}\r\n";
+        $cmd2 .= "display ont ip-host-config " . $p . " " . $o . "\r\n";
         $cmd2 .= "quit";
         
         $result2 = $this->executeCommand($oltId, $cmd2);
