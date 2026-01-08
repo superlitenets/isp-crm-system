@@ -299,7 +299,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 if ($vlanId) {
                     $onu = $huaweiOLT->getONU($onuId);
                     if ($onu) {
-                        $result = $huaweiOLT->attachVLAN($onuId, $vlanId);
+                        $result = $huaweiOLT->attachVlanToONU($onuId, $vlanId);
                         if (!$result['success']) {
                             $response['warning'] = 'Service port config: ' . ($result['message'] ?? 'Check manually');
                         }
