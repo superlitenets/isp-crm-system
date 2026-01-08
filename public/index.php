@@ -7237,6 +7237,31 @@ $csrfToken = \App\Auth::generateToken();
                 include __DIR__ . '/../templates/my-hr.php';
                 break;
             case 'call_center':
+                // Handle call center AJAX actions (check permission but return JSON for AJAX)
+                if ($action === 'originate_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+                    header('Content-Type: application/json');
+                    if (!\App\Auth::check()) {
+                        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+                        exit;
+                    }
+                    require_once __DIR__ . '/../src/CallCenter.php';
+                    $callCenter = new CallCenter($db);
+                    $phone = $_POST['phone'] ?? '';
+                    $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
+                    $ticketId = !empty($_POST['ticket_id']) ? (int)$_POST['ticket_id'] : null;
+                    $userExt = $callCenter->getExtensionByUserId($_SESSION['user_id']);
+                    if (!$userExt) {
+                        echo json_encode(['success' => false, 'error' => 'No extension assigned to your account. Contact admin to assign an extension.']);
+                        exit;
+                    }
+                    if (empty($phone)) {
+                        echo json_encode(['success' => false, 'error' => 'No phone number provided']);
+                        exit;
+                    }
+                    $result = $callCenter->originateCall($userExt['extension'], $phone, $customerId, $ticketId);
+                    echo json_encode($result);
+                    exit;
+                }
                 if (!\App\Auth::can('settings.view')) {
                     $accessDenied = true;
                 } else {
@@ -7253,27 +7278,6 @@ $csrfToken = \App\Auth::generateToken();
                         } else {
                             echo json_encode(['success' => false, 'error' => 'No extension assigned']);
                         }
-                        exit;
-                    }
-                    // Click-to-call from customer/ticket pages
-                    if ($action === 'originate_call' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-                        header('Content-Type: application/json');
-                        require_once __DIR__ . '/../src/CallCenter.php';
-                        $callCenter = new CallCenter($db);
-                        $phone = $_POST['phone'] ?? '';
-                        $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
-                        $ticketId = !empty($_POST['ticket_id']) ? (int)$_POST['ticket_id'] : null;
-                        $userExt = $callCenter->getExtensionByUserId($_SESSION['user_id']);
-                        if (!$userExt) {
-                            echo json_encode(['success' => false, 'error' => 'No extension assigned to your account. Contact admin to assign an extension.']);
-                            exit;
-                        }
-                        if (empty($phone)) {
-                            echo json_encode(['success' => false, 'error' => 'No phone number provided']);
-                            exit;
-                        }
-                        $result = $callCenter->originateCall($userExt['extension'], $phone, $customerId, $ticketId);
-                        echo json_encode($result);
                         exit;
                     }
                     if ($action === 'get_extension') {
