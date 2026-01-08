@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS radius_packages (
     fup_download_speed VARCHAR(20),
     fup_upload_speed VARCHAR(20),
     is_active BOOLEAN DEFAULT TRUE,
+    status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
