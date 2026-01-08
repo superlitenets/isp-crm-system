@@ -1,0 +1,32 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php --tail=30
+172.18.0.6 -  08/Jan/2026:13:53:09 +0300 "GET /api/olt-stats.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:09 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:09 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:15 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:16 +0300 "GET /api/olt-stats.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:16 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:18 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:20 +0300 "GET /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:21 +0300 "POST /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:53:32 +0300 "GET /api/oms-notify.php" 405
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0720256303
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+172.18.0.6 -  08/Jan/2026:13:53:45 +0300 "GET /ticket-view.php" 200
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: +254729149435
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+172.18.0.6 -  08/Jan/2026:13:53:48 +0300 "GET /ticket-status.php" 200
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0720256303
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0720256303
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+NOTICE: PHP message: notifyBranchWhatsAppGroup called - ticketId: 150, branchId: 1
+NOTICE: PHP message: notifyBranchWhatsAppGroup - Sending to group: 120363395097732236@g.us for branch: S-HURUMA
+NOTICE: PHP message: WhatsApp sendToGroup called - Group: 120363395097732236@g.us, Provider: session, URL: http://127.0.0.1:3001
+NOTICE: PHP message: WhatsApp sendToGroup - Calling URL: http://127.0.0.1:3001/send-group
+NOTICE: PHP message: WhatsApp sendToGroup response - HTTP: 200, Error: , Response: {"success":true,"messageId":"true_120363395097732236@g.us_3EB0CD36059F5E2430B337_210445378052171@lid","timestamp":1767869631}
+NOTICE: PHP message: WhatsApp sendToGroup SUCCESS - MessageId: true_120363395097732236@g.us_3EB0CD36059F5E2430B337_210445378052171@lid
+NOTICE: PHP message: WhatsApp branch group notification sent for ticket TKT-20260108-2928 to branch S-HURUMA
+172.18.0.6 -  08/Jan/2026:13:53:41 +0300 "POST /index.php" 200
+172.18.0.6 -  08/Jan/2026:13:54:02 +0300 "GET /api/oms-notify.php" 405
+172.18.0.6 -  08/Jan/2026:13:54:32 +0300 "GET /api/oms-notify.php" 405
+root@superlitecrm:~/isp#
