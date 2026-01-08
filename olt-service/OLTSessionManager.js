@@ -356,31 +356,12 @@ class OLTSession {
             this.buffer = '';
             response = '';
             
-            // Send command with Ctrl+V escape before each space
-            // Ctrl+V (0x16) tells the terminal to insert the next character literally
-            const sendWithEscapedSpaces = async () => {
-                let escapedCommand = '';
-                for (let i = 0; i < command.length; i++) {
-                    const char = command[i];
-                    if (char === ' ') {
-                        // Ctrl+V (0x16) before space to escape it
-                        escapedCommand += '\x16 ';
-                    } else {
-                        escapedCommand += char;
-                    }
-                }
-                
-                const cmdBuffer = Buffer.from(escapedCommand + '\r\n', 'utf8');
-                console.log(`[OLT ${this.oltId}] Sending (escaped): "${command}" (hex: ${cmdBuffer.toString('hex')})`);
-                this.socket.write(cmdBuffer);
-            };
+            // Send command directly - single buffer write
+            const cmdBuffer = Buffer.from(command + '\r\n', 'utf8');
+            console.log(`[OLT ${this.oltId}] Sending: "${command}" (${cmdBuffer.length} bytes, hex: ${cmdBuffer.toString('hex')})`);
             
-            // Start sending after a brief delay
-            setTimeout(() => {
-                sendWithEscapedSpaces().catch(err => {
-                    console.error(`[OLT ${this.oltId}] Send error:`, err);
-                });
-            }, 100);
+            // Write entire command in one shot
+            this.socket.write(cmdBuffer);
         });
     }
     
