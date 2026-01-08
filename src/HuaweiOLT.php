@@ -991,7 +991,9 @@ class HuaweiOLT {
     }
     
     public function getONUDistanceViaCLI(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $p = (int)$port;
+        $o = (int)$onuId;
+        $command = "display ont info {$frame}/{$slot} " . $p . " " . $o;
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -1031,7 +1033,10 @@ class HuaweiOLT {
         
         // Huawei requires entering GPON interface context first for optical-info
         // Also fetch ont info for distance in the same session
-        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\ndisplay ont info {$port} {$onuId}";
+        // Use explicit spacing to avoid concatenation issues
+        $p = (int)$port;
+        $o = (int)$onuId;
+        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info " . $p . " " . $o . "\r\ndisplay ont info " . $p . " " . $o;
         $result = $this->executeCommand($oltId, $command);
         
         if (!$result['success']) {
@@ -1946,12 +1951,16 @@ class HuaweiOLT {
         // Execute commands sequentially - each waits for its prompt
         $fullOutput = '';
         
+        // Ensure proper spacing for CLI commands
+        $p = (int)$port;
+        $o = (int)$onuId;
+        
         // 1. Enter interface context
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $this->executeViaService($oltId, $interfaceCmd, 30000);
         
         // 2. Get optical info
-        $opticalCmd = "display ont optical-info {$port} {$onuId}";
+        $opticalCmd = "display ont optical-info " . $p . " " . $o;
         $opticalResult = $this->executeViaService($oltId, $opticalCmd, 30000);
         $opticalOutput = '';
         if ($opticalResult['success']) {
@@ -1961,7 +1970,7 @@ class HuaweiOLT {
         }
         
         // 3. Get ONU info
-        $infoCmd = "display ont info {$port} {$onuId}";
+        $infoCmd = "display ont info " . $p . " " . $o;
         $infoResult = $this->executeViaService($oltId, $infoCmd, 30000);
         $infoOutput = '';
         if ($infoResult['success']) {
@@ -1971,7 +1980,7 @@ class HuaweiOLT {
         }
         
         // 4. Get WAN info (for Management IP)
-        $wanCmd = "display ont wan-info {$port} {$onuId}";
+        $wanCmd = "display ont wan-info " . $p . " " . $o;
         $wanResult = $this->executeViaService($oltId, $wanCmd, 30000);
         $wanOutput = '';
         if ($wanResult['success']) {
@@ -8114,7 +8123,9 @@ class HuaweiOLT {
     }
     
     public function getONUSingleInfo(int $oltId, int $frame, int $slot, int $port, int $onuId): array {
-        $command = "display ont info {$frame}/{$slot} {$port} {$onuId}";
+        $p = (int)$port;
+        $o = (int)$onuId;
+        $command = "display ont info {$frame}/{$slot} " . $p . " " . $o;
         return $this->executeCommand($oltId, $command);
     }
     
@@ -8325,7 +8336,9 @@ class HuaweiOLT {
             $status['source'] = 'tr069';
             
             // Still get optical from OLT (quick single command)
-            $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info {$port} {$onuId}\r\nquit";
+            $p = (int)$port;
+            $o = (int)$onuId;
+            $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info " . $p . " " . $o . "\r\nquit";
             $opticalResult = $this->executeCommand($oltId, $opticalCmd);
             if ($opticalResult['success']) {
                 $status['optical'] = $this->parseOpticalStatus($opticalResult['output']);
@@ -8345,14 +8358,17 @@ class HuaweiOLT {
         }
         
         // Fallback: Combined OLT command - all queries in one session
+        // Ensure explicit spacing for port and onu_id
+        $p = (int)$port;
+        $o = (int)$onuId;
         $combinedCmd = "interface gpon {$frame}/{$slot}\r\n" .
-            "display ont optical-info {$port} {$onuId}\r\n" .
-            "display ont info {$port} {$onuId}\r\n" .
-            "display ont wan-info {$port} {$onuId}\r\n" .
-            "display ont port state {$port} {$onuId} eth-port all\r\n" .
-            "display ont info {$port} {$onuId} history\r\n" .
+            "display ont optical-info " . $p . " " . $o . "\r\n" .
+            "display ont info " . $p . " " . $o . "\r\n" .
+            "display ont wan-info " . $p . " " . $o . "\r\n" .
+            "display ont port state " . $p . " " . $o . " eth-port all\r\n" .
+            "display ont info " . $p . " " . $o . " history\r\n" .
             "quit\r\n" .
-            "display mac-address port {$frame}/{$slot}/{$port} ont {$onuId}";
+            "display mac-address port {$frame}/{$slot}/{$port} ont " . $o;
         
         $result = $this->executeCommand($oltId, $combinedCmd);
         

@@ -3321,7 +3321,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => 'ONU not found']);
                     exit;
                 }
-                $cmd = "display ont version {$onu['frame']}/{$onu['slot']} {$onu['port']} {$onu['onu_id']}";
+                $portNum = (int)$onu['port'];
+                $onuNum = (int)$onu['onu_id'];
+                $cmd = "display ont version {$onu['frame']}/{$onu['slot']} " . $portNum . " " . $onuNum;
                 $cmdResult = $huaweiOLT->executeCommand($onu['olt_id'], $cmd);
                 $output = $cmdResult['output'] ?? '';
                 $swVersion = '-'; $hwVersion = '-'; $onuType = '-'; $uptime = '-';
