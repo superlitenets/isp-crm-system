@@ -1,0 +1,70 @@
+
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service 2>&1 | grep -E "Typing|SPACE|Sent CR" | tail -30
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service 2>&1 | grep -E "Typing|SPACE|Sent CR" | tail -30
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service 2>&1 | grep -E "Typing|SPACE|Sent CR" | tail -30
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+root@superlitecrm:~/isp# docker logs isp_crm_olt_service 2>&1 | grep -E "Typing|SPACE|Sent CR" | tail -30
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "enable" (6 chars, hex: 656e61626c65)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "config" (6 chars, hex: 636f6e666967)
+[OLT 1] Sent CR to execute command
+[OLT 1] Typing: "screen-length 0 temporary" (25 chars, hex: 73637265656e2d6c656e67746820302074656d706f72617279)
+[OLT 1] Sending SPACE at position 13 (hex: 20)
+[OLT 1] Sending SPACE at position 15 (hex: 20)
+[OLT 1] Sent CR to execute command
+root@superlitecrm:~/isp#
