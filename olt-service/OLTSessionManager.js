@@ -371,9 +371,13 @@ class OLTSession {
                 
                 for (let i = 0; i < command.length; i++) {
                     const char = command[i];
+                    // Wait before sending space to ensure previous char is processed
+                    if (char === ' ') {
+                        await new Promise(r => setTimeout(r, 150));
+                    }
                     this.socket.write(Buffer.from(char, 'utf8'));
-                    // Extra delay for spaces - OLT may need more time to process them
-                    const delay = (char === ' ') ? 100 : 50;
+                    // Delay after each character
+                    const delay = (char === ' ') ? 200 : 30;
                     await new Promise(r => setTimeout(r, delay));
                 }
                 // Send CR at the end
