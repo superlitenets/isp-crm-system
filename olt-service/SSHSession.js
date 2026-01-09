@@ -10,6 +10,7 @@ class SSHSession {
         this.buffer = '';
         this.lastActivity = null;
         this.initComplete = false;
+        this.initStarted = false;
         this.promptPattern = /(?:<[^<>]+>|\[[^\[\]]+\]|[A-Z0-9_-]+(?:\([^)]+\))?[#>])\s*$/i;
         this.dataListeners = [];
     }
@@ -42,8 +43,9 @@ class SSHSession {
                         this.buffer += chunk;
                         this.dataListeners.forEach(listener => listener(chunk));
                         
-                        // Check for login prompt completion
-                        if (!this.initComplete && this.promptPattern.test(this.buffer)) {
+                        // Check for login prompt completion - only run init once
+                        if (!this.initComplete && !this.initStarted && this.promptPattern.test(this.buffer)) {
+                            this.initStarted = true;
                             this.runInitSequence();
                         }
                     });
@@ -257,6 +259,7 @@ class SSHSession {
         this.client = null;
         this.connected = false;
         this.initComplete = false;
+        this.initStarted = false;
         this.buffer = '';
         console.log(`[OLT ${this.oltId}] SSH disconnected`);
     }
