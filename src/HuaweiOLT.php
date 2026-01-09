@@ -2052,6 +2052,16 @@ class HuaweiOLT {
             }
         }
         
+        // Parse ONT IP from ont info output (management IP assigned by OLT)
+        // Format: ONT IP 0 address/mask   : 10.97.127.32/16
+        $ontIp = null;
+        if (preg_match('/ONT\s+IP\s*\d*\s*address\/mask\s*:\s*([\d.]+)/i', $infoOutput, $m)) {
+            $ip = $m[1];
+            if ($ip && $ip !== '0.0.0.0') {
+                $ontIp = $ip;
+            }
+        }
+        
         // Save the optical data to database if we got valid readings
         $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
         $stmt->execute([$sn]);
@@ -2063,9 +2073,17 @@ class HuaweiOLT {
             if ($status) {
                 $this->updateONUStatus($dbOnu['id'], $status);
             }
-            // Update TR-069 IP if found
+            // Update TR-069 IP if found from WAN info
             if ($tr069Ip) {
                 $this->updateONU($dbOnu['id'], ['tr069_ip' => $tr069Ip]);
+            }
+            // Update ONT management IP from ont info (used by ACS for TR-069)
+            if ($ontIp) {
+                $this->updateONU($dbOnu['id'], ['ip_address' => $ontIp]);
+                // Also update tr069_ip if not already set
+                if (!$tr069Ip) {
+                    $this->updateONU($dbOnu['id'], ['tr069_ip' => $ontIp]);
+                }
             }
         }
         
@@ -2082,7 +2100,8 @@ class HuaweiOLT {
                 'rx_power' => $rxPower,
                 'tx_power' => $txPower,
                 'distance' => $distance,
-                'tr069_ip' => $tr069Ip,
+                'tr069_ip' => $tr069Ip ?: $ontIp,
+                'ont_ip' => $ontIp,
             ]
         ];
     }
@@ -8555,7 +8574,8 @@ class HuaweiOLT {
             'line_profile' => null,
             'service_profile' => null,
             'fec_upstream' => null,
-            'tr069_acs_profile' => null
+            'tr069_acs_profile' => null,
+            'ont_ip' => null
         ];
         
         $patterns = [
@@ -8584,6 +8604,10 @@ class HuaweiOLT {
             if (preg_match($pattern, $output, $m)) {
                 $details[$key] = trim($m[1]);
             }
+        }
+        
+        if (preg_match('/ONT IP\s*\d*\s*address\/mask\s*:\s*([\d\.]+)/i', $output, $m)) {
+            $details['ont_ip'] = trim($m[1]);
         }
         
         return $details;
