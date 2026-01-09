@@ -457,12 +457,14 @@ class GenieACS {
             $serial = $device['_deviceId']['_SerialNumber'] ?? '';
             if (empty($serial)) continue;
             
-            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ?");
-            $stmt->execute([$serial, $serial]);
+            $deviceId = $device['_id'] ?? '';
+            
+            // Match by: sn, tr069_serial, or tr069_device_id (already linked)
+            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ? OR tr069_device_id = ?");
+            $stmt->execute([$serial, $serial, $deviceId]);
             $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($onu) {
-                $deviceId = $device['_id'] ?? '';
                 $lastInform = $device['_lastInform'] ?? null;
                 $manufacturer = $device['_deviceId']['_Manufacturer'] ?? '';
                 $model = $device['_deviceId']['_ProductClass'] ?? '';
