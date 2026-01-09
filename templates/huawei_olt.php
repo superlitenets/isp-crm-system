@@ -3654,15 +3654,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
             case 'refresh_tr069_ip':
+                header('Content-Type: application/json');
                 $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
-                if ($result['success']) {
-                    $message = $result['message'];
-                    $messageType = 'success';
-                } else {
-                    $message = $result['message'] ?? 'Failed to get Management IP';
-                    $messageType = 'warning';
-                }
-                break;
+                echo json_encode([
+                    'success' => $result['success'] ?? false,
+                    'ip' => $result['ip'] ?? '-',
+                    'message' => $result['message'] ?? ''
+                ]);
+                exit;
             case 'refresh_ont_ip':
                 header('Content-Type: application/json');
                 $result = $huaweiOLT->refreshONUOntIP((int)$_POST['onu_id']);
@@ -7221,12 +7220,12 @@ try {
             })();
             
             // Management IP refresh function
-            async function refreshTR069IP() {
+            async function refreshTR069IP(silent = false) {
                 const icon = document.getElementById('tr069RefreshIcon');
                 const display = document.getElementById('tr069IpDisplay');
                 const onuId = <?= $currentOnu['id'] ?>;
                 
-                icon.classList.add('spin-animation');
+                if (icon) icon.classList.add('spin-animation');
                 
                 try {
                     const formData = new FormData();
@@ -7237,15 +7236,30 @@ try {
                         method: 'POST',
                         body: formData
                     });
+                    const data = await resp.json();
                     
-                    // Page will reload with updated IP
-                    location.reload();
+                    if (icon) icon.classList.remove('spin-animation');
+                    
+                    if (data.success && data.ip && data.ip !== '-') {
+                        if (display) {
+                            display.textContent = data.ip;
+                            display.className = 'text-success fw-bold';
+                        }
+                    } else if (!silent) {
+                        // Only reload on manual refresh
+                        location.reload();
+                    }
                 } catch (e) {
                     console.error('Failed to refresh Management IP:', e);
-                    icon.classList.remove('spin-animation');
-                    alert('Failed to refresh Management IP');
+                    if (icon) icon.classList.remove('spin-animation');
+                    if (!silent) alert('Failed to refresh Management IP');
                 }
             }
+            
+            // Auto-refresh Management IP on page load if missing
+            <?php if (empty($currentOnu['tr069_ip']) && !empty($currentOnu['tr069_device_id'])): ?>
+            setTimeout(() => refreshTR069IP(true), 1000);
+            <?php endif; ?>
             
             // WAN IP (OMCI) refresh function - fetches from OLT via CLI
             async function refreshOntIP() {
