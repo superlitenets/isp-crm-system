@@ -124,6 +124,7 @@ class GenieACS {
     }
     
     public function getDeviceBySerial(string $serial): array {
+        // Try exact match first
         $query = json_encode(['_deviceId._SerialNumber' => $serial]);
         $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
         
@@ -131,7 +132,60 @@ class GenieACS {
             return ['success' => true, 'device' => $result['data'][0]];
         }
         
+        // If not found and serial looks like OLT format (4 letter prefix + hex), convert to GenieACS format
+        if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $serial)) {
+            $genieSerial = $this->convertOltSerialToGenieacs($serial);
+            if ($genieSerial !== $serial) {
+                $query = json_encode(['_deviceId._SerialNumber' => $genieSerial]);
+                $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
+                
+                if ($result['success'] && !empty($result['data'])) {
+                    return ['success' => true, 'device' => $result['data'][0]];
+                }
+            }
+        }
+        
         return ['success' => false, 'error' => 'Device not found'];
+    }
+    
+    /**
+     * Convert OLT serial format (HWTCF2D53A8B) to GenieACS hex format (48575443F2D53A8B)
+     * OLT stores vendor prefix as ASCII (HWTC), GenieACS stores as hex (48575443)
+     */
+    public function convertOltSerialToGenieacs(string $oltSerial): string {
+        if (strlen($oltSerial) < 12) {
+            return $oltSerial;
+        }
+        
+        // First 4 chars are vendor prefix (ASCII like "HWTC")
+        $vendorPrefix = substr($oltSerial, 0, 4);
+        $hexSuffix = substr($oltSerial, 4); // Remaining 8 chars are already hex
+        
+        // Convert vendor prefix to uppercase hex
+        $vendorHex = strtoupper(bin2hex($vendorPrefix));
+        
+        return $vendorHex . strtoupper($hexSuffix);
+    }
+    
+    /**
+     * Convert GenieACS hex serial (48575443F2D53A8B) to OLT format (HWTCF2D53A8B)
+     */
+    public function convertGeniSerialToOlt(string $genieSerial): string {
+        if (strlen($genieSerial) !== 16) {
+            return $genieSerial;
+        }
+        
+        // First 8 chars are vendor prefix in hex
+        $vendorHex = substr($genieSerial, 0, 8);
+        $hexSuffix = substr($genieSerial, 8);
+        
+        // Convert hex back to ASCII
+        $vendorPrefix = @hex2bin($vendorHex);
+        if ($vendorPrefix === false) {
+            return $genieSerial;
+        }
+        
+        return $vendorPrefix . strtoupper($hexSuffix);
     }
     
     public function deleteDevice(string $deviceId): array {

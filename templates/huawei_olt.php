@@ -2866,24 +2866,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 require_once __DIR__ . '/../src/GenieACS.php';
                 $genieacs = new \App\GenieACS($db);
                 $deviceId = $_POST['device_id'] ?? '';
-                $serial = $_POST['serial'] ?? '';
                 $onuId = $_POST['onu_id'] ?? '';
                 
                 // Look up ONU if onu_id provided
-                if (empty($deviceId) && empty($serial) && !empty($onuId)) {
-                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                if (empty($deviceId) && !empty($onuId)) {
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial, genieacs_id FROM huawei_onus WHERE id = ?");
                     $onuStmt->execute([$onuId]);
                     $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
                     if ($onuData) {
-                        $deviceId = $onuData['tr069_device_id'] ?? '';
-                        $serial = $onuData['sn'] ?? '';
-                    }
-                }
-                
-                if (empty($deviceId) && !empty($serial)) {
-                    $deviceResult = $genieacs->getDeviceBySerial($serial);
-                    if ($deviceResult['success']) {
-                        $deviceId = $deviceResult['device']['_id'] ?? '';
+                        // Try genieacs_id first, then tr069_device_id
+                        $deviceId = !empty($onuData['genieacs_id']) ? $onuData['genieacs_id'] : '';
+                        if (empty($deviceId)) {
+                            $deviceId = !empty($onuData['tr069_device_id']) ? $onuData['tr069_device_id'] : '';
+                        }
+                        
+                        // If still empty, look up by serial
+                        if (empty($deviceId)) {
+                            $serial = !empty($onuData['tr069_serial']) ? $onuData['tr069_serial'] : 
+                                     (!empty($onuData['sn']) ? $onuData['sn'] : '');
+                            if (!empty($serial)) {
+                                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                                if ($deviceResult['success']) {
+                                    $deviceId = $deviceResult['device']['_id'] ?? '';
+                                    if (!empty($deviceId)) {
+                                        $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                                        $updateStmt->execute([$deviceId, $onuId]);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -3002,18 +3013,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Look up ONU if onu_id provided
                 if (empty($deviceId) && !empty($onuId)) {
-                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial FROM huawei_onus WHERE id = ?");
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial, genieacs_id FROM huawei_onus WHERE id = ?");
                     $onuStmt->execute([$onuId]);
                     $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
                     if ($onuData) {
-                        $deviceId = $onuData['tr069_device_id'] ?? '';
+                        // Try genieacs_id first, then tr069_device_id
+                        $deviceId = !empty($onuData['genieacs_id']) ? $onuData['genieacs_id'] : '';
+                        if (empty($deviceId)) {
+                            $deviceId = !empty($onuData['tr069_device_id']) ? $onuData['tr069_device_id'] : '';
+                        }
+                        
+                        // If still empty, look up by serial
                         if (empty($deviceId)) {
                             // Try tr069_serial first (GenieACS format), then sn (OLT format)
-                            $serial = $onuData['tr069_serial'] ?? $onuData['sn'] ?? '';
+                            $serial = !empty($onuData['tr069_serial']) ? $onuData['tr069_serial'] : 
+                                     (!empty($onuData['sn']) ? $onuData['sn'] : '');
                             if (!empty($serial)) {
                                 $deviceResult = $genieacs->getDeviceBySerial($serial);
                                 if ($deviceResult['success']) {
                                     $deviceId = $deviceResult['device']['_id'] ?? '';
+                                    // Update ONU record with found device ID
+                                    if (!empty($deviceId)) {
+                                        $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                                        $updateStmt->execute([$deviceId, $onuId]);
+                                    }
                                 }
                             }
                         }
@@ -3051,15 +3074,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Look up ONU if onu_id provided
                 if (empty($deviceId) && !empty($onuId)) {
-                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial, genieacs_id FROM huawei_onus WHERE id = ?");
                     $onuStmt->execute([$onuId]);
                     $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
                     if ($onuData) {
-                        $deviceId = $onuData['tr069_device_id'] ?? '';
-                        if (empty($deviceId) && !empty($onuData['sn'])) {
-                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
-                            if ($deviceResult['success']) {
-                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                        $deviceId = !empty($onuData['genieacs_id']) ? $onuData['genieacs_id'] : '';
+                        if (empty($deviceId)) {
+                            $deviceId = !empty($onuData['tr069_device_id']) ? $onuData['tr069_device_id'] : '';
+                        }
+                        if (empty($deviceId)) {
+                            $serial = !empty($onuData['tr069_serial']) ? $onuData['tr069_serial'] : 
+                                     (!empty($onuData['sn']) ? $onuData['sn'] : '');
+                            if (!empty($serial)) {
+                                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                                if ($deviceResult['success']) {
+                                    $deviceId = $deviceResult['device']['_id'] ?? '';
+                                    if (!empty($deviceId)) {
+                                        $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                                        $updateStmt->execute([$deviceId, $onuId]);
+                                    }
+                                }
                             }
                         }
                     }
@@ -3091,15 +3125,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Look up ONU if onu_id provided
                 if (empty($deviceId) && !empty($onuId)) {
-                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial, genieacs_id FROM huawei_onus WHERE id = ?");
                     $onuStmt->execute([$onuId]);
                     $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
                     if ($onuData) {
-                        $deviceId = $onuData['tr069_device_id'] ?? '';
-                        if (empty($deviceId) && !empty($onuData['sn'])) {
-                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
-                            if ($deviceResult['success']) {
-                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                        $deviceId = !empty($onuData['genieacs_id']) ? $onuData['genieacs_id'] : '';
+                        if (empty($deviceId)) {
+                            $deviceId = !empty($onuData['tr069_device_id']) ? $onuData['tr069_device_id'] : '';
+                        }
+                        if (empty($deviceId)) {
+                            $serial = !empty($onuData['tr069_serial']) ? $onuData['tr069_serial'] : 
+                                     (!empty($onuData['sn']) ? $onuData['sn'] : '');
+                            if (!empty($serial)) {
+                                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                                if ($deviceResult['success']) {
+                                    $deviceId = $deviceResult['device']['_id'] ?? '';
+                                    if (!empty($deviceId)) {
+                                        $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                                        $updateStmt->execute([$deviceId, $onuId]);
+                                    }
+                                }
                             }
                         }
                     }

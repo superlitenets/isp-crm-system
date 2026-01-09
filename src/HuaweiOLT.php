@@ -6944,6 +6944,25 @@ class HuaweiOLT {
         }
         
         $genieacsId = $onu['genieacs_id'] ?? null;
+        
+        // If genieacs_id not set, try to look up by serial
+        if (empty($genieacsId)) {
+            require_once __DIR__ . '/GenieACS.php';
+            $genieacs = new \App\GenieACS($this->db);
+            
+            // Try tr069_serial first (GenieACS format), then tr069_device_id, then OLT serial
+            $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
+            if (!empty($serial)) {
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
+                    $genieacsId = $deviceResult['device']['_id'];
+                    // Update the ONU record with the found ID
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                    $stmt->execute([$genieacsId, $onuDbId]);
+                }
+            }
+        }
+        
         if (empty($genieacsId)) {
             return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
         }
