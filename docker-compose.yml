@@ -94,34 +94,85 @@ services:
     networks:
       - crm_network
 
-  genieacs:
-    image: drumsergio/genieacs:1.2.13.2
-    container_name: isp_crm_genieacs
+  genieacs-cwmp:
+    image: node:18-alpine
+    container_name: isp_crm_genieacs_cwmp
     restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-cwmp"
     environment:
       - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
-      - GENIEACS_UI_JWT_SECRET=${GENIEACS_JWT_SECRET:-isp-crm-genieacs-jwt-secret-2025}
-      - GENIEACS_EXT_DIR=/opt/genieacs/ext
-      - GENIEACS_CWMP_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-cwmp-access.log
-      - GENIEACS_NBI_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-nbi-access.log
-      - GENIEACS_FS_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-fs-access.log
-      - GENIEACS_UI_ACCESS_LOG_FILE=/var/log/genieacs/genieacs-ui-access.log
-      - GENIEACS_DEBUG_FILE=/var/log/genieacs/genieacs-debug.yaml
-      - NODE_OPTIONS=--max-old-space-size=512
+      - GENIEACS_CWMP_ACCESS_LOG_FILE=/dev/stdout
+      - NODE_OPTIONS=--max-old-space-size=256
     ports:
       - "7547:7547"
-      - "7557:7557"
-      - "7567:7567"
-      - "3000:3000"
-    volumes:
-      - genieacs_ext:/opt/genieacs/ext
-      - genieacs_logs:/var/log/genieacs
     depends_on:
       - genieacs-mongo
     networks:
       - crm_network
-    mem_limit: 3072m
-    memswap_limit: 3072m
+    mem_limit: 512m
+    memswap_limit: 512m
+
+  genieacs-nbi:
+    image: node:18-alpine
+    container_name: isp_crm_genieacs_nbi
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-nbi"
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
+      - GENIEACS_NBI_ACCESS_LOG_FILE=/dev/stdout
+      - NODE_OPTIONS=--max-old-space-size=256
+    ports:
+      - "7557:7557"
+    depends_on:
+      - genieacs-mongo
+    networks:
+      - crm_network
+    mem_limit: 512m
+    memswap_limit: 512m
+
+  genieacs-fs:
+    image: node:18-alpine
+    container_name: isp_crm_genieacs_fs
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-fs"
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
+      - GENIEACS_FS_ACCESS_LOG_FILE=/dev/stdout
+      - NODE_OPTIONS=--max-old-space-size=256
+    ports:
+      - "7567:7567"
+    volumes:
+      - genieacs_ext:/opt/genieacs/ext
+    depends_on:
+      - genieacs-mongo
+    networks:
+      - crm_network
+    mem_limit: 512m
+    memswap_limit: 512m
+
+  genieacs-ui:
+    image: node:18-alpine
+    container_name: isp_crm_genieacs_ui
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-ui"
+    environment:
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
+      - GENIEACS_UI_JWT_SECRET=${GENIEACS_JWT_SECRET:-isp-crm-genieacs-jwt-secret-2025}
+      - GENIEACS_UI_ACCESS_LOG_FILE=/dev/stdout
+      - NODE_OPTIONS=--max-old-space-size=384
+    ports:
+      - "3000:3000"
+    depends_on:
+      - genieacs-mongo
+      - genieacs-nbi
+    networks:
+      - crm_network
+    mem_limit: 768m
+    memswap_limit: 768m
 
   genieacs-mongo:
     image: mongo:4.4
