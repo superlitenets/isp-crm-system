@@ -370,9 +370,11 @@ class OLTSession {
                 console.log(`[OLT ${this.oltId}] Typing: "${command}" (${command.length} chars)`);
                 
                 for (let i = 0; i < command.length; i++) {
-                    this.socket.write(Buffer.from(command[i], 'utf8'));
-                    // 50ms delay between characters - simulates slower typing
-                    await new Promise(r => setTimeout(r, 50));
+                    const char = command[i];
+                    this.socket.write(Buffer.from(char, 'utf8'));
+                    // Extra delay for spaces - OLT may need more time to process them
+                    const delay = (char === ' ') ? 100 : 50;
+                    await new Promise(r => setTimeout(r, delay));
                 }
                 // Send CR at the end
                 this.socket.write(Buffer.from('\r', 'utf8'));
