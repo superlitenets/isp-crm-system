@@ -119,8 +119,22 @@ class GenieACS {
     }
     
     public function getDevice(string $deviceId): array {
+        // Use query parameter approach to avoid URL encoding issues with device IDs containing special chars
+        $query = json_encode(['_id' => $deviceId]);
+        $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
+        
+        if ($result['success'] && !empty($result['data']) && is_array($result['data'])) {
+            return ['success' => true, 'data' => $result['data'][0]];
+        }
+        
+        // Fallback to direct path approach
         $encodedId = urlencode($deviceId);
-        return $this->request('GET', "/devices/{$encodedId}");
+        $directResult = $this->request('GET', "/devices/{$encodedId}");
+        if ($directResult['success']) {
+            return $directResult;
+        }
+        
+        return ['success' => false, 'error' => $result['error'] ?? $directResult['error'] ?? 'Device not found'];
     }
     
     public function getDeviceBySerial(string $serial): array {
