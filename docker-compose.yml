@@ -120,8 +120,8 @@ services:
       - genieacs-mongo
     networks:
       - crm_network
-    mem_limit: 2048m
-    memswap_limit: 2048m
+    mem_limit: 3072m
+    memswap_limit: 3072m
 
   genieacs-mongo:
     image: mongo:4.4
