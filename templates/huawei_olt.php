@@ -3730,7 +3730,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $genieacs = new \App\GenieACS($db);
                     $deviceResult = $genieacs->getDeviceBySerial($serial);
                     if (!$deviceResult['success']) {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
+                        echo json_encode(['success' => false, 'error' => 'Device not found in ACS. Serial: ' . $serial]);
                         exit;
                     }
                     $deviceId = $deviceResult['device']['_id'];

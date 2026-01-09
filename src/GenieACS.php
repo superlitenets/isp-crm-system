@@ -319,8 +319,12 @@ class GenieACS {
     public function getWiFiSettings(string $deviceId): array {
         $result = $this->getDevice($deviceId);
         
-        if (!$result['success'] || empty($result['data'])) {
-            return ['success' => false, 'error' => 'Device not found or no data'];
+        if (!$result['success']) {
+            return ['success' => false, 'error' => 'Failed to fetch device: ' . ($result['error'] ?? 'Unknown')];
+        }
+        
+        if (empty($result['data'])) {
+            return ['success' => false, 'error' => 'Device data is empty'];
         }
         
         $device = $result['data'];
@@ -338,6 +342,12 @@ class GenieACS {
             }
             return $current['_value'] ?? $current;
         };
+        
+        // Check if LANDevice exists
+        $lanDevice = $device['InternetGatewayDevice']['LANDevice']['1'] ?? null;
+        if (!$lanDevice || !isset($lanDevice['WLANConfiguration'])) {
+            return ['success' => false, 'error' => 'No WiFi configuration found. Device may not support WiFi or data not yet fetched from device.'];
+        }
         
         for ($i = 1; $i <= 5; $i++) {
             $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$i}";
@@ -359,6 +369,10 @@ class GenieACS {
                     $channel
                 ];
             }
+        }
+        
+        if (empty($wifiData)) {
+            return ['success' => false, 'error' => 'No WiFi interfaces found in device data'];
         }
         
         return ['success' => true, 'data' => $wifiData];
