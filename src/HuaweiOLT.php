@@ -6565,6 +6565,7 @@ class HuaweiOLT {
     /**
      * Refresh ONT WAN IP via CLI (OMCI-assigned IP from display ont info)
      * Parses: ONT IP 0 address/mask : 10.97.127.32/16
+     * Uses two-step approach to avoid Telnet space-stripping issue
      */
     public function refreshONUOntIP(int $onuDbId): array {
         $onu = $this->getONU($onuDbId);
@@ -6579,14 +6580,24 @@ class HuaweiOLT {
         
         $frame = $onu['frame'] ?? 0;
         $slot = $onu['slot'];
-        $port = $onu['port'];
-        $onuId = $onu['onu_id'];
+        $port = (int)$onu['port'];
+        $onuId = (int)$onu['onu_id'];
         
-        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
-        $result = $this->executeCommand($olt['id'], $command);
+        // Two-step approach to avoid Telnet space-stripping issue:
+        // 1. Enter GPON interface context
+        // 2. Execute display ont info with port and onu-id separated by space
+        
+        // Step 1: Enter interface context
+        $this->executeCommand($olt['id'], "interface gpon {$frame}/{$slot}");
+        
+        // Step 2: Execute display ont info (space between port and onu_id works in interface context)
+        $result = $this->executeCommand($olt['id'], "display ont info {$port} {$onuId}");
+        
+        // Step 3: Exit interface context
+        $this->executeCommand($olt['id'], "quit");
         
         if (!$result['success']) {
-            return ['success' => false, 'message' => $result['error'] ?? 'Failed to execute command'];
+            return ['success' => false, 'message' => $result['error'] ?? $result['message'] ?? 'Failed to execute command'];
         }
         
         $output = $result['output'] ?? '';
