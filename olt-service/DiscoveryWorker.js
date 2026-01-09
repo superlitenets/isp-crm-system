@@ -188,7 +188,8 @@ class DiscoveryWorker {
             const protocol = olt.cli_protocol || 'telnet';
             await this.sessionManager.connect(olt.id.toString(), {
                 host: olt.ip_address,
-                port: protocol === 'ssh' ? (olt.ssh_port || 22) : (olt.port || 23),
+                port: olt.port || 23,
+                sshPort: olt.ssh_port || 22,
                 username: olt.username,
                 password: password,
                 protocol: protocol
@@ -219,7 +220,8 @@ class DiscoveryWorker {
                 const protocol = olt.cli_protocol || 'telnet';
                 await this.sessionManager.connect(olt.id.toString(), {
                     host: olt.ip_address,
-                    port: protocol === 'ssh' ? (olt.ssh_port || 22) : (olt.port || 23),
+                    port: olt.port || 23,
+                    sshPort: olt.ssh_port || 22,
                     username: olt.username,
                     password: password,
                     protocol: protocol
