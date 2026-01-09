@@ -510,7 +510,9 @@ class DiscoveryWorker {
             const result = await this.pool.query(`
                 SELECT setting_value FROM company_settings WHERE setting_key = 'wa_provisioning_group'
             `);
-            return result.rows[0]?.setting_value || null;
+            const value = result.rows[0]?.setting_value;
+            console.log(`[Discovery] Provisioning group query result: rows=${result.rows.length}, value="${value || 'null'}"`);
+            return value || null;
         } catch (error) {
             console.error('[Discovery] Error getting provisioning group:', error.message);
             return null;
