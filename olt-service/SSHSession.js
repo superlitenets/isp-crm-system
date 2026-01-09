@@ -145,16 +145,18 @@ class SSHSession {
     }
 
     async runInitSequence() {
+        if (this.initComplete) return;
+        
         try {
             await new Promise(r => setTimeout(r, 1000));
             
-            await this.sendCommand('enable');
+            await this.sendCommand('enable', 10000);
             console.log(`[OLT ${this.oltId}] SSH entered enable mode`);
             
-            await this.sendCommand('config');
+            await this.sendCommand('config', 10000);
             console.log(`[OLT ${this.oltId}] SSH entered config mode`);
             
-            await this.sendCommand('screen-length 0 temporary');
+            await this.sendCommand('screen-length 0 temporary', 10000);
             console.log(`[OLT ${this.oltId}] SSH disabled paging`);
             
             this.initComplete = true;
