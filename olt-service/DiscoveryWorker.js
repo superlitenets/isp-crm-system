@@ -468,46 +468,61 @@ class DiscoveryWorker {
         }
 
         const provisioningGroup = await this.getProvisioningGroup();
-        
-        if (!provisioningGroup) {
-            console.log('[Discovery] No provisioning group configured (set wa_provisioning_group in settings)');
+
+        const discoveriesByGroup = {};
+        for (const d of result.rows) {
+            const groupId = d.whatsapp_group || provisioningGroup;
+            if (!groupId) {
+                console.log(`[Discovery] No group for ONU ${d.serial_number} (no branch group or global provisioning group)`);
+                continue;
+            }
+            
+            if (!discoveriesByGroup[groupId]) {
+                discoveriesByGroup[groupId] = [];
+            }
+            discoveriesByGroup[groupId].push({
+                id: d.id,
+                olt_name: d.olt_name,
+                olt_ip: d.olt_ip,
+                branch_name: d.branch_name || 'Unassigned',
+                branch_code: d.branch_code || '',
+                serial_number: d.serial_number,
+                frame_slot_port: d.frame_slot_port,
+                equipment_id: d.equipment_id,
+                first_seen_at: d.first_seen_at
+            });
+        }
+
+        const groupIds = Object.keys(discoveriesByGroup);
+        if (groupIds.length === 0) {
+            console.log('[Discovery] No WhatsApp groups configured for notifications');
             return;
         }
 
-        console.log(`[Discovery] Using provisioning group: ${provisioningGroup}`);
+        for (const groupId of groupIds) {
+            const discoveries = discoveriesByGroup[groupId];
+            console.log(`[Discovery] Sending ${discoveries.length} notifications to group: ${groupId.substring(0, 20)}...`);
 
-        const discoveries = result.rows.map(d => ({
-            id: d.id,
-            olt_name: d.olt_name,
-            olt_ip: d.olt_ip,
-            branch_name: d.branch_name || 'Unassigned',
-            branch_code: d.branch_code || '',
-            serial_number: d.serial_number,
-            frame_slot_port: d.frame_slot_port,
-            equipment_id: d.equipment_id,
-            first_seen_at: d.first_seen_at
-        }));
+            try {
+                const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
+                    type: 'new_onu_discovery',
+                    group_id: groupId,
+                    discoveries: discoveries
+                });
 
-        try {
-            console.log(`[Discovery] Calling PHP API at ${this.phpApiUrl}/api/oms-notify.php`);
-            const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
-                type: 'new_onu_discovery',
-                group_id: provisioningGroup,
-                discoveries: discoveries
-            });
-
-            if (response.data && response.data.success) {
-                for (const d of result.rows) {
-                    await this.markNotified(d.id, true);
+                if (response.data && response.data.success) {
+                    for (const d of discoveries) {
+                        await this.markNotified(d.id, true);
+                    }
+                    console.log(`[Discovery] Notified group about ${discoveries.length} new ONUs`);
+                } else {
+                    console.error(`[Discovery] PHP API returned failure:`, JSON.stringify(response.data));
                 }
-                console.log(`[Discovery] Notified provisioning group about ${discoveries.length} new ONUs`);
-            } else {
-                console.error(`[Discovery] PHP API returned failure:`, JSON.stringify(response.data));
-            }
-        } catch (error) {
-            console.error(`[Discovery] Failed to notify (will retry):`, error.message);
-            if (error.response) {
-                console.error(`[Discovery] Response status: ${error.response.status}, data:`, JSON.stringify(error.response.data));
+            } catch (error) {
+                console.error(`[Discovery] Failed to notify (will retry):`, error.message);
+                if (error.response) {
+                    console.error(`[Discovery] Response status: ${error.response.status}, data:`, JSON.stringify(error.response.data));
+                }
             }
         }
     }
