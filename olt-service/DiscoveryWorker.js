@@ -185,11 +185,13 @@ class DiscoveryWorker {
         if (!sessionStatus.connected) {
             console.log(`[Discovery] Connecting to ${olt.name}...`);
             const password = this.decryptPassword(olt.password_encrypted);
+            const protocol = olt.cli_protocol || 'telnet';
             await this.sessionManager.connect(olt.id.toString(), {
                 host: olt.ip_address,
-                port: olt.port || 23,
+                port: protocol === 'ssh' ? (olt.ssh_port || 22) : (olt.port || 23),
                 username: olt.username,
-                password: password
+                password: password,
+                protocol: protocol
             });
         }
 
@@ -214,11 +216,13 @@ class DiscoveryWorker {
             const sessionStatus = this.sessionManager.getSessionStatus(olt.id.toString());
             if (!sessionStatus.connected) {
                 const password = this.decryptPassword(olt.password_encrypted);
+                const protocol = olt.cli_protocol || 'telnet';
                 await this.sessionManager.connect(olt.id.toString(), {
                     host: olt.ip_address,
-                    port: olt.port || 23,
+                    port: protocol === 'ssh' ? (olt.ssh_port || 22) : (olt.port || 23),
                     username: olt.username,
-                    password: password
+                    password: password,
+                    protocol: protocol
                 });
             }
 

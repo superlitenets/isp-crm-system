@@ -79,9 +79,11 @@ class SSHSession {
                 password: this.config.password,
                 readyTimeout: 30000,
                 // Legacy algorithms for older Huawei OLTs
+                // Note: blowfish-cbc is not supported in ssh2 v1.x
                 algorithms: {
                     kex: [
                         'diffie-hellman-group-exchange-sha256',
+                        'diffie-hellman-group14-sha256',
                         'diffie-hellman-group14-sha1',
                         'diffie-hellman-group-exchange-sha1',
                         'diffie-hellman-group1-sha1'
@@ -90,14 +92,19 @@ class SSHSession {
                         'aes128-ctr',
                         'aes192-ctr',
                         'aes256-ctr',
+                        'aes256-gcm',
+                        'aes256-gcm@openssh.com',
+                        'aes128-gcm',
+                        'aes128-gcm@openssh.com',
                         'aes128-cbc',
                         'aes192-cbc',
                         'aes256-cbc',
-                        '3des-cbc',
-                        'blowfish-cbc'
+                        '3des-cbc'
                     ],
                     serverHostKey: [
                         'ssh-rsa',
+                        'rsa-sha2-256',
+                        'rsa-sha2-512',
                         'ssh-dss',
                         'ecdsa-sha2-nistp256',
                         'ecdsa-sha2-nistp384',
