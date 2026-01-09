@@ -1,0 +1,43 @@
+isp_crm_nginx           | 102.205.239.250 - - [09/Jan/2026:08:15:04 +0000] "GET /?page=api&action=huawei_live_onu&olt_id=1&frame=0&slot=1&port=0&onu_id=1&sn=48575443F2D53A8B HTTP/2.0" 200 185 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86178" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [OLT 1] Typing: "interface gpon 0/1" (18 chars)
+isp_crm_olt_service     | [OLT 1] Typing: "display ont optical-info 0 1" (28 chars)
+isp_crm_olt_service     | [OLT 1] Typing: "display ont info 0 1" (20 chars)
+isp_crm_php             | 172.18.0.9 -  09/Jan/2026:11:15:01 +0300 "GET /cron.php" 200
+isp_crm_nginx           | 102.205.236.243 - - [09/Jan/2026:08:15:11 +0000] "GET /cron.php?action=sync_attendance&secret=isp-crm-cron-2024 HTTP/2.0" 200 430 "-" "curl/8.5.0" "-"
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 81ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [OLT 2] Init incomplete, proceeding anyway
+isp_crm_olt_service     | [OLT 2] Typing: "display ont autofind all" (24 chars)
+isp_crm_php             | 172.18.0.9 -  09/Jan/2026:11:15:21 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.250 - - [09/Jan/2026:08:15:21 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86178" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-09T08:15:21.719+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1767946521:719597][1:0x74eac8004700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 8997, snapshot max: 8997 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 94439"}}
+isp_crm_olt_service     | [OLT 1] Command timeout, got 650 bytes
+isp_crm_olt_service     | [OLT 1] Last 300 chars: arm threshold(dBm)     : [-,-]\n  -----------------------------------------------------------------------------\n\nMA5683T(config-if-gpon-0/1)#isplayontinfo01\n                            ^\n  % Unknown command, the error locates at '^'\n\nMA5683T(config-if-gpon-0/1)#\n\nMA5683T(config-if-gpon-0/1)#
+isp_crm_olt_service     | [OLT 1] Typing: "quit" (4 chars)
+isp_crm_olt_service     | [Discovery] Parsing autofind output (118 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Sending 3 new ONU notifications...
+isp_crm_olt_service     | [Discovery] Sending 3 notifications to group: 120363151338798184@g...
+isp_crm_nginx           | 172.18.0.1 - - [09/Jan/2026:08:15:22 +0000] "POST /api/oms-notify.php HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+isp_crm_olt_service     | [RefreshONU] Updated ONU 48575443F2D53A8B: status=online, rx=-0.68
+isp_crm_php             | 172.18.0.9 -  09/Jan/2026:11:15:22 +0300 "GET /api/oms-notify.php" 405
+isp_crm_nginx           | 102.205.236.243 - - [09/Jan/2026:08:15:22 +0000] "GET /api/oms-notify.php HTTP/1.1" 405 57 "-" "axios/1.13.2" "-"
+isp_crm_olt_service     | [Discovery] Failed to notify (will retry): Request failed with status code 405
+isp_crm_olt_service     | [Discovery] Response status: 405, data: {"success":false,"error":"Method not allowed"}
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_nginx           | 172.18.0.1 - - [09/Jan/2026:08:15:30 +0000] "GET /api/smartolt-onus.php HTTP/1.1" 301 169 "-" "axios/1.13.2" "-"
+isp_crm_php             | NOTICE: PHP message: PHP Fatal error:  Uncaught Error: Class "SmartOLT" not found in /var/www/html/public/api/smartolt-onus.php:8
+isp_crm_php             | 172.18.0.9 -  09/Jan/2026:11:15:30 +0300 "GET /api/smartolt-onus.php" 500
+isp_crm_php             | Stack trace:
+isp_crm_php             | #0 {main}
+isp_crm_php             |   thrown in /var/www/html/public/api/smartolt-onus.php on line 8
+isp_crm_nginx           | 102.205.236.243 - - [09/Jan/2026:08:15:30 +0000] "GET /api/smartolt-onus.php HTTP/1.1" 500 5 "-" "axios/1.13.2" "-"
+isp_crm_olt_service     | [Discovery] SmartOLT cache refresh skipped: Request failed with status code 500
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 1] Typing: "display ont autofind all" (24 chars)

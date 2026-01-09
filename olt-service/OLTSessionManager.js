@@ -288,11 +288,16 @@ class OLTSession {
             for (const line of lines) {
                 const response = await this.sendSingleCommand(line, timeout);
                 fullResponse += response;
+                // Small delay between commands to prevent garbling
+                await new Promise(r => setTimeout(r, 100));
             }
             return fullResponse;
         }
         
-        return this.sendSingleCommand(command, timeout);
+        const result = await this.sendSingleCommand(command, timeout);
+        // Small delay after command to allow OLT to settle before next command
+        await new Promise(r => setTimeout(r, 100));
+        return result;
     }
     
     async sendSingleCommand(command, timeout = 60000) {
