@@ -1042,18 +1042,18 @@ class HuaweiOLT {
         $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $this->executeCommand($oltId, $interfaceCmd);
         
-        // Step 2: Get optical info (now in interface context)
-        $opticalCmd = "display ont optical-info " . $p . " " . $o;
-        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
-        if ($opticalResult['success']) {
-            $output = $opticalResult['output'] ?? '';
-        }
-        
-        // Step 3: Get ont info (distance, status, IP) - still in interface context
+        // Step 2: Get ont info first (distance, status, IP) - most important data
         $infoCmd = "display ont info " . $p . " " . $o;
         $infoResult = $this->executeCommand($oltId, $infoCmd);
         if ($infoResult['success']) {
-            $output .= "\n" . ($infoResult['output'] ?? '');
+            $output = $infoResult['output'] ?? '';
+        }
+        
+        // Step 3: Get optical info (still in interface context)
+        $opticalCmd = "display ont optical-info " . $p . " " . $o;
+        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+        if ($opticalResult['success']) {
+            $output .= "\n" . ($opticalResult['output'] ?? '');
         }
         
         if (empty($output)) {
