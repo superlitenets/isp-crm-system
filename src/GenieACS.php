@@ -195,21 +195,22 @@ class GenieACS {
     
     public function rebootDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks", [
+        // Use connection_request to execute immediately instead of waiting for periodic inform
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'reboot'
         ]);
     }
     
     public function factoryReset(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks", [
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'factoryReset'
         ]);
     }
     
     public function refreshDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks", [
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'refreshObject',
             'objectName' => ''
         ]);
@@ -225,7 +226,8 @@ class GenieACS {
     
     public function setParameterValues(string $deviceId, array $parameterValues): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks", [
+        // Use connection_request to execute immediately
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'setParameterValues',
             'parameterValues' => $parameterValues
         ]);
