@@ -3627,8 +3627,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 try {
                     require_once __DIR__ . '/../src/GenieACS.php';
-                    $genieacs = new GenieACS();
-                    $device = $genieacs->findDeviceBySerial($serial);
+                    $genieacs = new \App\GenieACS($db);
+                    $deviceResult = $genieacs->getDeviceBySerial($serial);
+                    $device = $deviceResult['success'] ? $deviceResult['device'] : null;
                     if (!$device) {
                         echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
                         exit;
