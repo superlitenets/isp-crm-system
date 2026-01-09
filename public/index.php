@@ -927,16 +927,20 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
         
         // Try genieacs_id first, then tr069_device_id
         $deviceId = !empty($onu['genieacs_id']) ? $onu['genieacs_id'] : '';
+        $lookupMethod = 'genieacs_id';
         if (empty($deviceId)) {
             $deviceId = !empty($onu['tr069_device_id']) ? $onu['tr069_device_id'] : '';
+            $lookupMethod = 'tr069_device_id';
         }
         
         // If still empty, look up by serial
         if (empty($deviceId)) {
             $serial = !empty($onu['tr069_serial']) ? $onu['tr069_serial'] : 
                      (!empty($onu['sn']) ? $onu['sn'] : '');
+            $lookupMethod = "serial lookup ({$serial})";
             if (!empty($serial)) {
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
+                error_log("[TR069 Reboot] Serial lookup for {$serial}: " . json_encode($deviceResult));
                 if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
                     $deviceId = $deviceResult['device']['_id'];
                     // Save for future lookups
@@ -947,13 +951,17 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
         }
         
         if (empty($deviceId)) {
-            echo json_encode(['success' => false, 'error' => 'Device not connected to TR-069/GenieACS']);
+            error_log("[TR069 Reboot] No device ID found for ONU {$onuId}, fields: " . json_encode($onu));
+            echo json_encode(['success' => false, 'error' => 'Device not connected to TR-069/GenieACS', 'debug' => $onu]);
             exit;
         }
         
+        error_log("[TR069 Reboot] Using deviceId={$deviceId} (via {$lookupMethod})");
         $result = $genieacs->rebootDevice($deviceId);
+        error_log("[TR069 Reboot] Result: " . json_encode($result));
         echo json_encode($result);
     } catch (Throwable $e) {
+        error_log("[TR069 Reboot] Exception: " . $e->getMessage());
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
