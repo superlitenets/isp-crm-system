@@ -5105,8 +5105,8 @@ try {
                                     <span class="text-truncate" style="max-width: 140px;" title="<?= htmlspecialchars($issue['sn']) ?>">
                                         <?= htmlspecialchars($issue['description'] ?: $issue['sn']) ?>
                                     </span>
-                                    <span class="badge bg-<?= strtolower($issue['status']) === 'los' ? 'danger' : (($issue['rx_power'] ?? 0) <= -28 ? 'danger' : 'warning') ?>">
-                                        <?= strtolower($issue['status']) === 'los' ? 'LOS' : (isset($issue['rx_power']) ? number_format($issue['rx_power'], 1) . ' dBm' : 'N/A') ?>
+                                    <span class="badge bg-<?= strtolower($issue['status']) === 'los' ? 'danger' : ((floatval($issue['rx_power'] ?? 0)) <= -28 ? 'danger' : 'warning') ?>">
+                                        <?= strtolower($issue['status']) === 'los' ? 'LOS' : (isset($issue['rx_power']) ? number_format((float)$issue['rx_power'], 1) . ' dBm' : 'N/A') ?>
                                     </span>
                                 </div>
                                 <?php endforeach; ?>
@@ -5818,8 +5818,8 @@ try {
                                     </td>
                                     <td>
                                         <?php
-                                        $rx = $onu['rx_power'];
-                                        $tx = $onu['tx_power'];
+                                        $rx = $onu['rx_power'] !== null ? (float)$onu['rx_power'] : null;
+                                        $tx = $onu['tx_power'] !== null ? (float)$onu['tx_power'] : null;
                                         $rxClass = 'success';
                                         if ($rx !== null) {
                                             if ($rx <= -28) $rxClass = 'danger';
@@ -5831,7 +5831,7 @@ try {
                                     </td>
                                     <td>
                                         <?php 
-                                        $distance = $onu['distance'] ?? null;
+                                        $distance = isset($onu['distance']) && $onu['distance'] !== null ? (float)$onu['distance'] : null;
                                         if ($distance !== null): 
                                             if ($distance >= 1000): ?>
                                                 <?= number_format($distance / 1000, 2) ?> km
@@ -6209,10 +6209,10 @@ try {
             <?php
             // Get provisioning stage info
             $provisioningStage = (int)($currentOnu['provisioning_stage'] ?? 0);
-            $rx = $currentOnu['rx_power'];
-            $tx = $currentOnu['tx_power'];
-            $distance = $currentOnu['distance'] ?? null;
-            $distanceDisplay = $distance ? ($distance >= 1000 ? number_format($distance/1000, 2).'km' : $distance.'m') : '-';
+            $rx = isset($currentOnu['rx_power']) && $currentOnu['rx_power'] !== null && $currentOnu['rx_power'] !== '' ? (float)$currentOnu['rx_power'] : null;
+            $tx = isset($currentOnu['tx_power']) && $currentOnu['tx_power'] !== null && $currentOnu['tx_power'] !== '' ? (float)$currentOnu['tx_power'] : null;
+            $distance = isset($currentOnu['distance']) && $currentOnu['distance'] !== null && $currentOnu['distance'] !== '' ? (float)$currentOnu['distance'] : null;
+            $distanceDisplay = $distance !== null ? ($distance >= 1000 ? number_format($distance/1000, 2).'km' : $distance.'m') : '-';
             $rxClass = 'success';
             $rxLabel = 'Excellent';
             if ($rx !== null) {
