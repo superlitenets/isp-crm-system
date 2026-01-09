@@ -487,14 +487,16 @@ class DiscoveryWorker {
             }
             
             await this.pool.query(`
-                INSERT INTO onu_discovery_log (olt_id, serial_number, frame_slot_port, equipment_id, onu_type_id, last_seen_at)
-                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                INSERT INTO onu_discovery_log (olt_id, serial_number, frame_slot_port, equipment_id, onu_type_id, last_seen_at, authorized)
+                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, false)
                 ON CONFLICT (olt_id, serial_number) 
                 DO UPDATE SET 
                     last_seen_at = CURRENT_TIMESTAMP, 
                     frame_slot_port = $3,
                     equipment_id = COALESCE($4, onu_discovery_log.equipment_id),
-                    onu_type_id = COALESCE($5, onu_discovery_log.onu_type_id)
+                    onu_type_id = COALESCE($5, onu_discovery_log.onu_type_id),
+                    authorized = false,
+                    notes = NULL
             `, [olt.id, onu.sn, onu.fsp, onu.eqid || null, onuTypeId]);
         } catch (error) {
             console.error(`[Discovery] Error recording discovery:`, error.message);
