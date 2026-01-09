@@ -2971,15 +2971,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Look up ONU if onu_id provided
                 if (empty($deviceId) && !empty($onuId)) {
-                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id FROM huawei_onus WHERE id = ?");
+                    $onuStmt = $db->prepare("SELECT sn, tr069_device_id, tr069_serial FROM huawei_onus WHERE id = ?");
                     $onuStmt->execute([$onuId]);
                     $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
                     if ($onuData) {
                         $deviceId = $onuData['tr069_device_id'] ?? '';
-                        if (empty($deviceId) && !empty($onuData['sn'])) {
-                            $deviceResult = $genieacs->getDeviceBySerial($onuData['sn']);
-                            if ($deviceResult['success']) {
-                                $deviceId = $deviceResult['device']['_id'] ?? '';
+                        if (empty($deviceId)) {
+                            // Try tr069_serial first (GenieACS format), then sn (OLT format)
+                            $serial = $onuData['tr069_serial'] ?? $onuData['sn'] ?? '';
+                            if (!empty($serial)) {
+                                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                                if ($deviceResult['success']) {
+                                    $deviceId = $deviceResult['device']['_id'] ?? '';
+                                }
                             }
                         }
                     }
