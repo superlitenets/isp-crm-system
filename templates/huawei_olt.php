@@ -3575,7 +3575,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         if ($deviceResult['success'] && !empty($deviceResult['device'])) {
                             $device = $deviceResult['device'];
                             $result['found_in_acs'] = true;
-                            $result['status'] = 'connected';
+                            
+                            // Determine online status based on last inform time
+                            // Device is "online" if it checked in within the last 5 minutes
+                            $lastInformTime = isset($device['_lastInform']) ? strtotime($device['_lastInform']) : 0;
+                            $fiveMinutesAgo = time() - 300;
+                            $result['status'] = ($lastInformTime >= $fiveMinutesAgo) ? 'online' : 'offline';
                             
                             // Device Info
                             $igd = $device['InternetGatewayDevice'] ?? [];
@@ -3681,10 +3686,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 // Fall back to database values if GenieACS didn't provide them
                 if ($result['ip'] === '-' && !empty($onu['tr069_ip'])) { 
                     $result['ip'] = $onu['tr069_ip']; 
-                    $result['status'] = 'connected'; 
                 }
                 if ($result['last_inform'] === '-' && !empty($onu['tr069_last_inform'])) {
                     $result['last_inform'] = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
+                    // Check if last inform from database is recent (online check)
+                    $lastInformTime = strtotime($onu['tr069_last_inform']);
+                    $fiveMinutesAgo = time() - 300;
+                    if ($result['status'] === 'pending') {
+                        $result['status'] = ($lastInformTime >= $fiveMinutesAgo) ? 'online' : 'offline';
+                    }
                 }
                 
                 echo json_encode($result);
@@ -15187,9 +15197,14 @@ echo "# ================================================\n";
                 return;
             }
             
-            let statusBadge = data.status === 'connected' 
-                ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Connected</span>'
-                : '<span class="badge bg-warning"><i class="bi bi-clock me-1"></i>Pending</span>';
+            let statusBadge;
+            if (data.status === 'online') {
+                statusBadge = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Online</span>';
+            } else if (data.status === 'offline') {
+                statusBadge = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Offline</span>';
+            } else {
+                statusBadge = '<span class="badge bg-warning"><i class="bi bi-clock me-1"></i>Pending</span>';
+            }
             
             let html = '<div class="mb-3">' + statusBadge + '</div>';
             
