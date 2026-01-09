@@ -6425,11 +6425,6 @@ try {
                                 <?php endif; ?>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">Management IP</span><br>
-                                <span class="<?= !empty($currentOnu['tr069_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? htmlspecialchars($currentOnu['tr069_ip']) : '-' ?></span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
-                            </div>
-                            <div class="mb-2">
                                 <span class="text-primary">WAN IP (OMCI)</span><br>
                                 <span class="<?= !empty($currentOnu['ont_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="ontIpDisplay"><?= !empty($currentOnu['ont_ip']) ? htmlspecialchars($currentOnu['ont_ip']) : '-' ?></span>
                                 <a href="#" onclick="refreshOntIP(); return false;" class="ms-1" title="Refresh WAN IP from OLT"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></a>
