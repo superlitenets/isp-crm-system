@@ -3663,6 +3663,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'warning';
                 }
                 break;
+            case 'refresh_ont_ip':
+                header('Content-Type: application/json');
+                $result = $huaweiOLT->refreshONUOntIP((int)$_POST['onu_id']);
+                echo json_encode($result);
+                exit;
             case 'update_dba_profile':
                 $onuId = (int)$_POST['onu_id'];
                 $dbaProfileId = (int)$_POST['dba_profile_id'];
@@ -6425,6 +6430,11 @@ try {
                                 <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
                             </div>
                             <div class="mb-2">
+                                <span class="text-primary">WAN IP (OMCI)</span><br>
+                                <span class="<?= !empty($currentOnu['ont_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="ontIpDisplay"><?= !empty($currentOnu['ont_ip']) ? htmlspecialchars($currentOnu['ont_ip']) : '-' ?></span>
+                                <a href="#" onclick="refreshOntIP(); return false;" class="ms-1" title="Refresh WAN IP from OLT"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></a>
+                            </div>
+                            <div class="mb-2">
                                 <span class="text-primary">ONU/OLT Rx signal</span><br>
                                 <span data-live-rx class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 2) : '-' ?> dBm</span>
                                 / <span data-live-tx><?= $tx !== null ? number_format($tx, 2) : '-' ?> dBm</span>
@@ -7234,6 +7244,41 @@ try {
                     console.error('Failed to refresh Management IP:', e);
                     icon.classList.remove('spin-animation');
                     alert('Failed to refresh Management IP');
+                }
+            }
+            
+            // WAN IP (OMCI) refresh function - fetches from OLT via CLI
+            async function refreshOntIP() {
+                const icon = document.getElementById('ontIpRefreshIcon');
+                const display = document.getElementById('ontIpDisplay');
+                const onuId = <?= $currentOnu['id'] ?>;
+                
+                icon.classList.add('spin-animation');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'refresh_ont_ip');
+                    formData.append('onu_id', onuId);
+                    
+                    const resp = await fetch('?page=huawei-olt', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    icon.classList.remove('spin-animation');
+                    
+                    if (data.success && data.ont_ip) {
+                        display.textContent = data.ont_ip;
+                        display.className = 'text-success fw-bold';
+                    } else {
+                        display.textContent = data.message || '-';
+                        display.className = 'text-muted';
+                    }
+                } catch (e) {
+                    console.error('Failed to refresh WAN IP:', e);
+                    icon.classList.remove('spin-animation');
+                    alert('Failed to refresh WAN IP from OLT');
                 }
             }
             </script>

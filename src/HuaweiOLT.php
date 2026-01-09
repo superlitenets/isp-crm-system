@@ -6563,6 +6563,60 @@ class HuaweiOLT {
     }
     
     /**
+     * Refresh ONT WAN IP via CLI (OMCI-assigned IP from display ont info)
+     * Parses: ONT IP 0 address/mask : 10.97.127.32/16
+     */
+    public function refreshONUOntIP(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        $olt = $this->getOLT($onu['olt_id']);
+        if (!$olt) {
+            return ['success' => false, 'message' => 'OLT not found'];
+        }
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $command = "display ont info {$frame}/{$slot}/{$port} {$onuId}";
+        $result = $this->executeCommand($olt['id'], $command);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'message' => $result['error'] ?? 'Failed to execute command'];
+        }
+        
+        $output = $result['output'] ?? '';
+        $ontIp = $this->parseOntIpFromCliOutput($output);
+        
+        if ($ontIp && $ontIp !== 'N/A') {
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET ont_ip = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$ontIp, $onuDbId]);
+            
+            return ['success' => true, 'ont_ip' => $ontIp, 'message' => "WAN IP: {$ontIp}"];
+        }
+        
+        return ['success' => false, 'message' => 'No WAN IP found in OLT response', 'ont_ip' => null];
+    }
+    
+    /**
+     * Parse ONT IP from CLI output
+     * Matches: ONT IP 0 address/mask : 10.97.127.32/16
+     */
+    private function parseOntIpFromCliOutput(string $output): ?string {
+        if (preg_match('/ONT\s+IP\s+\d+\s+address\/mask\s*:\s*([\d\.]+\/\d+)/i', $output, $m)) {
+            return $m[1];
+        }
+        if (preg_match('/ONT\s+IP\s+\d+\s+address\/mask\s*:\s*([\d\.]+)/i', $output, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+    
+    /**
      * Configure WAN via TR-069/GenieACS (SmartOLT-style approach)
      * Creates WANConnectionDevice and configures PPPoE/DHCP/Static via GenieACS tasks
      */
