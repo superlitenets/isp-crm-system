@@ -11,6 +11,8 @@ class DiscoveryWorker {
         this.isRunning = false;
         this.phpApiUrl = process.env.PHP_API_URL || 'http://localhost:5000';
         this.cronJob = null;
+        this.smartOltSerials = new Set();
+        this.smartOltCacheTime = 0;
     }
 
     start(schedule = '*/30 * * * * *') {
@@ -46,6 +48,8 @@ class DiscoveryWorker {
         console.log('[Discovery] Starting discovery cycle...');
 
         try {
+            await this.refreshSmartOltCache();
+            
             const olts = await this.getActiveOlts();
             console.log(`[Discovery] Found ${olts.length} active OLTs`);
 
@@ -195,6 +199,9 @@ class DiscoveryWorker {
         const unconfiguredOnus = this.parseAutofindOutput(output);
         console.log(`[Discovery] CLI found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
 
+        // Clean up: mark ONUs as authorized if they're no longer in autofind
+        await this.cleanupAuthorizedOnus(olt, unconfiguredOnus);
+
         for (const onu of unconfiguredOnus) {
             await this.recordDiscovery(olt, onu);
         }
@@ -219,6 +226,10 @@ class DiscoveryWorker {
             const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 30000 });
 
             const unconfiguredOnus = this.parseAutofindOutput(output);
+            
+            // Clean up: mark ONUs as authorized if they're no longer in autofind
+            await this.cleanupAuthorizedOnus(olt, unconfiguredOnus);
+            
             if (unconfiguredOnus.length > 0) {
                 console.log(`[Discovery] Found ${unconfiguredOnus.length} unconfigured ONUs on ${olt.name}`);
                 for (const onu of unconfiguredOnus) {
@@ -227,6 +238,42 @@ class DiscoveryWorker {
             }
         } catch (error) {
             console.log(`[Discovery] Autofind error on ${olt.name}: ${error.message}`);
+        }
+    }
+
+    async cleanupAuthorizedOnus(olt, currentAutofindOnus) {
+        try {
+            // Get all pending (not authorized) ONUs for this OLT from discovery log
+            const pendingResult = await this.pool.query(`
+                SELECT id, serial_number FROM onu_discovery_log 
+                WHERE olt_id = $1 AND authorized = false
+            `, [olt.id]);
+
+            if (pendingResult.rows.length === 0) return;
+
+            // Create a set of current autofind serials for fast lookup
+            const currentSerials = new Set(
+                currentAutofindOnus.map(o => o.sn.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+            );
+
+            // Find ONUs that are pending but no longer in autofind = they were authorized externally
+            for (const pending of pendingResult.rows) {
+                const normalizedSn = pending.serial_number.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (!currentSerials.has(normalizedSn)) {
+                    // This ONU is no longer in autofind - mark as authorized
+                    await this.pool.query(`
+                        UPDATE onu_discovery_log 
+                        SET authorized = true, 
+                            authorized_at = CURRENT_TIMESTAMP,
+                            notified = true,
+                            notes = COALESCE(notes, '') || ' Authorized externally'
+                        WHERE id = $1
+                    `, [pending.id]);
+                    console.log(`[Discovery] Marked ${pending.serial_number} as authorized (no longer in autofind)`);
+                }
+            }
+        } catch (error) {
+            console.error(`[Discovery] Error cleaning up authorized ONUs:`, error.message);
         }
     }
 
@@ -376,6 +423,27 @@ class DiscoveryWorker {
         return null;
     }
 
+    async refreshSmartOltCache() {
+        const now = Date.now();
+        if (now - this.smartOltCacheTime < 300000) return;
+        
+        try {
+            const response = await axios.get(`${this.phpApiUrl}/api/smartolt-onus.php`, { timeout: 30000 });
+            if (response.data && response.data.success && Array.isArray(response.data.serials)) {
+                this.smartOltSerials = new Set(response.data.serials.map(s => s.toUpperCase().replace(/[^A-Z0-9]/g, '')));
+                this.smartOltCacheTime = now;
+                console.log(`[Discovery] Cached ${this.smartOltSerials.size} SmartOLT serial numbers`);
+            }
+        } catch (error) {
+            console.log(`[Discovery] SmartOLT cache refresh skipped: ${error.message}`);
+        }
+    }
+
+    isInSmartOlt(serial) {
+        const normalized = serial.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return this.smartOltSerials.has(normalized);
+    }
+
     async recordDiscovery(olt, onu) {
         try {
             // Check if ONU is already authorized in huawei_onus
@@ -387,13 +455,23 @@ class DiscoveryWorker {
             const isAlreadyAuthorized = existingOnu.rows.length > 0 && existingOnu.rows[0].is_authorized;
             
             if (isAlreadyAuthorized) {
-                // ONU is already authorized - update discovery log to mark as authorized
                 await this.pool.query(`
                     UPDATE onu_discovery_log 
                     SET authorized = true, authorized_at = COALESCE(authorized_at, CURRENT_TIMESTAMP)
                     WHERE serial_number = $1 AND olt_id = $2
                 `, [onu.sn, olt.id]);
-                return; // Don't add to discovery list
+                return;
+            }
+
+            // Check if ONU is configured in SmartOLT
+            if (this.isInSmartOlt(onu.sn)) {
+                console.log(`[Discovery] ${onu.sn} already in SmartOLT, skipping`);
+                await this.pool.query(`
+                    UPDATE onu_discovery_log 
+                    SET authorized = true, authorized_at = CURRENT_TIMESTAMP, notes = 'Configured via SmartOLT'
+                    WHERE serial_number = $1 AND olt_id = $2
+                `, [onu.sn, olt.id]);
+                return;
             }
             
             const onuTypeId = await this.matchOnuType(onu.eqid);
