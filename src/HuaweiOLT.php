@@ -1032,23 +1032,26 @@ class HuaweiOLT {
         }
         
         // Huawei requires entering GPON interface context first for optical-info
-        // Commands must be sent separately - OLT can't handle multiple commands in one batch
+        // Commands must be sent completely separately - OLT can't handle chained commands
         $p = (int)$port;
         $o = (int)$onuId;
         
-        // First: Enter interface context and get optical info
-        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info " . $p . " " . $o;
-        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
-        
         $output = '';
+        
+        // Step 1: Enter interface context
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
+        $this->executeCommand($oltId, $interfaceCmd);
+        
+        // Step 2: Get optical info (now in interface context)
+        $opticalCmd = "display ont optical-info " . $p . " " . $o;
+        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
         if ($opticalResult['success']) {
             $output = $opticalResult['output'] ?? '';
         }
         
-        // Second: Get ont info (distance, status, IP) - separate command
-        $infoCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info " . $p . " " . $o;
+        // Step 3: Get ont info (distance, status, IP) - still in interface context
+        $infoCmd = "display ont info " . $p . " " . $o;
         $infoResult = $this->executeCommand($oltId, $infoCmd);
-        
         if ($infoResult['success']) {
             $output .= "\n" . ($infoResult['output'] ?? '');
         }
@@ -1117,6 +1120,7 @@ class HuaweiOLT {
             ],
             'debug' => [
                 'method' => 'cli',
+                'interface_cmd' => $interfaceCmd,
                 'optical_cmd' => $opticalCmd,
                 'info_cmd' => $infoCmd,
                 'output_length' => strlen($output),
