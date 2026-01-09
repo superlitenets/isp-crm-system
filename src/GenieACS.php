@@ -457,8 +457,8 @@ class GenieACS {
             $serial = $device['_deviceId']['_SerialNumber'] ?? '';
             if (empty($serial)) continue;
             
-            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ?");
-            $stmt->execute([$serial]);
+            $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ?");
+            $stmt->execute([$serial, $serial]);
             $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($onu) {
@@ -497,12 +497,13 @@ class GenieACS {
                     $updateStmt = $this->db->prepare("
                         UPDATE huawei_onus SET 
                             tr069_device_id = ?,
+                            tr069_serial = ?,
                             tr069_ip = COALESCE(?, tr069_ip),
                             tr069_status = 'connected',
                             tr069_last_inform = ?
                         WHERE id = ?
                     ");
-                    $updateStmt->execute([$deviceId, $ipAddress, $lastInform, $onu['id']]);
+                    $updateStmt->execute([$deviceId, $serial, $ipAddress, $lastInform, $onu['id']]);
                 } catch (\Exception $e) {
                     // Ignore if columns don't exist
                 }
