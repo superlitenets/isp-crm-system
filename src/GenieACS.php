@@ -484,6 +484,7 @@ class GenieACS {
                     INSERT INTO tr069_devices (onu_id, device_id, serial_number, last_inform, manufacturer, model, ip_address)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (serial_number) DO UPDATE SET 
+                        onu_id = COALESCE(EXCLUDED.onu_id, tr069_devices.onu_id),
                         device_id = EXCLUDED.device_id,
                         last_inform = EXCLUDED.last_inform,
                         ip_address = COALESCE(EXCLUDED.ip_address, tr069_devices.ip_address),
