@@ -6322,7 +6322,7 @@ class HuaweiOLT {
         $pppoeVlan = (int)($config['pppoe_vlan'] ?? 902);
         $pppoeUsername = $config['pppoe_username'] ?? '';
         $pppoePassword = $config['pppoe_password'] ?? '';
-        $gemPort = (int)($config['gemport'] ?? 1);
+        $gemPort = (int)($config['gemport'] ?? 2);
         $natEnabled = $config['nat_enabled'] ?? true;
         $priority = (int)($config['priority'] ?? 0);
         
@@ -7756,7 +7756,7 @@ class HuaweiOLT {
         if (!empty($onu['service_ports'])) {
             foreach ($onu['service_ports'] as $sp) {
                 $spVlan = $sp['vlan_id'] ?? $vlanId;
-                $gemId = $sp['gem_id'] ?? 1;
+                $gemId = $sp['gem_id'] ?? 2;
                 $multiService = $sp['multi_service'] ?? 'user-vlan';
                 $rxTraffic = $sp['rx_traffic'] ?? 'table';
                 $txTraffic = $sp['tx_traffic'] ?? 'table';
@@ -7764,7 +7764,7 @@ class HuaweiOLT {
                 $lines[] = "service-port vlan {$spVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemId} multi-service {$multiService} rx-cttr {$rxTraffic} tx-cttr {$txTraffic}";
             }
         } else {
-            $lines[] = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport 1 multi-service user-vlan rx-cttr 6 tx-cttr 6";
+            $lines[] = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport 2 multi-service user-vlan rx-cttr 6 tx-cttr 6";
         }
         
         return implode("\n", $lines);
