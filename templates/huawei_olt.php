@@ -11004,22 +11004,68 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 
                                 <div class="mb-3">
                                     <label class="form-label">Provisioning WhatsApp Group</label>
-                                    <input type="text" name="wa_provisioning_group" class="form-control" value="<?= htmlspecialchars($notifSettings['wa_provisioning_group'] ?? '') ?>" placeholder="254XXXXXXXXX-XXXXXXXXXX@g.us">
-                                    <div class="form-text">WhatsApp group ID where new ONU discovery alerts will be sent</div>
+                                    <div class="input-group">
+                                        <select name="wa_provisioning_group" id="waProvisioningGroup" class="form-select">
+                                            <option value="">-- Select a group --</option>
+                                            <?php if (!empty($notifSettings['wa_provisioning_group'])): ?>
+                                            <option value="<?= htmlspecialchars($notifSettings['wa_provisioning_group']) ?>" selected>
+                                                <?= htmlspecialchars($notifSettings['wa_provisioning_group']) ?> (current)
+                                            </option>
+                                            <?php endif; ?>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-secondary" id="refreshWaGroups" title="Refresh groups from WhatsApp">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Select the WhatsApp group where new ONU discovery alerts will be sent</div>
+                                    <div id="waGroupsStatus" class="small text-muted mt-1"></div>
                                 </div>
                                 
-                                <?php if (!empty($waGroups)): ?>
-                                <div class="mb-3">
-                                    <label class="form-label text-muted small">Recent Groups (click to copy)</label>
-                                    <div class="d-flex flex-wrap gap-1">
-                                        <?php foreach (array_slice($waGroups, 0, 5) as $group): ?>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('input[name=wa_provisioning_group]').value='<?= htmlspecialchars($group) ?>'">
-                                            <?= htmlspecialchars(substr($group, 0, 20)) ?>...
-                                        </button>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
+                                <script>
+                                (function() {
+                                    const select = document.getElementById('waProvisioningGroup');
+                                    const refreshBtn = document.getElementById('refreshWaGroups');
+                                    const statusDiv = document.getElementById('waGroupsStatus');
+                                    const currentValue = '<?= htmlspecialchars($notifSettings['wa_provisioning_group'] ?? '') ?>';
+                                    
+                                    async function loadGroups() {
+                                        statusDiv.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Loading groups...';
+                                        refreshBtn.disabled = true;
+                                        
+                                        try {
+                                            const resp = await fetch('/api/whatsapp-groups.php');
+                                            const data = await resp.json();
+                                            
+                                            if (data.error) {
+                                                statusDiv.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>' + data.error + '</span>';
+                                                return;
+                                            }
+                                            
+                                            select.innerHTML = '<option value="">-- Select a group --</option>';
+                                            
+                                            if (data.groups && data.groups.length > 0) {
+                                                data.groups.forEach(g => {
+                                                    const opt = document.createElement('option');
+                                                    opt.value = g.id;
+                                                    opt.textContent = g.name + ' (' + (g.participantsCount || 0) + ' members)';
+                                                    if (g.id === currentValue) opt.selected = true;
+                                                    select.appendChild(opt);
+                                                });
+                                                statusDiv.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + data.groups.length + ' groups loaded</span>';
+                                            } else {
+                                                statusDiv.innerHTML = '<span class="text-muted">No groups found</span>';
+                                            }
+                                        } catch (err) {
+                                            statusDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Failed to load groups</span>';
+                                        } finally {
+                                            refreshBtn.disabled = false;
+                                        }
+                                    }
+                                    
+                                    refreshBtn.addEventListener('click', loadGroups);
+                                    loadGroups();
+                                })();
+                                </script>
                                 
                                 <hr class="my-3">
                                 
@@ -11037,21 +11083,20 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 <div class="col-lg-6">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-white">
-                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>How to Find WhatsApp Group ID</h5>
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>WhatsApp Group Setup</h5>
                         </div>
                         <div class="card-body">
-                            <ol class="small">
-                                <li>Open WhatsApp Web or Desktop</li>
-                                <li>Open the group you want to use</li>
-                                <li>Click on the group name to view group info</li>
-                                <li>Look at the URL - it contains the group ID</li>
-                                <li>Or use the API: <code>GET /api/whatsapp-groups.php</code></li>
+                            <p class="small mb-2">To receive ONU notifications:</p>
+                            <ol class="small mb-3">
+                                <li>Ensure WhatsApp service is running and connected</li>
+                                <li>Click the refresh button to load your groups</li>
+                                <li>Select the group for ONU alerts</li>
+                                <li>Save settings and send a test message</li>
                             </ol>
                             
-                            <div class="alert alert-info small mb-0">
-                                <i class="bi bi-lightbulb me-1"></i>
-                                <strong>Group ID Format:</strong> <code>254XXXXXXXXX-XXXXXXXXXX@g.us</code><br>
-                                The group ID starts with a phone number and ends with <code>@g.us</code>
+                            <div class="alert alert-warning small mb-0">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                <strong>Note:</strong> If no groups appear, make sure WhatsApp is connected (scan QR code if needed)
                             </div>
                         </div>
                     </div>
