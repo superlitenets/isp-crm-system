@@ -1081,6 +1081,16 @@ class HuaweiOLT {
             $status = strtolower($m[1]);
         }
         
+        // Parse ONT management IP (for TR-069/ACS detection)
+        // Format: ONT IP 0 address/mask   : 10.97.127.32/16
+        $ontIp = null;
+        if (preg_match('/ONT\s+IP\s*\d*\s*address\/mask\s*:\s*([\d.]+)/i', $output, $m)) {
+            $ip = $m[1];
+            if ($ip && $ip !== '0.0.0.0') {
+                $ontIp = $ip;
+            }
+        }
+        
         return [
             'success' => true,
             'optical' => [
@@ -1091,6 +1101,7 @@ class HuaweiOLT {
                 'current' => $current,
                 'distance' => $distance,
                 'status' => $status,
+                'ont_ip' => $ontIp,
             ],
             'debug' => [
                 'method' => 'cli',
@@ -2964,6 +2975,7 @@ class HuaweiOLT {
         
         $distance = $optical['optical']['distance'] ?? null;
         $status = $optical['optical']['status'] ?? null;
+        $ontIp = $optical['optical']['ont_ip'] ?? null;
         
         $this->updateONUOpticalInDB($onuId, $optical['optical']['rx_power'], $optical['optical']['tx_power'], $distance);
         
@@ -2972,12 +2984,18 @@ class HuaweiOLT {
             $this->updateONUStatus($onuId, $status);
         }
         
+        // Update ONT management IP if found (used by ACS for TR-069)
+        if ($ontIp) {
+            $this->updateONU($onuId, ['ip_address' => $ontIp, 'tr069_ip' => $ontIp]);
+        }
+        
         return [
             'success' => true,
             'rx_power' => $optical['optical']['rx_power'],
             'tx_power' => $optical['optical']['tx_power'],
             'distance' => $distance,
-            'status' => $status
+            'status' => $status,
+            'ont_ip' => $ontIp
         ];
     }
     
