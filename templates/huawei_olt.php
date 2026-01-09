@@ -6430,6 +6430,11 @@ try {
                                 <a href="#" onclick="refreshOntIP(); return false;" class="ms-1" title="Refresh WAN IP from OLT"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></a>
                             </div>
                             <div class="mb-2">
+                                <span class="text-primary">TR-069 IP</span><br>
+                                <span class="<?= !empty($currentOnu['tr069_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? htmlspecialchars($currentOnu['tr069_ip']) : '-' ?></span>
+                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh TR-069 IP from GenieACS"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
+                            </div>
+                            <div class="mb-2">
                                 <span class="text-primary">ONU/OLT Rx signal</span><br>
                                 <span data-live-rx class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 2) : '-' ?> dBm</span>
                                 / <span data-live-tx><?= $tx !== null ? number_format($tx, 2) : '-' ?> dBm</span>
