@@ -5718,7 +5718,7 @@ class HuaweiOLT {
         // Service-port for internet VLAN (if specified)
         $vlanId = $options['vlan_id'] ?? $profile['default_vlan'] ?? null;
         if ($vlanId && $assignedOnuId !== null) {
-            $gemPort = $options['gem_port'] ?? 1;
+            $gemPort = $options['gem_port'] ?? 2;
             $inboundIndex = $options['inbound_traffic_index'] ?? 8;
             $outboundIndex = $options['outbound_traffic_index'] ?? 9;
             $batchScript .= "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$assignedOnuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}\r\n";
