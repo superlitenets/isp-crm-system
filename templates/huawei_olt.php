@@ -6675,12 +6675,6 @@ try {
                                 <span class="badge bg-secondary">Not configured</span>
                                 <?php endif; ?>
                             </div>
-                            <?php if (!empty($currentOnu['pppoe_username'])): ?>
-                            <div class="mb-2">
-                                <span class="text-primary">PPPoE Username</span><br>
-                                <span class="badge bg-dark"><?= htmlspecialchars($currentOnu['pppoe_username']) ?></span>
-                            </div>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -7120,7 +7114,7 @@ try {
             </div>
             
             <script>
-            const onuSerial = '<?= htmlspecialchars($currentOnu['sn']) ?>';
+            const onuSerial = '<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>';
             const onuId = <?= $currentOnu['id'] ?>;
             const hasTR069 = <?= !empty($currentOnu['tr069_ip']) ? 'true' : 'false' ?>;
             
