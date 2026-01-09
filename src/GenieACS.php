@@ -451,6 +451,7 @@ class GenieACS {
         }
         
         $synced = 0;
+        $unlinked = [];
         $devices = $result['data'] ?? [];
         
         foreach ($devices as $device) {
@@ -463,6 +464,10 @@ class GenieACS {
             $stmt = $this->db->prepare("SELECT id FROM huawei_onus WHERE sn = ? OR tr069_serial = ? OR tr069_device_id = ?");
             $stmt->execute([$serial, $serial, $deviceId]);
             $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$onu) {
+                $unlinked[] = ['serial' => $serial, 'device_id' => $deviceId];
+            }
             
             if ($onu) {
                 $lastInform = $device['_lastInform'] ?? null;
@@ -514,7 +519,7 @@ class GenieACS {
             }
         }
         
-        return ['success' => true, 'synced' => $synced, 'total' => count($devices)];
+        return ['success' => true, 'synced' => $synced, 'total' => count($devices), 'unlinked' => $unlinked];
     }
     
     public function getDeviceCount(): int {

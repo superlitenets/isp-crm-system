@@ -2819,8 +2819,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $genieacs = new \App\GenieACS($db);
                 $result = $genieacs->syncDevicesToDB();
                 if ($result['success']) {
-                    $message = "Synced {$result['synced']} devices from GenieACS (total: {$result['total']})";
-                    $messageType = 'success';
+                    $unlinkedCount = count($result['unlinked'] ?? []);
+                    $message = "Synced {$result['synced']} devices from GenieACS (total: {$result['total']}, unlinked: {$unlinkedCount})";
+                    if ($unlinkedCount > 0 && $unlinkedCount <= 5) {
+                        $unlinkedInfo = array_map(fn($u) => $u['serial'], $result['unlinked']);
+                        $message .= " - Unlinked serials: " . implode(', ', $unlinkedInfo);
+                    }
+                    $messageType = $result['synced'] > 0 ? 'success' : 'warning';
                 } else {
                     $message = $result['error'] ?? 'Sync failed';
                     $messageType = 'danger';
