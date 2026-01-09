@@ -1,0 +1,47 @@
+
+MA5683T(config-if-gpon-0/1)#display ont info 0 1
+  -----------------------------------------------------------------------------
+  F/S/P                   : 0/1/0
+  ONT-ID                  : 1
+  Control flag            : active
+  Run state               : online
+  Config state            : normal
+  Match state             : match
+  DBA type                : SR
+  ONT distance(m)         : 10
+  ONT battery state       : not support
+  Memory occupation       : 44%
+  CPU occupation          : 1%
+  Temperature             : 70(C)
+  Authentic type          : SN-auth
+  SN                      : 48575443F2D53A8B (HWTC-F2D53A8B)
+  Management mode         : OMCI
+  Software work mode      : normal
+  Isolation state         : normal
+  ONT IP 0 address/mask   : 10.97.127.32/16
+  Description             : Martin Muriu
+  Last down cause         : -
+  Last up time            : 2026-01-09 13:33:19+03:00
+  Last down time          : -
+  Last dying gasp time    : -        
+  ONT online duration     : 0 day(s), 0 hour(s), 4 minute(s), 30 second(s) 
+  Type C support          : Not support
+  Interoperability-mode   : ITU-T    
+  -----------------------------------------------------------------------------
+  VoIP configure method   : Default  
+  -----------------------------------------------------------------------------
+  Line profile ID      : 2           
+  Line profile name    : SMARTOLT_FLEXIBLE_GPON
+  -----------------------------------------------------------------------------
+  FEC upstream switch :Enable        
+  OMCC encrypt switch :Off           
+  Qos mode            :PQ            
+  Mapping mode        :802.1p PRI    
+  TR069 management    :Enable        
+  TR069 IP index      :0             
+  -----------------------------------------------------------------------------
+  Notes: * indicates Discrete TCONT(TCONT Unbound)
+  -----------------------------------------------------------------------------
+  <T-CONT   0>          DBA Profile-ID:2
+  <T-CONT   1>          DBA Profile-ID:11
+   <Gem Index 1>              
