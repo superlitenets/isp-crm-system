@@ -2519,11 +2519,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 } else {
                     try {
                         $waMessage = "OMS Test Notification\n\nThis is a test message from your OLT Management System.\n\nTime: " . date('Y-m-d H:i:s');
-                        $waUrl = 'http://127.0.0.1:3001/send';
+                        $waUrl = 'http://127.0.0.1:3001/send-group';
                         $ch = curl_init($waUrl);
                         curl_setopt($ch, CURLOPT_POST, true);
                         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                            'chatId' => $provGroup,
+                            'groupId' => $provGroup,
                             'message' => $waMessage
                         ]));
                         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
