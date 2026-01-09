@@ -431,6 +431,17 @@ class DiscoveryWorker {
         }
     }
 
+    async isDiscoveryNotifyEnabled() {
+        try {
+            const result = await this.pool.query(`
+                SELECT setting_value FROM company_settings WHERE setting_key = 'onu_discovery_notify'
+            `);
+            return result.rows[0]?.setting_value !== '0';
+        } catch (error) {
+            return true;
+        }
+    }
+
     async sendPendingNotifications() {
         const result = await this.pool.query(`
             SELECT d.*, o.name as olt_name, o.ip_address as olt_ip, 
@@ -442,11 +453,19 @@ class DiscoveryWorker {
         `);
 
         if (result.rows.length === 0) {
-            console.log('[Discovery] No pending notifications');
             return;
         }
 
         console.log(`[Discovery] Sending ${result.rows.length} new ONU notifications...`);
+
+        const notifyEnabled = await this.isDiscoveryNotifyEnabled();
+        if (!notifyEnabled) {
+            console.log('[Discovery] Discovery notifications disabled in settings');
+            for (const d of result.rows) {
+                await this.markNotified(d.id, true);
+            }
+            return;
+        }
 
         const provisioningGroup = await this.getProvisioningGroup();
         
@@ -454,6 +473,8 @@ class DiscoveryWorker {
             console.log('[Discovery] No provisioning group configured (set wa_provisioning_group in settings)');
             return;
         }
+
+        console.log(`[Discovery] Using provisioning group: ${provisioningGroup}`);
 
         const discoveries = result.rows.map(d => ({
             id: d.id,
@@ -468,6 +489,7 @@ class DiscoveryWorker {
         }));
 
         try {
+            console.log(`[Discovery] Calling PHP API at ${this.phpApiUrl}/api/oms-notify.php`);
             const response = await axios.post(`${this.phpApiUrl}/api/oms-notify.php`, {
                 type: 'new_onu_discovery',
                 group_id: provisioningGroup,
@@ -480,10 +502,13 @@ class DiscoveryWorker {
                 }
                 console.log(`[Discovery] Notified provisioning group about ${discoveries.length} new ONUs`);
             } else {
-                console.error(`[Discovery] PHP API returned failure:`, response.data?.error || 'Unknown error');
+                console.error(`[Discovery] PHP API returned failure:`, JSON.stringify(response.data));
             }
         } catch (error) {
-            console.error(`[Discovery] Failed to notify provisioning group (will retry next cycle):`, error.message);
+            console.error(`[Discovery] Failed to notify (will retry):`, error.message);
+            if (error.response) {
+                console.error(`[Discovery] Response status: ${error.response.status}, data:`, JSON.stringify(error.response.data));
+            }
         }
     }
 
