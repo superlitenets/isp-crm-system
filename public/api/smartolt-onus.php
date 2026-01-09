@@ -2,10 +2,13 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/SmartOLT.php';
 
+use App\SmartOLT;
+
 header('Content-Type: application/json');
 
 try {
-    $smartolt = new SmartOLT($pdo);
+    $db = Database::getConnection();
+    $smartolt = new SmartOLT($db);
     
     if (!$smartolt->isConfigured()) {
         echo json_encode(['success' => true, 'serials' => [], 'message' => 'SmartOLT not configured']);
