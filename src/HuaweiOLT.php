@@ -1038,23 +1038,23 @@ class HuaweiOLT {
         
         $output = '';
         
-        // Step 1: Enter interface context
-        $interfaceCmd = "interface gpon {$frame}/{$slot}";
-        $this->executeCommand($oltId, $interfaceCmd);
-        
-        // Step 2: Get ont info first (distance, status, IP) - most important data
+        // First command set: Get ont info (distance, status, IP)
+        $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
         $infoCmd = "display ont info " . $p . " " . $o;
         $infoResult = $this->executeCommand($oltId, $infoCmd);
         if ($infoResult['success']) {
             $output = $infoResult['output'] ?? '';
         }
+        $this->executeCommand($oltId, "quit");
         
-        // Step 3: Get optical info (still in interface context)
+        // Second command set: Get optical info (fresh context)
+        $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
         $opticalCmd = "display ont optical-info " . $p . " " . $o;
         $opticalResult = $this->executeCommand($oltId, $opticalCmd);
         if ($opticalResult['success']) {
             $output .= "\n" . ($opticalResult['output'] ?? '');
         }
+        $this->executeCommand($oltId, "quit");
         
         if (empty($output)) {
             return ['success' => false, 'error' => 'CLI commands failed'];
