@@ -363,25 +363,24 @@ class GenieACS {
             return ['success' => false, 'error' => 'No WiFi configuration found. Device may not support WiFi or data not yet fetched from device.'];
         }
         
-        for ($i = 1; $i <= 5; $i++) {
-            $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$i}";
-            $ssid = $extractValue($device, "{$basePath}.SSID");
-            $enable = $extractValue($device, "{$basePath}.Enable");
-            $channel = $extractValue($device, "{$basePath}.Channel");
+        // Dynamically iterate over all available WLANConfiguration entries
+        $wlanConfig = $lanDevice['WLANConfiguration'] ?? [];
+        foreach ($wlanConfig as $idx => $config) {
+            if (!is_numeric($idx)) continue;
             
-            if ($ssid !== null || $enable !== null) {
-                $wifiData[] = [
-                    "{$basePath}.SSID", 
-                    $ssid
-                ];
-                $wifiData[] = [
-                    "{$basePath}.Enable", 
-                    $enable
-                ];
-                $wifiData[] = [
-                    "{$basePath}.Channel", 
-                    $channel
-                ];
+            $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}";
+            $ssid = isset($config['SSID']['_value']) ? $config['SSID']['_value'] : ($config['SSID'] ?? null);
+            $enable = isset($config['Enable']['_value']) ? $config['Enable']['_value'] : ($config['Enable'] ?? null);
+            $channel = isset($config['Channel']['_value']) ? $config['Channel']['_value'] : ($config['Channel'] ?? null);
+            $password = isset($config['PreSharedKey']['1']['KeyPassphrase']['_value']) 
+                ? $config['PreSharedKey']['1']['KeyPassphrase']['_value'] 
+                : null;
+            
+            $wifiData[] = ["{$basePath}.SSID", $ssid];
+            $wifiData[] = ["{$basePath}.Enable", $enable];
+            $wifiData[] = ["{$basePath}.Channel", $channel];
+            if ($password !== null) {
+                $wifiData[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password];
             }
         }
         

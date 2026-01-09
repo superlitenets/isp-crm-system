@@ -13293,6 +13293,16 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             Configuring device: <strong id="wifiDeviceSn"></strong>
                         </div>
                         
+                        <!-- Current WiFi Interfaces -->
+                        <div class="mb-3">
+                            <h6 class="text-primary"><i class="bi bi-wifi me-2"></i>Current WiFi Interfaces</h6>
+                            <div id="wifiInterfacesContainer">
+                                <div class="text-muted small">Click refresh to load current WiFi settings</div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
                         <ul class="nav nav-tabs mb-3" role="tablist">
                             <li class="nav-item">
                                 <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#wifi24Tab" type="button">
@@ -15130,7 +15140,57 @@ echo "# ================================================\n";
         // Close the full status modal first
         const statusModal = bootstrap.Modal.getInstance(document.getElementById('onuFullStatusModal'));
         if (statusModal) statusModal.hide();
-        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+        
+        const modal = new bootstrap.Modal(document.getElementById('wifiConfigModal'));
+        modal.show();
+        
+        // Load current WiFi settings if serial number is provided
+        if (serialNumber) {
+            loadWifiInterfaces(serialNumber);
+        }
+    }
+    
+    function loadWifiInterfaces(serialNumber) {
+        const container = document.getElementById('wifiInterfacesContainer');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Loading WiFi interfaces...</div>';
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(serialNumber)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                container.innerHTML = '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load WiFi settings') + '</div>';
+                return;
+            }
+            
+            const interfaces = data.interfaces || [];
+            if (interfaces.length === 0) {
+                container.innerHTML = '<div class="alert alert-info small"><i class="bi bi-info-circle me-2"></i>No WiFi interfaces found. Device may need TR-069 refresh.</div>';
+                return;
+            }
+            
+            let html = '<div class="table-responsive"><table class="table table-sm table-bordered">';
+            html += '<thead><tr><th>Band</th><th>SSID</th><th>Status</th><th>Path</th></tr></thead><tbody>';
+            interfaces.forEach(iface => {
+                const statusBadge = iface.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>';
+                html += '<tr>';
+                html += '<td><strong>' + escapeHtml(iface.band) + '</strong></td>';
+                html += '<td><code>' + escapeHtml(iface.ssid || '-') + '</code></td>';
+                html += '<td>' + statusBadge + '</td>';
+                html += '<td class="small text-muted">' + escapeHtml(iface.path || '-') + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            container.innerHTML = '<div class="alert alert-danger small"><i class="bi bi-x-circle me-2"></i>Error: ' + err.message + '</div>';
+        });
     }
     
     function openPPPoEConfig(serialNumber) {
