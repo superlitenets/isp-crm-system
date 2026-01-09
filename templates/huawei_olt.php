@@ -3751,34 +3751,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         exit;
                     }
                     $deviceId = $deviceResult['device']['_id'];
+                    $device = $deviceResult['device'];
+                    
+                    // Get model info
+                    $model = $device['_deviceId']['_ProductClass'] ?? '';
+                    
+                    // Detect if dual-band based on model
+                    $isDualBand = preg_match('/HG8546|EG8145|HG8245|HS8145/i', $model);
+                    
                     $wifiResult = $genieacs->getWiFiSettings($deviceId);
                     if (!$wifiResult['success']) {
-                        echo json_encode(['success' => false, 'error' => $wifiResult['error'] ?? 'Failed to get WiFi settings']);
+                        echo json_encode(['success' => false, 'error' => $wifiResult['error'] ?? 'Failed to get WiFi settings', 'model' => $model]);
                         exit;
                     }
                     $wifiInterfaces = [];
-                    $bandMap = ['1' => '2.4GHz', '2' => '5GHz', '3' => '2.4GHz Guest', '4' => '5GHz Guest', '5' => '5GHz'];
                     $wifiData = $wifiResult['data'] ?? [];
                     $grouped = [];
+                    
+                    // Parse all WiFi data
                     foreach ($wifiData as $item) {
-                        if (preg_match('/WLANConfiguration\.(\d+)\.(\w+)$/', $item[0], $m)) {
+                        if (preg_match('/WLANConfiguration\.(\d+)\.(.+)$/', $item[0], $m)) {
                             $idx = $m[1];
                             $key = $m[2];
                             $grouped[$idx][$key] = $item[1];
                         }
                     }
+                    
+                    // Detect band based on channel or standard
                     foreach ($grouped as $idx => $data) {
-                        if (isset($data['SSID']) && $data['SSID']) {
-                            $wifiInterfaces[] = [
-                                'band' => $bandMap[$idx] ?? "WiFi {$idx}",
-                                'ssid' => $data['SSID'],
-                                'enabled' => ($data['Enable'] ?? false) === true || ($data['Enable'] ?? '') === 'true' || ($data['Enable'] ?? '') === '1',
-                                'mode' => 'LAN',
-                                'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
-                            ];
+                        $channel = (int)($data['Channel'] ?? 0);
+                        $standard = $data['Standard'] ?? '';
+                        
+                        // Determine band from channel or standard
+                        $band = '2.4GHz';
+                        if ($channel > 14 || stripos($standard, '5') !== false || stripos($standard, 'ac') !== false || stripos($standard, 'ax') !== false) {
+                            $band = '5GHz';
                         }
+                        
+                        // Add index suffix for guest networks (typically idx > 2)
+                        if ($idx == 1) $bandLabel = '2.4GHz';
+                        elseif ($idx == 2) $bandLabel = $isDualBand ? '5GHz' : '2.4GHz #2';
+                        elseif ($idx == 3) $bandLabel = '2.4GHz Guest';
+                        elseif ($idx == 4) $bandLabel = '5GHz Guest';
+                        elseif ($idx == 5) $bandLabel = '5GHz #2';
+                        else $bandLabel = "WiFi {$idx}";
+                        
+                        $wifiInterfaces[] = [
+                            'index' => $idx,
+                            'band' => $bandLabel,
+                            'ssid' => $data['SSID'] ?? '',
+                            'password' => $data['PreSharedKey.1.KeyPassphrase'] ?? '',
+                            'enabled' => ($data['Enable'] ?? false) === true || ($data['Enable'] ?? '') === 'true' || ($data['Enable'] ?? '') === '1' || $data['Enable'] === 1,
+                            'channel' => $channel,
+                            'standard' => $standard,
+                            'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
+                        ];
                     }
-                    echo json_encode(['success' => true, 'interfaces' => $wifiInterfaces]);
+                    
+                    echo json_encode([
+                        'success' => true, 
+                        'interfaces' => $wifiInterfaces,
+                        'model' => $model,
+                        'dual_band' => $isDualBand,
+                        'device_id' => $deviceId
+                    ]);
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
@@ -15067,33 +15103,79 @@ echo "# ================================================\n";
             const c = data.config;
             let html = '';
             
-            // ONU Info header
-            html += '<div class="alert alert-info small mb-3">';
-            html += '<strong>ONU:</strong> ' + (c.onu.sn || '-') + ' | ';
-            html += '<strong>Location:</strong> ' + c.onu.frame + '/' + c.onu.slot + '/' + c.onu.port + ' ONU ' + c.onu.onu_id + ' | ';
-            html += '<strong>Name:</strong> ' + (c.onu.name || '-');
+            // ONU Info header with better styling
+            html += '<div class="card bg-gradient mb-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">';
+            html += '<div class="card-body text-white py-3">';
+            html += '<div class="row align-items-center">';
+            html += '<div class="col-auto"><i class="bi bi-cpu fs-1 opacity-75"></i></div>';
+            html += '<div class="col">';
+            html += '<h5 class="mb-1"><code class="text-light bg-dark bg-opacity-25 px-2 py-1 rounded">' + escapeHtml(c.onu.sn || '-') + '</code></h5>';
+            html += '<div class="small">';
+            html += '<span class="me-3"><i class="bi bi-geo-alt me-1"></i>' + c.onu.frame + '/' + c.onu.slot + '/' + c.onu.port + ':' + c.onu.onu_id + '</span>';
+            html += '<span><i class="bi bi-tag me-1"></i>' + escapeHtml(c.onu.name || 'Unnamed') + '</span>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
             html += '</div>';
             
-            // Config script
+            // Quick Actions
+            html += '<div class="d-flex gap-2 mb-3 flex-wrap">';
+            html += '<button class="btn btn-outline-primary btn-sm" onclick="openWifiConfig(null, \'' + escapeHtml(c.onu.sn) + '\')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
+            html += '<button class="btn btn-outline-success btn-sm" onclick="openPPPoEConfig(\'' + escapeHtml(c.onu.sn) + '\')"><i class="bi bi-globe me-1"></i>WAN/PPPoE</button>';
+            html += '<button class="btn btn-outline-info btn-sm" onclick="getTR069Stat(' + onuId + ')"><i class="bi bi-broadcast me-1"></i>TR-069</button>';
+            html += '<button class="btn btn-outline-warning btn-sm" onclick="getOnuFullStatus(' + onuId + ')"><i class="bi bi-activity me-1"></i>Full Status</button>';
+            html += '</div>';
+            
+            // Config script with line numbers
             html += '<div class="mb-3">';
-            html += '<label class="form-label fw-bold">OLT Configuration Commands:</label>';
-            html += '<pre id="onuConfigText" class="bg-dark text-light p-3 rounded" style="white-space: pre-wrap; font-size: 0.85rem;">' + escapeHtml(c.script || '# No configuration found') + '</pre>';
+            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+            html += '<label class="form-label fw-bold mb-0"><i class="bi bi-terminal me-2"></i>OLT Configuration Commands</label>';
+            html += '<button class="btn btn-sm btn-outline-secondary" onclick="copyOnuConfig()"><i class="bi bi-clipboard me-1"></i>Copy</button>';
             html += '</div>';
             
-            // Raw output sections
+            const scriptLines = (c.script || '# No configuration found').split('\\n');
+            html += '<div class="position-relative">';
+            html += '<pre id="onuConfigText" class="bg-dark text-success p-3 rounded mb-0" style="white-space: pre-wrap; font-size: 0.8rem; font-family: \'Fira Code\', \'Consolas\', monospace; line-height: 1.5; max-height: 400px; overflow: auto;">' + escapeHtml(c.script || '# No configuration found') + '</pre>';
+            html += '</div>';
+            html += '</div>';
+            
+            // Service Ports Summary if available
+            if (c.service_ports && c.service_ports.length > 0) {
+                html += '<div class="card mb-3">';
+                html += '<div class="card-header bg-light"><i class="bi bi-diagram-3 me-2"></i><strong>Service Ports</strong></div>';
+                html += '<div class="card-body p-0">';
+                html += '<table class="table table-sm table-hover mb-0">';
+                html += '<thead class="table-dark"><tr><th>Index</th><th>VLAN</th><th>GEM</th><th>Type</th><th>User VLAN</th></tr></thead>';
+                html += '<tbody>';
+                c.service_ports.forEach(sp => {
+                    html += '<tr>';
+                    html += '<td><code>' + sp.index + '</code></td>';
+                    html += '<td><span class="badge bg-primary">' + sp.vlan + '</span></td>';
+                    html += '<td>' + (sp.gemport || '-') + '</td>';
+                    html += '<td><span class="badge bg-secondary">' + (sp.type || 'tag') + '</span></td>';
+                    html += '<td>' + (sp.user_vlan || '-') + '</td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            // Raw output sections with better styling
             if (c.raw && c.raw.ont_config) {
-                html += '<div class="accordion" id="rawConfigAccordion">';
-                html += '<div class="accordion-item">';
-                html += '<h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rawOntConfig">Raw ONT Configuration Output</button></h2>';
+                html += '<div class="accordion accordion-flush" id="rawConfigAccordion">';
+                html += '<div class="accordion-item border">';
+                html += '<h2 class="accordion-header"><button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rawOntConfig"><i class="bi bi-code-square me-2"></i>Raw ONT Configuration</button></h2>';
                 html += '<div id="rawOntConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
-                html += '<div class="accordion-body"><pre class="bg-secondary text-light p-2 rounded small" style="white-space: pre-wrap; max-height: 300px; overflow: auto;">' + escapeHtml(c.raw.ont_config) + '</pre></div>';
+                html += '<div class="accordion-body bg-light p-2"><pre class="bg-dark text-light p-2 rounded small mb-0" style="white-space: pre-wrap; max-height: 250px; overflow: auto;">' + escapeHtml(c.raw.ont_config) + '</pre></div>';
                 html += '</div></div>';
                 
                 if (c.raw.service_ports) {
-                    html += '<div class="accordion-item">';
-                    html += '<h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rawSpConfig">Raw Service-Port Output</button></h2>';
+                    html += '<div class="accordion-item border">';
+                    html += '<h2 class="accordion-header"><button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rawSpConfig"><i class="bi bi-layers me-2"></i>Raw Service-Port Output</button></h2>';
                     html += '<div id="rawSpConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
-                    html += '<div class="accordion-body"><pre class="bg-secondary text-light p-2 rounded small" style="white-space: pre-wrap; max-height: 300px; overflow: auto;">' + escapeHtml(c.raw.service_ports) + '</pre></div>';
+                    html += '<div class="accordion-body bg-light p-2"><pre class="bg-dark text-light p-2 rounded small mb-0" style="white-space: pre-wrap; max-height: 250px; overflow: auto;">' + escapeHtml(c.raw.service_ports) + '</pre></div>';
                     html += '</div></div>';
                 }
                 html += '</div>';
@@ -15164,28 +15246,50 @@ echo "# ================================================\n";
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
-                container.innerHTML = '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load WiFi settings') + '</div>';
+                container.innerHTML = '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load WiFi settings') + (data.model ? ' (Model: ' + data.model + ')' : '') + '</div>';
                 return;
             }
             
             const interfaces = data.interfaces || [];
             if (interfaces.length === 0) {
-                container.innerHTML = '<div class="alert alert-info small"><i class="bi bi-info-circle me-2"></i>No WiFi interfaces found. Device may need TR-069 refresh.</div>';
+                container.innerHTML = '<div class="alert alert-info small"><i class="bi bi-info-circle me-2"></i>No WiFi interfaces found. Device may need TR-069 refresh.' + (data.model ? ' (Model: ' + data.model + ')' : '') + '</div>';
                 return;
             }
             
-            let html = '<div class="table-responsive"><table class="table table-sm table-bordered">';
-            html += '<thead><tr><th>Band</th><th>SSID</th><th>Status</th><th>Path</th></tr></thead><tbody>';
+            let html = '<div class="small text-muted mb-2"><i class="bi bi-router me-1"></i>Model: <strong>' + escapeHtml(data.model || 'Unknown') + '</strong>';
+            html += data.dual_band ? ' <span class="badge bg-info">Dual-Band</span>' : ' <span class="badge bg-secondary">Single-Band</span>';
+            html += '</div>';
+            
+            html += '<div class="row g-2">';
             interfaces.forEach(iface => {
-                const statusBadge = iface.enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>';
-                html += '<tr>';
-                html += '<td><strong>' + escapeHtml(iface.band) + '</strong></td>';
-                html += '<td><code>' + escapeHtml(iface.ssid || '-') + '</code></td>';
-                html += '<td>' + statusBadge + '</td>';
-                html += '<td class="small text-muted">' + escapeHtml(iface.path || '-') + '</td>';
-                html += '</tr>';
+                const statusClass = iface.enabled ? 'border-success' : 'border-secondary';
+                const statusBadge = iface.enabled ? '<span class="badge bg-success">ON</span>' : '<span class="badge bg-secondary">OFF</span>';
+                const bandIcon = iface.band.includes('5') ? 'bi-broadcast' : 'bi-wifi';
+                
+                html += '<div class="col-md-6">';
+                html += '<div class="card ' + statusClass + '" style="border-width:2px">';
+                html += '<div class="card-body py-2 px-3">';
+                html += '<div class="d-flex justify-content-between align-items-center mb-1">';
+                html += '<span class="fw-bold"><i class="bi ' + bandIcon + ' me-1"></i>' + escapeHtml(iface.band) + '</span>';
+                html += statusBadge;
+                html += '</div>';
+                html += '<div class="mb-1">';
+                html += '<small class="text-muted">SSID:</small> <code class="text-dark">' + escapeHtml(iface.ssid || '(not set)') + '</code>';
+                html += '</div>';
+                if (iface.password) {
+                    html += '<div class="mb-1">';
+                    html += '<small class="text-muted">Password:</small> <code class="text-dark">' + escapeHtml(iface.password) + '</code>';
+                    html += '</div>';
+                }
+                if (iface.channel > 0) {
+                    html += '<div><small class="text-muted">Channel:</small> <span>' + iface.channel + '</span></div>';
+                }
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
             });
-            html += '</tbody></table></div>';
+            html += '</div>';
+            
             container.innerHTML = html;
         })
         .catch(err => {

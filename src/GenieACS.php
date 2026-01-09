@@ -239,12 +239,18 @@ class GenieACS {
     }
     
     public function setParameterValues(string $deviceId, array $parameterValues): array {
-        $encodedId = urlencode($deviceId);
+        // Use rawurlencode for path safety with special characters
+        $encodedId = rawurlencode($deviceId);
         // Use connection_request to execute immediately
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'setParameterValues',
             'parameterValues' => $parameterValues
         ]);
+        
+        // Log for debugging
+        error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode(['params' => count($parameterValues), 'result' => $result['success'], 'http_code' => $result['http_code'] ?? 0]));
+        
+        return $result;
     }
     
     public function downloadFirmware(string $deviceId, string $fileType, string $url, string $filename = ''): array {
