@@ -5244,6 +5244,311 @@ class HuaweiOLT {
         }
     }
     
+    // ==================== STABLE SSH PROVISIONING (SmartOLT-like) ====================
+    
+    /**
+     * Stable SSH-based ONU provisioning - SmartOLT-style
+     * Uses single-line commands for reliability, auto gemport detection, and safe rollback
+     */
+    public function provisionONUViaSSH(int $onuDbId, int $profileId, array $options = []): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'status' => 'FAILED', 'error' => 'ONU not found'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $olt = $this->getOLT($oltId);
+        if (!$olt) {
+            return ['success' => false, 'status' => 'FAILED', 'error' => 'OLT not found'];
+        }
+        
+        // Check if OLT supports SSH
+        $sshPort = $olt['ssh_port'] ?? 22;
+        $password = $this->decryptPassword($olt['password']);
+        
+        // Get profiles
+        $equipmentId = $this->getOnuEquipmentId($onuDbId);
+        $lineProfile = $this->getDefaultOltLineProfile($oltId);
+        $lineProfileId = $lineProfile['id'];
+        $srvProfileId = null;
+        
+        if ($equipmentId) {
+            $oltSrvProfile = $this->getOltSrvProfileByOnuType($oltId, $equipmentId);
+            if (!$oltSrvProfile) {
+                $oltSrvProfile = $this->createOltSrvProfileForOnuType($oltId, $equipmentId);
+            }
+            if ($oltSrvProfile) {
+                $srvProfileId = $oltSrvProfile['id'];
+            }
+        }
+        
+        if ($srvProfileId === null && $profileId > 0) {
+            $crmProfile = $this->getServiceProfile($profileId);
+            if ($crmProfile) {
+                $lineProfileId = !empty($crmProfile['line_profile']) ? (int)$crmProfile['line_profile'] : $lineProfileId;
+                $srvProfileId = !empty($crmProfile['srv_profile']) ? (int)$crmProfile['srv_profile'] : null;
+            }
+        }
+        
+        if ($srvProfileId === null) {
+            return ['success' => false, 'status' => 'FAILED', 'error' => "No service profile for ONU type '{$equipmentId}'"];
+        }
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $serial = $onu['sn'];
+        $description = $options['description'] ?? $onu['name'] ?? $this->generateNextSNSCode($oltId);
+        $vlanId = $options['vlan_id'] ?? null;
+        
+        // Find next ONU ID
+        $ontId = $onu['onu_id'];
+        if (empty($ontId)) {
+            $ontId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
+        }
+        
+        try {
+            $ssh = new SSH2($olt['ip_address'], $sshPort);
+            $ssh->setTimeout(30);
+            
+            if (!$ssh->login($olt['username'], $password)) {
+                return ['success' => false, 'status' => 'FAILED', 'error' => 'SSH authentication failed'];
+            }
+            
+            $ssh->enablePTY();
+            
+            // Detect prompt
+            $banner = $ssh->read('/[#>]/', SSH2::READ_REGEX);
+            $prompt = str_contains($banner, '>') ? '>' : '#';
+            
+            // Helper to execute single command
+            $exec = function(string $cmd) use ($ssh, $prompt): string {
+                $ssh->write(trim($cmd) . "\n");
+                usleep(200000); // 200ms rate limit
+                $data = $ssh->read('/[#>]/', SSH2::READ_REGEX);
+                return $data !== false ? substr($data, 0, 50000) : '';
+            };
+            
+            // Helper to check for errors
+            $ok = function(string $output): bool {
+                return !preg_match('/(error|failure|invalid|denied)/i', $output);
+            };
+            
+            $debugLog = '';
+            
+            // Disable paging
+            $exec("screen-length 0 temporary");
+            
+            // Enter config mode
+            $exec("enable");
+            $exec("config");
+            
+            // STAGE 1: Add ONT
+            $out = $exec("interface gpon {$frame}/{$slot}");
+            $debugLog .= "[Interface] " . $out . "\n";
+            
+            $ontCmd = "ont add {$port} {$ontId} sn-auth {$serial} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"";
+            $out = $exec($ontCmd);
+            $debugLog .= "[ONT Add] " . $out . "\n";
+            
+            $exec("quit");
+            
+            if (!$ok($out)) {
+                return [
+                    'success' => false, 'status' => 'FAILED',
+                    'error' => 'ONT authorization failed',
+                    'debug' => substr($debugLog, 0, 2000)
+                ];
+            }
+            
+            // Parse assigned ONT ID
+            if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $out, $m)) {
+                $ontId = (int)$m[1];
+            }
+            
+            // STAGE 2: Bind VLAN (if provided)
+            if ($vlanId) {
+                $out = $exec("interface gpon {$frame}/{$slot}");
+                $out = $exec("ont port native-vlan {$port} {$ontId} eth 1 vlan {$vlanId} priority 0");
+                $debugLog .= "[Native VLAN] " . $out . "\n";
+                $exec("quit");
+                
+                if (!$ok($out)) {
+                    // Rollback ONT
+                    $exec("interface gpon {$frame}/{$slot}");
+                    $exec("ont delete {$port} {$ontId}");
+                    $exec("quit");
+                    return [
+                        'success' => false, 'status' => 'FAILED',
+                        'error' => 'VLAN binding failed',
+                        'debug' => substr($debugLog, 0, 2000)
+                    ];
+                }
+            }
+            
+            // STAGE 3: Service-port (if VLAN provided)
+            $gemPort = 1;
+            $servicePortId = null;
+            
+            if ($vlanId) {
+                // Auto-detect next gemport
+                $out = $exec("display ont interface {$frame}/{$slot} {$port} {$ontId}");
+                preg_match_all('/gemport (\d+)/i', $out, $matches);
+                $usedGemports = array_map('intval', $matches[1] ?? []);
+                while (in_array($gemPort, $usedGemports)) {
+                    $gemPort++;
+                }
+                
+                // Create service-port with auto-assigned ID
+                $inboundIndex = $options['inbound_traffic_index'] ?? 8;
+                $outboundIndex = $options['outbound_traffic_index'] ?? 9;
+                
+                $spCmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$ontId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index {$inboundIndex} outbound traffic-table index {$outboundIndex}";
+                $out = $exec($spCmd);
+                $debugLog .= "[Service-Port] " . $out . "\n";
+                
+                // Extract service-port ID
+                if (preg_match('/service-port\s+(\d+)/i', $out, $m)) {
+                    $servicePortId = (int)$m[1];
+                }
+                
+                if (!$ok($out)) {
+                    // Rollback
+                    if ($servicePortId) {
+                        $exec("undo service-port {$servicePortId}");
+                    }
+                    $exec("interface gpon {$frame}/{$slot}");
+                    $exec("ont delete {$port} {$ontId}");
+                    $exec("quit");
+                    
+                    return [
+                        'success' => false, 'status' => 'FAILED',
+                        'error' => 'Service-port failed',
+                        'debug' => substr($debugLog, 0, 2000)
+                    ];
+                }
+            }
+            
+            // Update ONU record
+            $updateData = [
+                'is_authorized' => true,
+                'onu_id' => $ontId,
+                'line_profile' => $lineProfileId,
+                'srv_profile' => $srvProfileId,
+                'name' => $description,
+                'status' => 'online'
+            ];
+            if ($vlanId) {
+                $updateData['vlan_id'] = $vlanId;
+            }
+            $this->updateONU($onuDbId, $updateData);
+            
+            // Mark discovery log as authorized
+            try {
+                $stmt = $this->db->prepare("UPDATE onu_discovery_log SET authorized = true, authorized_at = CURRENT_TIMESTAMP WHERE serial_number = ? AND olt_id = ?");
+                $stmt->execute([$serial, $oltId]);
+            } catch (\Exception $e) {}
+            
+            // Log success
+            $this->addLog([
+                'olt_id' => $oltId, 'onu_id' => $onuDbId, 'action' => 'provision_ssh',
+                'status' => 'success',
+                'message' => "SSH provisioning complete: ONU {$serial} as ID {$ontId}" . ($vlanId ? ", VLAN {$vlanId}" : ''),
+                'command_sent' => $ontCmd, 'command_response' => $debugLog,
+                'user_id' => $_SESSION['user_id'] ?? null
+            ]);
+            
+            return [
+                'success' => true,
+                'status' => 'ACTIVE',
+                'message' => "ONU provisioned successfully via SSH",
+                'onu_id' => $ontId,
+                'gemport' => $gemPort,
+                'vlan_id' => $vlanId,
+                'service_port_id' => $servicePortId,
+                'description' => $description,
+                'debug' => substr($debugLog, 0, 2000)
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'status' => 'FAILED',
+                'error' => 'SSH error: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Deprovision ONU via SSH
+     */
+    public function deprovisionONUViaSSH(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $olt = $this->getOLT($onu['olt_id']);
+        if (!$olt) {
+            return ['success' => false, 'error' => 'OLT not found'];
+        }
+        
+        $sshPort = $olt['ssh_port'] ?? 22;
+        $password = $this->decryptPassword($olt['password']);
+        
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $ontId = $onu['onu_id'];
+        
+        try {
+            $ssh = new SSH2($olt['ip_address'], $sshPort);
+            $ssh->setTimeout(30);
+            
+            if (!$ssh->login($olt['username'], $password)) {
+                return ['success' => false, 'error' => 'SSH authentication failed'];
+            }
+            
+            $ssh->enablePTY();
+            $ssh->read('/[#>]/', SSH2::READ_REGEX);
+            
+            $exec = function(string $cmd) use ($ssh): string {
+                $ssh->write(trim($cmd) . "\n");
+                usleep(200000);
+                return $ssh->read('/[#>]/', SSH2::READ_REGEX) ?: '';
+            };
+            
+            $exec("screen-length 0 temporary");
+            $exec("enable");
+            $exec("config");
+            
+            // Find and remove service-ports for this ONT
+            $out = $exec("display service-port all");
+            if (preg_match_all('/(\d+)\s+vlan\s+\d+\s+gpon\s+' . preg_quote("{$frame}/{$slot}/{$port}", '/') . '\s+ont\s+' . $ontId . '/i', $out, $matches)) {
+                foreach ($matches[1] as $spId) {
+                    $exec("undo service-port {$spId}");
+                }
+            }
+            
+            // Delete ONT
+            $exec("interface gpon {$frame}/{$slot}");
+            $exec("ont delete {$port} {$ontId}");
+            $exec("quit");
+            
+            // Update ONU record
+            $this->updateONU($onuDbId, [
+                'is_authorized' => false,
+                'onu_id' => null,
+                'status' => 'offline'
+            ]);
+            
+            return ['success' => true, 'message' => 'ONU deprovisioned via SSH'];
+            
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'SSH error: ' . $e->getMessage()];
+        }
+    }
+    
     // ==================== Node.js OLT Session Service ====================
     
     private function getOLTServiceUrl(): string {
