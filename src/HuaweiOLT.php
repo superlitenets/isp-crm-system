@@ -1007,8 +1007,8 @@ class HuaweiOLT {
         // Parse distance - formats:
         // "Distance(m)            : 1234"
         // "ONU Distance           : 1234"
-        // "Ont distance(m)        : 1234"
-        if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
+        // "ONT distance(m)        : 10"
+        if (preg_match('/(?:Distance|ONT distance|Ont distance|ONU distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
             $distance = (int)$m[1];
         }
         
@@ -1089,7 +1089,8 @@ class HuaweiOLT {
         }
         
         // Parse distance and status from ont info output (in same response)
-        if (preg_match('/(?:Distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
+        // Format: "ONT distance(m)         : 10"
+        if (preg_match('/(?:Distance|ONT distance|Ont distance)\s*\(?m?\)?\s*:\s*(\d+)/i', $output, $m)) {
             $distance = (int)$m[1];
         }
         if (preg_match('/Run state\s*:\s*(\w+)/i', $output, $m)) {
