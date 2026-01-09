@@ -2490,6 +2490,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = 'GenieACS settings saved successfully';
                 $messageType = 'success';
                 break;
+            case 'save_oms_notifications':
+                $notifSettings = [
+                    'wa_provisioning_group' => trim($_POST['wa_provisioning_group'] ?? ''),
+                    'onu_discovery_notify' => isset($_POST['onu_discovery_notify']) ? '1' : '0',
+                    'onu_authorized_notify' => isset($_POST['onu_authorized_notify']) ? '1' : '0'
+                ];
+                foreach ($notifSettings as $key => $value) {
+                    $stmt = $db->prepare("UPDATE company_settings SET setting_value = ? WHERE setting_key = ?");
+                    $stmt->execute([$value, $key]);
+                    if ($stmt->rowCount() === 0) {
+                        $stmt = $db->prepare("INSERT INTO company_settings (setting_key, setting_value) VALUES (?, ?)");
+                        $stmt->execute([$key, $value]);
+                    }
+                }
+                $message = 'Notification settings saved successfully';
+                $messageType = 'success';
+                header('Location: ?page=huawei-olt&view=settings&tab=notifications&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
+            case 'test_oms_notification':
+                $provGroup = null;
+                $stmt = $db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'wa_provisioning_group'");
+                $stmt->execute();
+                $provGroup = $stmt->fetchColumn();
+                if (!$provGroup) {
+                    $message = 'No provisioning group configured';
+                    $messageType = 'warning';
+                } else {
+                    try {
+                        $waMessage = "OMS Test Notification\n\nThis is a test message from your OLT Management System.\n\nTime: " . date('Y-m-d H:i:s');
+                        $waUrl = 'http://127.0.0.1:3001/send';
+                        $ch = curl_init($waUrl);
+                        curl_setopt($ch, CURLOPT_POST, true);
+                        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                            'chatId' => $provGroup,
+                            'message' => $waMessage
+                        ]));
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                        $response = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
+                        if ($httpCode === 200) {
+                            $message = 'Test notification sent successfully';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'Failed to send test notification: ' . $response;
+                            $messageType = 'danger';
+                        }
+                    } catch (Exception $e) {
+                        $message = 'Error: ' . $e->getMessage();
+                        $messageType = 'danger';
+                    }
+                }
+                header('Location: ?page=huawei-olt&view=settings&tab=notifications&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
             case 'save_smartolt_settings':
                 require_once __DIR__ . '/../src/SmartOLT.php';
                 \App\SmartOLT::saveSettings($db, [
@@ -9974,6 +10030,11 @@ try {
                         <i class="bi bi-terminal me-1"></i> OLT Scripts
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= $settingsTab === 'notifications' ? 'active' : '' ?>" href="?page=huawei-olt&view=settings&tab=notifications">
+                        <i class="bi bi-bell me-1"></i> Notifications
+                    </a>
+                </li>
             </ul>
             
             <?php if ($settingsTab === 'genieacs'): ?>
@@ -10905,6 +10966,108 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                     </ul>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <?php elseif ($settingsTab === 'notifications'): ?>
+            <?php
+            $notifSettings = [];
+            try {
+                $stmt = $db->query("SELECT setting_key, setting_value FROM company_settings WHERE setting_key IN ('wa_provisioning_group', 'onu_discovery_notify', 'onu_authorized_notify')");
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $notifSettings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch (Exception $e) {}
+            
+            $waGroups = [];
+            try {
+                $stmt = $db->query("SELECT DISTINCT recipient FROM whatsapp_messages WHERE recipient LIKE '%@g.us' ORDER BY created_at DESC LIMIT 50");
+                $waGroups = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (Exception $e) {}
+            ?>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-bell me-2"></i>ONU Discovery Notifications</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_oms_notifications">
+                                
+                                <div class="mb-3 form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="onu_discovery_notify" id="onuDiscoveryNotify" <?= ($notifSettings['onu_discovery_notify'] ?? '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="onuDiscoveryNotify">Enable New ONU Discovery Notifications</label>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Provisioning WhatsApp Group</label>
+                                    <input type="text" name="wa_provisioning_group" class="form-control" value="<?= htmlspecialchars($notifSettings['wa_provisioning_group'] ?? '') ?>" placeholder="254XXXXXXXXX-XXXXXXXXXX@g.us">
+                                    <div class="form-text">WhatsApp group ID where new ONU discovery alerts will be sent</div>
+                                </div>
+                                
+                                <?php if (!empty($waGroups)): ?>
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small">Recent Groups (click to copy)</label>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <?php foreach (array_slice($waGroups, 0, 5) as $group): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('input[name=wa_provisioning_group]').value='<?= htmlspecialchars($group) ?>'">
+                                            <?= htmlspecialchars(substr($group, 0, 20)) ?>...
+                                        </button>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                                
+                                <hr class="my-3">
+                                
+                                <div class="mb-3 form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="onu_authorized_notify" id="onuAuthorizedNotify" <?= ($notifSettings['onu_authorized_notify'] ?? '1') === '1' ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="onuAuthorizedNotify">Enable ONU Authorized Notifications</label>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>How to Find WhatsApp Group ID</h5>
+                        </div>
+                        <div class="card-body">
+                            <ol class="small">
+                                <li>Open WhatsApp Web or Desktop</li>
+                                <li>Open the group you want to use</li>
+                                <li>Click on the group name to view group info</li>
+                                <li>Look at the URL - it contains the group ID</li>
+                                <li>Or use the API: <code>GET /api/whatsapp-groups.php</code></li>
+                            </ol>
+                            
+                            <div class="alert alert-info small mb-0">
+                                <i class="bi bi-lightbulb me-1"></i>
+                                <strong>Group ID Format:</strong> <code>254XXXXXXXXX-XXXXXXXXXX@g.us</code><br>
+                                The group ID starts with a phone number and ends with <code>@g.us</code>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Test Notification</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted">Send a test message to verify WhatsApp connectivity</p>
+                            <form method="post">
+                                <input type="hidden" name="action" value="test_oms_notification">
+                                <button type="submit" class="btn btn-outline-success" <?= empty($notifSettings['wa_provisioning_group']) ? 'disabled' : '' ?>>
+                                    <i class="bi bi-send me-1"></i> Send Test Message
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
