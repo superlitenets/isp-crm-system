@@ -424,9 +424,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
         
         $sql = "SELECT o.id, o.sn, o.name, o.status, o.rx_power, o.tx_power, 
                        o.frame, o.slot, o.port, o.onu_id, o.olt_id, 
+                       o.tr069_ip, o.distance, o.vlan_id,
                        ol.name as olt_name, o.updated_at,
-                       c.name as customer_name
+                       c.name as customer_name, z.name as zone_name
                 FROM huawei_onus o
+                LEFT JOIN zones z ON o.zone_id = z.id
                 LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
                 LEFT JOIN customers c ON o.customer_id = c.id
                 $whereClause
@@ -5681,6 +5683,7 @@ try {
                                     <th>Name</th>
                                     <th>Zone</th>
                                     <th>VLAN</th>
+                                    <th>TR-069 IP</th>
                                     <th>Status</th>
                                     <th>Signal (RX/TX)</th>
                                     <th>Distance</th>
@@ -5712,6 +5715,13 @@ try {
                                     <td>
                                         <?php if (!empty($onu['vlan_id'])): ?>
                                             <span class="badge bg-primary"><?= $onu['vlan_id'] ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($onu['tr069_ip'])): ?>
+                                            <code class="text-success"><?= htmlspecialchars($onu['tr069_ip']) ?></code>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
