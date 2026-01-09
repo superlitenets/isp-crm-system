@@ -3005,13 +3005,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'auto_bind_ports' => true,
                 ];
                 
+                error_log("[TR069-PPPoE] Config: " . json_encode($config));
                 $result = $genieacs->configureInternetWAN($deviceId, $config);
+                error_log("[TR069-PPPoE] Result: " . json_encode($result));
                 
                 if ($result['success']) {
+                    // Save PPPoE credentials to database
+                    $updateStmt = $db->prepare("UPDATE huawei_onus SET pppoe_username = ?, wan_mode = 'pppoe' WHERE id = ?");
+                    $updateStmt->execute([$config['pppoe_username'], $onuDbId]);
+                    
                     $message = 'Internet PPPoE configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
                     $messageType = 'success';
                 } else {
-                    $message = 'Failed to configure PPPoE: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                    $detailedErrors = [];
+                    if (!empty($result['errors'])) {
+                        $detailedErrors = $result['errors'];
+                    }
+                    if (!empty($result['results'])) {
+                        foreach ($result['results'] as $step => $stepResult) {
+                            if (!($stepResult['success'] ?? true)) {
+                                $detailedErrors[] = "{$step}: " . ($stepResult['error'] ?? 'failed');
+                            }
+                        }
+                    }
+                    $message = 'Failed to configure PPPoE: ' . (implode(', ', $detailedErrors) ?: 'Unknown error');
                     $messageType = 'danger';
                 }
                 break;
