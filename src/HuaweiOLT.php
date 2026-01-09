@@ -49,6 +49,13 @@ class HuaweiOLT {
         return (bool)$value;
     }
     
+    private function getGenieACSUrl(): ?string {
+        $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $url = $result['setting_value'] ?? null;
+        return !empty($url) ? rtrim($url, '/') : null;
+    }
+    
     // ==================== OLT Management ====================
     
     public function getOLTs(bool $activeOnly = true): array {
