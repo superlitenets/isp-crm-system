@@ -1032,18 +1032,30 @@ class HuaweiOLT {
         }
         
         // Huawei requires entering GPON interface context first for optical-info
-        // Also fetch ont info for distance in the same session
-        // Use explicit spacing to avoid concatenation issues
+        // Commands must be sent separately - OLT can't handle multiple commands in one batch
         $p = (int)$port;
         $o = (int)$onuId;
-        $command = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info " . $p . " " . $o . "\r\ndisplay ont info " . $p . " " . $o;
-        $result = $this->executeCommand($oltId, $command);
         
-        if (!$result['success']) {
-            return ['success' => false, 'error' => $result['error'] ?? 'CLI command failed'];
+        // First: Enter interface context and get optical info
+        $opticalCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont optical-info " . $p . " " . $o;
+        $opticalResult = $this->executeCommand($oltId, $opticalCmd);
+        
+        $output = '';
+        if ($opticalResult['success']) {
+            $output = $opticalResult['output'] ?? '';
         }
         
-        $output = $result['output'] ?? '';
+        // Second: Get ont info (distance, status, IP) - separate command
+        $infoCmd = "interface gpon {$frame}/{$slot}\r\ndisplay ont info " . $p . " " . $o;
+        $infoResult = $this->executeCommand($oltId, $infoCmd);
+        
+        if ($infoResult['success']) {
+            $output .= "\n" . ($infoResult['output'] ?? '');
+        }
+        
+        if (empty($output)) {
+            return ['success' => false, 'error' => 'CLI commands failed'];
+        }
         
         $rxPower = null;
         $txPower = null;
@@ -1105,7 +1117,8 @@ class HuaweiOLT {
             ],
             'debug' => [
                 'method' => 'cli',
-                'command' => $command,
+                'optical_cmd' => $opticalCmd,
+                'info_cmd' => $infoCmd,
                 'output_length' => strlen($output),
             ]
         ];
