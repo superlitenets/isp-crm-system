@@ -913,17 +913,45 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
     }
     
     try {
-        $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, sn, tr069_device_id, tr069_serial, genieacs_id FROM huawei_onus WHERE id = ?");
         $stmt->execute([$onuId]);
         $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$onu || empty($onu['genieacs_id'])) {
-            echo json_encode(['success' => false, 'error' => 'ONU not found or not registered in GenieACS']);
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
             exit;
         }
         
-        $huaweiOLT = new \App\HuaweiOLT($db);
-        $result = $huaweiOLT->rebootONUViaTR069($onu['genieacs_id']);
+        require_once __DIR__ . '/../src/GenieACS.php';
+        $genieacs = new \App\GenieACS($db);
+        
+        // Try genieacs_id first, then tr069_device_id
+        $deviceId = !empty($onu['genieacs_id']) ? $onu['genieacs_id'] : '';
+        if (empty($deviceId)) {
+            $deviceId = !empty($onu['tr069_device_id']) ? $onu['tr069_device_id'] : '';
+        }
+        
+        // If still empty, look up by serial
+        if (empty($deviceId)) {
+            $serial = !empty($onu['tr069_serial']) ? $onu['tr069_serial'] : 
+                     (!empty($onu['sn']) ? $onu['sn'] : '');
+            if (!empty($serial)) {
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
+                    $deviceId = $deviceResult['device']['_id'];
+                    // Save for future lookups
+                    $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                    $updateStmt->execute([$deviceId, $onuId]);
+                }
+            }
+        }
+        
+        if (empty($deviceId)) {
+            echo json_encode(['success' => false, 'error' => 'Device not connected to TR-069/GenieACS']);
+            exit;
+        }
+        
+        $result = $genieacs->rebootDevice($deviceId);
         echo json_encode($result);
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);

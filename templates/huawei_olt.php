@@ -2904,9 +2904,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     break;
                 }
                 
+                error_log("[TR069] Reboot: deviceId={$deviceId}");
                 $result = $genieacs->rebootDevice($deviceId);
-                $message = $result['success'] ? 'Reboot command sent to device' : ($result['error'] ?? 'Reboot failed');
-                $messageType = $result['success'] ? 'success' : 'danger';
+                error_log("[TR069] Reboot result: " . json_encode($result));
+                
+                if ($result['success']) {
+                    $message = 'Reboot command sent to device';
+                    $messageType = 'success';
+                } else {
+                    $errorDetail = $result['error'] ?? 'Unknown error';
+                    $httpCode = $result['http_code'] ?? '';
+                    $message = "Reboot failed: {$errorDetail}" . ($httpCode ? " (HTTP {$httpCode})" : '');
+                    $messageType = 'danger';
+                }
                 break;
             case 'configure_pppoe':
                 // SmartOLT-style Internet WAN configuration via TR-069
