@@ -2508,6 +2508,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $messageType = 'success';
                 header('Location: ?page=huawei-olt&view=settings&tab=notifications&msg=' . urlencode($message) . '&msg_type=' . $messageType);
                 exit;
+            case 'save_oms_templates':
+                $templates = [
+                    'wa_template_oms_new_onu' => trim($_POST['wa_template_oms_new_onu'] ?? ''),
+                    'wa_template_oms_fault' => trim($_POST['wa_template_oms_fault'] ?? '')
+                ];
+                foreach ($templates as $key => $value) {
+                    if (empty($value)) continue;
+                    $stmt = $db->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+                    $stmt->execute([$value, $key]);
+                    if ($stmt->rowCount() === 0) {
+                        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, setting_group) VALUES (?, ?, 'WhatsApp')");
+                        $stmt->execute([$key, $value]);
+                    }
+                }
+                $message = 'Message templates saved successfully';
+                $messageType = 'success';
+                header('Location: ?page=huawei-olt&view=settings&tab=notifications&msg=' . urlencode($message) . '&msg_type=' . $messageType);
+                exit;
             case 'test_oms_notification':
                 $provGroup = null;
                 $stmt = $db->prepare("SELECT setting_value FROM company_settings WHERE setting_key = 'wa_provisioning_group'");
@@ -10981,6 +10999,17 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 }
             } catch (Exception $e) {}
             
+            $templateSettings = [];
+            try {
+                $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('wa_template_oms_new_onu', 'wa_template_oms_fault')");
+                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $templateSettings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch (Exception $e) {}
+            
+            $defaultDiscoveryTemplate = "*🆕 New ONU Discovery*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\nFound {onu_count} unconfigured ONU(s):\n{onu_list}\n\nDiscovered at: {discovery_time}";
+            $defaultFaultTemplate = "*⚠️ ONU Fault Alert*\n\nOLT: {olt_name} ({olt_ip})\nBranch: {branch_name}\n\n{fault_count} ONU(s) went offline:\n{fault_list}\n\nDetected at: {detection_time}";
+            
             $waGroups = [];
             try {
                 $stmt = $db->query("SELECT DISTINCT recipient FROM whatsapp_messages WHERE recipient LIKE '%@g.us' ORDER BY created_at DESC LIMIT 50");
@@ -11112,6 +11141,87 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <button type="submit" class="btn btn-outline-success" <?= empty($notifSettings['wa_provisioning_group']) ? 'disabled' : '' ?>>
                                     <i class="bi bi-send me-1"></i> Send Test Message
                                 </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Message Templates</h5>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#templateHelp">
+                                <i class="bi bi-question-circle me-1"></i>Placeholders
+                            </button>
+                        </div>
+                        <div class="collapse" id="templateHelp">
+                            <div class="card-body bg-light border-bottom">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary">Discovery Template Placeholders:</h6>
+                                        <ul class="small mb-0">
+                                            <li><code>{olt_name}</code> - OLT name</li>
+                                            <li><code>{olt_ip}</code> - OLT IP address</li>
+                                            <li><code>{branch_name}</code> - Branch name</li>
+                                            <li><code>{branch_code}</code> - Branch code</li>
+                                            <li><code>{onu_count}</code> - Number of ONUs discovered</li>
+                                            <li><code>{onu_list}</code> - List of ONUs with details</li>
+                                            <li><code>{onu_serials}</code> - Comma-separated serial numbers</li>
+                                            <li><code>{discovery_time}</code> - Discovery timestamp</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-danger">Fault Template Placeholders:</h6>
+                                        <ul class="small mb-0">
+                                            <li><code>{olt_name}</code> - OLT name</li>
+                                            <li><code>{olt_ip}</code> - OLT IP address</li>
+                                            <li><code>{branch_name}</code> - Branch name</li>
+                                            <li><code>{fault_count}</code> - Number of faults</li>
+                                            <li><code>{fault_list}</code> - List of faults with status icons</li>
+                                            <li><code>{detection_time}</code> - Detection timestamp</li>
+                                        </ul>
+                                        <div class="mt-2 small text-muted">
+                                            <strong>Status Icons:</strong> 🔴 LOS, ⚡ Power, ❌ Offline
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <input type="hidden" name="action" value="save_oms_templates">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-broadcast text-primary me-1"></i>
+                                                New ONU Discovery Template
+                                            </label>
+                                            <textarea name="wa_template_oms_new_onu" class="form-control font-monospace" rows="8" placeholder="Enter discovery notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_new_onu'] ?? $defaultDiscoveryTemplate) ?></textarea>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_new_onu]').value = <?= htmlspecialchars(json_encode($defaultDiscoveryTemplate)) ?>">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-exclamation-triangle text-danger me-1"></i>
+                                                ONU Fault/LOS Alert Template
+                                            </label>
+                                            <textarea name="wa_template_oms_fault" class="form-control font-monospace" rows="8" placeholder="Enter fault notification template..."><?= htmlspecialchars($templateSettings['wa_template_oms_fault'] ?? $defaultFaultTemplate) ?></textarea>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelector('textarea[name=wa_template_oms_fault]').value = <?= htmlspecialchars(json_encode($defaultFaultTemplate)) ?>">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3">
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Save Templates</button>
                             </form>
                         </div>
                     </div>
