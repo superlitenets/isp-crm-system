@@ -3629,28 +3629,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     require_once __DIR__ . '/../src/GenieACS.php';
                     $genieacs = new \App\GenieACS($db);
                     $deviceResult = $genieacs->getDeviceBySerial($serial);
-                    $device = $deviceResult['success'] ? $deviceResult['device'] : null;
-                    if (!$device) {
+                    if (!$deviceResult['success']) {
                         echo json_encode(['success' => false, 'error' => 'Device not found in ACS']);
                         exit;
                     }
+                    $deviceId = $deviceResult['device']['_id'];
+                    $wifiResult = $genieacs->getWiFiSettings($deviceId);
+                    if (!$wifiResult['success']) {
+                        echo json_encode(['success' => false, 'error' => $wifiResult['error'] ?? 'Failed to get WiFi settings']);
+                        exit;
+                    }
                     $wifiInterfaces = [];
-                    $wifiPaths = [
-                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1' => '2.4GHz',
-                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.2' => '5GHz',
-                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.3' => '2.4GHz Guest',
-                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.4' => '5GHz Guest'
-                    ];
-                    foreach ($wifiPaths as $path => $band) {
-                        $ssid = $genieacs->getParameterValue($device, $path . '.SSID');
-                        if ($ssid !== null) {
-                            $enabled = $genieacs->getParameterValue($device, $path . '.Enable');
+                    $bandMap = ['1' => '2.4GHz', '2' => '5GHz', '3' => '2.4GHz Guest', '4' => '5GHz Guest', '5' => '5GHz'];
+                    $wifiData = $wifiResult['data'] ?? [];
+                    $grouped = [];
+                    foreach ($wifiData as $item) {
+                        if (preg_match('/WLANConfiguration\.(\d+)\.(\w+)$/', $item[0], $m)) {
+                            $idx = $m[1];
+                            $key = $m[2];
+                            $grouped[$idx][$key] = $item[1];
+                        }
+                    }
+                    foreach ($grouped as $idx => $data) {
+                        if (isset($data['SSID']) && $data['SSID']) {
                             $wifiInterfaces[] = [
-                                'band' => $band,
-                                'ssid' => $ssid,
-                                'enabled' => $enabled === true || $enabled === 'true' || $enabled === '1' || $enabled === 1,
+                                'band' => $bandMap[$idx] ?? "WiFi {$idx}",
+                                'ssid' => $data['SSID'],
+                                'enabled' => ($data['Enable'] ?? false) === true || ($data['Enable'] ?? '') === 'true' || ($data['Enable'] ?? '') === '1',
                                 'mode' => 'LAN',
-                                'path' => $path
+                                'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
                             ];
                         }
                     }
