@@ -1845,6 +1845,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['message'];
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'force_tr069_reconnect':
+                $onuId = (int)$_POST['onu_id'];
+                // First ensure periodic inform is enabled
+                $onu = $huaweiOLT->getONU($onuId);
+                if ($onu) {
+                    $olt = $huaweiOLT->getOLT($onu['olt_id']);
+                    $frame = $onu['frame'] ?? 0;
+                    $slot = $onu['slot'];
+                    $port = (int)$onu['port'];
+                    $onuIdNum = (int)$onu['onu_id'];
+                    
+                    // Enable periodic inform (300 seconds = 5 minutes)
+                    $cmd = "interface gpon {$frame}/{$slot}\r\n";
+                    $cmd .= "ont tr069-server-config {$port} {$onuIdNum} periodic-inform enable interval 300\r\n";
+                    $cmd .= "quit";
+                    $huaweiOLT->executeCommand($onu['olt_id'], $cmd);
+                    
+                    // Reboot the ONU to force immediate reconnection
+                    $result = $huaweiOLT->rebootONU($onuId);
+                    if ($result['success']) {
+                        $message = 'ONU rebooting to re-establish TR-069 connection. Wait 2-3 minutes for it to come online.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to reboot ONU: ' . ($result['message'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                } else {
+                    $message = 'ONU not found';
+                    $messageType = 'danger';
+                }
+                break;
             case 'delete_onu_olt':
                 $result = $huaweiOLT->deleteONUFromOLT((int)$_POST['onu_id']);
                 $message = $result['message'];
@@ -6792,6 +6823,13 @@ try {
                                     <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                     <button type="submit" class="btn btn-outline-info btn-sm">
                                         <i class="bi bi-arrow-repeat me-1"></i> Refresh Data
+                                    </button>
+                                </form>
+                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot ONU to force TR-069 reconnection?')">
+                                    <input type="hidden" name="action" value="force_tr069_reconnect">
+                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                    <button type="submit" class="btn btn-info btn-sm">
+                                        <i class="bi bi-plug me-1"></i> Force Reconnect
                                     </button>
                                 </form>
                             </div>
@@ -14352,6 +14390,7 @@ echo "# ================================================\n";
         'quick_authorize': 'Quick authorizing ONU...',
         'configure_stage2_tr069': 'Configuring TR-069 management...',
         'reboot_onu': 'Rebooting ONU...',
+        'force_tr069_reconnect': 'Rebooting ONU to reconnect TR-069...',
         'delete_onu_olt': 'Removing ONU from OLT...',
         'configure_wifi': 'Configuring WiFi...',
         'tr069_refresh': 'Refreshing device...',
