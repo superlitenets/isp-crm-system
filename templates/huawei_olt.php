@@ -3562,6 +3562,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     exit;
                 }
                 
+                // Use tr069_serial or sn for serial lookup
+                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
+                
                 $result = [
                     'success' => true,
                     'status' => 'pending',
@@ -3575,7 +3578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'sw_version' => '-',
                     'hw_version' => '-',
                     'provisioning_code' => '-',
-                    'serial' => $onu['serial_number'] ?? '-',
+                    'serial' => $onu['sn'] ?? '-',
                     'cpu_usage' => '-',
                     'ram_usage' => '-',
                     'uptime' => '-',
@@ -3584,11 +3587,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 ];
                 
                 // Get TR-069 info from GenieACS if device is registered
-                if (!empty($onu['serial_number'])) {
+                if (!empty($serialForLookup)) {
                     try {
                         require_once __DIR__ . '/../src/GenieACS.php';
                         $genieacs = new \App\GenieACS($db);
-                        $deviceResult = $genieacs->getDeviceBySerial($onu['serial_number']);
+                        $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
                         if ($deviceResult['success'] && !empty($deviceResult['device'])) {
                             $device = $deviceResult['device'];
                             $result['found_in_acs'] = true;
