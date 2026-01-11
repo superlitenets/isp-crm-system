@@ -6622,8 +6622,8 @@ class HuaweiOLT {
         $result2a = $this->executeCommand($oltId, $cmd2a);
         $output .= "[Step 2a: Enter GPON Interface]\n" . ($result2a['output'] ?? '') . "\n";
         
-        // ACS URL command - quote the URL to avoid parsing issues
-        $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"";
+        // ACS URL command - no quotes (Huawei CLI doesn't support quoted URLs)
+        $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
         $result2b = $this->executeCommand($oltId, $cmd2b);
         $output .= "[Step 2b: ACS URL Config]\n" . ($result2b['output'] ?? '') . "\n";
         $acsUrlFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
