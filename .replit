@@ -59,16 +59,12 @@ task = "shell.exec"
 args = "cd olt-service && OLT_SERVICE_PORT=3002 npm start"
 
 [[ports]]
-localPort = 3001
-externalPort = 80
-exposeLocalhost = true
-
-[[ports]]
 localPort = 3002
+externalPort = 80
 
 [[ports]]
 localPort = 5000
-externalPort = 80
+externalPort = 5000
 
 [nix]
 channel = "stable-25_05"

@@ -241,10 +241,24 @@ class GenieACS {
     public function setParameterValues(string $deviceId, array $parameterValues): array {
         // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
-        // Use connection_request to execute immediately
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        
+        // Convert key-value pairs to GenieACS format: [[name, value, type], ...]
+        $formattedParams = [];
+        foreach ($parameterValues as $name => $value) {
+            // Determine type based on value
+            if (is_bool($value)) {
+                $formattedParams[] = [$name, $value, 'xsd:boolean'];
+            } elseif (is_int($value)) {
+                $formattedParams[] = [$name, $value, 'xsd:unsignedInt'];
+            } else {
+                $formattedParams[] = [$name, (string)$value, 'xsd:string'];
+            }
+        }
+        
+        // Use connection_request to execute immediately with longer timeout
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
             'name' => 'setParameterValues',
-            'parameterValues' => $parameterValues
+            'parameterValues' => $formattedParams
         ]);
         
         // Log for debugging
