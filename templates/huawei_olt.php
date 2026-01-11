@@ -4676,19 +4676,23 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
-    // Improve status detection: also check TR-069 last inform and SNMP status
-    // If TR-069 informed within last 5 minutes OR has valid optical power, mark as online
+    // Status detection priority: SNMP > Optical Power > TR-069
+    // SNMP is most reliable for detecting ONU online status from OLT
     if ($currentOnu['status'] !== 'online') {
         $isOnline = false;
-        // Check TR-069 last inform from GenieACS
-        if (!empty($currentOnu['tr069_last_inform'])) {
+        // 1. SNMP status is primary (from OLT polling)
+        if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') {
+            $isOnline = true;
+        }
+        // 2. Valid optical power means ONU is definitely online
+        elseif (!empty($currentOnu['rx_power']) && $currentOnu['rx_power'] > -40) {
+            $isOnline = true;
+        }
+        // 3. TR-069 last inform as fallback (device talking to ACS)
+        elseif (!empty($currentOnu['tr069_last_inform'])) {
             $lastInformTime = strtotime($currentOnu['tr069_last_inform']);
             if ($lastInformTime >= time() - 300) $isOnline = true;
         }
-        // Check if we have valid optical power readings (means ONU is responding)
-        if (!empty($currentOnu['rx_power']) && $currentOnu['rx_power'] > -40) $isOnline = true;
-        // Check SNMP status field
-        if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') $isOnline = true;
         if ($isOnline) $currentOnu['status'] = 'online';
     }
     
@@ -15400,83 +15404,55 @@ echo "# ================================================\n";
             const c = data.config;
             let html = '';
             
-            // ONU Info header with better styling
-            html += '<div class="card bg-gradient mb-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">';
-            html += '<div class="card-body text-white py-3">';
-            html += '<div class="row align-items-center">';
-            html += '<div class="col-auto"><i class="bi bi-cpu fs-1 opacity-75"></i></div>';
-            html += '<div class="col">';
-            html += '<h5 class="mb-1"><code class="text-light bg-dark bg-opacity-25 px-2 py-1 rounded">' + escapeHtml(c.onu.sn || '-') + '</code></h5>';
-            html += '<div class="small">';
-            html += '<span class="me-3"><i class="bi bi-geo-alt me-1"></i>' + c.onu.frame + '/' + c.onu.slot + '/' + c.onu.port + ':' + c.onu.onu_id + '</span>';
-            html += '<span><i class="bi bi-tag me-1"></i>' + escapeHtml(c.onu.name || 'Unnamed') + '</span>';
+            // ONT Info Header - OMCI focused
+            html += '<div class="card mb-3 border-0 shadow-sm">';
+            html += '<div class="card-header bg-dark text-white"><i class="bi bi-cpu me-2"></i>ONT Information (OMCI)</div>';
+            html += '<div class="card-body">';
+            html += '<div class="row g-2 small">';
+            html += '<div class="col-6"><strong>Serial:</strong> <code>' + escapeHtml(c.onu.sn || '-') + '</code></div>';
+            html += '<div class="col-6"><strong>Location:</strong> ' + c.onu.frame + '/' + c.onu.slot + '/' + c.onu.port + ':' + c.onu.onu_id + '</div>';
+            html += '<div class="col-6"><strong>Name:</strong> ' + escapeHtml(c.onu.name || '-') + '</div>';
+            html += '<div class="col-6"><strong>Type:</strong> ' + escapeHtml(c.onu.onu_type_name || c.onu.model || '-') + '</div>';
+            html += '<div class="col-6"><strong>Line Profile:</strong> ' + escapeHtml(c.onu.line_profile || '-') + '</div>';
+            html += '<div class="col-6"><strong>Service Profile:</strong> ' + escapeHtml(c.onu.service_profile || '-') + '</div>';
             html += '</div>';
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
+            html += '</div></div>';
             
-            // Quick Actions
-            html += '<div class="d-flex gap-2 mb-3 flex-wrap">';
-            html += '<button class="btn btn-outline-primary btn-sm" onclick="openWifiConfig(null, \'' + escapeHtml(c.onu.sn) + '\')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
-            html += '<button class="btn btn-outline-success btn-sm" onclick="openPPPoEConfig(\'' + escapeHtml(c.onu.sn) + '\')"><i class="bi bi-globe me-1"></i>WAN/PPPoE</button>';
-            html += '<button class="btn btn-outline-info btn-sm" onclick="getTR069Stat(' + onuId + ')"><i class="bi bi-broadcast me-1"></i>TR-069</button>';
-            html += '<button class="btn btn-outline-warning btn-sm" onclick="getOnuFullStatus(' + onuId + ')"><i class="bi bi-activity me-1"></i>Full Status</button>';
+            // Service Ports - main OMCI focus
+            html += '<div class="card mb-3 border-0 shadow-sm">';
+            html += '<div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">';
+            html += '<span><i class="bi bi-diagram-3 me-2"></i>Service Ports (OMCI)</span>';
+            html += '<span class="badge bg-light text-dark">' + (c.service_ports ? c.service_ports.length : 0) + ' ports</span>';
             html += '</div>';
-            
-            // Config script with line numbers
-            html += '<div class="mb-3">';
-            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-            html += '<label class="form-label fw-bold mb-0"><i class="bi bi-terminal me-2"></i>OLT Configuration Commands</label>';
-            html += '<button class="btn btn-sm btn-outline-secondary" onclick="copyOnuConfig()"><i class="bi bi-clipboard me-1"></i>Copy</button>';
-            html += '</div>';
-            
-            const scriptLines = (c.script || '# No configuration found').split('\\n');
-            html += '<div class="position-relative">';
-            html += '<pre id="onuConfigText" class="bg-dark text-success p-3 rounded mb-0" style="white-space: pre-wrap; font-size: 0.8rem; font-family: \'Fira Code\', \'Consolas\', monospace; line-height: 1.5; max-height: 400px; overflow: auto;">' + escapeHtml(c.script || '# No configuration found') + '</pre>';
-            html += '</div>';
-            html += '</div>';
-            
-            // Service Ports Summary if available
+            html += '<div class="card-body p-0">';
             if (c.service_ports && c.service_ports.length > 0) {
-                html += '<div class="card mb-3">';
-                html += '<div class="card-header bg-light"><i class="bi bi-diagram-3 me-2"></i><strong>Service Ports</strong></div>';
-                html += '<div class="card-body p-0">';
-                html += '<table class="table table-sm table-hover mb-0">';
-                html += '<thead class="table-dark"><tr><th>Index</th><th>VLAN</th><th>GEM</th><th>Type</th><th>User VLAN</th></tr></thead>';
+                html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0">';
+                html += '<thead class="table-light"><tr><th>Index</th><th>VLAN</th><th>GEM Port</th><th>Attr</th></tr></thead>';
                 html += '<tbody>';
                 c.service_ports.forEach(sp => {
                     html += '<tr>';
                     html += '<td><code>' + sp.index + '</code></td>';
                     html += '<td><span class="badge bg-primary">' + sp.vlan + '</span></td>';
                     html += '<td>' + (sp.gemport || '-') + '</td>';
-                    html += '<td><span class="badge bg-secondary">' + (sp.type || 'tag') + '</span></td>';
-                    html += '<td>' + (sp.user_vlan || '-') + '</td>';
+                    html += '<td><span class="text-muted">' + escapeHtml(sp.vlan_attr || '-') + '</span></td>';
                     html += '</tr>';
                 });
-                html += '</tbody></table>';
-                html += '</div>';
-                html += '</div>';
+                html += '</tbody></table></div>';
+            } else {
+                html += '<div class="text-center text-muted py-3">No service ports configured</div>';
             }
+            html += '</div></div>';
             
-            // Raw output sections with better styling
-            if (c.raw && c.raw.ont_config) {
-                html += '<div class="accordion accordion-flush" id="rawConfigAccordion">';
-                html += '<div class="accordion-item border">';
-                html += '<h2 class="accordion-header"><button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rawOntConfig"><i class="bi bi-code-square me-2"></i>Raw ONT Configuration</button></h2>';
-                html += '<div id="rawOntConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
-                html += '<div class="accordion-body bg-light p-2"><pre class="bg-dark text-light p-2 rounded small mb-0" style="white-space: pre-wrap; max-height: 250px; overflow: auto;">' + escapeHtml(c.raw.ont_config) + '</pre></div>';
-                html += '</div></div>';
-                
-                if (c.raw.service_ports) {
-                    html += '<div class="accordion-item border">';
-                    html += '<h2 class="accordion-header"><button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#rawSpConfig"><i class="bi bi-layers me-2"></i>Raw Service-Port Output</button></h2>';
-                    html += '<div id="rawSpConfig" class="accordion-collapse collapse" data-bs-parent="#rawConfigAccordion">';
-                    html += '<div class="accordion-body bg-light p-2"><pre class="bg-dark text-light p-2 rounded small mb-0" style="white-space: pre-wrap; max-height: 250px; overflow: auto;">' + escapeHtml(c.raw.service_ports) + '</pre></div>';
-                    html += '</div></div>';
-                }
-                html += '</div>';
-            }
+            // Raw OLT Config Commands (collapsible)
+            html += '<div class="card border-0 shadow-sm">';
+            html += '<div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#rawConfigCollapse" style="cursor:pointer">';
+            html += '<span><i class="bi bi-terminal me-2"></i>Raw OLT Commands</span>';
+            html += '<div><button class="btn btn-sm btn-light me-2" onclick="event.stopPropagation(); copyOnuConfig()"><i class="bi bi-clipboard"></i></button><i class="bi bi-chevron-down"></i></div>';
+            html += '</div>';
+            html += '<div class="collapse" id="rawConfigCollapse">';
+            html += '<div class="card-body p-0">';
+            html += '<pre id="onuConfigText" class="bg-dark text-success p-3 mb-0" style="white-space: pre-wrap; font-size: 0.75rem; font-family: monospace; max-height: 300px; overflow: auto;">' + escapeHtml(c.script || '# No configuration') + '</pre>';
+            html += '</div></div></div>';
             
             body.innerHTML = html;
         })
@@ -15491,14 +15467,13 @@ echo "# ================================================\n";
             navigator.clipboard.writeText(configText.textContent).then(() => {
                 alert('Configuration copied to clipboard!');
             }).catch(() => {
-                // Fallback for older browsers
                 const range = document.createRange();
                 range.selectNode(configText);
                 window.getSelection().removeAllRanges();
                 window.getSelection().addRange(range);
                 document.execCommand('copy');
                 window.getSelection().removeAllRanges();
-                alert('Configuration copied to clipboard!');
+                alert('Configuration copied!');
             });
         }
     }
