@@ -1223,11 +1223,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $config = [
                     'connection_type' => 'pppoe',
                     'service_vlan' => !empty($_POST['pppoe_vlan']) ? (int)$_POST['pppoe_vlan'] : 902,
-                    'wan_index' => 2,
+                    'wan_index' => 1, // WANConnectionDevice.1 is default (created by OMCI)
                     'connection_name' => 'Internet_PPPoE',
                     'pppoe_username' => trim($_POST['pppoe_username'] ?? ''),
                     'pppoe_password' => trim($_POST['pppoe_password'] ?? ''),
-                    'auto_bind_ports' => true,
                 ];
                 
                 $result = $genieacs->configureInternetWAN($deviceId, $config);
@@ -2935,15 +2934,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $deviceId = $deviceResult['device']['_id'];
                 
                 // Use SmartOLT-style configureInternetWAN function
+                // NOTE: Huawei ONUs do NOT allow creating WAN objects via TR-069
+                // The WANPPPConnection.1 must already exist from OLT OMCI config
                 $config = [
                     'connection_type' => $connType,
                     'service_vlan' => (int)($_POST['vlan_id'] ?? 0),
-                    'wan_index' => 2, // WAN device 1 is management, 2 is internet
+                    'wan_index' => 1, // WANConnectionDevice.1 (created by OMCI)
                     'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
-                    'auto_bind_ports' => true, // Bind LAN1-4 and SSID1 to this WAN
-                    'create_wan_device' => true,
-                    'create_ppp_connection' => ($connType === 'pppoe'),
-                    'create_ip_connection' => ($connType !== 'pppoe'),
                 ];
                 
                 if ($connType === 'pppoe') {
@@ -2998,16 +2995,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $deviceId = $deviceResult['device']['_id'];
                 
                 // Use SmartOLT-style configureInternetWAN function
+                // NOTE: Huawei ONUs require WANPPPConnection.1 to already exist from OMCI
                 $config = [
                     'connection_type' => 'pppoe',
                     'service_vlan' => (int)($_POST['pppoe_vlan'] ?? 902),
-                    'wan_index' => 2,
+                    'wan_index' => 1, // WANConnectionDevice.1 (created by OMCI)
                     'connection_name' => 'Internet_PPPoE',
                     'pppoe_username' => $_POST['pppoe_username'] ?? '',
                     'pppoe_password' => $_POST['pppoe_password'] ?? '',
-                    'auto_bind_ports' => true,
-                    'create_wan_device' => true,
-                    'create_ppp_connection' => true,
                 ];
                 
                 error_log("[TR069-PPPoE] Config: " . json_encode($config));
@@ -3441,12 +3436,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $deviceId = $deviceResult['device']['_id'];
                 $connType = $_POST['wan_type'] ?? $_POST['connection_type'] ?? 'pppoe';
                 
+                // NOTE: Huawei ONUs require WANPPPConnection.1 to already exist from OMCI
                 $config = [
                     'connection_type' => $connType,
                     'service_vlan' => (int)($_POST['wan_vlan'] ?? $_POST['vlan_id'] ?? 0),
-                    'wan_index' => 2,
+                    'wan_index' => 1, // WANConnectionDevice.1 (created by OMCI)
                     'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
-                    'auto_bind_ports' => true,
                 ];
                 
                 if ($connType === 'pppoe') {
