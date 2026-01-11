@@ -7611,9 +7611,45 @@ class HuaweiOLT {
     }
     
     /**
+     * Ensure TR-069 logs table exists (auto-initialize)
+     */
+    private function ensureTR069LogsTable(): void {
+        static $checked = false;
+        if ($checked) return;
+        
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS huawei_onu_tr069_logs (
+                    id SERIAL PRIMARY KEY,
+                    onu_id INTEGER REFERENCES huawei_onus(id) ON DELETE CASCADE,
+                    olt_id INTEGER REFERENCES huawei_olts(id) ON DELETE CASCADE,
+                    genieacs_id VARCHAR(255),
+                    task_type VARCHAR(50) NOT NULL,
+                    task_name VARCHAR(100),
+                    terminal VARCHAR(50) DEFAULT 'ACS',
+                    result VARCHAR(20) DEFAULT 'Pending',
+                    request_data TEXT,
+                    response_data TEXT,
+                    error_message TEXT,
+                    http_code INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_tr069_logs_onu ON huawei_onu_tr069_logs(onu_id);
+                CREATE INDEX IF NOT EXISTS idx_tr069_logs_created ON huawei_onu_tr069_logs(created_at DESC);
+            ");
+            $checked = true;
+        } catch (\Exception $e) {
+            // Table likely already exists, ignore
+            $checked = true;
+        }
+    }
+    
+    /**
      * Log TR-069 task to database (SmartOLT-style device logs)
      */
     public function logTR069Task(array $data): int {
+        $this->ensureTR069LogsTable();
+        
         $stmt = $this->db->prepare("
             INSERT INTO huawei_onu_tr069_logs 
             (onu_id, olt_id, genieacs_id, task_type, task_name, terminal, result, request_data, response_data, error_message, http_code)
@@ -7639,6 +7675,8 @@ class HuaweiOLT {
      * Get TR-069 logs for an ONU (SmartOLT-style device logs)
      */
     public function getTR069Logs(int $onuId, int $limit = 100): array {
+        $this->ensureTR069LogsTable();
+        
         $stmt = $this->db->prepare("
             SELECT * FROM huawei_onu_tr069_logs 
             WHERE onu_id = ? 
