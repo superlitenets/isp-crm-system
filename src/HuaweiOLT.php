@@ -7356,7 +7356,7 @@ class HuaweiOLT {
             'message' => empty($errors) 
                 ? "WAN {$wanMode} configured via TR-069 (VLAN: {$serviceVlan})"
                 : "WAN config partial: " . implode(', ', $errors),
-            'command_response' => json_encode(['tasks' => $tasksSent, 'params' => array_keys($paramValues)]),
+            'command_response' => json_encode(['tasks' => $tasksSent, 'mode' => $wanMode]),
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
