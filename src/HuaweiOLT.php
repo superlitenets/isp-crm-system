@@ -6995,76 +6995,8 @@ class HuaweiOLT {
         $errors = [];
         $tasksSent = [];
         
-        // Build TR-069 parameter values based on WAN mode
-        $paramValues = [];
-        
-        // Common WAN path for most ONUs (InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1)
-        $wanBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1';
-        
-        if ($wanMode === 'pppoe') {
-            // PPPoE configuration
-            $paramValues = [
-                "{$wanBasePath}.WANPPPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
-                "{$wanBasePath}.WANPPPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANPPPConnection.1.Username" => ['value' => $pppoeUsername, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANPPPConnection.1.Password" => ['value' => $pppoePassword, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANPPPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
-            ];
-            
-            // Add VLAN if specified
-            if ($serviceVlan > 0) {
-                $paramValues["{$wanBasePath}.WANPPPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
-            }
-        } elseif ($wanMode === 'dhcp') {
-            // DHCP/IPoE configuration
-            $paramValues = [
-                "{$wanBasePath}.WANIPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
-                "{$wanBasePath}.WANIPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.AddressingType" => ['value' => 'DHCP', 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
-            ];
-            
-            if ($serviceVlan > 0) {
-                $paramValues["{$wanBasePath}.WANIPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
-            }
-        } elseif ($wanMode === 'static') {
-            // Static IP configuration
-            $staticIp = $config['static_ip'] ?? '';
-            $subnetMask = $config['subnet_mask'] ?? '255.255.255.0';
-            $gateway = $config['gateway'] ?? '';
-            $dnsServers = $config['dns_servers'] ?? '8.8.8.8,8.8.4.4';
-            
-            if (empty($staticIp) || empty($gateway)) {
-                return ['success' => false, 'error' => 'Static IP and gateway are required'];
-            }
-            
-            $paramValues = [
-                "{$wanBasePath}.WANIPConnection.1.Enable" => ['value' => true, 'type' => 'xsd:boolean'],
-                "{$wanBasePath}.WANIPConnection.1.ConnectionType" => ['value' => 'IP_Routed', 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.AddressingType" => ['value' => 'Static', 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.ExternalIPAddress" => ['value' => $staticIp, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.SubnetMask" => ['value' => $subnetMask, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.DefaultGateway" => ['value' => $gateway, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.DNSServers" => ['value' => $dnsServers, 'type' => 'xsd:string'],
-                "{$wanBasePath}.WANIPConnection.1.NATEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
-            ];
-            
-            if ($serviceVlan > 0) {
-                $paramValues["{$wanBasePath}.WANIPConnection.1.X_HW_VLAN"] = ['value' => $serviceVlan, 'type' => 'xsd:unsignedInt'];
-            }
-        }
-        
-        // Send setParameterValues task to GenieACS
-        if (!empty($paramValues)) {
-            $task = [
-                'name' => 'setParameterValues',
-                'parameterValues' => []
-            ];
-            
-            foreach ($paramValues as $path => $val) {
-                $task['parameterValues'][] = [$path, $val['value'], $val['type']];
-            }
-            
+        // Helper function to send task to GenieACS
+        $sendTask = function($task) use ($genieacsUrl, $genieacsId) {
             $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -7076,11 +7008,129 @@ class HuaweiOLT {
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+            return ['code' => $httpCode, 'response' => $response, 'success' => ($httpCode >= 200 && $httpCode < 300)];
+        };
+        
+        // WAN base path - use index 2 for internet WAN (1 is typically management WAN)
+        $wanDevicePath = 'InternetGatewayDevice.WANDevice.1';
+        $wanConnDeviceIndex = $config['wan_connection_device'] ?? 2;
+        $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
+        
+        // Step 1: Create WANConnectionDevice if needed (addObject)
+        $addConnDeviceTask = [
+            'name' => 'addObject',
+            'objectName' => "{$wanDevicePath}.WANConnectionDevice."
+        ];
+        $result = $sendTask($addConnDeviceTask);
+        if ($result['success']) {
+            $tasksSent[] = 'Create WANConnectionDevice';
+            // Parse instance number from response if available
+            $respData = json_decode($result['response'], true);
+            if (!empty($respData['instanceNumber'])) {
+                $wanConnDeviceIndex = $respData['instanceNumber'];
+                $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
+            }
+        }
+        
+        // Step 2: Create the appropriate WAN connection type
+        if ($wanMode === 'pppoe') {
+            // Create WANPPPConnection
+            $addPppConnTask = [
+                'name' => 'addObject',
+                'objectName' => "{$wanConnPath}.WANPPPConnection."
+            ];
+            $result = $sendTask($addPppConnTask);
+            if ($result['success']) {
+                $tasksSent[] = 'Create WANPPPConnection';
+            } else {
+                // Object may already exist, continue with configuration
+            }
             
-            if ($httpCode >= 200 && $httpCode < 300) {
+            // Step 3: Configure PPPoE parameters
+            $paramValues = [
+                ["{$wanConnPath}.WANPPPConnection.1.Enable", true, 'xsd:boolean'],
+                ["{$wanConnPath}.WANPPPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$wanConnPath}.WANPPPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
+                ["{$wanConnPath}.WANPPPConnection.1.Username", $pppoeUsername, 'xsd:string'],
+                ["{$wanConnPath}.WANPPPConnection.1.Password", $pppoePassword, 'xsd:string'],
+                ["{$wanConnPath}.WANPPPConnection.1.NATEnabled", true, 'xsd:boolean'],
+            ];
+            
+            // Add VLAN if specified
+            if ($serviceVlan > 0) {
+                $paramValues[] = ["{$wanConnPath}.WANPPPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            
+        } elseif ($wanMode === 'dhcp') {
+            // Create WANIPConnection
+            $addIpConnTask = [
+                'name' => 'addObject',
+                'objectName' => "{$wanConnPath}.WANIPConnection."
+            ];
+            $result = $sendTask($addIpConnTask);
+            if ($result['success']) {
+                $tasksSent[] = 'Create WANIPConnection';
+            }
+            
+            $paramValues = [
+                ["{$wanConnPath}.WANIPConnection.1.Enable", true, 'xsd:boolean'],
+                ["{$wanConnPath}.WANIPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.AddressingType", 'DHCP', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.NATEnabled", true, 'xsd:boolean'],
+            ];
+            
+            if ($serviceVlan > 0) {
+                $paramValues[] = ["{$wanConnPath}.WANIPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            
+        } elseif ($wanMode === 'static') {
+            $staticIp = $config['static_ip'] ?? '';
+            $subnetMask = $config['subnet_mask'] ?? '255.255.255.0';
+            $gateway = $config['gateway'] ?? '';
+            $dnsServers = $config['dns_servers'] ?? '8.8.8.8,8.8.4.4';
+            
+            if (empty($staticIp) || empty($gateway)) {
+                return ['success' => false, 'error' => 'Static IP and gateway are required'];
+            }
+            
+            $addIpConnTask = [
+                'name' => 'addObject',
+                'objectName' => "{$wanConnPath}.WANIPConnection."
+            ];
+            $sendTask($addIpConnTask);
+            
+            $paramValues = [
+                ["{$wanConnPath}.WANIPConnection.1.Enable", true, 'xsd:boolean'],
+                ["{$wanConnPath}.WANIPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.AddressingType", 'Static', 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.ExternalIPAddress", $staticIp, 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.SubnetMask", $subnetMask, 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.DefaultGateway", $gateway, 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.DNSServers", $dnsServers, 'xsd:string'],
+                ["{$wanConnPath}.WANIPConnection.1.NATEnabled", true, 'xsd:boolean'],
+            ];
+            
+            if ($serviceVlan > 0) {
+                $paramValues[] = ["{$wanConnPath}.WANIPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+        } else {
+            return ['success' => false, 'error' => "Unknown WAN mode: {$wanMode}"];
+        }
+        
+        // Step 4: Send setParameterValues task
+        if (!empty($paramValues)) {
+            $task = [
+                'name' => 'setParameterValues',
+                'parameterValues' => $paramValues
+            ];
+            
+            $result = $sendTask($task);
+            if ($result['success']) {
                 $tasksSent[] = 'WAN Configuration';
             } else {
-                $errors[] = "Failed to send WAN config task (HTTP $httpCode): $response";
+                $errors[] = "Failed to send WAN config task (HTTP {$result['code']}): {$result['response']}";
             }
         }
         
