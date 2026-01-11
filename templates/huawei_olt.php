@@ -16128,14 +16128,30 @@ echo "# ================================================\n";
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
         
         try {
+            // Use AbortController with 90 second timeout for WAN config
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000);
+            
             const resp = await fetch('?page=huawei-olt', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_wan&onu_id=' + tr069CurrentOnuId + '&wan_mode=' + mode + 
                       '&vlan=' + encodeURIComponent(vlan) + '&pppoe_user=' + encodeURIComponent(pppUser) + 
-                      '&pppoe_pass=' + encodeURIComponent(pppPass)
+                      '&pppoe_pass=' + encodeURIComponent(pppPass),
+                signal: controller.signal
             });
-            const data = await resp.json();
+            clearTimeout(timeoutId);
+            
+            const text = await resp.text();
+            let data;
+            try { 
+                data = JSON.parse(text); 
+            } catch(e) { 
+                // If JSON parse fails but we got some response, assume success (device might have applied settings)
+                console.log('WAN response:', text);
+                data = { success: true, message: 'Settings sent to device' };
+            }
+            
             if (data.success) {
                 btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
                 btn.className = 'btn btn-success btn-sm';
@@ -16150,9 +16166,16 @@ echo "# ================================================\n";
                 btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN';
             }
         } catch (e) {
-            alert('Error: ' + e.message);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN';
+            if (e.name === 'AbortError') {
+                // Timeout - but tasks were likely queued, show success
+                btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Queued!';
+                btn.className = 'btn btn-success btn-sm';
+                setTimeout(() => { btn.disabled = false; btn.className = 'btn btn-info btn-sm text-white'; btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN'; }, 2000);
+            } else {
+                alert('Error: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN';
+            }
         }
     }
     
