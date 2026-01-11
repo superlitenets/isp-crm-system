@@ -6411,22 +6411,45 @@ try {
             .onu-status-bar.online { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
             .onu-status-bar.offline { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
             .onu-status-bar.los { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-            .onu-status-bar .status-icon { font-size: 3rem; opacity: 0.9; }
-            .onu-status-bar .status-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
-            .onu-status-bar .status-value { font-size: 1.1rem; font-weight: 600; }
+            .onu-status-bar .status-icon { font-size: 2.5rem; opacity: 0.9; }
+            .onu-status-bar .status-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
+            .onu-status-bar .status-value { font-size: 0.9rem; font-weight: 600; word-break: break-all; }
             .onu-info-card { background: #fff; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
             .onu-info-card .info-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-            .onu-info-card .info-value { font-size: 0.95rem; font-weight: 500; color: #1e293b; }
+            .onu-info-card .info-value { font-size: 0.95rem; font-weight: 500; color: #1e293b; word-break: break-word; }
             .action-toolbar { background: #f8fafc; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
-            .action-toolbar .btn { font-size: 0.85rem; padding: 0.5rem 1rem; }
+            .action-toolbar .btn { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
             .signal-meter { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
             .signal-meter-fill { height: 100%; border-radius: 3px; }
-            .data-table { font-size: 0.9rem; }
-            .data-table th { font-weight: 600; color: #64748b; font-size: 0.8rem; text-transform: uppercase; }
+            .data-table { font-size: 0.85rem; }
+            .data-table th { font-weight: 600; color: #64748b; font-size: 0.75rem; text-transform: uppercase; }
             .section-header { font-size: 0.9rem; font-weight: 600; color: #374151; border-bottom: 2px solid #3b82f6; padding-bottom: 0.5rem; }
             .pulse-online { animation: pulse-green 2s infinite; }
             @keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } }
             .danger-zone { border: 1px solid #fee2e2; background: #fef2f2; border-radius: 0.75rem; }
+            
+            /* Mobile responsive styles */
+            @media (max-width: 768px) {
+                .onu-status-bar { padding: 0.75rem !important; }
+                .onu-status-bar .status-icon { font-size: 1.5rem; }
+                .onu-status-bar .status-label { font-size: 0.6rem; }
+                .onu-status-bar .status-value { font-size: 0.75rem; }
+                .onu-status-bar .border-end { border: none !important; }
+                .onu-status-bar .py-2 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+                .action-toolbar .btn { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
+                .action-toolbar .btn .me-1 { margin-right: 0 !important; }
+                .action-toolbar .btn-text { display: none; }
+                .onu-info-card { margin-bottom: 0.5rem; }
+                .onu-info-card .section-header { font-size: 0.8rem; }
+                .signal-card .display-6 { font-size: 1.5rem !important; }
+                .signal-card .border-start { border: none !important; padding-top: 0.5rem; }
+                .hide-mobile { display: none !important; }
+            }
+            @media (max-width: 576px) {
+                .onu-status-bar .col-auto.text-center { display: none; }
+                .action-toolbar { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+                .action-toolbar .d-flex { flex-wrap: nowrap !important; }
+            }
             </style>
             
             <?php 
@@ -6455,53 +6478,43 @@ try {
             <?php endif; ?>
             
             <!-- SmartOLT-Style Gradient Status Bar -->
-            <div class="onu-status-bar <?= $currentOnu['status'] ?? 'offline' ?> text-white p-3 mb-4">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-sm btn-light btn-opacity-25 me-2">
+            <div class="onu-status-bar <?= $currentOnu['status'] ?? 'offline' ?> text-white p-2 p-md-3 mb-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-sm btn-light">
                             <i class="bi bi-arrow-left"></i>
                         </a>
-                    </div>
-                    <div class="col-auto text-center px-3 border-end border-white border-opacity-25">
-                        <div class="<?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?> d-inline-block rounded-circle p-2" style="background: rgba(255,255,255,0.2);">
+                        <div class="<?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?> rounded-circle p-1 p-md-2 d-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.2);">
                             <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> status-icon"></i>
                         </div>
-                        <div class="status-label mt-1">Status</div>
-                        <div class="status-value" data-live-status><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></div>
-                    </div>
-                    <div class="col">
-                        <div class="row text-center">
-                            <div class="col-6 col-md-2 border-end border-white border-opacity-25 py-2">
-                                <div class="status-label">ONU Name</div>
-                                <div class="status-value"><?= htmlspecialchars($currentOnu['name'] ?: '-') ?></div>
-                            </div>
-                            <div class="col-6 col-md-2 border-end border-white border-opacity-25 py-2">
-                                <div class="status-label">Serial</div>
-                                <div class="status-value small"><?= htmlspecialchars($currentOnu['sn']) ?></div>
-                            </div>
-                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
-                                <div class="status-label">RX Power</div>
-                                <div class="status-value" data-live-rx><?= $rx !== null ? number_format($rx, 1).' dBm' : '-' ?></div>
-                            </div>
-                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
-                                <div class="status-label">TX Power</div>
-                                <div class="status-value" data-live-tx><?= $tx !== null ? number_format($tx, 1).' dBm' : '-' ?></div>
-                            </div>
-                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
-                                <div class="status-label">Distance</div>
-                                <div class="status-value"><?= $distanceDisplay ?></div>
-                            </div>
-                            <div class="col-6 col-md-2 py-2">
-                                <div class="status-label">Uptime</div>
-                                <div class="status-value" data-live-uptime><?= $uptimeDisplay ?: '-' ?></div>
-                            </div>
+                        <div>
+                            <div class="fw-bold" style="font-size: 1rem;" data-live-status><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></div>
+                            <div class="status-label"><?= htmlspecialchars($currentOnu['name'] ?: $currentOnu['sn']) ?></div>
                         </div>
                     </div>
-                    <div class="col-auto">
+                    <div class="d-none d-md-flex gap-3 text-center">
+                        <div class="px-2 border-start border-white border-opacity-25">
+                            <div class="status-label">RX</div>
+                            <div class="status-value" data-live-rx><?= $rx !== null ? number_format($rx, 1).' dBm' : '-' ?></div>
+                        </div>
+                        <div class="px-2 border-start border-white border-opacity-25">
+                            <div class="status-label">TX</div>
+                            <div class="status-value" data-live-tx><?= $tx !== null ? number_format($tx, 1).' dBm' : '-' ?></div>
+                        </div>
+                        <div class="px-2 border-start border-white border-opacity-25">
+                            <div class="status-label">Dist</div>
+                            <div class="status-value"><?= $distanceDisplay ?></div>
+                        </div>
+                        <div class="px-2 border-start border-white border-opacity-25">
+                            <div class="status-label">Uptime</div>
+                            <div class="status-value" data-live-uptime><?= $uptimeDisplay ?: '-' ?></div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-1">
                         <button type="button" class="btn btn-sm btn-light" onclick="fetchLiveOnuData()" title="Refresh">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-light ms-1" id="liveBtn" onclick="toggleLiveMode()" title="Live Mode">
+                        <button type="button" class="btn btn-sm btn-light" id="liveBtn" onclick="toggleLiveMode()" title="Live Mode">
                             <i class="bi bi-broadcast"></i>
                         </button>
                     </div>
@@ -6518,34 +6531,34 @@ try {
             ?>
             
             <!-- Action Toolbar -->
-            <div class="action-toolbar p-2 mb-4">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <span class="text-muted small me-2"><i class="bi bi-lightning-charge me-1"></i>Quick Actions:</span>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
-                        <i class="bi bi-code-slash me-1"></i>Config
+            <div class="action-toolbar p-2 mb-3">
+                <div class="d-flex flex-wrap gap-1 gap-md-2 align-items-center">
+                    <span class="text-muted small me-1 d-none d-md-inline"><i class="bi bi-lightning-charge"></i> Actions:</span>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)" title="Config">
+                        <i class="bi bi-code-slash"></i><span class="d-none d-md-inline ms-1">Config</span>
                     </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)">
-                        <i class="bi bi-broadcast me-1"></i>TR-069 Info
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)" title="TR-069 Info">
+                        <i class="bi bi-broadcast"></i><span class="d-none d-md-inline ms-1">TR-069</span>
                     </button>
                     <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
                         <input type="hidden" name="action" value="reboot_onu">
                         <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                        <button type="submit" class="btn btn-outline-warning btn-sm">
-                            <i class="bi bi-arrow-clockwise me-1"></i>Reboot
+                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Reboot">
+                            <i class="bi bi-arrow-clockwise"></i><span class="d-none d-md-inline ms-1">Reboot</span>
                         </button>
                     </form>
-                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#tr069ConfigModal">
-                        <i class="bi bi-gear me-1"></i>Push TR-069
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#tr069ConfigModal" title="Push TR-069">
+                        <i class="bi bi-gear"></i><span class="d-none d-md-inline ms-1">Push TR-069</span>
                     </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#wanConfigModal">
-                        <i class="bi bi-ethernet me-1"></i>WAN Config
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="WAN Config">
+                        <i class="bi bi-ethernet"></i><span class="d-none d-md-inline ms-1">WAN</span>
                     </button>
                     <div class="ms-auto">
                         <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU from OLT?')">
                             <input type="hidden" name="action" value="delete_onu_olt">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-trash me-1"></i>Delete
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                                <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Delete</span>
                             </button>
                         </form>
                     </div>
@@ -6825,31 +6838,31 @@ try {
             }
             </script>
             
-            <!-- Optical Signal Card -->
-            <div class="onu-info-card p-3 mb-4">
-                <div class="section-header mb-3"><i class="bi bi-reception-4 me-2"></i>Optical Signal Quality</div>
-                <div class="row align-items-center">
-                    <div class="col-md-3 text-center">
-                        <div class="display-6 text-<?= $rxClass ?> fw-bold" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
-                        <div class="text-muted small">RX Power (dBm)</div>
-                        <div class="signal-meter mt-2 mx-auto" style="max-width: 150px;">
+            <!-- Optical Signal Card (Mobile shows on status bar) -->
+            <div class="onu-info-card signal-card p-3 mb-3 d-md-block">
+                <div class="section-header mb-3"><i class="bi bi-reception-4 me-2"></i>Optical Signal</div>
+                <div class="row align-items-center g-2">
+                    <div class="col-4 col-md-3 text-center">
+                        <div class="h4 text-<?= $rxClass ?> fw-bold mb-0" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
+                        <div class="text-muted small">RX (dBm)</div>
+                        <div class="signal-meter mt-1 mx-auto" style="max-width: 100px;">
                             <div class="signal-meter-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
                         </div>
-                        <span class="badge bg-<?= $rxClass ?> mt-1"><?= $rxLabel ?></span>
+                        <span class="badge bg-<?= $rxClass ?> mt-1" style="font-size: 0.65rem;"><?= $rxLabel ?></span>
                     </div>
-                    <div class="col-md-3 text-center border-start">
-                        <div class="display-6 fw-bold" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
-                        <div class="text-muted small">TX Power (dBm)</div>
+                    <div class="col-4 col-md-3 text-center">
+                        <div class="h4 fw-bold mb-0" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
+                        <div class="text-muted small">TX (dBm)</div>
                     </div>
-                    <div class="col-md-3 text-center border-start">
-                        <div class="display-6 fw-bold"><?= $distanceDisplay ?></div>
+                    <div class="col-4 col-md-3 text-center">
+                        <div class="h4 fw-bold mb-0"><?= $distanceDisplay ?></div>
                         <div class="text-muted small">Distance</div>
                     </div>
-                    <div class="col-md-3 text-center border-start">
-                        <div class="small text-muted mb-1">Signal Thresholds</div>
-                        <div class="small"><span class="text-success">Excellent:</span> > -20 dBm</div>
-                        <div class="small"><span class="text-warning">Warning:</span> -25 to -20 dBm</div>
-                        <div class="small"><span class="text-danger">Critical:</span> < -28 dBm</div>
+                    <div class="col-12 col-md-3 text-center d-none d-md-block">
+                        <div class="small text-muted mb-1">Thresholds</div>
+                        <div class="small"><span class="text-success">Good:</span> > -20</div>
+                        <div class="small"><span class="text-warning">Fair:</span> -25 to -20</div>
+                        <div class="small"><span class="text-danger">Bad:</span> &lt; -28</div>
                     </div>
                 </div>
             </div>
