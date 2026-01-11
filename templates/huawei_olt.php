@@ -13275,8 +13275,29 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 </div>
                             </div>
                         </div>
+                        
+                        <h6 class="text-info mb-3"><i class="bi bi-wifi me-2"></i>WiFi Configuration (Optional)</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">WiFi SSID (2.4GHz)</label>
+                                    <input type="text" name="wifi_ssid_24" id="authWifiSsid" class="form-control" placeholder="e.g., MyNetwork">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">WiFi Password</label>
+                                    <div class="input-group">
+                                        <input type="password" name="wifi_pass_24" id="authWifiPass" class="form-control" placeholder="Min 8 characters" minlength="8">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPassword()">
+                                            <i class="bi bi-eye" id="wifiEyeIcon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <small class="text-muted d-block mb-3">
-                            <i class="bi bi-info-circle me-1"></i>If provided, PPPoE credentials will be configured via TR-069 after authorization.
+                            <i class="bi bi-info-circle me-1"></i>PPPoE and WiFi will be configured via TR-069 after ONU connects to GenieACS. PPPoE is pushed first, then WiFi.
                         </small>
                         
                         <div class="alert alert-secondary small mb-0">
@@ -13317,6 +13338,18 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
     function togglePppoePassword() {
         const input = document.getElementById('authPppoePass');
         const icon = document.getElementById('pppoeEyeIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+    
+    function toggleWifiPassword() {
+        const input = document.getElementById('authWifiPass');
+        const icon = document.getElementById('wifiEyeIcon');
         if (input.type === 'password') {
             input.type = 'text';
             icon.className = 'bi bi-eye-slash';
