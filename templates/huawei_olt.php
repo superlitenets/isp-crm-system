@@ -6403,48 +6403,31 @@ try {
             ?>
             
             <style>
-            .onu-hero { background: #fff; border-radius: 1rem; color: #1e293b; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-            .onu-hero .stat-card { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; border: 1px solid #e2e8f0; }
-            .onu-hero .stat-value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
-            .onu-hero .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
-            .quick-action-card { transition: all 0.2s ease; border: 2px solid transparent; }
-            .quick-action-card:hover { transform: translateY(-2px); border-color: var(--oms-accent); box-shadow: 0 8px 25px rgba(59,130,246,0.15); }
-            .quick-action-card .icon-wrapper { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
-            .config-section { border-left: 3px solid var(--oms-accent); }
-            .signal-gauge { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; }
-            .signal-gauge-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+            .onu-status-bar { 
+                border-radius: 0.75rem; 
+                overflow: hidden;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            }
+            .onu-status-bar.online { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+            .onu-status-bar.offline { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
+            .onu-status-bar.los { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+            .onu-status-bar .status-icon { font-size: 3rem; opacity: 0.9; }
+            .onu-status-bar .status-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+            .onu-status-bar .status-value { font-size: 1.1rem; font-weight: 600; }
+            .onu-info-card { background: #fff; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
+            .onu-info-card .info-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+            .onu-info-card .info-value { font-size: 0.95rem; font-weight: 500; color: #1e293b; }
+            .action-toolbar { background: #f8fafc; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
+            .action-toolbar .btn { font-size: 0.85rem; padding: 0.5rem 1rem; }
+            .signal-meter { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
+            .signal-meter-fill { height: 100%; border-radius: 3px; }
+            .data-table { font-size: 0.9rem; }
+            .data-table th { font-weight: 600; color: #64748b; font-size: 0.8rem; text-transform: uppercase; }
+            .section-header { font-size: 0.9rem; font-weight: 600; color: #374151; border-bottom: 2px solid #3b82f6; padding-bottom: 0.5rem; }
             .pulse-online { animation: pulse-green 2s infinite; }
             @keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); } }
+            .danger-zone { border: 1px solid #fee2e2; background: #fef2f2; border-radius: 0.75rem; }
             </style>
-            
-            <!-- Breadcrumb Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="text-decoration-none text-muted">
-                        <i class="bi bi-arrow-left me-1"></i> Back to ONUs
-                    </a>
-                    <h4 class="mb-0 mt-2">
-                        <i class="bi bi-router text-primary me-2"></i>
-                        <?= htmlspecialchars($currentOnu['name'] ?: $currentOnu['sn']) ?>
-                    </h4>
-                </div>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-primary" onclick="fetchLiveOnuData()">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                    </button>
-                    <button type="button" class="btn btn-success" id="liveBtn" onclick="toggleLiveMode()">
-                        <i class="bi bi-broadcast me-1"></i> Live Mode
-                    </button>
-                </div>
-            </div>
-            
-            <?php if (!empty($message)): ?>
-            <div class="alert alert-<?= $messageType ?? 'success' ?> alert-dismissible fade show" role="alert">
-                <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'x-circle' : 'info-circle') ?> me-2"></i>
-                <?= htmlspecialchars($message) ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <?php endif; ?>
             
             <?php 
             // Calculate uptime for display
@@ -6463,278 +6446,220 @@ try {
             }
             ?>
             
-            <!-- Hero Status Card -->
-            <div class="onu-hero p-4 mb-4">
+            <?php if (!empty($message)): ?>
+            <div class="alert alert-<?= $messageType ?? 'success' ?> alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-<?= $messageType === 'success' ? 'check-circle' : ($messageType === 'danger' ? 'x-circle' : 'info-circle') ?> me-2"></i>
+                <?= htmlspecialchars($message) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <?php endif; ?>
+            
+            <!-- SmartOLT-Style Gradient Status Bar -->
+            <div class="onu-status-bar <?= $currentOnu['status'] ?? 'offline' ?> text-white p-3 mb-4">
                 <div class="row align-items-center">
-                    <div class="col-md-3 text-center border-end mb-3 mb-md-0">
-                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center <?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?>" 
-                             style="width: 80px; height: 80px; background: <?= $currentOnu['status'] === 'online' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)' ?>">
-                            <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>" style="font-size: 2.5rem;"></i>
-                        </div>
-                        <h5 data-live-status class="mt-2 mb-0 text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?>"><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></h5>
-                        <small class="text-muted">Device Status</small>
-                        <?php if ($uptimeDisplay): ?>
-                        <div class="mt-1 small text-muted" data-live-uptime><i class="bi bi-clock me-1"></i><?= $uptimeDisplay ?></div>
-                        <?php endif; ?>
+                    <div class="col-auto">
+                        <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-sm btn-light btn-opacity-25 me-2">
+                            <i class="bi bi-arrow-left"></i>
+                        </a>
                     </div>
-                    <div class="col-md-9">
-                        <div class="row g-3">
-                            <div class="col-6 col-md-3">
-                                <div class="stat-card text-center">
-                                    <div class="stat-value text-<?= $rxClass ?>" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
-                                    <div class="stat-label">RX Power (dBm)</div>
-                                    <div class="signal-gauge mt-2">
-                                        <div class="signal-gauge-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
-                                    </div>
-                                    <small class="text-<?= $rxClass ?>"><?= $rxLabel ?></small>
-                                </div>
+                    <div class="col-auto text-center px-3 border-end border-white border-opacity-25">
+                        <div class="<?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?> d-inline-block rounded-circle p-2" style="background: rgba(255,255,255,0.2);">
+                            <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> status-icon"></i>
+                        </div>
+                        <div class="status-label mt-1">Status</div>
+                        <div class="status-value" data-live-status><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></div>
+                    </div>
+                    <div class="col">
+                        <div class="row text-center">
+                            <div class="col-6 col-md-2 border-end border-white border-opacity-25 py-2">
+                                <div class="status-label">ONU Name</div>
+                                <div class="status-value"><?= htmlspecialchars($currentOnu['name'] ?: '-') ?></div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="stat-card text-center">
-                                    <div class="stat-value" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
-                                    <div class="stat-label">TX Power (dBm)</div>
-                                </div>
+                            <div class="col-6 col-md-2 border-end border-white border-opacity-25 py-2">
+                                <div class="status-label">Serial</div>
+                                <div class="status-value small"><?= htmlspecialchars($currentOnu['sn']) ?></div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="stat-card text-center">
-                                    <div class="stat-value"><?= $distanceDisplay ?></div>
-                                    <div class="stat-label">Distance</div>
-                                </div>
+                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
+                                <div class="status-label">RX Power</div>
+                                <div class="status-value" data-live-rx><?= $rx !== null ? number_format($rx, 1).' dBm' : '-' ?></div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="stat-card text-center">
-                                    <div class="stat-value"><?= !empty($currentOnu['vlan_id']) ? $currentOnu['vlan_id'] : '-' ?></div>
-                                    <div class="stat-label">Service VLAN</div>
-                                </div>
+                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
+                                <div class="status-label">TX Power</div>
+                                <div class="status-value" data-live-tx><?= $tx !== null ? number_format($tx, 1).' dBm' : '-' ?></div>
+                            </div>
+                            <div class="col-4 col-md-2 border-end border-white border-opacity-25 py-2">
+                                <div class="status-label">Distance</div>
+                                <div class="status-value"><?= $distanceDisplay ?></div>
+                            </div>
+                            <div class="col-6 col-md-2 py-2">
+                                <div class="status-label">Uptime</div>
+                                <div class="status-value" data-live-uptime><?= $uptimeDisplay ?: '-' ?></div>
                             </div>
                         </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-light" onclick="fetchLiveOnuData()" title="Refresh">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light ms-1" id="liveBtn" onclick="toggleLiveMode()" title="Live Mode">
+                            <i class="bi bi-broadcast"></i>
+                        </button>
                     </div>
                 </div>
             </div>
             
-            <!-- SmartOLT-style ONU Info Header -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <div class="row">
-                        <!-- Left: Basic Info (Editable) -->
-                        <div class="col-md-4 border-end">
-                            <form method="post" id="onuInfoForm">
-                                <input type="hidden" name="action" value="update_onu_info">
-                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                
-                                <div class="mb-2">
-                                    <span class="text-primary">Zone</span><br>
-                                    <select name="zone_id" class="form-select form-select-sm" style="max-width: 200px;">
-                                        <option value="">None</option>
-                                        <?php foreach ($zones as $z): ?>
-                                        <option value="<?= $z['id'] ?>" <?= ($currentOnu['zone_id'] == $z['id']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($z['name']) ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-2">
-                                    <span class="text-primary">Name</span><br>
-                                    <input type="text" name="name" class="form-control form-control-sm" style="max-width: 200px;" 
-                                           value="<?= htmlspecialchars($currentOnu['name'] ?? '') ?>" placeholder="Customer name">
-                                </div>
-                                <div class="mb-2">
-                                    <span class="text-primary">Address or comment</span><br>
-                                    <input type="text" name="description" class="form-control form-control-sm" style="max-width: 200px;"
-                                           value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" placeholder="Description">
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-sm mt-1">
-                                    <i class="bi bi-check me-1"></i> Save
-                                </button>
-                            </form>
+            <?php 
+            $attachedVlans = [];
+            if (!empty($currentOnu['attached_vlans'])) {
+                $attachedVlans = json_decode($currentOnu['attached_vlans'], true) ?: [];
+            } elseif (!empty($currentOnu['vlan_id'])) {
+                $attachedVlans = [(int)$currentOnu['vlan_id']];
+            }
+            ?>
+            
+            <!-- Action Toolbar -->
+            <div class="action-toolbar p-2 mb-4">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="text-muted small me-2"><i class="bi bi-lightning-charge me-1"></i>Quick Actions:</span>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
+                        <i class="bi bi-code-slash me-1"></i>Config
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)">
+                        <i class="bi bi-broadcast me-1"></i>TR-069 Info
+                    </button>
+                    <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
+                        <input type="hidden" name="action" value="reboot_onu">
+                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                        <button type="submit" class="btn btn-outline-warning btn-sm">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Reboot
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#tr069ConfigModal">
+                        <i class="bi bi-gear me-1"></i>Push TR-069
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#wanConfigModal">
+                        <i class="bi bi-ethernet me-1"></i>WAN Config
+                    </button>
+                    <div class="ms-auto">
+                        <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU from OLT?')">
+                            <input type="hidden" name="action" value="delete_onu_olt">
+                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Info Cards Row -->
+            <div class="row g-3 mb-4">
+                <!-- Customer & Location -->
+                <div class="col-md-4">
+                    <div class="onu-info-card h-100 p-3">
+                        <div class="section-header mb-3"><i class="bi bi-person me-2"></i>Customer & Location</div>
+                        <form method="post" id="onuInfoForm">
+                            <input type="hidden" name="action" value="update_onu_info">
+                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                             <div class="mb-2">
-                                <span class="text-primary">Customer</span><br>
-                                <?php if ($currentOnu['customer_id']): ?>
-                                <a href="?page=customers&action=view&id=<?= $currentOnu['customer_id'] ?>"><?= htmlspecialchars($currentOnu['customer_name'] ?? 'Linked') ?></a>
-                                <?php else: ?>
-                                None
-                                <?php endif; ?>
+                                <div class="info-label">Name</div>
+                                <input type="text" name="name" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['name'] ?? '') ?>" placeholder="Customer name">
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">Authorization date</span><br>
-                                <?= $currentOnu['auth_date'] ? date('d-M-Y H:i:s', strtotime($currentOnu['auth_date'])) : ($currentOnu['created_at'] ? date('d-M-Y H:i:s', strtotime($currentOnu['created_at'])) : '-') ?>
+                                <div class="info-label">Zone</div>
+                                <select name="zone_id" class="form-select form-select-sm">
+                                    <option value="">None</option>
+                                    <?php foreach ($zones as $z): ?>
+                                    <option value="<?= $z['id'] ?>" <?= ($currentOnu['zone_id'] == $z['id']) ? 'selected' : '' ?>><?= htmlspecialchars($z['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="mb-2">
-                                <span class="text-primary">ONU external ID</span><br>
-                                <code class="text-primary"><?= htmlspecialchars($currentOnu['sn']) ?></code>
+                                <div class="info-label">Description</div>
+                                <input type="text" name="description" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" placeholder="Address or comment">
                             </div>
+                            <div class="mb-2">
+                                <div class="info-label">Customer Link</div>
+                                <div class="info-value">
+                                    <?php if ($currentOnu['customer_id']): ?>
+                                    <a href="?page=customers&action=view&id=<?= $currentOnu['customer_id'] ?>"><?= htmlspecialchars($currentOnu['customer_name'] ?? 'View') ?></a>
+                                    <?php else: ?>
+                                    <span class="text-muted">Not linked</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100 mt-2"><i class="bi bi-check me-1"></i>Save Changes</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Network Configuration -->
+                <div class="col-md-4">
+                    <div class="onu-info-card h-100 p-3">
+                        <div class="section-header mb-3"><i class="bi bi-hdd-network me-2"></i>Network Configuration</div>
+                        <div class="mb-2">
+                            <div class="info-label">OLT Position</div>
+                            <div class="info-value"><code><?= $currentOnu['frame'] ?? 0 ?>/<?= $currentOnu['slot'] ?? 0 ?>/<?= $currentOnu['port'] ?? 0 ?></code> ONU <code><?= $currentOnu['onu_id'] ?? '-' ?></code></div>
                         </div>
-                        
-                        <!-- Center: ONU Image & Service Profile -->
-                        <div class="col-md-2 text-center d-flex align-items-center justify-content-center">
-                            <div>
-                                <i class="bi bi-router text-secondary" style="font-size: 4rem;"></i>
-                                <div class="small mt-2">
-                                    <span class="text-primary">Service Profile</span><br>
-                                    <strong><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'ONU') ?></strong>
-                                </div>
-                                <?php if (!empty($currentOnu['line_profile_name'])): ?>
-                                <div class="small text-muted mt-1">
-                                    Line: <?= htmlspecialchars($currentOnu['line_profile_name']) ?>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        
-                        <!-- Right: Status Info -->
-                        <div class="col-md-6">
-                            <div class="mb-2">
-                                <span class="text-primary">Status</span><br>
-                                <?php
-                                $statusColors = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'];
-                                ?>
-                                <span data-live-status class="text-<?= $statusColors[$currentOnu['status']] ?? 'secondary' ?> fw-bold">
-                                    <?= ucfirst($currentOnu['status'] ?? 'Unknown') ?>
-                                </span>
-                                <?php if ($uptimeDisplay): ?>
-                                <span class="ms-2 text-muted small" data-live-uptime title="ONU Uptime">
-                                    <i class="bi bi-clock"></i> <?= $uptimeDisplay ?>
-                                </span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">WAN IP (OMCI)</span><br>
-                                <span class="<?= !empty($currentOnu['ont_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="ontIpDisplay"><?= !empty($currentOnu['ont_ip']) ? htmlspecialchars($currentOnu['ont_ip']) : '-' ?></span>
-                                <a href="#" onclick="refreshOntIP(); return false;" class="ms-1" title="Refresh WAN IP from OLT"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></a>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">Management IP</span><br>
-                                <span class="<?= !empty($currentOnu['tr069_ip']) ? 'text-success fw-bold' : 'text-muted' ?>" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? htmlspecialchars($currentOnu['tr069_ip']) : '-' ?></span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" class="ms-1" title="Refresh Management IP from GenieACS"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></a>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">ONU/OLT Rx signal</span><br>
-                                <span data-live-rx class="text-<?= $rxClass ?> fw-bold"><?= $rx !== null ? number_format($rx, 2) : '-' ?> dBm</span>
-                                / <span data-live-tx><?= $tx !== null ? number_format($tx, 2) : '-' ?> dBm</span>
-                                (<?= $distanceDisplay ?>)
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">Attached VLANs</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" data-bs-toggle="modal" data-bs-target="#attachedVlansModal" title="Edit Attached VLANs">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <br>
-                                <?php 
-                                $attachedVlans = [];
-                                if (!empty($currentOnu['attached_vlans'])) {
-                                    $attachedVlans = json_decode($currentOnu['attached_vlans'], true) ?: [];
-                                } elseif (!empty($currentOnu['vlan_id'])) {
-                                    $attachedVlans = [(int)$currentOnu['vlan_id']];
-                                }
-                                if (!empty($attachedVlans)): 
-                                    foreach ($attachedVlans as $vid): ?>
-                                <span class="badge bg-primary me-1"><?= htmlspecialchars($vid) ?></span>
-                                <?php endforeach; 
-                                else: ?>
+                        <div class="mb-2">
+                            <div class="info-label">Service VLANs <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-bs-toggle="modal" data-bs-target="#attachedVlansModal"><i class="bi bi-pencil-square"></i></button></div>
+                            <div class="info-value">
+                                <?php if (!empty($attachedVlans)): foreach ($attachedVlans as $vid): ?>
+                                <span class="badge bg-primary me-1"><?= $vid ?></span>
+                                <?php endforeach; else: ?>
                                 <span class="text-muted">None</span>
                                 <?php endif; ?>
                             </div>
-                            <div class="mb-2">
-                                <span class="text-primary">ONU mode</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" onclick="toggleOnuModeEdit()" title="Edit ONU Mode">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <br>
-                                <span id="onuModeDisplay">
-                                    <span class="badge bg-<?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'secondary' : 'info' ?>"><?= $currentOnu['ip_mode'] ?? 'Bridge' ?></span>
-                                    <?php if (($currentOnu['ip_mode'] ?? 'Bridge') !== 'Bridge' && !empty($currentOnu['wan_mode'])): ?>
-                                    - <?= strtoupper($currentOnu['wan_mode']) ?>
-                                    <?php endif; ?>
-                                </span>
-                                <div id="onuModeEdit" style="display: none;" class="mt-2 p-2 border rounded bg-light" style="max-width: 320px;">
-                                    <div class="mb-2">
-                                        <label class="form-label small mb-1">Mode</label>
-                                        <select id="onuModeSelect" class="form-select form-select-sm" onchange="onModeChange()">
-                                            <option value="Bridge" <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Bridge' ? 'selected' : '' ?>>Bridge (OMCI)</option>
-                                            <option value="Router" <?= ($currentOnu['ip_mode'] ?? '') === 'Router' ? 'selected' : '' ?>>Router (TR-069)</option>
-                                        </select>
-                                    </div>
-                                    <div id="routerWanOptions" style="display: <?= ($currentOnu['ip_mode'] ?? 'Bridge') === 'Router' ? 'block' : 'none' ?>;">
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1">WAN Type</label>
-                                            <select id="routerWanType" class="form-select form-select-sm" onchange="onWanTypeChange()">
-                                                <option value="dhcp" <?= ($currentOnu['wan_mode'] ?? '') === 'dhcp' ? 'selected' : '' ?>>DHCP</option>
-                                                <option value="static" <?= ($currentOnu['wan_mode'] ?? '') === 'static' ? 'selected' : '' ?>>Static IP</option>
-                                                <option value="pppoe" <?= ($currentOnu['wan_mode'] ?? '') === 'pppoe' ? 'selected' : '' ?>>PPPoE</option>
-                                            </select>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label small mb-1">Service VLAN</label>
-                                            <select id="routerServiceVlan" class="form-select form-select-sm">
-                                                <?php if (empty($attachedVlans)): ?>
-                                                <option value="">-- Attach VLANs first --</option>
-                                                <?php else: foreach ($attachedVlans as $vid): ?>
-                                                <option value="<?= $vid ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vid ? 'selected' : '' ?>><?= $vid ?></option>
-                                                <?php endforeach; endif; ?>
-                                            </select>
-                                        </div>
-                                        <div id="pppoeFields2" style="display: <?= ($currentOnu['wan_mode'] ?? '') === 'pppoe' ? 'block' : 'none' ?>;">
-                                            <div class="mb-2">
-                                                <label class="form-label small mb-1">PPPoE Username</label>
-                                                <input type="text" id="pppoeUser" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['pppoe_username'] ?? '') ?>" placeholder="username">
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small mb-1">PPPoE Password</label>
-                                                <input type="text" id="pppoePass" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['pppoe_password'] ?? '') ?>" placeholder="password">
-                                            </div>
-                                        </div>
-                                        <div id="staticFields2" style="display: <?= ($currentOnu['wan_mode'] ?? '') === 'static' ? 'block' : 'none' ?>;">
-                                            <div class="mb-2">
-                                                <label class="form-label small mb-1">Static IP</label>
-                                                <input type="text" id="staticIp" class="form-control form-control-sm" placeholder="192.168.1.100">
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small mb-1">Gateway</label>
-                                                <input type="text" id="staticGw" class="form-control form-control-sm" placeholder="192.168.1.1">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex gap-2 mt-2">
-                                        <button type="button" class="btn btn-success btn-sm" onclick="saveOnuMode()">
-                                            <i class="bi bi-check me-1"></i> Save
-                                        </button>
-                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOnuModeEdit()">
-                                            <i class="bi bi-x me-1"></i> Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">TR069</span><br>
-                                <?php 
-                                $tr069Status = $currentOnu['tr069_status'] ?? 'pending';
-                                ?>
-                                <span class="text-<?= $tr069Status === 'configured' ? 'success' : 'warning' ?>">
-                                    <?= $tr069Status === 'configured' ? 'Configured' : 'Pending' ?>
-                                </span>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">Mgmt IP</span><br>
-                                <?php if (!empty($currentOnu['tr069_ip'])): ?>
-                                <span class="text-success">DHCP - vlan 69 - <?= htmlspecialchars($currentOnu['tr069_ip']) ?></span>
-                                <a href="#" onclick="refreshTR069IP(); return false;" title="Refresh"><i class="bi bi-arrow-clockwise"></i></a>
-                                <?php else: ?>
-                                <span class="text-muted">Waiting for TR-069 connection...</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-primary">WAN setup mode</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 ms-2" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="Configure WAN">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <br>
+                        </div>
+                        <div class="mb-2">
+                            <div class="info-label">WAN Mode</div>
+                            <div class="info-value">
                                 <?php if (!empty($currentOnu['pppoe_username'])): ?>
-                                <span class="badge bg-info">PPPoE (TR069)</span> - <?= htmlspecialchars($currentOnu['pppoe_username']) ?>
+                                <span class="badge bg-info">PPPoE</span> <?= htmlspecialchars($currentOnu['pppoe_username']) ?>
                                 <?php elseif (!empty($currentOnu['wan_mode'])): ?>
                                 <span class="badge bg-success"><?= strtoupper($currentOnu['wan_mode']) ?></span>
                                 <?php else: ?>
-                                <span class="badge bg-secondary">Not configured</span>
+                                <span class="badge bg-secondary">Bridge</span>
                                 <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="info-label">WAN IP <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshOntIP()"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></button></div>
+                            <div class="info-value" id="ontIpDisplay"><?= !empty($currentOnu['ont_ip']) ? htmlspecialchars($currentOnu['ont_ip']) : '<span class="text-muted">-</span>' ?></div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="info-label">TR-069 IP <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshTR069IP()"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></button></div>
+                            <div class="info-value" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? '<span class="text-success">'.htmlspecialchars($currentOnu['tr069_ip']).'</span>' : '<span class="text-muted">Pending...</span>' ?></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Device Info -->
+                <div class="col-md-4">
+                    <div class="onu-info-card h-100 p-3">
+                        <div class="section-header mb-3"><i class="bi bi-cpu me-2"></i>Device Information</div>
+                        <div class="text-center mb-3">
+                            <i class="bi bi-router text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <div class="mb-2">
+                            <div class="info-label">Model</div>
+                            <div class="info-value"><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'Unknown') ?></div>
+                        </div>
+                        <?php if (!empty($currentOnu['line_profile_name'])): ?>
+                        <div class="mb-2">
+                            <div class="info-label">Line Profile</div>
+                            <div class="info-value"><?= htmlspecialchars($currentOnu['line_profile_name']) ?></div>
+                        </div>
+                        <?php endif; ?>
+                        <div class="mb-2">
+                            <div class="info-label">Authorization Date</div>
+                            <div class="info-value"><?= $currentOnu['auth_date'] ? date('d-M-Y H:i', strtotime($currentOnu['auth_date'])) : ($currentOnu['created_at'] ? date('d-M-Y H:i', strtotime($currentOnu['created_at'])) : '-') ?></div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="info-label">TR-069 Status</div>
+                            <div class="info-value">
+                                <?php $tr069Status = $currentOnu['tr069_status'] ?? 'pending'; ?>
+                                <span class="badge bg-<?= $tr069Status === 'configured' ? 'success' : 'warning' ?>"><?= ucfirst($tr069Status) ?></span>
                             </div>
                         </div>
                     </div>
@@ -6900,151 +6825,31 @@ try {
             }
             </script>
             
-            <!-- Quick Actions Grid -->
-            <div class="row g-3 mb-4">
-                <!-- OLT Actions -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card quick-action-card h-100 shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="icon-wrapper bg-primary bg-opacity-10 text-primary me-3">
-                                    <i class="bi bi-terminal"></i>
-                                </div>
-                                <h6 class="mb-0">OLT Commands</h6>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)">
-                                    <i class="bi bi-code-slash me-1"></i> Running Config
-                                </button>
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuSWInfo(<?= $currentOnu['id'] ?>)">
-                                    <i class="bi bi-cpu me-1"></i> Software Info
-                                </button>
-                            </div>
+            <!-- Optical Signal Card -->
+            <div class="onu-info-card p-3 mb-4">
+                <div class="section-header mb-3"><i class="bi bi-reception-4 me-2"></i>Optical Signal Quality</div>
+                <div class="row align-items-center">
+                    <div class="col-md-3 text-center">
+                        <div class="display-6 text-<?= $rxClass ?> fw-bold" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
+                        <div class="text-muted small">RX Power (dBm)</div>
+                        <div class="signal-meter mt-2 mx-auto" style="max-width: 150px;">
+                            <div class="signal-meter-fill bg-<?= $rxClass ?>" style="width: <?= $rx !== null ? min(100, max(0, (($rx + 30) / 20) * 100)) : 0 ?>%"></div>
                         </div>
+                        <span class="badge bg-<?= $rxClass ?> mt-1"><?= $rxLabel ?></span>
                     </div>
-                </div>
-                
-                <!-- TR-069 Actions -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card quick-action-card h-100 shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="icon-wrapper bg-info bg-opacity-10 text-info me-3">
-                                    <i class="bi bi-broadcast"></i>
-                                </div>
-                                <h6 class="mb-0">TR-069 Remote</h6>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)">
-                                    <i class="bi bi-info-circle me-1"></i> Device Info
-                                </button>
-                                <form method="post" class="d-grid">
-                                    <input type="hidden" name="action" value="tr069_refresh">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-info btn-sm">
-                                        <i class="bi bi-arrow-repeat me-1"></i> Refresh Data
-                                    </button>
-                                </form>
-                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot ONU to force TR-069 reconnection?')">
-                                    <input type="hidden" name="action" value="force_tr069_reconnect">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-info btn-sm">
-                                        <i class="bi bi-plug me-1"></i> Force Reconnect
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
+                    <div class="col-md-3 text-center border-start">
+                        <div class="display-6 fw-bold" data-live-tx><?= $tx !== null ? number_format($tx, 1) : '-' ?></div>
+                        <div class="text-muted small">TX Power (dBm)</div>
                     </div>
-                </div>
-                
-                <!-- Device Control -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card quick-action-card h-100 shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="icon-wrapper bg-warning bg-opacity-10 text-warning me-3">
-                                    <i class="bi bi-power"></i>
-                                </div>
-                                <h6 class="mb-0">Device Control</h6>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot this ONU via OLT?')">
-                                    <input type="hidden" name="action" value="reboot_onu">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-warning btn-sm">
-                                        <i class="bi bi-arrow-clockwise me-1"></i> Reboot (OLT)
-                                    </button>
-                                </form>
-                                <form method="post" class="d-grid" onsubmit="return confirm('Reboot via TR-069?')">
-                                    <input type="hidden" name="action" value="tr069_reboot">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-warning btn-sm">
-                                        <i class="bi bi-arrow-clockwise me-1"></i> Reboot (TR-069)
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
+                    <div class="col-md-3 text-center border-start">
+                        <div class="display-6 fw-bold"><?= $distanceDisplay ?></div>
+                        <div class="text-muted small">Distance</div>
                     </div>
-                </div>
-                
-                <!-- Danger Zone -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card quick-action-card h-100 shadow-sm border-danger border-opacity-25">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="icon-wrapper bg-danger bg-opacity-10 text-danger me-3">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                </div>
-                                <h6 class="mb-0 text-danger">Danger Zone</h6>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <form method="post" class="d-grid" onsubmit="return confirm('FACTORY RESET? All settings will be erased!')">
-                                    <input type="hidden" name="action" value="tr069_factory_reset">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">
-                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Factory Reset
-                                    </button>
-                                </form>
-                                <form method="post" class="d-grid" onsubmit="return confirm('DELETE this ONU from OLT?')">
-                                    <input type="hidden" name="action" value="delete_onu_olt">
-                                    <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                                    <button type="submit" class="btn btn-danger btn-sm">
-                                        <i class="bi bi-trash me-1"></i> Delete ONU
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Traffic/Signal Charts Row -->
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header bg-dark text-white py-2">
-                            <small><i class="bi bi-graph-up me-1"></i> Traffic</small>
-                        </div>
-                        <div class="card-body p-2">
-                            <canvas id="trafficChart" height="100"></canvas>
-                            <div class="d-flex justify-content-between small text-muted mt-1">
-                                <span><span class="text-warning">Upload:</span> <span id="uploadRate">0.00 Mbps</span></span>
-                                <span><span class="text-info">Download:</span> <span id="downloadRate">0.00 Mbps</span></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header bg-dark text-white py-2">
-                            <small><i class="bi bi-reception-4 me-1"></i> Signal</small>
-                        </div>
-                        <div class="card-body p-2">
-                            <canvas id="signalHistoryChart" height="100"></canvas>
-                            <div class="d-flex justify-content-between small text-muted mt-1">
-                                <span><span class="text-danger">1310nm OLT Rx for ONU:</span> Current: <?= $rx !== null ? number_format($rx, 1) : '-' ?></span>
-                            </div>
-                        </div>
+                    <div class="col-md-3 text-center border-start">
+                        <div class="small text-muted mb-1">Signal Thresholds</div>
+                        <div class="small"><span class="text-success">Excellent:</span> > -20 dBm</div>
+                        <div class="small"><span class="text-warning">Warning:</span> -25 to -20 dBm</div>
+                        <div class="small"><span class="text-danger">Critical:</span> < -28 dBm</div>
                     </div>
                 </div>
             </div>
