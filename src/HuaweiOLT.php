@@ -7068,14 +7068,14 @@ class HuaweiOLT {
         ];
         $sendTask($refreshTask, 'Refresh WAN data');
         
-        // Step 0b: Query GenieACS for current WAN configuration
+        // Query GenieACS for current WAN configuration
         $wanDevicePath = 'InternetGatewayDevice.WANDevice.1';
-        $wanConnDeviceIndex = 2; // Default to 2 (1 is usually management WAN)
+        $wanConnDeviceIndex = 1; // Use existing WANConnectionDevice.1 (most devices only have this)
         $pppConnIndex = 1;
         $existingPppPath = null;
         
-        // Check GenieACS for existing WANConnectionDevice and WANPPPConnection
-        $queryUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId);
+        // Check GenieACS for existing WANPPPConnection
+        $queryUrl = "{$genieacsUrl}/devices?query=" . urlencode('{"_id":"' . $genieacsId . '"}');
         $ch = curl_init($queryUrl);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -7085,56 +7085,26 @@ class HuaweiOLT {
         curl_close($ch);
         
         if ($deviceData) {
-            $device = json_decode($deviceData, true);
-            // Look for existing Internet WAN (not management)
+            $devices = json_decode($deviceData, true);
+            $device = $devices[0] ?? null;
+            // Look for existing PPPoE connection in WANConnectionDevice.1
             if (!empty($device)) {
-                // Check WANConnectionDevice.2 (typical Internet WAN)
-                $wanConn2Ppp = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['2']['WANPPPConnection'] ?? null;
-                if ($wanConn2Ppp) {
-                    foreach ($wanConn2Ppp as $idx => $conn) {
+                $wanConn1Ppp = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['1']['WANPPPConnection'] ?? null;
+                if ($wanConn1Ppp) {
+                    foreach ($wanConn1Ppp as $idx => $conn) {
                         if (is_numeric($idx)) {
-                            $existingPppPath = "{$wanDevicePath}.WANConnectionDevice.2.WANPPPConnection.{$idx}";
-                            $wanConnDeviceIndex = 2;
+                            // Found existing PPP connection - reuse it
+                            $existingPppPath = "{$wanDevicePath}.WANConnectionDevice.1.WANPPPConnection.{$idx}";
                             $pppConnIndex = (int)$idx;
                             break;
                         }
                     }
                 }
-                // Check WANConnectionDevice.1 if no 2
-                if (!$existingPppPath) {
-                    $wanConn1Ppp = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['1']['WANPPPConnection'] ?? null;
-                    if ($wanConn1Ppp) {
-                        foreach ($wanConn1Ppp as $idx => $conn) {
-                            if (is_numeric($idx) && $idx > 1) { // Skip index 1 which is usually management
-                                $existingPppPath = "{$wanDevicePath}.WANConnectionDevice.1.WANPPPConnection.{$idx}";
-                                $wanConnDeviceIndex = 1;
-                                $pppConnIndex = (int)$idx;
-                                break;
-                            }
-                        }
-                    }
-                }
             }
         }
         
+        // Always use WANConnectionDevice.1 (most HG8546M devices only have this)
         $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
-        
-        // Step 1: Create WANConnectionDevice only if we don't have one for Internet WAN
-        if (!$existingPppPath) {
-            $addConnDeviceTask = [
-                'name' => 'addObject',
-                'objectName' => "{$wanDevicePath}.WANConnectionDevice."
-            ];
-            $result = $sendTask($addConnDeviceTask);
-            if ($result['success']) {
-                $tasksSent[] = 'Create WANConnectionDevice';
-                $respData = json_decode($result['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $wanConnDeviceIndex = (int)$respData['instanceNumber'];
-                    $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
-                }
-            }
-        }
         
         // Step 2: Enable L3 on ETH ports (router mode) - SmartOLT does this
         $ethL3Params = [];
