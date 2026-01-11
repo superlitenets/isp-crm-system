@@ -15703,21 +15703,7 @@ echo "# ================================================\n";
                 return;
             }
             
-            let statusColor = data.status === 'online' ? 'success' : 'danger';
             let html = '';
-            
-            // Status Bar with Optical Power
-            html += '<div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-' + statusColor + ' bg-opacity-10 rounded">';
-            html += '<div><span class="badge bg-' + statusColor + '">' + (data.status === 'online' ? 'Online' : 'Offline') + '</span>';
-            html += ' <small class="text-muted ms-2">' + escapeHtml(data.model || '') + '</small></div>';
-            html += '<div class="text-end small">';
-            if (data.optical_power) {
-                let rxPower = parseFloat(data.optical_power.rx) || -99;
-                let rxColor = rxPower > -25 ? 'success' : (rxPower > -28 ? 'warning' : 'danger');
-                html += '<span class="badge bg-' + rxColor + '">RX: ' + escapeHtml(data.optical_power.rx || '-') + ' dBm</span> ';
-                html += '<span class="badge bg-secondary">TX: ' + escapeHtml(data.optical_power.tx || '-') + ' dBm</span>';
-            }
-            html += '</div></div>';
             
             // Auto-refresh toggle
             html += '<div class="d-flex justify-content-between align-items-center mb-2">';
