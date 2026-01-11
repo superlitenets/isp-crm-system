@@ -6418,9 +6418,14 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot ONU">
-                                            <i class="bi bi-arrow-clockwise"></i>
-                                        </button>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-dark" onclick="showTR069LogsModal(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>')" title="TR-069 Logs">
+                                                <i class="bi bi-journal-text"></i>
+                                            </button>
+                                            <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot ONU">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -15678,6 +15683,7 @@ echo "# ================================================\n";
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'lan' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'lan\')"><i class="bi bi-ethernet"></i> LAN</a></li>';
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'clients' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'clients\')"><i class="bi bi-people"></i> Clients</a></li>';
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'system' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'system\')"><i class="bi bi-gear"></i> System</a></li>';
+            html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'logs' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'logs\')"><i class="bi bi-journal-text"></i> Logs</a></li>';
             html += '</ul>';
             
             // Tab Content
@@ -15908,7 +15914,85 @@ echo "# ================================================\n";
             html += '</div></div></div>';
         }
         
+        else if (tab === 'logs') {
+            // TR-069 Device Logs Tab
+            html += '<div class="card"><div class="card-header py-1 d-flex justify-content-between align-items-center">';
+            html += '<span><i class="bi bi-journal-text me-1"></i>TR-069 Device Logs</span>';
+            html += '<button class="btn btn-outline-secondary btn-sm py-0" onclick="loadTR069LogsInTab(' + onuId + ')"><i class="bi bi-arrow-repeat"></i></button>';
+            html += '</div><div class="card-body p-0" id="tr069LogsContent" style="max-height:350px;overflow-y:auto;">';
+            html += '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Loading logs...</div>';
+            html += '</div></div>';
+            
+            // Auto-load logs when tab is shown
+            setTimeout(() => loadTR069LogsInTab(onuId), 100);
+        }
+        
         return html;
+    }
+    
+    // Load TR-069 logs inside the Logs tab
+    function loadTR069LogsInTab(onuId) {
+        const container = document.getElementById('tr069LogsContent');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Loading...</div>';
+        
+        fetch(`?page=api&action=get_tr069_logs&onu_id=${onuId}&limit=100`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    container.innerHTML = '<div class="alert alert-warning m-2 small">' + (data.error || 'Failed') + '</div>';
+                    return;
+                }
+                if (!data.logs || data.logs.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-3 small">No TR-069 logs yet.<br>Configure WiFi or WAN to see logs.</div>';
+                    return;
+                }
+                
+                let html = '<table class="table table-sm table-striped mb-0 small"><thead class="table-dark sticky-top"><tr><th>Time</th><th>Type</th><th>Result</th><th>Details</th></tr></thead><tbody>';
+                data.logs.forEach((log, i) => {
+                    const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
+                    const time = new Date(log.created_at).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+                    html += `<tr onclick="showLogDetail(${i})" style="cursor:pointer" title="Click for details">
+                        <td class="text-muted">${time}</td>
+                        <td><span class="badge bg-info">${log.task_type || '-'}</span></td>
+                        <td><span class="badge bg-${resultClass}">${log.result || '-'}</span></td>
+                        <td class="text-truncate" style="max-width:150px">${escapeHtml(log.task_name || '-')}</td>
+                    </tr>`;
+                    if (!window.tr069LogsCache) window.tr069LogsCache = [];
+                    window.tr069LogsCache[i] = log;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            })
+            .catch(err => container.innerHTML = '<div class="alert alert-danger m-2 small">Error: ' + err.message + '</div>');
+    }
+    
+    function showLogDetail(idx) {
+        const log = window.tr069LogsCache ? window.tr069LogsCache[idx] : null;
+        if (!log) return;
+        
+        let reqData = '-', respData = '-';
+        try { reqData = log.request_data ? JSON.stringify(JSON.parse(log.request_data), null, 2) : '-'; } catch(e) { reqData = log.request_data || '-'; }
+        try { respData = log.response_data ? JSON.stringify(JSON.parse(log.response_data), null, 2) : '-'; } catch(e) { respData = log.response_data || '-'; }
+        
+        const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
+        const time = new Date(log.created_at).toLocaleString();
+        
+        const html = `<div class="modal fade" id="logDetailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header bg-dark text-white py-2"><h6 class="modal-title"><i class="bi bi-journal-code me-2"></i>Log Detail</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body small">
+                <div class="row mb-2"><div class="col-4"><strong>Time:</strong><br>${time}</div><div class="col-4"><strong>Type:</strong><br><span class="badge bg-info">${log.task_type||'-'}</span></div><div class="col-4"><strong>Result:</strong><br><span class="badge bg-${resultClass}">${log.result||'-'}</span> ${log.error_message?'<small class="text-danger">'+log.error_message+'</small>':''}</div></div>
+                <div class="mb-2"><strong>Task:</strong> <code>${escapeHtml(log.task_name||'-')}</code></div>
+                <div class="mb-2"><strong>Request:</strong><pre class="bg-light p-2 rounded" style="max-height:150px;overflow:auto;font-size:10px">${escapeHtml(reqData)}</pre></div>
+                <div><strong>Response:</strong><pre class="bg-light p-2 rounded" style="max-height:150px;overflow:auto;font-size:10px">${escapeHtml(respData)}</pre></div>
+            </div>
+            <div class="modal-footer py-1"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
+        </div></div></div>`;
+        
+        document.getElementById('logDetailModal')?.remove();
+        document.body.insertAdjacentHTML('beforeend', html);
+        new bootstrap.Modal(document.getElementById('logDetailModal')).show();
     }
     
     function toggleAutoRefresh(onuId) {
