@@ -1,0 +1,52 @@
+root@superlitecrm:~/isp# docker compose logs | grep -i "connection_request\|48575443F2D53A8B" | tail -50
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.119Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0400" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.119Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfb43cdc3f7c2028c0d" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_nbi    | 2026-01-11T17:53:09.496Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_nbi    | 2026-01-11T17:53:47.863Z [INFO] ::ffff:172.18.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_genieacs_nbi    | 2026-01-11T17:53:47.966Z [INFO] ::ffff:172.18.0.1: GET /tasks; query="{\"device\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_genieacs_nbi    | 2026-01-11T17:54:10.471Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_nbi    | 2026-01-11T17:54:10.484Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.120Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d05074a2a9ee89ce2db" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.121Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d051f364aded6c90073" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_nbi    | 2026-01-11T17:54:10.499Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_nbi    | 2026-01-11T17:54:39.114Z [INFO] ::ffff:172.18.0.1: DELETE /tasks; query="{\"device\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_genieacs_nbi    | 2026-01-11T17:55:11.487Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_nbi    | 2026-01-11T17:55:11.503Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_nbi    | 2026-01-11T17:55:11.521Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}" limit="1"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.121Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d054a2b646761fe0d1d" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.124Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0500" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.190Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0500" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.191Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d0567157147d3f63fa3" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.194Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0600" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.257Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0600" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.257Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d056e5cf623352a1ff9" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.261Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0700" acsRequestName="GetParameterValues"
+isp_crm_olt_service     | [Discovery] Marked 48575443F2D53A8B as authorized (no longer in autofind)
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [OLT 1] SSH sending: "ont add 0 1 sn-auth 48575443F2D53A8B omci ont-lineprofile-id 2 ont-srvprofile-id 3 desc "Martin Muriu""
+root@superlitecrm:~/isp#
