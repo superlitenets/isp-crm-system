@@ -6997,7 +6997,8 @@ class HuaweiOLT {
         $self = $this;
         
         // Helper function to send task to GenieACS with logging
-        $sendTask = function($task, $taskName = null) use ($genieacsUrl, $genieacsId, $onuDbId, $onu, $self) {
+        // $triggerConnection: if true, triggers immediate connection request (use only for last task)
+        $sendTask = function($task, $taskName = null, $triggerConnection = false) use ($genieacsUrl, $genieacsId, $onuDbId, $onu, $self) {
             $taskType = $task['name'] ?? 'Unknown';
             if (!$taskName) {
                 // Generate task name from task details
@@ -7012,7 +7013,12 @@ class HuaweiOLT {
             }
             
             $requestJson = json_encode($task);
-            $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+            // Only trigger connection_request on final task for immediate execution
+            $url = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks";
+            if ($triggerConnection) {
+                $url .= "?connection_request";
+            }
+            $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
@@ -7154,7 +7160,8 @@ class HuaweiOLT {
                 ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
                 ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
             ];
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams]);
+            // Final task - trigger connection_request for immediate execution
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], null, true);
             if ($result['success']) $tasksSent[] = 'Create policy route';
             
         } elseif ($wanMode === 'dhcp') {
@@ -7210,7 +7217,8 @@ class HuaweiOLT {
                 ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
                 ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
             ];
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams]);
+            // Final task - trigger connection_request for immediate execution
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], null, true);
             
         } elseif ($wanMode === 'static') {
             $staticIp = $config['static_ip'] ?? '';
@@ -7250,9 +7258,10 @@ class HuaweiOLT {
             }
             
             $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            // Final task - trigger connection_request for immediate execution
             $sendTask(['name' => 'setParameterValues', 'parameterValues' => [
                 ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
-            ]]);
+            ]], null, true);
             
         } else {
             return ['success' => false, 'error' => "Unknown WAN mode: {$wanMode}"];
