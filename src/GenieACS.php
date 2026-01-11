@@ -1021,15 +1021,17 @@ class GenieACS {
      * Add an object instance via TR-069 (e.g., new WANConnectionDevice)
      */
     public function addObject(string $deviceId, string $objectPath): array {
-        $encodedId = urlencode($deviceId);
+        $encodedId = rawurlencode($deviceId);
         
-        // GenieACS uses tasks to add objects
+        // GenieACS uses tasks to add objects - use connection_request for immediate execution
         $task = [
             'name' => 'addObject',
             'objectName' => $objectPath
         ];
         
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
+        error_log("[GenieACS] addObject: {$objectPath} on {$deviceId}");
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
+        error_log("[GenieACS] addObject result: " . json_encode($result));
         
         return $result;
     }
@@ -1038,14 +1040,14 @@ class GenieACS {
      * Delete an object instance via TR-069
      */
     public function deleteObject(string $deviceId, string $objectPath): array {
-        $encodedId = urlencode($deviceId);
+        $encodedId = rawurlencode($deviceId);
         
         $task = [
             'name' => 'deleteObject',
             'objectName' => $objectPath
         ];
         
-        return $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
     }
     
     /**

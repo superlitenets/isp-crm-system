@@ -2941,6 +2941,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'wan_index' => 2, // WAN device 1 is management, 2 is internet
                     'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
                     'auto_bind_ports' => true, // Bind LAN1-4 and SSID1 to this WAN
+                    'create_wan_device' => true,
+                    'create_ppp_connection' => ($connType === 'pppoe'),
+                    'create_ip_connection' => ($connType !== 'pppoe'),
                 ];
                 
                 if ($connType === 'pppoe') {
@@ -3003,6 +3006,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'pppoe_username' => $_POST['pppoe_username'] ?? '',
                     'pppoe_password' => $_POST['pppoe_password'] ?? '',
                     'auto_bind_ports' => true,
+                    'create_wan_device' => true,
+                    'create_ppp_connection' => true,
                 ];
                 
                 error_log("[TR069-PPPoE] Config: " . json_encode($config));
