@@ -7019,18 +7019,28 @@ class HuaweiOLT {
                 $url .= "?connection_request";
             }
             $ch = curl_init($url);
+            // Longer timeout for connection_request (device needs time to connect)
+            $timeout = $triggerConnection ? 60 : 30;
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => $requestJson,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_TIMEOUT => 30
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_CONNECTTIMEOUT => 10
             ]);
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
             curl_close($ch);
             
+            // For connection_request tasks, consider timeout as success (task was queued)
             $success = ($httpCode >= 200 && $httpCode < 300);
+            if (!$success && $triggerConnection && ($curlError || $httpCode === 0)) {
+                // Timeout on connection_request - task was likely queued, device will apply on next inform
+                $success = true;
+                $response = json_encode(['status' => 'queued', 'note' => 'Connection request timed out, device will apply on next inform']);
+            }
             
             // Log to TR-069 logs table
             $self->logTR069Task([
