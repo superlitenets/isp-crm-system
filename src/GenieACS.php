@@ -242,27 +242,38 @@ class GenieACS {
         // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
         
-        // Convert key-value pairs to GenieACS format: [[name, value, type], ...]
+        // GenieACS expects parameterValues as array of [name, value, type] arrays
+        // Check if already in correct format or needs conversion
         $formattedParams = [];
-        foreach ($parameterValues as $name => $value) {
-            // Determine type based on value
-            if (is_bool($value)) {
-                $formattedParams[] = [$name, $value, 'xsd:boolean'];
-            } elseif (is_int($value)) {
-                $formattedParams[] = [$name, $value, 'xsd:unsignedInt'];
+        foreach ($parameterValues as $key => $value) {
+            if (is_array($value) && isset($value[0], $value[1])) {
+                // Already in [name, value, type] format
+                $formattedParams[] = $value;
             } else {
-                $formattedParams[] = [$name, (string)$value, 'xsd:string'];
+                // Convert key-value to [name, value, type] format
+                if (is_bool($value)) {
+                    $formattedParams[] = [$key, $value, 'xsd:boolean'];
+                } elseif (is_int($value)) {
+                    $formattedParams[] = [$key, $value, 'xsd:unsignedInt'];
+                } else {
+                    $formattedParams[] = [$key, (string)$value, 'xsd:string'];
+                }
             }
         }
         
-        // Use connection_request to execute immediately with longer timeout
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
+        // Use connection_request to execute immediately
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
         ]);
         
         // Log for debugging
-        error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode(['params' => count($parameterValues), 'result' => $result['success'], 'http_code' => $result['http_code'] ?? 0]));
+        error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode([
+            'params' => $formattedParams, 
+            'result' => $result['success'] ?? false, 
+            'http_code' => $result['http_code'] ?? 0,
+            'error' => $result['error'] ?? null
+        ]));
         
         return $result;
     }
