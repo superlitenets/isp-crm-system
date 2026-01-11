@@ -1012,10 +1012,17 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
         ];
         
         $result = $huaweiOLT->configureWANViaTR069($onuId, $config);
-        echo json_encode($result);
+        $json = json_encode($result);
+        if ($json === false) {
+            echo json_encode(['success' => false, 'error' => 'JSON encode error: ' . json_last_error_msg()]);
+        } else {
+            echo $json;
+        }
     } catch (Throwable $e) {
+        error_log("[configure_wan_tr069] Exception: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
