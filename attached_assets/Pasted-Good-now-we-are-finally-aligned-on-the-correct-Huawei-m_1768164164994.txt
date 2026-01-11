@@ -1,0 +1,130 @@
+Good — now we are finally aligned on the correct Huawei mode you are running:
+
+OMCI provides only the Service-VLAN (902)
+TR-069 (GenieACS) creates and controls the PPPoE WAN
+
+That is exactly how Huawei “ACS-controlled routed WAN” is designed to work.
+
+So let’s do this cleanly and in a way that always commits.
+
+1️⃣ What must already exist on the OLT
+
+You already did this (SmartOLT style):
+
+ONU UNI → GEM → Service-Port → VLAN 902 → Uplink
+
+
+So packets can already pass in bridge mode.
+
+You can verify:
+
+display service-port vlan 902
+
+
+If traffic passes in bridge mode → TR-069 PPPoE will work.
+
+2️⃣ The only WAN object GenieACS should touch
+
+On Huawei ONUs in ACS-WAN mode, only this object is real:
+
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+
+
+Never try to:
+
+Add WANDevice
+Add WANConnectionDevice
+Add PolicyRoute
+Add WANPPPConnection
+
+
+Huawei will fake-accept it but not bind it.
+
+The .1 must already exist.
+
+3️⃣ How to make the WAN appear in GenieACS
+
+In GenieACS UI → Device → Reboot once
+Then → Refresh Object
+
+Now you will see:
+
+WANPPPConnection.1
+
+
+If you see only:
+
+WANPPPConnection
+
+
+(without .1) → do NOT continue — that is a template.
+
+4️⃣ Correct parameters to set
+
+These are the only parameters Huawei actually binds in this mode:
+
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable = 1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username = 2116
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password = 2116
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled = 1
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ConnectionType = IP_Routed
+
+5️⃣ VLAN 902 binding (Huawei-specific)
+
+Huawei does not use standard VLAN objects.
+It uses a proprietary binding:
+
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN = 902
+
+
+NOT:
+
+X_HW_VlanList
+Layer2Bridging
+WANIPConnection
+
+
+Only X_HW_VLAN works in ACS WAN mode.
+
+6️⃣ Final push order (very important)
+
+In GenieACS Provisioning script or Preset, push in this order:
+
+1️⃣
+
+X_HW_VLAN = 902
+
+
+2️⃣
+
+Username
+Password
+
+
+3️⃣
+
+NATEnabled = 1
+
+
+4️⃣
+
+Enable = 1
+
+
+Huawei will not start PPPoE if VLAN is missing when Enable is set.
+
+7️⃣ How to confirm it worked
+
+On the ONU (TR-069 view):
+
+WANPPPConnection.1.ConnectionStatus → Connected
+WANPPPConnection.1.ExternalIPAddress → public IP
+
+
+On the OLT:
+
+display service-port vlan 902
+display traffic table
+
+
+You will see packets but no PPPoE user — that is normal in ACS mode.
