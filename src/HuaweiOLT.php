@@ -7011,12 +7011,13 @@ class HuaweiOLT {
             return ['code' => $httpCode, 'response' => $response, 'success' => ($httpCode >= 200 && $httpCode < 300)];
         };
         
-        // WAN base path - use index 2 for internet WAN (1 is typically management WAN)
+        // SmartOLT-style WAN configuration sequence
+        // Uses WANConnectionDevice index from config or creates new one
         $wanDevicePath = 'InternetGatewayDevice.WANDevice.1';
-        $wanConnDeviceIndex = $config['wan_connection_device'] ?? 2;
-        $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
+        $wanConnDeviceIndex = (int)($config['wan_connection_device'] ?? 0);
+        $pppConnIndex = 1;
         
-        // Step 1: Create WANConnectionDevice if needed (addObject)
+        // Step 1: Create WANConnectionDevice (SmartOLT creates at index 1)
         $addConnDeviceTask = [
             'name' => 'addObject',
             'objectName' => "{$wanDevicePath}.WANConnectionDevice."
@@ -7024,15 +7025,24 @@ class HuaweiOLT {
         $result = $sendTask($addConnDeviceTask);
         if ($result['success']) {
             $tasksSent[] = 'Create WANConnectionDevice';
-            // Parse instance number from response if available
             $respData = json_decode($result['response'], true);
             if (!empty($respData['instanceNumber'])) {
-                $wanConnDeviceIndex = $respData['instanceNumber'];
-                $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
+                $wanConnDeviceIndex = (int)$respData['instanceNumber'];
             }
         }
+        if ($wanConnDeviceIndex < 1) $wanConnDeviceIndex = 2; // Default to 2 if creation failed
         
-        // Step 2: Create the appropriate WAN connection type
+        $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
+        
+        // Step 2: Enable L3 on ETH ports (router mode) - SmartOLT does this
+        $ethL3Params = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $ethL3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+        }
+        $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params]);
+        if ($result['success']) $tasksSent[] = 'Enable L3 on ETH ports';
+        
+        // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
             // Create WANPPPConnection
             $addPppConnTask = [
@@ -7042,47 +7052,122 @@ class HuaweiOLT {
             $result = $sendTask($addPppConnTask);
             if ($result['success']) {
                 $tasksSent[] = 'Create WANPPPConnection';
-            } else {
-                // Object may already exist, continue with configuration
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $pppConnIndex = (int)$respData['instanceNumber'];
+                }
             }
             
-            // Step 3: Configure PPPoE parameters
+            $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
+            $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
+            
+            // Configure PPPoE - matching SmartOLT parameters
             $paramValues = [
-                ["{$wanConnPath}.WANPPPConnection.1.Enable", true, 'xsd:boolean'],
-                ["{$wanConnPath}.WANPPPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
-                ["{$wanConnPath}.WANPPPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
-                ["{$wanConnPath}.WANPPPConnection.1.Username", $pppoeUsername, 'xsd:string'],
-                ["{$wanConnPath}.WANPPPConnection.1.Password", $pppoePassword, 'xsd:string'],
-                ["{$wanConnPath}.WANPPPConnection.1.NATEnabled", true, 'xsd:boolean'],
+                ["{$pppPath}.Enable", true, 'xsd:boolean'],
+                ["{$pppPath}.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$pppPath}.Username", $pppoeUsername, 'xsd:string'],
+                ["{$pppPath}.Password", $pppoePassword, 'xsd:string'],
+                ["{$pppPath}.NATEnabled", true, 'xsd:boolean'],
+                ["{$pppPath}.X_HW_LcpEchoReqCheck", true, 'xsd:boolean'],
+                ["{$pppPath}.PPPLCPEcho", 10, 'xsd:unsignedInt'],
+                ["{$pppPath}.Name", 'Internet_PPPoE', 'xsd:string'],
             ];
             
-            // Add VLAN if specified
             if ($serviceVlan > 0) {
-                $paramValues[] = ["{$wanConnPath}.WANPPPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                $paramValues[] = ["{$pppPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
             
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            if ($result['success']) {
+                $tasksSent[] = 'Configure PPPoE';
+            } else {
+                $errors[] = "PPPoE config failed (HTTP {$result['code']})";
+            }
+            
+            // Step 4: Set default WAN and provisioning code
+            $defaultWanParams = [
+                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
+            ];
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
+            $tasksSent[] = 'Set default WAN';
+            
+            // Step 5: Create policy route to bind LAN ports and WiFi to WAN
+            $addRouteTask = [
+                'name' => 'addObject',
+                'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
+            ];
+            $routeResult = $sendTask($addRouteTask);
+            $routeIndex = 1;
+            if ($routeResult['success']) {
+                $respData = json_decode($routeResult['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $routeIndex = (int)$respData['instanceNumber'];
+                }
+            }
+            
+            $routeParams = [
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
+            ];
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams]);
+            if ($result['success']) $tasksSent[] = 'Create policy route';
+            
         } elseif ($wanMode === 'dhcp') {
-            // Create WANIPConnection
+            // Create WANIPConnection for DHCP
             $addIpConnTask = [
                 'name' => 'addObject',
                 'objectName' => "{$wanConnPath}.WANIPConnection."
             ];
             $result = $sendTask($addIpConnTask);
+            $ipConnIndex = 1;
             if ($result['success']) {
                 $tasksSent[] = 'Create WANIPConnection';
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $ipConnIndex = (int)$respData['instanceNumber'];
+                }
             }
             
+            $ipPath = "{$wanConnPath}.WANIPConnection.{$ipConnIndex}";
+            $wanName = "wan1.{$wanConnDeviceIndex}.ip{$ipConnIndex}";
+            
             $paramValues = [
-                ["{$wanConnPath}.WANIPConnection.1.Enable", true, 'xsd:boolean'],
-                ["{$wanConnPath}.WANIPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.AddressingType", 'DHCP', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.NATEnabled", true, 'xsd:boolean'],
+                ["{$ipPath}.Enable", true, 'xsd:boolean'],
+                ["{$ipPath}.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$ipPath}.AddressingType", 'DHCP', 'xsd:string'],
+                ["{$ipPath}.NATEnabled", true, 'xsd:boolean'],
+                ["{$ipPath}.Name", 'Internet_DHCP', 'xsd:string'],
             ];
             
             if ($serviceVlan > 0) {
-                $paramValues[] = ["{$wanConnPath}.WANIPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                $paramValues[] = ["{$ipPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
+            
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            if ($result['success']) $tasksSent[] = 'Configure DHCP WAN';
+            
+            // Set default WAN
+            $defaultWanParams = [
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
+            ];
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
+            
+            // Create policy route
+            $addRouteTask = ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'];
+            $routeResult = $sendTask($addRouteTask);
+            $routeIndex = 1;
+            if ($routeResult['success']) {
+                $respData = json_decode($routeResult['response'], true);
+                if (!empty($respData['instanceNumber'])) $routeIndex = (int)$respData['instanceNumber'];
+            }
+            $routeParams = [
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
+            ];
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams]);
             
         } elseif ($wanMode === 'static') {
             $staticIp = $config['static_ip'] ?? '';
@@ -7094,44 +7179,40 @@ class HuaweiOLT {
                 return ['success' => false, 'error' => 'Static IP and gateway are required'];
             }
             
-            $addIpConnTask = [
-                'name' => 'addObject',
-                'objectName' => "{$wanConnPath}.WANIPConnection."
-            ];
-            $sendTask($addIpConnTask);
+            $addIpConnTask = ['name' => 'addObject', 'objectName' => "{$wanConnPath}.WANIPConnection."];
+            $result = $sendTask($addIpConnTask);
+            $ipConnIndex = 1;
+            if ($result['success']) {
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) $ipConnIndex = (int)$respData['instanceNumber'];
+            }
+            
+            $ipPath = "{$wanConnPath}.WANIPConnection.{$ipConnIndex}";
+            $wanName = "wan1.{$wanConnDeviceIndex}.ip{$ipConnIndex}";
             
             $paramValues = [
-                ["{$wanConnPath}.WANIPConnection.1.Enable", true, 'xsd:boolean'],
-                ["{$wanConnPath}.WANIPConnection.1.ConnectionType", 'IP_Routed', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.X_HW_ExServiceList", 'INTERNET', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.AddressingType", 'Static', 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.ExternalIPAddress", $staticIp, 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.SubnetMask", $subnetMask, 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.DefaultGateway", $gateway, 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.DNSServers", $dnsServers, 'xsd:string'],
-                ["{$wanConnPath}.WANIPConnection.1.NATEnabled", true, 'xsd:boolean'],
+                ["{$ipPath}.Enable", true, 'xsd:boolean'],
+                ["{$ipPath}.ConnectionType", 'IP_Routed', 'xsd:string'],
+                ["{$ipPath}.AddressingType", 'Static', 'xsd:string'],
+                ["{$ipPath}.ExternalIPAddress", $staticIp, 'xsd:string'],
+                ["{$ipPath}.SubnetMask", $subnetMask, 'xsd:string'],
+                ["{$ipPath}.DefaultGateway", $gateway, 'xsd:string'],
+                ["{$ipPath}.DNSServers", $dnsServers, 'xsd:string'],
+                ["{$ipPath}.NATEnabled", true, 'xsd:boolean'],
+                ["{$ipPath}.Name", 'Internet_Static', 'xsd:string'],
             ];
             
             if ($serviceVlan > 0) {
-                $paramValues[] = ["{$wanConnPath}.WANIPConnection.1.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                $paramValues[] = ["{$ipPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
+            
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
+            ]]);
+            
         } else {
             return ['success' => false, 'error' => "Unknown WAN mode: {$wanMode}"];
-        }
-        
-        // Step 4: Send setParameterValues task
-        if (!empty($paramValues)) {
-            $task = [
-                'name' => 'setParameterValues',
-                'parameterValues' => $paramValues
-            ];
-            
-            $result = $sendTask($task);
-            if ($result['success']) {
-                $tasksSent[] = 'WAN Configuration';
-            } else {
-                $errors[] = "Failed to send WAN config task (HTTP {$result['code']}): {$result['response']}";
-            }
         }
         
         // Update ONU record with WAN configuration
