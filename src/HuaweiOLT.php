@@ -7072,7 +7072,7 @@ class HuaweiOLT {
         for ($i = 1; $i <= 4; $i++) {
             $ethL3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
         }
-        $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params]);
+        $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params], 'L3 Enable: ETH1-4 Router Mode');
         if ($result['success']) $tasksSent[] = 'Enable L3 on ETH ports';
         
         // Step 3: Create and configure WAN connection based on mode
@@ -7110,7 +7110,8 @@ class HuaweiOLT {
                 $paramValues[] = ["{$pppPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
             
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            $pppoeTaskName = "PPPoE: User={$pppoeUsername}, VLAN={$serviceVlan}";
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues], $pppoeTaskName);
             if ($result['success']) {
                 $tasksSent[] = 'Configure PPPoE';
             } else {
