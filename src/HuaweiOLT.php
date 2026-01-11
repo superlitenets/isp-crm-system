@@ -7225,33 +7225,54 @@ class HuaweiOLT {
         
         // Build TR-069 parameter values
         $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
+        
+        // Map security mode to Huawei BeaconType values
+        $beaconTypeMap = [
+            'WPA2-PSK' => '11i',
+            'WPA-WPA2-PSK' => 'WPAand11i',
+            'WPA3-SAE' => 'WPA3',
+            'WPA-PSK' => 'WPA',
+            'None' => 'Basic',
+            'Open' => 'Basic'
+        ];
+        $beaconType = $beaconTypeMap[$security] ?? '11i';
+        
+        // Map security to authentication mode
+        $authModeMap = [
+            'WPA2-PSK' => 'PSKAuthentication',
+            'WPA-WPA2-PSK' => 'PSKAuthentication',
+            'WPA3-SAE' => 'SAEAuthentication',
+            'WPA-PSK' => 'PSKAuthentication',
+            'None' => 'None',
+            'Open' => 'None'
+        ];
+        $authMode = $authModeMap[$security] ?? 'PSKAuthentication';
+        
         $paramValues = [
-            "{$basePath}.Enable" => ['value' => $enabled, 'type' => 'xsd:boolean'],
-            "{$basePath}.SSID" => ['value' => $ssid, 'type' => 'xsd:string']
+            ["{$basePath}.Enable", $enabled, 'xsd:boolean'],
+            ["{$basePath}.SSID", $ssid, 'xsd:string'],
+            ["{$basePath}.BeaconType", $beaconType, 'xsd:string'],
+            ["{$basePath}.WPAAuthenticationMode", $authMode, 'xsd:string'],
+            ["{$basePath}.IEEE11iAuthenticationMode", $authMode, 'xsd:string'],
+            ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'],
+            ["{$basePath}.IEEE11iEncryptionModes", 'AESEncryption', 'xsd:string'],
         ];
         
         if (!empty($password)) {
-            $paramValues["{$basePath}.PreSharedKey.1.PreSharedKey"] = ['value' => $password, 'type' => 'xsd:string'];
-            $paramValues["{$basePath}.KeyPassphrase"] = ['value' => $password, 'type' => 'xsd:string'];
+            $paramValues[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
+            $paramValues[] = ["{$basePath}.KeyPassphrase", $password, 'xsd:string'];
+            $paramValues[] = ["{$basePath}.X_HW_WPAKey", $password, 'xsd:string'];
         }
         
         if ($channel > 0) {
-            $paramValues["{$basePath}.Channel"] = ['value' => $channel, 'type' => 'xsd:unsignedInt'];
-        }
-        
-        if (!empty($security)) {
-            $paramValues["{$basePath}.BeaconType"] = ['value' => $security, 'type' => 'xsd:string'];
+            $paramValues[] = ["{$basePath}.Channel", $channel, 'xsd:unsignedInt'];
         }
         
         // Send setParameterValues task to GenieACS
         $task = [
             'name' => 'setParameterValues',
-            'parameterValues' => []
+            'parameterValues' => $paramValues
         ];
-        
-        foreach ($paramValues as $path => $val) {
-            $task['parameterValues'][] = [$path, $val['value'], $val['type']];
-        }
         
         $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
         curl_setopt_array($ch, [
