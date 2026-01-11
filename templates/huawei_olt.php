@@ -3311,18 +3311,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $allSuccess = true;
                         $errors = [];
                         
-                        // Apply WAN config
+                        // Apply WAN config using SmartOLT-style function
                         if (!empty($config['pppoe_username'])) {
-                            $wanResult = $genieacs->setWANConfig($tr069Device['device_id'], [
+                            $wanResult = $genieacs->configureInternetWAN($tr069Device['device_id'], [
                                 'connection_type' => $config['connection_type'] ?? 'pppoe',
                                 'pppoe_username' => $config['pppoe_username'],
                                 'pppoe_password' => $config['pppoe_password'],
-                                'wan_vlan' => $config['wan_vlan'] ?? 902,
-                                'nat_enable' => $config['nat_enable'] ?? true
+                                'service_vlan' => $config['wan_vlan'] ?? $config['service_vlan'] ?? 0,
+                                'nat_enabled' => $config['nat_enable'] ?? true,
+                                'enable_connection' => true
                             ]);
                             if (!$wanResult['success']) {
                                 $allSuccess = false;
-                                $errors[] = 'WAN: ' . ($wanResult['error'] ?? 'failed');
+                                $errors[] = 'WAN: ' . implode(', ', $wanResult['errors'] ?? ['failed']);
                             }
                         }
                         
