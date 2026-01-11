@@ -1,0 +1,31 @@
+root@superlitecrm:~/isp# docker compose logs 2>&1 | grep -i "SetParameterValues\|fault" | tail -30
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:29.910Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0200" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:29.977Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0200" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:29.977Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69638462eaae72b4018e1629" retries=3 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:29.979Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfa1341888c8974f05d" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:29.983Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0300" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.047Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0300" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.047Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfa4aa222593316f79f" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.048Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfa74718ae4d34cd4d2" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.049Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfa8c25a6b3544109ae" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.053Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0400" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.119Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0400" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.119Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639cfb43cdc3f7c2028c0d" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.120Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d05074a2a9ee89ce2db" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.121Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d051f364aded6c90073" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_freeradius      |       sql_user_name = "%{%{Stripped-User-Name}:-%{%{User-Name}:-DEFAULT}}"
+isp_crm_freeradius      |       default_user_profile = ""
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.121Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d054a2b646761fe0d1d" retries=1 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.124Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0500" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.190Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0500" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.191Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d0567157147d3f63fa3" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.194Z [INFO] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bad2fccdd0600" acsRequestName="SetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.257Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: CPE fault; acsRequestId="19bad2fccdd0600" cpeFaultCode="9002" cpeFaultString="Internal error"
+isp_crm_genieacs_cwmp   | 2026-01-11T13:12:30.257Z [WARN] ::ffff:10.97.127.32 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69639d056e5cf623352a1ff9" retries=1 faultCode="cwmp.9002" faultMessage="Internal error"
+isp_crm_freeradius      | server default { # from file /etc/freeradius/sites-enabled/default
+isp_crm_freeradius      | } # server default
+isp_crm_freeradius      | Listening on auth address * port 1812 bound to server default
+isp_crm_freeradius      | Listening on acct address * port 1813 bound to server default
+isp_crm_freeradius      | Listening on auth address :: port 1812 bound to server default
+isp_crm_freeradius      | Listening on acct address :: port 1813 bound to server default
+isp_crm_freeradius      |
