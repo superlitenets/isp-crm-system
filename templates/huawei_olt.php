@@ -3567,7 +3567,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     exit;
                 }
                 
-                // Use tr069_serial or sn for serial lookup
                 $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
                 
                 $result = [
@@ -3588,10 +3587,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     'ram_usage' => '-',
                     'uptime' => '-',
                     'uptime_seconds' => 0,
-                    'found_in_acs' => false
+                    'found_in_acs' => false,
+                    'wifi' => [],
+                    'wan' => [],
+                    'lan' => [],
+                    'admin_password' => '-'
                 ];
                 
-                // Get TR-069 info from GenieACS if device is registered
                 if (!empty($serialForLookup)) {
                     try {
                         require_once __DIR__ . '/../src/GenieACS.php';
@@ -3600,107 +3602,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         if ($deviceResult['success'] && !empty($deviceResult['device'])) {
                             $device = $deviceResult['device'];
                             $result['found_in_acs'] = true;
+                            $result['device_id'] = $device['_id'] ?? '';
                             
-                            // Determine online status based on last inform time
-                            // Device is "online" if it checked in within the last 5 minutes
                             $lastInformTime = isset($device['_lastInform']) ? strtotime($device['_lastInform']) : 0;
                             $fiveMinutesAgo = time() - 300;
                             $result['status'] = ($lastInformTime >= $fiveMinutesAgo) ? 'online' : 'offline';
                             
-                            // Device Info
                             $igd = $device['InternetGatewayDevice'] ?? [];
                             $devInfo = $igd['DeviceInfo'] ?? [];
                             $mgmtServer = $igd['ManagementServer'] ?? [];
+                            $lanDevice = $igd['LANDevice'] ?? [];
+                            $wanDevice = $igd['WANDevice'] ?? [];
                             
-                            // Manufacturer & OUI
-                            if (isset($devInfo['Manufacturer']['_value'])) {
-                                $result['manufacturer'] = $devInfo['Manufacturer']['_value'];
-                            }
-                            if (isset($device['_deviceId']['_OUI'])) {
-                                $result['oui'] = $device['_deviceId']['_OUI'];
-                            }
+                            // Basic device info
+                            if (isset($devInfo['Manufacturer']['_value'])) $result['manufacturer'] = $devInfo['Manufacturer']['_value'];
+                            if (isset($device['_deviceId']['_OUI'])) $result['oui'] = $device['_deviceId']['_OUI'];
+                            if (isset($devInfo['ModelName']['_value'])) $result['model'] = $devInfo['ModelName']['_value'];
+                            elseif (isset($device['_deviceId']['_ProductClass'])) $result['model'] = $device['_deviceId']['_ProductClass'];
+                            if (isset($devInfo['SoftwareVersion']['_value'])) $result['sw_version'] = $devInfo['SoftwareVersion']['_value'];
+                            if (isset($devInfo['HardwareVersion']['_value'])) $result['hw_version'] = $devInfo['HardwareVersion']['_value'];
+                            if (isset($devInfo['ProvisioningCode']['_value'])) $result['provisioning_code'] = $devInfo['ProvisioningCode']['_value'];
+                            if (isset($devInfo['SerialNumber']['_value'])) $result['serial'] = $devInfo['SerialNumber']['_value'];
+                            elseif (isset($device['_deviceId']['_SerialNumber'])) $result['serial'] = $device['_deviceId']['_SerialNumber'];
                             
-                            // Model
-                            if (isset($devInfo['ModelName']['_value'])) {
-                                $result['model'] = $devInfo['ModelName']['_value'];
-                            } elseif (isset($device['_deviceId']['_ProductClass'])) {
-                                $result['model'] = $device['_deviceId']['_ProductClass'];
-                            }
-                            
-                            // Software/Hardware Version
-                            if (isset($devInfo['SoftwareVersion']['_value'])) {
-                                $result['sw_version'] = $devInfo['SoftwareVersion']['_value'];
-                            }
-                            if (isset($devInfo['HardwareVersion']['_value'])) {
-                                $result['hw_version'] = $devInfo['HardwareVersion']['_value'];
-                            }
-                            
-                            // Provisioning Code
-                            if (isset($devInfo['ProvisioningCode']['_value'])) {
-                                $result['provisioning_code'] = $devInfo['ProvisioningCode']['_value'];
-                            }
-                            
-                            // Serial Number
-                            if (isset($devInfo['SerialNumber']['_value'])) {
-                                $result['serial'] = $devInfo['SerialNumber']['_value'];
-                            } elseif (isset($device['_deviceId']['_SerialNumber'])) {
-                                $result['serial'] = $device['_deviceId']['_SerialNumber'];
-                            }
-                            
-                            // CPU Usage (X_HW_DeviceMgr.CpuUsage or similar)
-                            if (isset($igd['X_HW_DeviceMgr']['CpuUsage']['_value'])) {
-                                $result['cpu_usage'] = $igd['X_HW_DeviceMgr']['CpuUsage']['_value'] . ' %';
-                            } elseif (isset($devInfo['ProcessStatus']['CPUUsage']['_value'])) {
-                                $result['cpu_usage'] = $devInfo['ProcessStatus']['CPUUsage']['_value'] . ' %';
-                            }
-                            
-                            // Memory/RAM Usage
-                            if (isset($igd['X_HW_DeviceMgr']['MemUsage']['_value'])) {
-                                $result['ram_usage'] = $igd['X_HW_DeviceMgr']['MemUsage']['_value'] . ' %';
-                            } elseif (isset($devInfo['MemoryStatus']['Free']['_value']) && isset($devInfo['MemoryStatus']['Total']['_value'])) {
-                                $free = $devInfo['MemoryStatus']['Free']['_value'];
-                                $total = $devInfo['MemoryStatus']['Total']['_value'];
-                                if ($total > 0) {
-                                    $usedPercent = round((($total - $free) / $total) * 100);
-                                    $result['ram_usage'] = $usedPercent . ' %';
-                                }
-                            }
+                            // CPU/RAM
+                            if (isset($igd['X_HW_DeviceMgr']['CpuUsage']['_value'])) $result['cpu_usage'] = $igd['X_HW_DeviceMgr']['CpuUsage']['_value'] . '%';
+                            elseif (isset($devInfo['ProcessStatus']['CPUUsage']['_value'])) $result['cpu_usage'] = $devInfo['ProcessStatus']['CPUUsage']['_value'] . '%';
+                            if (isset($igd['X_HW_DeviceMgr']['MemUsage']['_value'])) $result['ram_usage'] = $igd['X_HW_DeviceMgr']['MemUsage']['_value'] . '%';
                             
                             // Uptime
                             if (isset($devInfo['UpTime']['_value'])) {
                                 $uptimeSec = (int)$devInfo['UpTime']['_value'];
                                 $result['uptime_seconds'] = $uptimeSec;
-                                $days = floor($uptimeSec / 86400);
-                                $hours = floor(($uptimeSec % 86400) / 3600);
-                                $mins = floor(($uptimeSec % 3600) / 60);
-                                $secs = $uptimeSec % 60;
-                                $result['uptime'] = '';
-                                if ($days > 0) $result['uptime'] .= "{$days} day" . ($days > 1 ? 's' : '') . ", ";
-                                if ($hours > 0) $result['uptime'] .= "{$hours} hour" . ($hours > 1 ? 's' : '') . ", ";
-                                $result['uptime'] .= "{$mins} min" . ($mins > 1 ? 's' : '') . ", {$secs} sec";
+                                $d = floor($uptimeSec / 86400); $h = floor(($uptimeSec % 86400) / 3600); $m = floor(($uptimeSec % 3600) / 60);
+                                $result['uptime'] = ($d > 0 ? "{$d}d " : '') . ($h > 0 ? "{$h}h " : '') . "{$m}m";
                             }
                             
-                            // Management IP from ConnectionRequestURL
+                            // Management Server
                             if (isset($mgmtServer['ConnectionRequestURL']['_value'])) {
-                                $connUrl = $mgmtServer['ConnectionRequestURL']['_value'];
-                                if (preg_match('/https?:\/\/([^:\/]+)/', $connUrl, $m)) {
-                                    $result['ip'] = $m[1];
+                                if (preg_match('/https?:\/\/([^:\/]+)/', $mgmtServer['ConnectionRequestURL']['_value'], $m)) $result['ip'] = $m[1];
+                            }
+                            if (isset($mgmtServer['URL']['_value'])) $result['acs_url'] = $mgmtServer['URL']['_value'];
+                            if (isset($mgmtServer['PeriodicInformInterval']['_value'])) $result['inform_interval'] = $mgmtServer['PeriodicInformInterval']['_value'];
+                            if (isset($device['_lastInform'])) $result['last_inform'] = date('Y-m-d H:i:s', strtotime($device['_lastInform']));
+                            
+                            // Admin Password
+                            if (isset($igd['X_HW_WebUserInfo']['UserName']['_value'])) {
+                                $result['admin_user'] = $igd['X_HW_WebUserInfo']['UserName']['_value'];
+                            }
+                            if (isset($igd['X_HW_WebUserInfo']['Password']['_value'])) {
+                                $result['admin_password'] = $igd['X_HW_WebUserInfo']['Password']['_value'];
+                            }
+                            
+                            // WiFi Configuration
+                            foreach ($lanDevice as $lanIdx => $lan) {
+                                if (!is_array($lan) || !isset($lan['WLANConfiguration'])) continue;
+                                foreach ($lan['WLANConfiguration'] as $wlanIdx => $wlan) {
+                                    if (!is_array($wlan)) continue;
+                                    $wifiEntry = [
+                                        'index' => $wlanIdx,
+                                        'enabled' => $wlan['Enable']['_value'] ?? false,
+                                        'ssid' => $wlan['SSID']['_value'] ?? '-',
+                                        'password' => $wlan['PreSharedKey']['1']['PreSharedKey']['_value'] ?? $wlan['KeyPassphrase']['_value'] ?? '-',
+                                        'channel' => $wlan['Channel']['_value'] ?? 'Auto',
+                                        'security' => $wlan['BeaconType']['_value'] ?? '-',
+                                        'standard' => $wlan['Standard']['_value'] ?? '-',
+                                        'mac' => $wlan['BSSID']['_value'] ?? '-'
+                                    ];
+                                    // Determine band from standard or frequency
+                                    if (isset($wlan['X_HW_WlanRfPara']['FreqBand']['_value'])) {
+                                        $wifiEntry['band'] = $wlan['X_HW_WlanRfPara']['FreqBand']['_value'] == '5' ? '5GHz' : '2.4GHz';
+                                    } elseif (strpos($wifiEntry['standard'], 'a') !== false || strpos($wifiEntry['standard'], 'ac') !== false) {
+                                        $wifiEntry['band'] = '5GHz';
+                                    } else {
+                                        $wifiEntry['band'] = '2.4GHz';
+                                    }
+                                    $result['wifi'][] = $wifiEntry;
                                 }
                             }
                             
-                            // ACS URL
-                            if (isset($mgmtServer['URL']['_value'])) {
-                                $result['acs_url'] = $mgmtServer['URL']['_value'];
+                            // WAN Configuration
+                            foreach ($wanDevice as $wanIdx => $wan) {
+                                if (!is_array($wan) || !isset($wan['WANConnectionDevice'])) continue;
+                                foreach ($wan['WANConnectionDevice'] as $connIdx => $connDev) {
+                                    if (!is_array($connDev)) continue;
+                                    // PPP Connections
+                                    if (isset($connDev['WANPPPConnection'])) {
+                                        foreach ($connDev['WANPPPConnection'] as $pppIdx => $ppp) {
+                                            if (!is_array($ppp)) continue;
+                                            $result['wan'][] = [
+                                                'type' => 'PPPoE',
+                                                'name' => $ppp['Name']['_value'] ?? "WAN $pppIdx",
+                                                'enabled' => $ppp['Enable']['_value'] ?? false,
+                                                'username' => $ppp['Username']['_value'] ?? '-',
+                                                'status' => $ppp['ConnectionStatus']['_value'] ?? '-',
+                                                'ip' => $ppp['ExternalIPAddress']['_value'] ?? '-',
+                                                'vlan' => $ppp['X_HW_VLAN']['_value'] ?? '-',
+                                                'nat' => $ppp['NATEnabled']['_value'] ?? false
+                                            ];
+                                        }
+                                    }
+                                    // IP Connections (DHCP/Static)
+                                    if (isset($connDev['WANIPConnection'])) {
+                                        foreach ($connDev['WANIPConnection'] as $ipIdx => $ipConn) {
+                                            if (!is_array($ipConn)) continue;
+                                            $addrType = $ipConn['AddressingType']['_value'] ?? 'DHCP';
+                                            $result['wan'][] = [
+                                                'type' => $addrType === 'Static' ? 'Static' : 'DHCP',
+                                                'name' => $ipConn['Name']['_value'] ?? "WAN $ipIdx",
+                                                'enabled' => $ipConn['Enable']['_value'] ?? false,
+                                                'status' => $ipConn['ConnectionStatus']['_value'] ?? '-',
+                                                'ip' => $ipConn['ExternalIPAddress']['_value'] ?? '-',
+                                                'vlan' => $ipConn['X_HW_VLAN']['_value'] ?? '-',
+                                                'nat' => $ipConn['NATEnabled']['_value'] ?? false
+                                            ];
+                                        }
+                                    }
+                                }
                             }
                             
-                            // Periodic inform interval
-                            if (isset($mgmtServer['PeriodicInformInterval']['_value'])) {
-                                $result['inform_interval'] = $mgmtServer['PeriodicInformInterval']['_value'];
-                            }
-                            
-                            // Last inform time
-                            if (isset($device['_lastInform'])) {
-                                $result['last_inform'] = date('Y-m-d H:i:s', strtotime($device['_lastInform']));
+                            // LAN Configuration
+                            foreach ($lanDevice as $lanIdx => $lan) {
+                                if (!is_array($lan) || !isset($lan['LANHostConfigManagement'])) continue;
+                                $lanCfg = $lan['LANHostConfigManagement'];
+                                $result['lan'] = [
+                                    'dhcp_enabled' => $lanCfg['DHCPServerEnable']['_value'] ?? false,
+                                    'ip' => $lanCfg['IPInterface']['1']['IPInterfaceIPAddress']['_value'] ?? '-',
+                                    'subnet' => $lanCfg['SubnetMask']['_value'] ?? '-',
+                                    'dhcp_start' => $lanCfg['MinAddress']['_value'] ?? '-',
+                                    'dhcp_end' => $lanCfg['MaxAddress']['_value'] ?? '-',
+                                    'lease_time' => $lanCfg['DHCPLeaseTime']['_value'] ?? '-'
+                                ];
+                                break;
                             }
                         }
                     } catch (Exception $e) {
@@ -3708,19 +3741,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
-                // Fall back to database values if GenieACS didn't provide them
-                if ($result['ip'] === '-' && !empty($onu['tr069_ip'])) { 
-                    $result['ip'] = $onu['tr069_ip']; 
-                }
+                // Fallback to DB values
+                if ($result['ip'] === '-' && !empty($onu['tr069_ip'])) $result['ip'] = $onu['tr069_ip'];
                 if ($result['last_inform'] === '-' && !empty($onu['tr069_last_inform'])) {
                     $result['last_inform'] = date('Y-m-d H:i:s', strtotime($onu['tr069_last_inform']));
-                    // Check if last inform from database is recent (online check)
                     $lastInformTime = strtotime($onu['tr069_last_inform']);
-                    $fiveMinutesAgo = time() - 300;
-                    if ($result['status'] === 'pending') {
-                        $result['status'] = ($lastInformTime >= $fiveMinutesAgo) ? 'online' : 'offline';
-                    }
+                    if ($result['status'] === 'pending' && $lastInformTime >= time() - 300) $result['status'] = 'online';
                 }
+                
+                // Add DB-stored config
+                if (!empty($onu['pppoe_username'])) $result['db_pppoe_user'] = $onu['pppoe_username'];
+                if (!empty($onu['wan_mode'])) $result['db_wan_mode'] = $onu['wan_mode'];
+                if (!empty($onu['vlan_id'])) $result['db_vlan'] = $onu['vlan_id'];
                 
                 echo json_encode($result);
                 exit;
@@ -15176,8 +15208,8 @@ echo "# ================================================\n";
         const title = document.getElementById('onuFullStatusTitle');
         const body = document.getElementById('onuFullStatusBody');
         
-        title.textContent = 'TR-069 Device Info';
-        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching TR-069 device info from GenieACS...</p></div>';
+        title.textContent = 'TR-069 Full Configuration';
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching complete ONU configuration from GenieACS...</p></div>';
         modal.show();
         
         fetch('?page=huawei-olt', {
@@ -15194,48 +15226,97 @@ echo "# ================================================\n";
             
             if (!data.found_in_acs) {
                 body.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Device not found in GenieACS. The ONU may not have connected to the ACS server yet.</div>' +
-                    '<div class="text-muted small"><strong>Serial:</strong> ' + escapeHtml(data.serial || '-') + '</div>';
+                    '<div class="text-muted small mt-2"><strong>Serial:</strong> ' + escapeHtml(data.serial || '-') + '</div>' +
+                    (data.db_wan_mode ? '<div class="text-muted small"><strong>DB WAN Mode:</strong> ' + escapeHtml(data.db_wan_mode) + '</div>' : '');
                 return;
             }
             
-            let statusBadge;
-            if (data.status === 'online') {
-                statusBadge = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Online</span>';
-            } else if (data.status === 'offline') {
-                statusBadge = '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Offline</span>';
-            } else {
-                statusBadge = '<span class="badge bg-warning"><i class="bi bi-clock me-1"></i>Pending</span>';
+            let statusBadge = data.status === 'online' ? '<span class="badge bg-success">Online</span>' : 
+                              data.status === 'offline' ? '<span class="badge bg-danger">Offline</span>' : 
+                              '<span class="badge bg-warning">Pending</span>';
+            
+            let html = '<div class="mb-3">' + statusBadge + ' <small class="text-muted ms-2">Last: ' + escapeHtml(data.last_inform || '-') + '</small></div>';
+            
+            // Device Info (compact)
+            html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-cpu me-2"></i>Device Info</div>';
+            html += '<div class="card-body py-2 small">';
+            html += '<div class="row"><div class="col-6"><strong>Model:</strong> ' + escapeHtml(data.model || '-') + '</div>';
+            html += '<div class="col-6"><strong>Manufacturer:</strong> ' + escapeHtml(data.manufacturer || '-') + '</div></div>';
+            html += '<div class="row"><div class="col-6"><strong>SW:</strong> <code>' + escapeHtml(data.sw_version || '-') + '</code></div>';
+            html += '<div class="col-6"><strong>HW:</strong> ' + escapeHtml(data.hw_version || '-') + '</div></div>';
+            html += '<div class="row"><div class="col-6"><strong>Serial:</strong> <code>' + escapeHtml(data.serial || '-') + '</code></div>';
+            html += '<div class="col-6"><strong>Uptime:</strong> ' + escapeHtml(data.uptime || '-') + '</div></div>';
+            html += '<div class="row"><div class="col-6"><strong>CPU:</strong> ' + escapeHtml(data.cpu_usage || '-') + '</div>';
+            html += '<div class="col-6"><strong>RAM:</strong> ' + escapeHtml(data.ram_usage || '-') + '</div></div>';
+            if (data.admin_password && data.admin_password !== '-') {
+                html += '<div class="row mt-1"><div class="col-12"><strong>Admin:</strong> ' + escapeHtml(data.admin_user || 'admin') + ' / <code>' + escapeHtml(data.admin_password) + '</code></div></div>';
+            }
+            html += '</div></div>';
+            
+            // WiFi Configuration
+            if (data.wifi && data.wifi.length > 0) {
+                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-wifi me-2"></i>WiFi Configuration</div>';
+                html += '<div class="card-body p-0"><table class="table table-sm mb-0 small">';
+                html += '<thead class="table-light"><tr><th>Band</th><th>SSID</th><th>Password</th><th>Channel</th><th>Status</th></tr></thead><tbody>';
+                data.wifi.forEach(w => {
+                    let enabledBadge = w.enabled ? '<span class="badge bg-success">On</span>' : '<span class="badge bg-secondary">Off</span>';
+                    html += '<tr><td>' + escapeHtml(w.band || '-') + '</td>';
+                    html += '<td><strong>' + escapeHtml(w.ssid || '-') + '</strong></td>';
+                    html += '<td><code>' + escapeHtml(w.password || '-') + '</code></td>';
+                    html += '<td>' + escapeHtml(w.channel || 'Auto') + '</td>';
+                    html += '<td>' + enabledBadge + '</td></tr>';
+                });
+                html += '</tbody></table></div></div>';
             }
             
-            let html = '<div class="mb-3">' + statusBadge + '</div>';
+            // WAN Configuration
+            if (data.wan && data.wan.length > 0) {
+                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-globe me-2"></i>WAN Connections</div>';
+                html += '<div class="card-body p-0"><table class="table table-sm mb-0 small">';
+                html += '<thead class="table-light"><tr><th>Type</th><th>Name</th><th>VLAN</th><th>IP</th><th>Status</th></tr></thead><tbody>';
+                data.wan.forEach(w => {
+                    let statusBadge = w.status === 'Connected' ? '<span class="badge bg-success">Connected</span>' : '<span class="badge bg-secondary">' + escapeHtml(w.status || '-') + '</span>';
+                    html += '<tr><td><span class="badge bg-' + (w.type === 'PPPoE' ? 'info' : 'primary') + '">' + escapeHtml(w.type || '-') + '</span></td>';
+                    html += '<td>' + escapeHtml(w.name || '-') + (w.username ? '<br><small class="text-muted">' + escapeHtml(w.username) + '</small>' : '') + '</td>';
+                    html += '<td>' + escapeHtml(w.vlan || '-') + '</td>';
+                    html += '<td><code>' + escapeHtml(w.ip || '-') + '</code></td>';
+                    html += '<td>' + statusBadge + '</td></tr>';
+                });
+                html += '</tbody></table></div></div>';
+            } else if (data.db_wan_mode) {
+                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-globe me-2"></i>WAN (from DB)</div>';
+                html += '<div class="card-body py-2 small">';
+                html += '<strong>Mode:</strong> ' + escapeHtml(data.db_wan_mode.toUpperCase()) + ' ';
+                if (data.db_pppoe_user) html += '| <strong>User:</strong> ' + escapeHtml(data.db_pppoe_user) + ' ';
+                if (data.db_vlan) html += '| <strong>VLAN:</strong> ' + escapeHtml(data.db_vlan);
+                html += '</div></div>';
+            }
             
-            // General Info Section
-            html += '<h6 class="text-primary border-bottom pb-2 mb-3"><i class="bi bi-info-circle me-2"></i>General</h6>';
-            html += '<table class="table table-sm table-borderless">';
-            html += '<tr><th style="width:40%">Manufacturer</th><td>' + escapeHtml(data.manufacturer || '-') + ' <span class="text-muted">(OUI: ' + escapeHtml(data.oui || '-') + ')</span></td></tr>';
-            html += '<tr><th>Model name</th><td><strong>' + escapeHtml(data.model || '-') + '</strong></td></tr>';
-            html += '<tr><th>Software version</th><td><code>' + escapeHtml(data.sw_version || '-') + '</code></td></tr>';
-            html += '<tr><th>Hardware version</th><td>' + escapeHtml(data.hw_version || '-') + '</td></tr>';
-            html += '<tr><th>Provisioning code</th><td>' + escapeHtml(data.provisioning_code || '-') + '</td></tr>';
-            html += '<tr><th>Serial number</th><td><code>' + escapeHtml(data.serial || '-') + '</code></td></tr>';
-            html += '<tr><th>CPU Usage</th><td>' + escapeHtml(data.cpu_usage || '-') + '</td></tr>';
-            html += '<tr><th>Used RAM</th><td>' + escapeHtml(data.ram_usage || '-') + '</td></tr>';
-            html += '<tr><th>Uptime</th><td>' + escapeHtml(data.uptime || '-') + '</td></tr>';
-            html += '</table>';
+            // LAN Configuration
+            if (data.lan && data.lan.ip) {
+                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-ethernet me-2"></i>LAN Configuration</div>';
+                html += '<div class="card-body py-2 small">';
+                html += '<div class="row"><div class="col-6"><strong>IP:</strong> ' + escapeHtml(data.lan.ip || '-') + '</div>';
+                html += '<div class="col-6"><strong>DHCP:</strong> ' + (data.lan.dhcp_enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>') + '</div></div>';
+                if (data.lan.dhcp_enabled) {
+                    html += '<div class="row"><div class="col-6"><strong>Pool:</strong> ' + escapeHtml(data.lan.dhcp_start || '-') + ' - ' + escapeHtml(data.lan.dhcp_end || '-') + '</div>';
+                    html += '<div class="col-6"><strong>Lease:</strong> ' + escapeHtml(data.lan.lease_time || '-') + 's</div></div>';
+                }
+                html += '</div></div>';
+            }
             
-            // TR-069 Connection Info
-            html += '<h6 class="text-primary border-bottom pb-2 mb-3 mt-4"><i class="bi bi-broadcast me-2"></i>TR-069 Connection</h6>';
-            html += '<table class="table table-sm table-borderless">';
-            html += '<tr><th style="width:40%">Management IP</th><td><code>' + escapeHtml(data.ip || '-') + '</code></td></tr>';
-            html += '<tr><th>ACS URL</th><td><small class="text-break">' + escapeHtml(data.acs_url || '-') + '</small></td></tr>';
-            html += '<tr><th>Last Inform</th><td>' + escapeHtml(data.last_inform || '-') + '</td></tr>';
-            html += '<tr><th>Inform Interval</th><td>' + escapeHtml(data.inform_interval || '-') + ' sec</td></tr>';
-            html += '</table>';
+            // TR-069 Connection
+            html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-broadcast me-2"></i>TR-069 Connection</div>';
+            html += '<div class="card-body py-2 small">';
+            html += '<div class="row"><div class="col-6"><strong>Mgmt IP:</strong> <code>' + escapeHtml(data.ip || '-') + '</code></div>';
+            html += '<div class="col-6"><strong>Interval:</strong> ' + escapeHtml(data.inform_interval || '-') + 's</div></div>';
+            html += '<div class="text-muted text-break" style="font-size:0.75rem;"><strong>ACS:</strong> ' + escapeHtml(data.acs_url || '-') + '</div>';
+            html += '</div></div>';
             
             // Quick Actions
-            html += '<div class="mt-4 pt-3 border-top">';
-            html += '<button class="btn btn-outline-primary btn-sm me-2" onclick="openTR069Config(' + onuId + ')"><i class="bi bi-gear me-1"></i>WiFi Config</button>';
-            html += '<button class="btn btn-outline-info btn-sm me-2" onclick="openWANConfig(' + onuId + ')"><i class="bi bi-globe me-1"></i>WAN Config</button>';
+            html += '<div class="d-flex gap-2 flex-wrap">';
+            html += '<button class="btn btn-outline-primary btn-sm" onclick="openTR069Config(' + onuId + ')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
+            html += '<button class="btn btn-outline-info btn-sm" onclick="openWANConfig(' + onuId + ')"><i class="bi bi-globe me-1"></i>WAN</button>';
             html += '<button class="btn btn-outline-warning btn-sm" onclick="rebootONUViaTR069(' + onuId + ')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
             html += '</div>';
             
