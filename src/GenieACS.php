@@ -384,28 +384,141 @@ class GenieACS {
         return $this->request('GET', '/files');
     }
     
-    public function setWiFiSettings(string $deviceId, string $ssid, string $password, bool $enabled = true, int $channel = 0): array {
-        $params = [
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable', $enabled, 'xsd:boolean']
-        ];
+    /**
+     * Configure WiFi settings for Huawei ONUs via TR-069
+     * Supports both 2.4GHz (index 1) and 5GHz (index 5) bands
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param array $config WiFi configuration:
+     *   - ssid: SSID name
+     *   - password: Pre-shared key
+     *   - enabled: Enable/disable WiFi (default true)
+     *   - channel: Channel number (0 = auto)
+     *   - broadcast_ssid: Broadcast SSID (default true)
+     *   - security_mode: WPA2-PSK, WPA-WPA2-PSK, etc. (default WPA2-PSK)
+     *   - access_vlan: VLAN for WiFi traffic (0 = untagged)
+     *   - band: '2.4ghz', '5ghz', or 'both' (default '2.4ghz')
+     */
+    public function configureWiFi(string $deviceId, array $config): array {
+        $results = [];
+        $errors = [];
         
-        if ($channel > 0) {
-            $params[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Channel', $channel, 'xsd:unsignedInt'];
+        $ssid = $config['ssid'] ?? '';
+        $password = $config['password'] ?? '';
+        $enabled = $config['enabled'] ?? true;
+        $channel = (int)($config['channel'] ?? 0);
+        $broadcastSsid = $config['broadcast_ssid'] ?? true;
+        $securityMode = $config['security_mode'] ?? 'WPA2-PSK';
+        $accessVlan = (int)($config['access_vlan'] ?? 0);
+        $band = $config['band'] ?? '2.4ghz';
+        
+        // Determine which interfaces to configure
+        $interfaces = [];
+        if ($band === '2.4ghz' || $band === 'both') {
+            $interfaces['2.4GHz'] = 1;
+        }
+        if ($band === '5ghz' || $band === 'both') {
+            $interfaces['5GHz'] = 5;
         }
         
-        return $this->setParameterValues($deviceId, $params);
+        foreach ($interfaces as $bandName => $wlanIndex) {
+            // Try Huawei direct path first (InternetGatewayDevice.WLANConfiguration)
+            // Fall back to LANDevice path if needed
+            $basePath = "InternetGatewayDevice.WLANConfiguration.{$wlanIndex}";
+            $altBasePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
+            
+            $params = [];
+            
+            // Enable WiFi
+            $params[] = ["{$basePath}.Enable", $enabled, 'xsd:boolean'];
+            
+            // Set SSID
+            if (!empty($ssid)) {
+                $params[] = ["{$basePath}.SSID", $ssid, 'xsd:string'];
+            }
+            
+            // Broadcast SSID
+            $params[] = ["{$basePath}.SSIDAdvertisementEnabled", $broadcastSsid, 'xsd:boolean'];
+            
+            // Security Mode
+            $params[] = ["{$basePath}.BeaconType", $securityMode === 'WPA2-PSK' ? 'WPA' : 'Basic', 'xsd:string'];
+            $params[] = ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'];
+            $params[] = ["{$basePath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+            
+            // Pre-shared key (password)
+            if (!empty($password)) {
+                $params[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
+                // Also try KeyPassphrase for compatibility
+                $params[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+            }
+            
+            // Channel (0 = auto)
+            if ($channel > 0) {
+                $params[] = ["{$basePath}.Channel", $channel, 'xsd:unsignedInt'];
+            }
+            
+            // Huawei-specific: Access VLAN
+            if ($accessVlan > 0) {
+                $params[] = ["{$basePath}.X_HW_AccessVLAN", $accessVlan, 'xsd:unsignedInt'];
+            }
+            
+            $result = $this->setParameterValues($deviceId, $params);
+            $results[$bandName] = $result;
+            
+            // If direct path fails, try LANDevice path
+            if (!$result['success']) {
+                $altParams = [];
+                $altParams[] = ["{$altBasePath}.Enable", $enabled, 'xsd:boolean'];
+                if (!empty($ssid)) {
+                    $altParams[] = ["{$altBasePath}.SSID", $ssid, 'xsd:string'];
+                }
+                if (!empty($password)) {
+                    $altParams[] = ["{$altBasePath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+                }
+                if ($channel > 0) {
+                    $altParams[] = ["{$altBasePath}.Channel", $channel, 'xsd:unsignedInt'];
+                }
+                
+                $altResult = $this->setParameterValues($deviceId, $altParams);
+                $results["{$bandName}_alt"] = $altResult;
+                
+                if (!$altResult['success']) {
+                    $errors[] = "Failed to configure {$bandName} WiFi";
+                }
+            }
+        }
+        
+        return [
+            'success' => empty($errors),
+            'message' => empty($errors) ? 'WiFi configured successfully' : 'Some errors occurred',
+            'errors' => $errors,
+            'results' => $results
+        ];
     }
     
+    /**
+     * Legacy function - use configureWiFi instead
+     */
+    public function setWiFiSettings(string $deviceId, string $ssid, string $password, bool $enabled = true, int $channel = 0): array {
+        return $this->configureWiFi($deviceId, [
+            'ssid' => $ssid,
+            'password' => $password,
+            'enabled' => $enabled,
+            'channel' => $channel,
+            'band' => '2.4ghz'
+        ]);
+    }
+    
+    /**
+     * Legacy function - use configureWiFi instead
+     */
     public function setWiFi5GSettings(string $deviceId, string $ssid, string $password, bool $enabled = true): array {
-        $params = [
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID', $ssid, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'],
-            ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable', $enabled, 'xsd:boolean']
-        ];
-        
-        return $this->setParameterValues($deviceId, $params);
+        return $this->configureWiFi($deviceId, [
+            'ssid' => $ssid,
+            'password' => $password,
+            'enabled' => $enabled,
+            'band' => '5ghz'
+        ]);
     }
     
     public function getWiFiSettings(string $deviceId): array {
