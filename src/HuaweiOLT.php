@@ -7242,6 +7242,248 @@ class HuaweiOLT {
     }
     
     /**
+     * Configure Ethernet ports via TR-069/GenieACS
+     */
+    public function configureEthPortsViaTR069(int $onuDbId, array $ports): array {
+        return $this->sendTR069Task($onuDbId, 'eth_ports', function($basePath) use ($ports) {
+            $params = [];
+            foreach ($ports as $i => $enabled) {
+                $portNum = $i + 1;
+                $params["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNum}.Enable"] = 
+                    ['value' => (bool)$enabled, 'type' => 'xsd:boolean'];
+            }
+            return $params;
+        }, 'Ethernet ports configured');
+    }
+    
+    /**
+     * Configure LAN/DHCP settings via TR-069/GenieACS
+     */
+    public function configureLANViaTR069(int $onuDbId, array $config): array {
+        return $this->sendTR069Task($onuDbId, 'lan_dhcp', function($basePath) use ($config) {
+            $params = [];
+            $lanPath = 'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement';
+            
+            if (isset($config['dhcp_enabled'])) {
+                $params["{$lanPath}.DHCPServerEnable"] = ['value' => (bool)$config['dhcp_enabled'], 'type' => 'xsd:boolean'];
+            }
+            if (!empty($config['ip_start'])) {
+                $params["{$lanPath}.MinAddress"] = ['value' => $config['ip_start'], 'type' => 'xsd:string'];
+            }
+            if (!empty($config['ip_end'])) {
+                $params["{$lanPath}.MaxAddress"] = ['value' => $config['ip_end'], 'type' => 'xsd:string'];
+            }
+            if (!empty($config['lease_time'])) {
+                $params["{$lanPath}.DHCPLeaseTime"] = ['value' => (int)$config['lease_time'], 'type' => 'xsd:unsignedInt'];
+            }
+            return $params;
+        }, 'LAN/DHCP configured');
+    }
+    
+    /**
+     * Add port forward via TR-069/GenieACS
+     */
+    public function addPortForwardViaTR069(int $onuDbId, array $config): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
+        
+        $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) return ['success' => false, 'error' => 'GenieACS URL not configured'];
+        
+        // First, create a new PortMapping entry using AddObject
+        $addTask = [
+            'name' => 'addObject',
+            'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.'
+        ];
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($addTask),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode < 200 || $httpCode >= 300) {
+            return ['success' => false, 'error' => "Failed to create port mapping entry (HTTP {$httpCode})"];
+        }
+        
+        // Now set the parameters (using index from response or assuming next available)
+        $portIndex = $config['port_index'] ?? 1;
+        $basePath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.{$portIndex}";
+        
+        $params = [
+            "{$basePath}.PortMappingEnabled" => ['value' => true, 'type' => 'xsd:boolean'],
+            "{$basePath}.ExternalPort" => ['value' => (int)$config['external_port'], 'type' => 'xsd:unsignedInt'],
+            "{$basePath}.InternalPort" => ['value' => (int)$config['internal_port'], 'type' => 'xsd:unsignedInt'],
+            "{$basePath}.InternalClient" => ['value' => $config['internal_ip'], 'type' => 'xsd:string'],
+            "{$basePath}.PortMappingProtocol" => ['value' => strtoupper($config['protocol'] ?? 'TCP'), 'type' => 'xsd:string'],
+            "{$basePath}.PortMappingDescription" => ['value' => $config['description'] ?? 'Port Forward', 'type' => 'xsd:string']
+        ];
+        
+        $task = ['name' => 'setParameterValues', 'parameterValues' => []];
+        foreach ($params as $path => $val) {
+            $task['parameterValues'][] = [$path, $val['value'], $val['type']];
+        }
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return ($httpCode >= 200 && $httpCode < 300) 
+            ? ['success' => true, 'message' => 'Port forward added']
+            : ['success' => false, 'error' => "Failed to configure port forward (HTTP {$httpCode})"];
+    }
+    
+    /**
+     * Change admin password via TR-069/GenieACS
+     */
+    public function changeAdminPasswordViaTR069(int $onuDbId, string $newPassword): array {
+        return $this->sendTR069Task($onuDbId, 'admin_password', function($basePath) use ($newPassword) {
+            return [
+                'InternetGatewayDevice.UserInterface.X_HW_WebUserInfo.1.UserName' => ['value' => 'admin', 'type' => 'xsd:string'],
+                'InternetGatewayDevice.UserInterface.X_HW_WebUserInfo.1.Password' => ['value' => $newPassword, 'type' => 'xsd:string']
+            ];
+        }, 'Admin password changed');
+    }
+    
+    /**
+     * Factory reset ONU via TR-069/GenieACS
+     */
+    public function factoryResetViaTR069(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
+        
+        $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) return ['success' => false, 'error' => 'GenieACS URL not configured'];
+        
+        $task = ['name' => 'factoryReset'];
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuDbId,
+            'action' => 'factory_reset_tr069',
+            'status' => ($httpCode >= 200 && $httpCode < 300) ? 'success' : 'error',
+            'message' => 'Factory reset via TR-069',
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return ($httpCode >= 200 && $httpCode < 300)
+            ? ['success' => true, 'message' => 'Factory reset command sent']
+            : ['success' => false, 'error' => "Failed to send factory reset (HTTP {$httpCode})"];
+    }
+    
+    /**
+     * Helper: Resolve GenieACS device ID from ONU
+     */
+    private function resolveGenieACSId(int $onuDbId, array $onu): ?string {
+        $genieacsId = $onu['genieacs_id'] ?? null;
+        
+        if (empty($genieacsId)) {
+            require_once __DIR__ . '/GenieACS.php';
+            $genieacs = new \App\GenieACS($this->db);
+            
+            $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
+            if (!empty($serial)) {
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
+                    $genieacsId = $deviceResult['device']['_id'];
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                    $stmt->execute([$genieacsId, $onuDbId]);
+                }
+            }
+        }
+        
+        return $genieacsId;
+    }
+    
+    /**
+     * Helper: Send TR-069 setParameterValues task
+     */
+    private function sendTR069Task(int $onuDbId, string $action, callable $paramsBuilder, string $successMsg): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
+        
+        $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) return ['success' => false, 'error' => 'GenieACS URL not configured'];
+        
+        $paramValues = $paramsBuilder('');
+        if (empty($paramValues)) {
+            return ['success' => false, 'error' => 'No parameters to set'];
+        }
+        
+        $task = ['name' => 'setParameterValues', 'parameterValues' => []];
+        foreach ($paramValues as $path => $val) {
+            $task['parameterValues'][] = [$path, $val['value'], $val['type']];
+        }
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuDbId,
+            'action' => "configure_{$action}_tr069",
+            'status' => ($httpCode >= 200 && $httpCode < 300) ? 'success' : 'error',
+            'message' => $successMsg,
+            'command_response' => json_encode(['http_code' => $httpCode]),
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return ($httpCode >= 200 && $httpCode < 300)
+            ? ['success' => true, 'message' => $successMsg]
+            : ['success' => false, 'error' => "Failed (HTTP {$httpCode}): {$response}"];
+    }
+    
+    /**
      * Attach a VLAN to an ONU - creates service-port on OLT
      */
     public function attachVlanToONU(int $onuDbId, int $vlanId): array {

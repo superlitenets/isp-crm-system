@@ -3959,90 +3959,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             case 'save_tr069_eth_ports':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                $ports = json_decode($_POST['ports'] ?? '[]', true);
-                if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
-                
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($onu['tr069_serial'] ?? $onu['sn']);
-                
-                if ($deviceResult['success']) {
-                    $deviceId = $deviceResult['device']['_id'];
-                    $params = [];
-                    foreach ($ports as $idx => $enabled) {
-                        $portNum = $idx + 1;
-                        $params["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$portNum}.Enable"] = $enabled;
-                    }
-                    $genieacs->setParameterValues($deviceId, $params);
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    $ports = json_decode($_POST['ports'] ?? '[]', true);
+                    if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
+                    
+                    $result = $huaweiOLT->configureEthPortsViaTR069($onuId, $ports);
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
-                echo json_encode(['success' => true]);
                 exit;
             case 'save_tr069_lan':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
-                
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($onu['tr069_serial'] ?? $onu['sn']);
-                
-                if ($deviceResult['success']) {
-                    $deviceId = $deviceResult['device']['_id'];
-                    $params = [
-                        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DHCPServerEnable' => ($_POST['dhcp_enabled'] ?? '0') === '1',
-                        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MinAddress' => $_POST['dhcp_start'] ?? '192.168.1.100',
-                        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MaxAddress' => $_POST['dhcp_end'] ?? '192.168.1.200',
-                        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DNSServers' => ($_POST['dns1'] ?? '8.8.8.8') . ',' . ($_POST['dns2'] ?? '8.8.4.4')
-                    ];
-                    $genieacs->setParameterValues($deviceId, $params);
-                    echo json_encode(['success' => true]);
-                } else {
-                    echo json_encode(['success' => false, 'error' => 'Device not in GenieACS']);
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
+                    
+                    $result = $huaweiOLT->configureLANViaTR069($onuId, [
+                        'dhcp_enabled' => ($_POST['dhcp_enabled'] ?? '0') === '1',
+                        'ip_start' => $_POST['dhcp_start'] ?? '192.168.1.100',
+                        'ip_end' => $_POST['dhcp_end'] ?? '192.168.1.200'
+                    ]);
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
             case 'add_port_forward':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
-                
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($onu['tr069_serial'] ?? $onu['sn']);
-                
-                if ($deviceResult['success']) {
-                    $deviceId = $deviceResult['device']['_id'];
-                    // Add port mapping via TR-069
-                    $extPort = $_POST['ext_port'] ?? '';
-                    $intIp = $_POST['int_ip'] ?? '';
-                    $intPort = $_POST['int_port'] ?? '';
-                    $protocol = strtoupper($_POST['protocol'] ?? 'TCP');
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
                     
-                    // Find next available slot
-                    $device = $deviceResult['device'];
-                    $mappingNum = ($device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['2']['WANIPConnection']['1']['PortMappingNumberOfEntries']['_value'] ?? 0) + 1;
-                    
-                    $basePath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.PortMapping.{$mappingNum}";
-                    $params = [
-                        "{$basePath}.PortMappingEnabled" => true,
-                        "{$basePath}.ExternalPort" => (int)$extPort,
-                        "{$basePath}.InternalClient" => $intIp,
-                        "{$basePath}.InternalPort" => (int)$intPort,
-                        "{$basePath}.PortMappingProtocol" => $protocol
-                    ];
-                    $genieacs->setParameterValues($deviceId, $params);
-                    echo json_encode(['success' => true]);
-                } else {
-                    echo json_encode(['success' => false, 'error' => 'Device not in GenieACS']);
+                    $result = $huaweiOLT->addPortForwardViaTR069($onuId, [
+                        'external_port' => $_POST['ext_port'] ?? '',
+                        'internal_ip' => $_POST['int_ip'] ?? '',
+                        'internal_port' => $_POST['int_port'] ?? '',
+                        'protocol' => $_POST['protocol'] ?? 'TCP',
+                        'description' => $_POST['description'] ?? 'Port Forward'
+                    ]);
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
             case 'delete_port_forward':
@@ -4051,44 +4010,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             case 'change_admin_password':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                $newPassword = $_POST['password'] ?? '';
-                if (!$onuId || !$newPassword) { echo json_encode(['success' => false, 'error' => 'ONU ID and password required']); exit; }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
-                
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($onu['tr069_serial'] ?? $onu['sn']);
-                
-                if ($deviceResult['success']) {
-                    $deviceId = $deviceResult['device']['_id'];
-                    $params = ['InternetGatewayDevice.X_HW_WebUserInfo.AdminPassword' => $newPassword];
-                    $result = $genieacs->setParameterValues($deviceId, $params);
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    $newPassword = $_POST['password'] ?? '';
+                    if (!$onuId || !$newPassword) { echo json_encode(['success' => false, 'error' => 'ONU ID and password required']); exit; }
+                    
+                    $result = $huaweiOLT->changeAdminPasswordViaTR069($onuId, $newPassword);
                     echo json_encode($result);
-                } else {
-                    echo json_encode(['success' => false, 'error' => 'Device not in GenieACS']);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
             case 'factory_reset_onu':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
-                
-                require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
-                $deviceResult = $genieacs->getDeviceBySerial($onu['tr069_serial'] ?? $onu['sn']);
-                
-                if ($deviceResult['success']) {
-                    $deviceId = $deviceResult['device']['_id'];
-                    $result = $genieacs->factoryReset($deviceId);
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
+                    
+                    $result = $huaweiOLT->factoryResetViaTR069($onuId);
                     echo json_encode($result);
-                } else {
-                    echo json_encode(['success' => false, 'error' => 'Device not in GenieACS']);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
             case 'restore_onu_config':
