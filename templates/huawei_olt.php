@@ -3781,9 +3781,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
                     require_once __DIR__ . '/../src/GenieACS.php';
                     $genieacs = new \App\GenieACS($db);
+                    
+                    // Check if GenieACS is configured
+                    if (!$genieacs->isConfigured()) {
+                        echo json_encode(['success' => false, 'error' => 'GenieACS is not configured. Go to Settings > GenieACS to configure.']);
+                        exit;
+                    }
+                    
                     $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
-                    if (!$deviceResult['success']) {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS. Serial: ' . $serialForLookup]);
+                    if (!$deviceResult['success'] || empty($deviceResult['device'])) {
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS. Serial searched: ' . $serialForLookup . '. Make sure TR-069 is enabled on the ONU.']);
                         exit;
                     }
                     $deviceId = $deviceResult['device']['_id'];
@@ -3807,9 +3814,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     
                     $setResult = $genieacs->setParameterValues($deviceId, $params);
                     if ($setResult['success']) {
-                        echo json_encode(['success' => true, 'message' => 'WiFi configuration saved and pushed to device']);
+                        echo json_encode([
+                            'success' => true, 
+                            'message' => 'WiFi configuration pushed to device successfully',
+                            'device_id' => $deviceId,
+                            'http_code' => $setResult['http_code'] ?? 200
+                        ]);
                     } else {
-                        echo json_encode(['success' => false, 'error' => $setResult['error'] ?? 'Failed to push to device']);
+                        echo json_encode([
+                            'success' => false, 
+                            'error' => 'Failed to push to device: ' . ($setResult['error'] ?? 'Unknown error'),
+                            'http_code' => $setResult['http_code'] ?? 0
+                        ]);
                     }
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
@@ -3845,34 +3861,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // If device is in GenieACS, push config via TR-069
                 $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
-                $tr069Result = ['attempted' => false];
+                $tr069Result = ['attempted' => false, 'success' => false];
                 
                 if (!empty($serialForLookup)) {
                     try {
                         require_once __DIR__ . '/../src/GenieACS.php';
                         $genieacs = new \App\GenieACS($db);
-                        $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
                         
-                        if ($deviceResult['success'] && !empty($deviceResult['device'])) {
-                            $deviceId = $deviceResult['device']['_id'];
-                            $tr069Result['attempted'] = true;
+                        if (!$genieacs->isConfigured()) {
+                            $tr069Result['error'] = 'GenieACS not configured';
+                        } else {
+                            $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
                             
-                            if ($wanMode === 'pppoe' && $pppoeUser) {
-                                // Configure PPPoE via TR-069
-                                $configResult = $genieacs->configurePPPoE($deviceId, [
-                                    'username' => $pppoeUser,
-                                    'password' => $pppoePass,
-                                    'vlan' => (int)$vlan,
-                                    'create_wan_device' => true,
-                                    'create_ppp_connection' => true
-                                ]);
-                                $tr069Result['pppoe'] = $configResult;
-                            } elseif ($wanMode === 'dhcp') {
-                                // Configure DHCP mode via TR-069
-                                $configResult = $genieacs->configureDHCP($deviceId, [
-                                    'vlan' => (int)$vlan
-                                ]);
-                                $tr069Result['dhcp'] = $configResult;
+                            if ($deviceResult['success'] && !empty($deviceResult['device'])) {
+                                $deviceId = $deviceResult['device']['_id'];
+                                $tr069Result['attempted'] = true;
+                                $tr069Result['device_id'] = $deviceId;
+                                
+                                if ($wanMode === 'pppoe' && $pppoeUser) {
+                                    $configResult = $genieacs->configurePPPoE($deviceId, [
+                                        'username' => $pppoeUser,
+                                        'password' => $pppoePass,
+                                        'vlan' => (int)$vlan
+                                    ]);
+                                    $tr069Result['pppoe'] = $configResult;
+                                    $tr069Result['success'] = $configResult['success'] ?? false;
+                                } elseif ($wanMode === 'dhcp') {
+                                    $configResult = $genieacs->configureDHCP($deviceId, [
+                                        'vlan' => (int)$vlan
+                                    ]);
+                                    $tr069Result['dhcp'] = $configResult;
+                                    $tr069Result['success'] = $configResult['success'] ?? false;
+                                } else {
+                                    // Bridge mode - just save to DB, no TR-069 needed
+                                    $tr069Result['success'] = true;
+                                    $tr069Result['message'] = 'Bridge mode saved (no TR-069 config needed)';
+                                }
+                            } else {
+                                $tr069Result['error'] = 'Device not found in GenieACS. Serial: ' . $serialForLookup;
                             }
                         }
                     } catch (Exception $e) {
@@ -3880,9 +3906,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
+                $message = 'WAN configuration saved to database';
+                if ($tr069Result['attempted']) {
+                    $message .= $tr069Result['success'] ? ' and pushed to ONU' : ' but failed to push to ONU';
+                } else {
+                    $message .= ' (TR-069 not available)';
+                }
+                
                 echo json_encode([
                     'success' => true, 
-                    'message' => 'WAN configuration saved' . ($tr069Result['attempted'] ? ' and pushed to ONU' : ' (TR-069 not available)'),
+                    'message' => $message,
                     'tr069' => $tr069Result
                 ]);
                 exit;
