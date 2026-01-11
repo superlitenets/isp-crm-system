@@ -15248,12 +15248,133 @@ echo "# ================================================\n";
             }
             html += '</div></div></div>';
             
+            // TR-069 Device Logs (SmartOLT-style)
+            html += '<div class="col-12 mb-3"><div class="card"><div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">';
+            html += '<span><i class="bi bi-journal-text me-2"></i>TR-069 Device Logs</span>';
+            html += '<button class="btn btn-sm btn-outline-light" onclick="loadTR069Logs(' + s.onu.id + ')"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>';
+            html += '</div><div class="card-body p-0" id="tr069-logs-container" style="max-height:300px;overflow-y:auto;">';
+            html += '<div class="text-center p-3"><button class="btn btn-outline-primary" onclick="loadTR069Logs(' + s.onu.id + ')"><i class="bi bi-cloud-download me-1"></i>Load TR-069 Logs</button></div>';
+            html += '</div></div></div>';
+            
             html += '</div>';
             body.innerHTML = html;
         })
         .catch(err => {
             body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
         });
+    }
+    
+    // Load TR-069 Device Logs (SmartOLT-style)
+    function loadTR069Logs(onuId) {
+        const container = document.getElementById('tr069-logs-container');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm"></div> Loading logs...</div>';
+        
+        fetch(`?page=api&action=get_tr069_logs&onu_id=${onuId}&limit=100`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    container.innerHTML = '<div class="alert alert-warning m-2">' + (data.error || 'Failed to load logs') + '</div>';
+                    return;
+                }
+                
+                if (!data.logs || data.logs.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted p-3">No TR-069 logs yet. Configure WiFi or WAN to see logs here.</div>';
+                    return;
+                }
+                
+                let html = '<table class="table table-sm table-striped mb-0"><thead class="table-dark sticky-top"><tr><th style="width:140px">Timestamp</th><th>Type</th><th>Result</th><th>Details</th><th style="width:40px"></th></tr></thead><tbody>';
+                
+                data.logs.forEach((log, i) => {
+                    const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
+                    const timestamp = new Date(log.created_at).toLocaleString();
+                    
+                    // Parse request to show summary
+                    let reqSummary = log.task_name || log.task_type || '-';
+                    
+                    html += `<tr>
+                        <td><small class="text-muted">${timestamp}</small></td>
+                        <td><span class="badge bg-info">${log.task_type || '-'}</span></td>
+                        <td><span class="badge bg-${resultClass}">${log.result || '-'}</span></td>
+                        <td><small>${reqSummary}</small></td>
+                        <td><button class="btn btn-xs btn-outline-secondary p-0 px-1" onclick="showTR069LogDetail(${i})" title="View Details"><i class="bi bi-eye"></i></button></td>
+                    </tr>`;
+                    
+                    // Store log data for detail view
+                    if (!window.tr069LogsData) window.tr069LogsData = [];
+                    window.tr069LogsData[i] = log;
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="alert alert-danger m-2">Error: ' + err.message + '</div>';
+            });
+    }
+    
+    // Show TR-069 log detail in modal
+    function showTR069LogDetail(index) {
+        const log = window.tr069LogsData ? window.tr069LogsData[index] : null;
+        if (!log) return;
+        
+        let reqData = '-', respData = '-';
+        try {
+            reqData = log.request_data ? JSON.stringify(JSON.parse(log.request_data), null, 2) : '-';
+        } catch(e) { reqData = log.request_data || '-'; }
+        try {
+            respData = log.response_data ? JSON.stringify(JSON.parse(log.response_data), null, 2) : '-';
+        } catch(e) { respData = log.response_data || '-'; }
+        
+        const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
+        const timestamp = new Date(log.created_at).toLocaleString();
+        
+        const html = `
+            <div class="modal fade" id="tr069LogDetailModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title"><i class="bi bi-journal-code me-2"></i>TR-069 Log Detail</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4"><strong>Timestamp:</strong><br>${timestamp}</div>
+                                <div class="col-md-4"><strong>Type:</strong><br><span class="badge bg-info">${log.task_type || '-'}</span></div>
+                                <div class="col-md-4"><strong>Result:</strong><br><span class="badge bg-${resultClass}">${log.result || '-'}</span> ${log.error_message ? '<small class="text-danger">'+log.error_message+'</small>' : ''}</div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6"><strong>Terminal:</strong> ${log.terminal || 'ACS'}</div>
+                                <div class="col-md-6"><strong>HTTP Code:</strong> ${log.http_code || '-'}</div>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Task Name:</strong><br><code>${log.task_name || '-'}</code>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Request Data:</strong>
+                                <pre class="bg-light p-2 rounded" style="max-height:200px;overflow:auto;font-size:11px">${reqData}</pre>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Response Data:</strong>
+                                <pre class="bg-light p-2 rounded" style="max-height:200px;overflow:auto;font-size:11px">${respData}</pre>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove old modal if exists
+        const old = document.getElementById('tr069LogDetailModal');
+        if (old) old.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        const modal = new bootstrap.Modal(document.getElementById('tr069LogDetailModal'));
+        modal.show();
     }
     
     function getOnuConfig(onuId) {

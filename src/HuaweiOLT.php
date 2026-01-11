@@ -6994,21 +6994,54 @@ class HuaweiOLT {
         
         $errors = [];
         $tasksSent = [];
+        $self = $this;
         
-        // Helper function to send task to GenieACS
-        $sendTask = function($task) use ($genieacsUrl, $genieacsId) {
+        // Helper function to send task to GenieACS with logging
+        $sendTask = function($task, $taskName = null) use ($genieacsUrl, $genieacsId, $onuDbId, $onu, $self) {
+            $taskType = $task['name'] ?? 'Unknown';
+            if (!$taskName) {
+                // Generate task name from task details
+                if ($taskType === 'addObject') {
+                    $taskName = 'Add:' . basename(rtrim($task['objectName'] ?? '', '.'));
+                } elseif ($taskType === 'setParameterValues' && !empty($task['parameterValues'])) {
+                    $params = array_map(function($p) { return basename($p[0]); }, array_slice($task['parameterValues'], 0, 3));
+                    $taskName = 'Set:' . implode(',', $params) . (count($task['parameterValues']) > 3 ? '...' : '');
+                } else {
+                    $taskName = $taskType;
+                }
+            }
+            
+            $requestJson = json_encode($task);
             $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode($task),
+                CURLOPT_POSTFIELDS => $requestJson,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
                 CURLOPT_TIMEOUT => 30
             ]);
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            return ['code' => $httpCode, 'response' => $response, 'success' => ($httpCode >= 200 && $httpCode < 300)];
+            
+            $success = ($httpCode >= 200 && $httpCode < 300);
+            
+            // Log to TR-069 logs table
+            $self->logTR069Task([
+                'onu_id' => $onuDbId,
+                'olt_id' => $onu['olt_id'] ?? null,
+                'genieacs_id' => $genieacsId,
+                'task_type' => $taskType,
+                'task_name' => $taskName,
+                'terminal' => 'ACS',
+                'result' => $success ? 'Success' : 'Error',
+                'request_data' => $requestJson,
+                'response_data' => $response,
+                'error_message' => $success ? null : "HTTP {$httpCode}",
+                'http_code' => $httpCode
+            ]);
+            
+            return ['code' => $httpCode, 'response' => $response, 'success' => $success];
         };
         
         // SmartOLT-style WAN configuration sequence
@@ -7355,11 +7388,12 @@ class HuaweiOLT {
             'parameterValues' => $paramValues
         ];
         
+        $requestJson = json_encode($task);
         $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_POSTFIELDS => $requestJson,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_TIMEOUT => 30
         ]);
@@ -7368,17 +7402,34 @@ class HuaweiOLT {
         $curlError = curl_error($ch);
         curl_close($ch);
         
+        $success = ($httpCode >= 200 && $httpCode < 300);
+        
+        // Log to TR-069 logs table
+        $this->logTR069Task([
+            'onu_id' => $onuDbId,
+            'olt_id' => $onu['olt_id'] ?? null,
+            'genieacs_id' => $genieacsId,
+            'task_type' => 'setParameterValues',
+            'task_name' => "WiFi Config: SSID={$ssid}",
+            'terminal' => 'ACS',
+            'result' => $success ? 'Success' : 'Error',
+            'request_data' => $requestJson,
+            'response_data' => $response,
+            'error_message' => $success ? null : "HTTP {$httpCode}",
+            'http_code' => $httpCode
+        ]);
+        
         $this->addLog([
             'olt_id' => $onu['olt_id'],
             'onu_id' => $onuDbId,
             'action' => 'configure_wifi_tr069',
-            'status' => ($httpCode >= 200 && $httpCode < 300) ? 'success' : 'error',
+            'status' => $success ? 'success' : 'error',
             'message' => "WiFi config: SSID={$ssid}, WLAN={$wlanIndex}",
             'command_response' => json_encode(['http_code' => $httpCode, 'response' => $response]),
             'user_id' => $_SESSION['user_id'] ?? null
         ]);
         
-        if ($httpCode >= 200 && $httpCode < 300) {
+        if ($success) {
             return [
                 'success' => true,
                 'message' => "WiFi configuration sent via TR-069. SSID: {$ssid}",
@@ -7557,6 +7608,45 @@ class HuaweiOLT {
         return ($httpCode >= 200 && $httpCode < 300)
             ? ['success' => true, 'message' => 'Factory reset command sent']
             : ['success' => false, 'error' => "Failed to send factory reset (HTTP {$httpCode})"];
+    }
+    
+    /**
+     * Log TR-069 task to database (SmartOLT-style device logs)
+     */
+    public function logTR069Task(array $data): int {
+        $stmt = $this->db->prepare("
+            INSERT INTO huawei_onu_tr069_logs 
+            (onu_id, olt_id, genieacs_id, task_type, task_name, terminal, result, request_data, response_data, error_message, http_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $data['onu_id'] ?? null,
+            $data['olt_id'] ?? null,
+            $data['genieacs_id'] ?? null,
+            $data['task_type'] ?? 'Unknown',
+            $data['task_name'] ?? '',
+            $data['terminal'] ?? 'ACS',
+            $data['result'] ?? 'Pending',
+            $data['request_data'] ?? null,
+            $data['response_data'] ?? null,
+            $data['error_message'] ?? null,
+            $data['http_code'] ?? null
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+    
+    /**
+     * Get TR-069 logs for an ONU (SmartOLT-style device logs)
+     */
+    public function getTR069Logs(int $onuId, int $limit = 100): array {
+        $stmt = $this->db->prepare("
+            SELECT * FROM huawei_onu_tr069_logs 
+            WHERE onu_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        ");
+        $stmt->execute([$onuId, $limit]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     /**

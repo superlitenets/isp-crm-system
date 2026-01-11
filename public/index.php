@@ -1019,6 +1019,34 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
     exit;
 }
 
+// Get TR-069 Device Logs (SmartOLT-style)
+if ($page === 'api' && $action === 'get_tr069_logs') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $onuId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : 0;
+    $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 500) : 100;
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $huaweiOLT = new \App\HuaweiOLT($db);
+        $logs = $huaweiOLT->getTR069Logs($onuId, $limit);
+        echo json_encode(['success' => true, 'logs' => $logs, 'count' => count($logs)]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Update ONU Mode (Bridge/Router)
 if ($page === 'api' && $action === 'update_onu_mode') {
     ob_clean();
