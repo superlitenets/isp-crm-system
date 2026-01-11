@@ -7045,6 +7045,32 @@ try {
                                 <span class="badge bg-<?= $tr069Status === 'configured' ? 'success' : 'warning' ?>"><?= ucfirst($tr069Status) ?></span>
                             </div>
                         </div>
+                        <?php if ($pendingTr069Config && $pendingTr069Config['status'] === 'pending'): ?>
+                        <div class="alert alert-info py-2 px-3 mb-2 small">
+                            <i class="bi bi-clock-history me-1"></i> <strong>Pending Config:</strong>
+                            <?php 
+                            $cfg = $pendingTr069Config['config'] ?? [];
+                            $parts = [];
+                            if (!empty($cfg['pppoe_username'])) $parts[] = 'PPPoE: ' . $cfg['pppoe_username'];
+                            if (!empty($cfg['wifi_ssid_24'])) $parts[] = 'WiFi: ' . $cfg['wifi_ssid_24'];
+                            echo htmlspecialchars(implode(', ', $parts) ?: 'WAN/WiFi settings');
+                            ?>
+                            <form method="post" class="mt-2">
+                                <input type="hidden" name="action" value="apply_pending_tr069">
+                                <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-primary" <?= empty($currentOnu['tr069_ip']) ? 'disabled title="ONU must connect to GenieACS first"' : '' ?>>
+                                    <i class="bi bi-cloud-upload me-1"></i> Apply Now
+                                </button>
+                                <?php if (empty($currentOnu['tr069_ip'])): ?>
+                                <small class="text-muted d-block mt-1">Waiting for ONU to connect to ACS...</small>
+                                <?php endif; ?>
+                            </form>
+                        </div>
+                        <?php elseif ($pendingTr069Config && $pendingTr069Config['status'] === 'applied'): ?>
+                        <div class="text-success small">
+                            <i class="bi bi-check-circle me-1"></i> Config applied <?= $pendingTr069Config['applied_at'] ? date('d-M H:i', strtotime($pendingTr069Config['applied_at'])) : '' ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
