@@ -3758,52 +3758,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             case 'save_tr069_wifi':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                $wlanIndex = (int)($_POST['wlan_index'] ?? 1);
-                $enabled = ($_POST['enabled'] ?? '1') === '1';
-                $ssid = $_POST['ssid'] ?? '';
-                $password = $_POST['password'] ?? '';
-                
-                if (!$onuId || !$ssid) {
-                    echo json_encode(['success' => false, 'error' => 'ONU ID and SSID are required']);
-                    exit;
-                }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) {
-                    echo json_encode(['success' => false, 'error' => 'ONU not found']);
-                    exit;
-                }
-                
-                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
                 try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    $wlanIndex = (int)($_POST['wlan_index'] ?? 1);
+                    $enabled = ($_POST['enabled'] ?? '1') === '1';
+                    $ssid = $_POST['ssid'] ?? '';
+                    $password = $_POST['password'] ?? '';
+                    $channel = (int)($_POST['channel'] ?? 0);
+                    $security = $_POST['security'] ?? 'WPA2-PSK';
+                    
+                    if (!$onuId || !$ssid) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID and SSID are required']);
+                        exit;
+                    }
+                    
+                    $onu = $huaweiOLT->getONU($onuId);
+                    if (!$onu) {
+                        echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                        exit;
+                    }
+                    
+                    $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
                     require_once __DIR__ . '/../src/GenieACS.php';
                     $genieacs = new \App\GenieACS($db);
                     $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
                     if (!$deviceResult['success']) {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS. Serial: ' . $serialForLookup]);
                         exit;
                     }
                     $deviceId = $deviceResult['device']['_id'];
                     
                     // Build parameters to set
+                    $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
                     $params = [
-                        "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.Enable" => $enabled,
-                        "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.SSID" => $ssid
+                        "{$basePath}.Enable" => $enabled,
+                        "{$basePath}.SSID" => $ssid
                     ];
                     if ($password) {
-                        $params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.PreSharedKey.1.PreSharedKey"] = $password;
-                        $params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.KeyPassphrase"] = $password;
+                        $params["{$basePath}.PreSharedKey.1.PreSharedKey"] = $password;
+                        $params["{$basePath}.KeyPassphrase"] = $password;
+                    }
+                    if ($channel > 0) {
+                        $params["{$basePath}.Channel"] = $channel;
+                    }
+                    if ($security) {
+                        $params["{$basePath}.BeaconType"] = $security;
                     }
                     
                     $setResult = $genieacs->setParameterValues($deviceId, $params);
                     if ($setResult['success']) {
-                        echo json_encode(['success' => true, 'message' => 'WiFi configuration saved']);
+                        echo json_encode(['success' => true, 'message' => 'WiFi configuration saved and pushed to device']);
                     } else {
-                        echo json_encode(['success' => false, 'error' => $setResult['error'] ?? 'Failed to save']);
+                        echo json_encode(['success' => false, 'error' => $setResult['error'] ?? 'Failed to push to device']);
                     }
                 } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                    echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
                 }
                 exit;
             case 'save_tr069_wan':
@@ -15928,6 +15937,8 @@ echo "# ================================================\n";
         const enabled = document.getElementById('wifiEnable' + formIdx).checked;
         const ssid = document.getElementById('wifiSsid' + formIdx).value;
         const password = document.getElementById('wifiPass' + formIdx).value;
+        const channel = document.getElementById('wifiChannel' + formIdx)?.value || '0';
+        const security = document.getElementById('wifiSecurity' + formIdx)?.value || 'WPA2-PSK';
         
         if (!ssid) { alert('SSID is required'); return; }
         if (password && password.length < 8) { alert('Password must be at least 8 characters'); return; }
@@ -15942,22 +15953,26 @@ echo "# ================================================\n";
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
                       '&enabled=' + (enabled ? '1' : '0') + '&ssid=' + encodeURIComponent(ssid) + 
-                      '&password=' + encodeURIComponent(password)
+                      '&password=' + encodeURIComponent(password) + '&channel=' + channel + '&security=' + encodeURIComponent(security)
             });
-            const data = await resp.json();
+            const text = await resp.text();
+            let data;
+            try { data = JSON.parse(text); } 
+            catch(e) { throw new Error('Invalid response: ' + text.substring(0, 100)); }
+            
             if (data.success) {
                 btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
-                btn.className = 'btn btn-success btn-sm';
-                setTimeout(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check me-1"></i>Save'; }, 2000);
+                btn.className = 'btn btn-success btn-sm w-100';
+                setTimeout(() => { btn.disabled = false; btn.className = 'btn btn-success btn-sm w-100'; btn.innerHTML = '<i class="bi bi-check"></i> Save'; }, 2000);
             } else {
                 alert('Error: ' + (data.error || 'Failed to save'));
                 btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-check me-1"></i>Save';
+                btn.innerHTML = '<i class="bi bi-check"></i> Save';
             }
         } catch (e) {
             alert('Error: ' + e.message);
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check me-1"></i>Save';
+            btn.innerHTML = '<i class="bi bi-check"></i> Save';
         }
     }
     
