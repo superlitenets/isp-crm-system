@@ -267,6 +267,53 @@ class GenieACS {
         return $result;
     }
     
+    /**
+     * Configure PPPoE WAN connection via TR-069
+     */
+    public function configurePPPoE(string $deviceId, array $config): array {
+        $username = $config['username'] ?? '';
+        $password = $config['password'] ?? '';
+        $vlan = (int)($config['vlan'] ?? 0);
+        
+        // Standard TR-069 paths for PPPoE configuration
+        // WANConnectionDevice.2 is typically the internet WAN (WANConnectionDevice.1 is often management)
+        $basePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1';
+        
+        $params = [
+            "{$basePath}.Enable" => true,
+            "{$basePath}.Username" => $username,
+            "{$basePath}.Password" => $password,
+            "{$basePath}.ConnectionType" => 'IP_Routed'
+        ];
+        
+        // Add VLAN if specified (Huawei specific path)
+        if ($vlan > 0) {
+            $params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_HW_VLAN'] = $vlan;
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
+    /**
+     * Configure DHCP/IPoE WAN connection via TR-069
+     */
+    public function configureDHCP(string $deviceId, array $config = []): array {
+        $vlan = (int)($config['vlan'] ?? 0);
+        $basePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1';
+        
+        $params = [
+            "{$basePath}.Enable" => true,
+            "{$basePath}.AddressingType" => 'DHCP',
+            "{$basePath}.ConnectionType" => 'IP_Routed'
+        ];
+        
+        if ($vlan > 0) {
+            $params['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.X_HW_VLAN'] = $vlan;
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
     public function downloadFirmware(string $deviceId, string $fileType, string $url, string $filename = ''): array {
         $encodedId = urlencode($deviceId);
         return $this->request('POST', "/devices/{$encodedId}/tasks", [

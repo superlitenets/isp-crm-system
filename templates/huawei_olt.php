@@ -3859,12 +3859,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                                 ]);
                                 $tr069Result['pppoe'] = $configResult;
                             } elseif ($wanMode === 'dhcp') {
-                                // Configure DHCP mode - just update existing WAN to DHCP
-                                $params = [
-                                    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.Enable' => true,
-                                    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.AddressingType' => 'DHCP'
-                                ];
-                                $tr069Result['dhcp'] = $genieacs->setParameterValues($deviceId, $params);
+                                // Configure DHCP mode via TR-069
+                                $configResult = $genieacs->configureDHCP($deviceId, [
+                                    'vlan' => (int)$vlan
+                                ]);
+                                $tr069Result['dhcp'] = $configResult;
                             }
                         }
                     } catch (Exception $e) {
