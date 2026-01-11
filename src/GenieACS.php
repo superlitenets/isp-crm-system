@@ -993,13 +993,29 @@ class GenieACS {
                 $errors[] = 'Failed to set connection settings: ' . ($settingsResult['error'] ?? 'Unknown');
             }
             
-            // 4. Enable the connection (LAST - after all other parameters are set)
+            // 4. Enable the connection (after all other WAN parameters are set)
             $enableResult = $this->setParameterValues($deviceId, [
                 ["{$pppBase}.Enable", true, 'xsd:boolean']
             ]);
             $results['enable_config'] = $enableResult;
             if (!$enableResult['success']) {
                 $errors[] = 'Failed to enable connection: ' . ($enableResult['error'] ?? 'Unknown');
+            }
+            
+            // 5. Enable L3 (Router Mode) on ETH1-4 ports
+            if (!isset($config['skip_l3_enable']) || !$config['skip_l3_enable']) {
+                $l3Params = [
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable', true, 'xsd:boolean']
+                ];
+                $l3Result = $this->setParameterValues($deviceId, $l3Params);
+                $results['l3_enable'] = $l3Result;
+                if (!$l3Result['success']) {
+                    // L3 enable failure is not critical - may not be supported on all devices
+                    error_log("[GenieACS] L3 enable failed (non-critical): " . ($l3Result['error'] ?? 'Unknown'));
+                }
             }
             
         } else {
@@ -1047,13 +1063,25 @@ class GenieACS {
                 $errors[] = 'Failed to configure IP connection: ' . ($ipResult['error'] ?? 'Unknown');
             }
             
-            // 3. Enable (LAST)
+            // 3. Enable (after IP settings)
             $enableResult = $this->setParameterValues($deviceId, [
                 ["{$ipBase}.Enable", true, 'xsd:boolean']
             ]);
             $results['enable_config'] = $enableResult;
             if (!$enableResult['success']) {
                 $errors[] = 'Failed to enable connection: ' . ($enableResult['error'] ?? 'Unknown');
+            }
+            
+            // 4. Enable L3 (Router Mode) on ETH1-4 ports
+            if (!isset($config['skip_l3_enable']) || !$config['skip_l3_enable']) {
+                $l3Params = [
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable', true, 'xsd:boolean'],
+                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable', true, 'xsd:boolean']
+                ];
+                $l3Result = $this->setParameterValues($deviceId, $l3Params);
+                $results['l3_enable'] = $l3Result;
             }
         }
         
