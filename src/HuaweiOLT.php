@@ -6616,25 +6616,38 @@ class HuaweiOLT {
             $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Push ACS URL and periodic inform
-        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}\r\n";
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}\r\n";
-        $cmd2 .= "quit";
-        $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: ACS URL Config]\n" . ($result2['output'] ?? '') . "\n";
-        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
+        // Step 2: Push ACS URL (send commands separately to avoid SSH terminal issues)
+        $cmd2a = "interface gpon {$frame}/{$slot}";
+        $result2a = $this->executeCommand($oltId, $cmd2a);
+        $output .= "[Step 2a: Enter GPON Interface]\n" . ($result2a['output'] ?? '') . "\n";
+        
+        // ACS URL command - quote the URL to avoid parsing issues
+        $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url \"{$acsUrl}\"";
+        $result2b = $this->executeCommand($oltId, $cmd2b);
+        $output .= "[Step 2b: ACS URL Config]\n" . ($result2b['output'] ?? '') . "\n";
+        $acsUrlFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
+        
+        // Periodic inform command
+        $cmd2c = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
+        $result2c = $this->executeCommand($oltId, $cmd2c);
+        $output .= "[Step 2c: Periodic Inform Config]\n" . ($result2c['output'] ?? '') . "\n";
+        
+        $cmd2d = "quit";
+        $this->executeCommand($oltId, $cmd2d);
+        
+        if ($acsUrlFailed || $hasRealError($result2c['output'] ?? '')) {
             $errors[] = "ACS URL config failed";
         }
         
         // Step 3: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
         // TR-069 uses traffic-table index 7 (management traffic)
+        // Service port already exists from authorization - skip this step (it's not an error)
         $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index 7 outbound traffic-table index 7";
         $result3 = $this->executeCommand($oltId, $cmd3);
         $output .= "[Step 3: Service Port]\n" . ($result3['output'] ?? '') . "\n";
+        // Ignore "already exist" - means service port is already configured from authorization
         if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
-            // Not critical if already exists
-            if (!preg_match('/already exist/i', $result3['output'] ?? '')) {
+            if (!preg_match('/already exist|Conflicted service/i', $result3['output'] ?? '')) {
                 $errors[] = "Service port creation failed";
             }
         }
