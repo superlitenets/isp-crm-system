@@ -7625,7 +7625,7 @@ class HuaweiOLT {
                     olt_id INTEGER REFERENCES huawei_olts(id) ON DELETE CASCADE,
                     genieacs_id VARCHAR(255),
                     task_type VARCHAR(50) NOT NULL,
-                    task_name VARCHAR(100),
+                    task_name VARCHAR(500),
                     terminal VARCHAR(50) DEFAULT 'ACS',
                     result VARCHAR(20) DEFAULT 'Pending',
                     request_data TEXT,
@@ -7637,9 +7637,11 @@ class HuaweiOLT {
                 CREATE INDEX IF NOT EXISTS idx_tr069_logs_onu ON huawei_onu_tr069_logs(onu_id);
                 CREATE INDEX IF NOT EXISTS idx_tr069_logs_created ON huawei_onu_tr069_logs(created_at DESC);
             ");
+            // Extend task_name column if it exists with smaller size
+            $this->db->exec("ALTER TABLE huawei_onu_tr069_logs ALTER COLUMN task_name TYPE VARCHAR(500)");
             $checked = true;
         } catch (\Exception $e) {
-            // Table likely already exists, ignore
+            // Table likely already exists or column already correct, ignore
             $checked = true;
         }
     }
