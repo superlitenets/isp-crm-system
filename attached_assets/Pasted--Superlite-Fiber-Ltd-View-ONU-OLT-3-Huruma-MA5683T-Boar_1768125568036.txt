@@ -1,0 +1,163 @@
+
+Superlite Fiber Ltd
+View ONU
+OLT
+3 - Huruma_MA5683T
+Board
+0
+Port
+2 (HURUMA FLATS)
+ONU
+gpon-onu_0/0/2:13
+GPON channel
+GPON
+SN
+HWTC46A8E49E
+ONU type
+HG8546M
+Zone
+Huruma flats
+ODB (Splitter)
+None
+Name
+SNS001650
+Address or comment
+Teresia Waithira
+Contact
+None
+Authorization date
+10-Jan-2026 13:22:29 History
+ONU external ID
+HWTC46A8E49E
+
+Status
+Online(15 minutes ago)
+ONU/OLT Rx signal
+-25.37 dBm / -28.24 dBm (1338m)
+Attached VLANs
+15, 34
+ONU mode
+Routing - WAN vlan: 15
+TR069
+SmartOLT
+Mgmt IP
+DHCP - vlan: 69 - 10.97.126.134 
+WAN setup mode
+PPPoE (TR069)
+PPPoE username
+**********
+PPPoE password
+**********
+Status
+    
+ General
+ PPP Interface 2.1
+ Port Forward
+ IP Interface 3.1
+ IP Interface 1.1
+ LAN DHCP Server
+ LAN Ports
+ LAN Counters
+ Wireless LAN 1
+ Wireless LAN 2
+ WLAN Counters
+ Wifi 2.4GHz Site Survey
+ Hosts
+ Security
+ Voice lines
+ Miscellaneous
+ Troubleshooting
+ Device Logs
+Logs	
+2026-01-11 12:58:11 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-11 12:57:51 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-11 12:57:44 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-11 12:41:54 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+2026-01-11 12:41:54 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+2026-01-11 12:41:54 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+2026-01-11 12:41:54 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+2026-01-11 12:39:52 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+2026-01-11 12:39:51 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+2026-01-11 12:39:51 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+2026-01-11 12:37:25 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+2026-01-11 12:37:25 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+2026-01-11 12:37:25 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+2026-01-11 12:37:25 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+2026-01-10 13:26:07 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,X_HW_Security.AclServices.WanAccess:1,Protocol:HTTP,WanName:wan1.2.ppp1
+2026-01-10 13:26:02 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.UserInterface.X_HW_WebUserInfo:2,UserName:superlite,Password:-
+2026-01-10 13:25:57 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANIPConnection:1.3.1,Name:WIFI_Bridge_VLAN_34,X_HW_VLAN:34
+2026-01-10 13:25:54 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:2,PhyPortName:SSID2,PolicyRouteType:SourcePhyPort,WanName:wan1.3.ip1
+2026-01-10 13:25:53 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:
+2026-01-10 13:25:50 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANIPConnection:1.3.1,ConnectionType:IP_Bridged
+2026-01-10 13:25:47 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,WANDevice.WANConnectionDevice.WANIPConnection:1.3
+2026-01-10 13:25:46 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.WLANConfiguration:1.2,BeaconType:None,SSID:SuperLite Networks
+2026-01-10 13:25:42 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.WANDevice.WANConnectionDevice:1
+2026-01-10 13:25:39 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.LANDevice.WLANConfiguration:1
+2026-01-10 13:25:33 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-10 13:25:29 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-10 13:24:48 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.X_HW_Security.AclServices:,HTTPWanEnable:1
+2026-01-10 13:24:46 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:1,PhyPortName:LAN1,LAN2,LAN3,LAN4,SSID1,PolicyRouteType:SourcePhyPort,WanName:wan1.2.ppp1
+2026-01-10 13:24:44 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route:
+2026-01-10 13:24:38 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,X_HW_Security.AclServices.WanAccess:
+2026-01-10 13:24:35 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.Layer3Forwarding:,DefaultConnectionService:...,X_HW_WanDefaultWanName:wan1.2.ppp1
+2026-01-10 13:24:35 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.DeviceInfo:,ProvisioningCode:sOLT.rPPP
+2026-01-10 13:24:33 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANPPPConnection:1.2.1,X_HW_VLAN:15,Name:Internet_PPPoE
+2026-01-10 13:24:28 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,WANDevice.WANConnectionDevice.WANPPPConnection:1.2.1,Username:SNS001650,Password:-,NATEnabled:1,X_HW_LcpEchoReqCheck:1,PPPLCPEcho:10
+2026-01-10 13:24:26 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-10 13:24:24 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,WANDevice.WANConnectionDevice.WANPPPConnection:1.2
+2026-01-10 13:24:21 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Add,InternetGatewayDevice.WANDevice.WANConnectionDevice:1
+2026-01-10 13:24:18 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Authorization,smartolt:
+2026-01-10 13:24:13 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.X_HW_Security.AclServices:,HTTPWanEnable:0
+2026-01-10 13:24:08 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.LANEthernetInterfaceConfig:1.4,X_HW_L3Enable:1
+2026-01-10 13:24:07 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.LANEthernetInterfaceConfig:1.3,X_HW_L3Enable:1
+2026-01-10 13:24:07 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.LANEthernetInterfaceConfig:1.2,X_HW_L3Enable:1
+2026-01-10 13:24:06 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.LANEthernetInterfaceConfig:1.1,X_HW_L3Enable:1
+2026-01-10 13:23:53 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.DeviceInfo:,ProvisioningCode:sOLTinit
+2026-01-10 13:23:52 [Critical] Terminal:ACS(10.69.69.1),Result:Success,Type:Set,InternetGatewayDevice.ManagementServer:,ConnectionRequestUsername:smartolt,ConnectionRequestPassword:-,PeriodicInformInterval:3600
+2026-01-10 13:23:20 [Critical] Terminal:VoiceServer(-),Result:Success,Type:Set,Services.VoiceService.X_HW_DialSN:,IsHaveAuthed:1
+1981-01-01 00:18:45 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[260] Att[5] Val[0]
+1981-01-01 00:18:45 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[259] Att[5] Val[0]
+1981-01-01 00:18:45 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[258] Att[5] Val[0]
+1981-01-01 00:18:45 [Critical] Terminal:OLT(-),Result:Success,Type:Set,Msg:Me[11] Inst[257] Att[5] Val[0]
+1981-01-01 00:14:05 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Logout,Username:telecomadmin
+1981-01-01 00:13:05 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Set,LANDevice.WLANConfiguration.PreSharedKey:1.1.1,PreSharedKey:-
+1981-01-01 00:13:04 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Set,LANDevice.WLANConfiguration.WPS:1.1,Enable:0,X_HW_ConfigMethod:PushButton
+1981-01-01 00:13:04 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Set,InternetGatewayDevice.LANDevice.WLANConfiguration:1.1,Enable:1,SSIDAdvertisementEnabled:1,SSID:Carpy,X_HW_AssociateNum:32,BeaconType:WPAand11i,...
+1981-01-01 00:13:03 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Set,X_HW_DEBUG.AMP.WifiCoverSetWlanBasic:,SsidInst:1,SSID:Carpy,Enable:1,Standard:11bgn,BasicAuthenticationMode:None,...
+1981-01-01 00:12:00 [Critical] Terminal:WEB(192.168.100.2),Result:Success,Type:Login,Username:telecomadmin
+1981-01-01 00:00:15 [Error] AlarmID:104001,AlarmLevel:Error,Device reset. Cause: ONU reset after being powered on, Terminal:OTHER
+2025-10-28 11:07:33 [Critical] Terminal:CLI(192.168.100.100),Result:Success,Cmd:Shell
+2025-10-28 11:07:27 [Critical] Terminal:CFG-TOOL(-),Result:Success,Type:Set,InternetGatewayDevice.DeviceInfo:,X_HW_MachineItem:2150083448AGJ4821886
+File & Firmware management
+  
+Traffic/Signal
+UploadCurrent: 0.23 MbpsMaximum: 0.38 Mbps
+DownloadCurrent: 3.80 MbpsMaximum: 4.94 Mbps
+1310nm OLT Rx for ONUCurrent: -28.24Maximum: -27.82
+Speed profiles
+Service-port ID	User-VLAN	Download	Upload	Action
+328	15	1G	1G	 Configure
+338	34	1G	1G	 Configure
+Ethernet ports
+Port	Admin state	Mode	DHCP	Action
+eth_0/1	Enabled	LAN	No control	 Configure
+eth_0/2	Enabled	LAN	No control	 Configure
+eth_0/3	Enabled	LAN	No control	 Configure
+eth_0/4	Enabled	LAN	No control	 Configure
+WiFi
+Enable
+Port	Admin state	Mode	SSID	DHCP	Action
+wifi_0/1	Enabled	LAN		No control	 Configure
+wifi_0/2	Enabled	Access VLAN: 34	SuperLite Networks	No control	 Configure
+wifi_0/3	Disabled	LAN		No control	 Configure
+wifi_0/4	Disabled	LAN		No control	 Configure
+VoIP service
+Disabled
+CATV
+Not supported by ONU-Type.
+Web user pass
+Change
+
+    
+
+SmartOLT v3.51.0 © 2026

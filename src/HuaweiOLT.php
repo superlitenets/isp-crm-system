@@ -7094,8 +7094,8 @@ class HuaweiOLT {
             $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
             $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
             
-            // Configure PPPoE - matching SmartOLT parameters
-            $paramValues = [
+            // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
+            $credParams = [
                 ["{$pppPath}.Enable", true, 'xsd:boolean'],
                 ["{$pppPath}.ConnectionType", 'IP_Routed', 'xsd:string'],
                 ["{$pppPath}.Username", $pppoeUsername, 'xsd:string'],
@@ -7103,19 +7103,28 @@ class HuaweiOLT {
                 ["{$pppPath}.NATEnabled", true, 'xsd:boolean'],
                 ["{$pppPath}.X_HW_LcpEchoReqCheck", true, 'xsd:boolean'],
                 ["{$pppPath}.PPPLCPEcho", 10, 'xsd:unsignedInt'],
-                ["{$pppPath}.Name", 'Internet_PPPoE', 'xsd:string'],
             ];
-            
-            if ($serviceVlan > 0) {
-                $paramValues[] = ["{$pppPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            $credTaskName = "PPPoE Credentials: Username={$pppoeUsername}, NATEnabled=1, LcpEcho=10";
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $credParams], $credTaskName);
+            if ($result['success']) {
+                $tasksSent[] = 'Set PPPoE credentials';
+            } else {
+                $errors[] = "PPPoE credentials failed (HTTP {$result['code']})";
             }
             
-            $pppoeTaskName = "PPPoE: User={$pppoeUsername}, VLAN={$serviceVlan}";
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues], $pppoeTaskName);
+            // SmartOLT-style: Send VLAN and Name separately
+            $vlanParams = [
+                ["{$pppPath}.Name", 'Internet_PPPoE', 'xsd:string'],
+            ];
+            if ($serviceVlan > 0) {
+                $vlanParams[] = ["{$pppPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            $vlanTaskName = "PPPoE VLAN: X_HW_VLAN={$serviceVlan}, Name=Internet_PPPoE";
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $vlanParams], $vlanTaskName);
             if ($result['success']) {
-                $tasksSent[] = 'Configure PPPoE';
+                $tasksSent[] = 'Set PPPoE VLAN';
             } else {
-                $errors[] = "PPPoE config failed (HTTP {$result['code']})";
+                $errors[] = "PPPoE VLAN failed (HTTP {$result['code']})";
             }
             
             // Step 4: Set default WAN and provisioning code

@@ -15949,20 +15949,23 @@ echo "# ================================================\n";
                     return;
                 }
                 
-                let html = '<table class="table table-sm table-striped mb-0 small"><thead class="table-dark sticky-top"><tr><th>Time</th><th>Type</th><th>Result</th><th>Details</th></tr></thead><tbody>';
+                let html = '<div class="list-group list-group-flush" style="font-size:11px">';
+                window.tr069LogsCache = [];
                 data.logs.forEach((log, i) => {
-                    const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
-                    const time = new Date(log.created_at).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-                    html += `<tr onclick="showLogDetail(${i})" style="cursor:pointer" title="Click for details">
-                        <td class="text-muted">${time}</td>
-                        <td><span class="badge bg-info">${log.task_type || '-'}</span></td>
-                        <td><span class="badge bg-${resultClass}">${log.result || '-'}</span></td>
-                        <td class="text-truncate" style="max-width:150px">${escapeHtml(log.task_name || '-')}</td>
-                    </tr>`;
-                    if (!window.tr069LogsCache) window.tr069LogsCache = [];
+                    const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'warning');
+                    const time = new Date(log.created_at).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                    const taskType = log.task_type === 'setParameterValues' ? 'Set' : (log.task_type === 'addObject' ? 'Add' : log.task_type);
+                    // SmartOLT-style: Terminal:ACS, Result, Type, Message
+                    html += `<div class="list-group-item list-group-item-action py-1 px-2" onclick="showLogDetail(${i})" style="cursor:pointer">
+                        <span class="text-muted">${time}</span> 
+                        <span class="text-${resultClass}">[${log.result}]</span> 
+                        <span class="text-primary">Terminal:ACS</span>,
+                        <span class="fw-bold">Type:${taskType}</span>,
+                        <span class="text-dark">${escapeHtml(log.task_name || '-')}</span>
+                    </div>`;
                     window.tr069LogsCache[i] = log;
                 });
-                html += '</tbody></table>';
+                html += '</div>';
                 container.innerHTML = html;
             })
             .catch(err => container.innerHTML = '<div class="alert alert-danger m-2 small">Error: ' + err.message + '</div>');
