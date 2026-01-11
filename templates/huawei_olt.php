@@ -580,12 +580,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
             }
         }
         
-        // Infer bands from index if not detected (common convention: 1=2.4GHz, 5=5GHz)
+        // Infer bands from index if not detected
+        // HG8546M convention: WLAN 1,2 = 2.4GHz (main/guest), WLAN 5,6 = 5GHz (main/guest)
         foreach ($detectedConfigs as $idx => &$config) {
             if ($config['band'] === null) {
-                if ($idx == 1) $config['band'] = '2.4GHz';
-                elseif ($idx == 5 || $idx == 2) $config['band'] = '5GHz';
-                else $config['band'] = "Radio {$idx}";
+                if ($idx == 1 || $idx == 2) {
+                    $config['band'] = '2.4GHz';
+                    $config['role'] = ($idx == 1) ? 'main' : 'guest';
+                } elseif ($idx == 5 || $idx == 6) {
+                    $config['band'] = '5GHz';
+                    $config['role'] = ($idx == 5) ? 'main' : 'guest';
+                } else {
+                    $config['band'] = "Radio {$idx}";
+                    $config['role'] = 'unknown';
+                }
             }
         }
         

@@ -521,6 +521,155 @@ class GenieACS {
         ]);
     }
     
+    /**
+     * Configure Layer 2 VLAN bridge for Guest WiFi on Huawei ONUs
+     * This creates a bridge with VLAN tag and attaches WiFi interfaces to it
+     * 
+     * HG8546M WLAN indices:
+     *   - WLAN 1: 2.4GHz main (goes to LAN/NAT by default)
+     *   - WLAN 2: 2.4GHz guest (can be bridged to VLAN)
+     *   - WLAN 5: 5GHz main (goes to LAN/NAT by default)
+     *   - WLAN 6: 5GHz guest (can be bridged to VLAN)
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param array $config Bridge configuration:
+     *   - bridge_index: Bridge index (1-4, avoid 1 if used for WAN)
+     *   - vlan_id: VLAN ID for the bridge (e.g., 903)
+     *   - wlan_interfaces: Array of WLAN indices to attach [2, 6] for guest
+     *   - ssid: SSID for guest network
+     *   - password: Password for guest network
+     *   - enabled: Enable the WiFi interfaces (default true)
+     */
+    public function configureLayer2WiFiBridge(string $deviceId, array $config): array {
+        $results = [];
+        $errors = [];
+        
+        $bridgeIndex = (int)($config['bridge_index'] ?? 2);
+        $vlanId = (int)($config['vlan_id'] ?? 0);
+        $wlanInterfaces = $config['wlan_interfaces'] ?? [2, 6]; // Default: guest interfaces
+        $ssid = $config['ssid'] ?? '';
+        $password = $config['password'] ?? '';
+        $enabled = $config['enabled'] ?? true;
+        $securityMode = $config['security_mode'] ?? 'WPA2-PSK';
+        $broadcastSsid = $config['broadcast_ssid'] ?? true;
+        
+        if ($vlanId <= 0) {
+            return ['success' => false, 'error' => 'VLAN ID is required for Layer 2 bridge'];
+        }
+        
+        // Step 1: Create and configure the bridge with VLAN
+        $bridgeParams = [
+            ["InternetGatewayDevice.X_HW_Bridge.{$bridgeIndex}.Enable", true, 'xsd:boolean'],
+            ["InternetGatewayDevice.X_HW_Bridge.{$bridgeIndex}.X_HW_VLAN", $vlanId, 'xsd:unsignedInt']
+        ];
+        
+        $bridgeResult = $this->setParameterValues($deviceId, $bridgeParams);
+        $results['bridge'] = $bridgeResult;
+        
+        if (!$bridgeResult['success']) {
+            $errors[] = 'Failed to create bridge: ' . ($bridgeResult['error'] ?? 'Unknown');
+        }
+        
+        // Step 2: Attach WiFi interfaces to the bridge and configure them
+        foreach ($wlanInterfaces as $wlanIndex) {
+            $wlanIndex = (int)$wlanIndex;
+            $basePath = "InternetGatewayDevice.WLANConfiguration.{$wlanIndex}";
+            
+            $wlanParams = [
+                // Attach to bridge
+                ["{$basePath}.X_HW_Bridge", $bridgeIndex, 'xsd:unsignedInt'],
+                // Enable interface
+                ["{$basePath}.Enable", $enabled, 'xsd:boolean'],
+                // Broadcast SSID
+                ["{$basePath}.SSIDAdvertisementEnabled", $broadcastSsid, 'xsd:boolean']
+            ];
+            
+            // Set SSID
+            if (!empty($ssid)) {
+                $wlanParams[] = ["{$basePath}.SSID", $ssid, 'xsd:string'];
+            }
+            
+            // Set password
+            if (!empty($password)) {
+                $wlanParams[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
+            }
+            
+            // Security mode
+            $wlanParams[] = ["{$basePath}.BeaconType", 'WPA', 'xsd:string'];
+            $wlanParams[] = ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'];
+            $wlanParams[] = ["{$basePath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+            
+            $wlanResult = $this->setParameterValues($deviceId, $wlanParams);
+            $results["wlan_{$wlanIndex}"] = $wlanResult;
+            
+            if (!$wlanResult['success']) {
+                $errors[] = "Failed to configure WLAN {$wlanIndex}: " . ($wlanResult['error'] ?? 'Unknown');
+            }
+        }
+        
+        return [
+            'success' => empty($errors),
+            'message' => empty($errors) 
+                ? "Layer 2 bridge configured: VLAN {$vlanId} on WLAN " . implode(',', $wlanInterfaces)
+                : 'Some errors occurred',
+            'errors' => $errors,
+            'results' => $results
+        ];
+    }
+    
+    /**
+     * Configure individual WiFi interface with optional Layer 2 bridging
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param int $wlanIndex WLAN interface index (1, 2, 5, or 6)
+     * @param array $config Interface configuration
+     */
+    public function configureWiFiInterface(string $deviceId, int $wlanIndex, array $config): array {
+        $basePath = "InternetGatewayDevice.WLANConfiguration.{$wlanIndex}";
+        $params = [];
+        
+        // Enable/disable
+        $params[] = ["{$basePath}.Enable", $config['enabled'] ?? true, 'xsd:boolean'];
+        
+        // SSID
+        if (!empty($config['ssid'])) {
+            $params[] = ["{$basePath}.SSID", $config['ssid'], 'xsd:string'];
+        }
+        
+        // Password
+        if (!empty($config['password'])) {
+            $params[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $config['password'], 'xsd:string'];
+        }
+        
+        // Broadcast SSID
+        $params[] = ["{$basePath}.SSIDAdvertisementEnabled", $config['broadcast_ssid'] ?? true, 'xsd:boolean'];
+        
+        // Security
+        $params[] = ["{$basePath}.BeaconType", 'WPA', 'xsd:string'];
+        $params[] = ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'];
+        $params[] = ["{$basePath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
+        
+        // Layer 2 bridge attachment (0 = no bridge/NAT mode)
+        if (isset($config['bridge_index'])) {
+            $bridgeIndex = (int)$config['bridge_index'];
+            if ($bridgeIndex > 0) {
+                $params[] = ["{$basePath}.X_HW_Bridge", $bridgeIndex, 'xsd:unsignedInt'];
+            }
+        }
+        
+        // Access VLAN (direct VLAN tagging without bridge)
+        if (isset($config['access_vlan']) && (int)$config['access_vlan'] > 0) {
+            $params[] = ["{$basePath}.X_HW_AccessVLAN", (int)$config['access_vlan'], 'xsd:unsignedInt'];
+        }
+        
+        // Channel
+        if (isset($config['channel']) && (int)$config['channel'] > 0) {
+            $params[] = ["{$basePath}.Channel", (int)$config['channel'], 'xsd:unsignedInt'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
+    
     public function getWiFiSettings(string $deviceId): array {
         $result = $this->getDevice($deviceId);
         
