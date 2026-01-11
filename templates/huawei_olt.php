@@ -15972,20 +15972,74 @@ echo "# ================================================\n";
         const log = window.tr069LogsCache ? window.tr069LogsCache[idx] : null;
         if (!log) return;
         
-        let reqData = '-', respData = '-';
-        try { reqData = log.request_data ? JSON.stringify(JSON.parse(log.request_data), null, 2) : '-'; } catch(e) { reqData = log.request_data || '-'; }
-        try { respData = log.response_data ? JSON.stringify(JSON.parse(log.response_data), null, 2) : '-'; } catch(e) { respData = log.response_data || '-'; }
+        let reqObj = null, respObj = null;
+        try { reqObj = log.request_data ? JSON.parse(log.request_data) : null; } catch(e) {}
+        try { respObj = log.response_data ? JSON.parse(log.response_data) : null; } catch(e) {}
         
         const resultClass = log.result === 'Success' ? 'success' : (log.result === 'Error' ? 'danger' : 'secondary');
         const time = new Date(log.created_at).toLocaleString();
         
+        // Build parameters table for setParameterValues
+        let paramsHtml = '';
+        if (reqObj && reqObj.parameterValues && Array.isArray(reqObj.parameterValues)) {
+            paramsHtml = '<div class="mb-2"><strong>Parameters:</strong><table class="table table-sm table-bordered mb-0 mt-1" style="font-size:11px"><thead class="table-secondary"><tr><th>Parameter</th><th>Value</th><th>Type</th></tr></thead><tbody>';
+            reqObj.parameterValues.forEach(p => {
+                const fullPath = p[0] || '';
+                const value = p[1];
+                const type = p[2] || '';
+                // Show friendly name (last 2-3 parts of path)
+                const parts = fullPath.split('.');
+                const friendlyName = parts.slice(-2).join('.');
+                // Format value
+                let displayVal = value;
+                if (typeof value === 'boolean') displayVal = value ? '<span class="text-success">true</span>' : '<span class="text-danger">false</span>';
+                else if (fullPath.includes('Password')) displayVal = '<span class="text-muted">[hidden]</span>';
+                else if (fullPath.includes('VLAN')) displayVal = '<span class="badge bg-primary">' + value + '</span>';
+                else if (fullPath.includes('Username')) displayVal = '<code class="text-success">' + escapeHtml(String(value)) + '</code>';
+                else displayVal = '<code>' + escapeHtml(String(value)) + '</code>';
+                // Highlight key params
+                let rowClass = '';
+                if (fullPath.includes('X_HW_VLAN')) rowClass = 'table-info';
+                else if (fullPath.includes('L3Enable')) rowClass = 'table-warning';
+                else if (fullPath.includes('Username') || fullPath.includes('Password')) rowClass = 'table-success';
+                paramsHtml += '<tr class="' + rowClass + '"><td title="' + escapeHtml(fullPath) + '">' + escapeHtml(friendlyName) + '</td><td>' + displayVal + '</td><td class="text-muted">' + escapeHtml(type.replace('xsd:','')) + '</td></tr>';
+            });
+            paramsHtml += '</tbody></table></div>';
+        }
+        
+        // Build addObject info
+        let addObjHtml = '';
+        if (reqObj && reqObj.objectName) {
+            addObjHtml = '<div class="mb-2"><strong>Object Path:</strong> <code class="text-primary">' + escapeHtml(reqObj.objectName) + '</code></div>';
+            if (respObj && respObj.instanceNumber) {
+                addObjHtml += '<div class="mb-2"><strong>Created Instance:</strong> <span class="badge bg-success">' + respObj.instanceNumber + '</span></div>';
+            }
+        }
+        
+        // Raw JSON toggle
+        let rawJson = '';
+        try { rawJson = JSON.stringify(reqObj || log.request_data, null, 2); } catch(e) { rawJson = log.request_data || '-'; }
+        let rawResp = '';
+        try { rawResp = JSON.stringify(respObj || log.response_data, null, 2); } catch(e) { rawResp = log.response_data || '-'; }
+        
         const html = `<div class="modal fade" id="logDetailModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
             <div class="modal-header bg-dark text-white py-2"><h6 class="modal-title"><i class="bi bi-journal-code me-2"></i>Log Detail</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
             <div class="modal-body small">
-                <div class="row mb-2"><div class="col-4"><strong>Time:</strong><br>${time}</div><div class="col-4"><strong>Type:</strong><br><span class="badge bg-info">${log.task_type||'-'}</span></div><div class="col-4"><strong>Result:</strong><br><span class="badge bg-${resultClass}">${log.result||'-'}</span> ${log.error_message?'<small class="text-danger">'+log.error_message+'</small>':''}</div></div>
+                <div class="row mb-2"><div class="col-4"><strong>Time:</strong><br>${time}</div><div class="col-4"><strong>Type:</strong><br><span class="badge bg-info">${log.task_type||'-'}</span></div><div class="col-4"><strong>Result:</strong><br><span class="badge bg-${resultClass}">${log.result||'-'}</span> ${log.error_message?'<small class="text-danger ms-1">'+escapeHtml(log.error_message)+'</small>':''}</div></div>
                 <div class="mb-2"><strong>Task:</strong> <code>${escapeHtml(log.task_name||'-')}</code></div>
-                <div class="mb-2"><strong>Request:</strong><pre class="bg-light p-2 rounded" style="max-height:150px;overflow:auto;font-size:10px">${escapeHtml(reqData)}</pre></div>
-                <div><strong>Response:</strong><pre class="bg-light p-2 rounded" style="max-height:150px;overflow:auto;font-size:10px">${escapeHtml(respData)}</pre></div>
+                ${addObjHtml}
+                ${paramsHtml}
+                <div class="accordion accordion-flush" id="rawJsonAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed py-1 small" type="button" data-bs-toggle="collapse" data-bs-target="#rawJsonBody">Show Raw JSON</button></h2>
+                        <div id="rawJsonBody" class="accordion-collapse collapse" data-bs-parent="#rawJsonAccordion">
+                            <div class="accordion-body p-2">
+                                <div class="mb-2"><strong>Request:</strong><pre class="bg-light p-2 rounded mb-0" style="max-height:120px;overflow:auto;font-size:10px">${escapeHtml(rawJson)}</pre></div>
+                                <div><strong>Response:</strong><pre class="bg-light p-2 rounded mb-0" style="max-height:120px;overflow:auto;font-size:10px">${escapeHtml(rawResp)}</pre></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer py-1"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
         </div></div></div>`;
