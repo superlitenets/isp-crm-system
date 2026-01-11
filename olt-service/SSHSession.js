@@ -27,7 +27,7 @@ class SSHSession {
             this.client.on('ready', () => {
                 console.log(`[OLT ${this.oltId}] SSH connected to ${this.config.host}`);
                 
-                this.client.shell({ term: 'vt100' }, (err, stream) => {
+                this.client.shell({ term: 'vt100', cols: 200, rows: 50 }, (err, stream) => {
                     if (err) {
                         clearTimeout(timeout);
                         reject(err);
