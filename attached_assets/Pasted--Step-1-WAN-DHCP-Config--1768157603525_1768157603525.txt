@@ -1,0 +1,34 @@
+[Step 1: WAN DHCP Config]                                                                                                                                                        +
+ interface gpon 0/1\r                                                                                                                                                             +
+ \r                                                                                                                                                                               +
+ MA5683T(config-if-gpon-0/1)#ont ipconfig 0 1 dhcp vlan 69 priority 2\r                                                                                                           +
+ \r                                                                                                                                                                               +
+ MA5683T(config-if-gpon-0/1)#quit\r                                                                                                                                               +
+ \r                                                                                                                                                                               +
+ MA5683T(config)#                                                                                                                                                                 +
+ [Step 2a: Enter GPON Interface]                                                                                                                                                  +
+ interface gpon 0/1\r                                                                                                                                                             +
+ \r                                                                                                                                                                               +
+ MA5683T(config-if-gpon-0/1)#                                                                                                                                                     +
+ [Step 2b: ACS URL Config]                                                                                                                                                        +
+ ont tr069-server-config 0 1 acs-url"http://10.200.0. \x1B[1D1:7557"\r                                                                                                            +
+                                                         ^\r                                                                                                                      +
+   % Unknown command, the error locates at '^'\r                                                                                                                                  +
+ \r                                                                                                                                                                               +
+ MA5683T(config-if-gpon-0/1)#                                                                                                                                                     +
+ [Step 2c: Periodic Inform Config]                                                                                                                                                +
+ ont tr069-server-config 0 1 periodic-informenableint \x1B[1Derval300\r                                                                                                           +
+                                                         ^\r                                                                                                                      +
+   % Unknown command, the error locates at '^'\r                                                                                                                                  +
+ \r                                                                                                                                                                               +
+ MA5683T(config-if-gpon-0/1)#                                                                                                                                                     +
+ [Step 3: Service Port]                                                                                                                                                           +
+ service-port vlan 69 gpon 0/1/0 ont 1 gemport 2 multi-service us \x1B[1Der-vlan 69 tag-transform translate inbound traffic-table index 7 outbound traffi \x1B[1Dc-table index 7\r+
+   Failure: Service virtual port has existed already\r                                                                                                                            +
+   Conflicted service virtual port index: 4013\r                                                                                                                                  +
+ \r                                                                                                                                                                               +
+ MA5683T(config)#                                                                                                                                                                 +
+
+(1 row)
+
+root@superlitecrm:~/isp#

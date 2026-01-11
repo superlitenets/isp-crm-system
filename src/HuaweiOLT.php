@@ -5208,8 +5208,9 @@ class HuaweiOLT {
                 return ['success' => false, 'message' => 'SSH authentication failed'];
             }
             
-            // Enable interactive mode for Huawei OLT
+            // Enable interactive mode for Huawei OLT with wide terminal
             $ssh->enablePTY();
+            $ssh->setWindowSize(200, 50); // Wide terminal to prevent line wrapping
             
             // Send setup commands
             $ssh->write("screen-length 0 temporary\n");
