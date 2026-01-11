@@ -526,12 +526,11 @@ class GenieACS {
      * This creates a bridge with VLAN tag and attaches WiFi interfaces to it
      * 
      * HG8546M (2.4GHz only):
-     *   - WLAN 1: 2.4GHz main (goes to LAN/NAT by default)
-     *   - WLAN 2-4: 2.4GHz guest SSIDs (can be bridged to VLAN)
+     *   - WLAN 1-4: All 2.4GHz (1=main, 2-4=guest SSIDs)
      * 
      * HG8145V5 (dual-band):
-     *   - WLAN 1: 2.4GHz main, WLAN 2: 2.4GHz guest
-     *   - WLAN 5: 5GHz main, WLAN 6: 5GHz guest
+     *   - WLAN 1-4: 2.4GHz (1=main, 2-4=guest)
+     *   - WLAN 5: 5GHz main
      * 
      * @param string $deviceId GenieACS device ID
      * @param array $config Bridge configuration:

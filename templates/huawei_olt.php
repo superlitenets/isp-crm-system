@@ -581,19 +581,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'wifi_status') {
         }
         
         // Infer bands from index if not detected
-        // HG8546M: WLAN 1-4 = 2.4GHz only (1=main, 2-4=guest SSIDs)
-        // HG8145V5: WLAN 1,2 = 2.4GHz, WLAN 5,6 = 5GHz (dual-band)
+        // HG8546M: WLAN 1-4 = 2.4GHz (1=main, 2-4=guest SSIDs)
+        // HG8145V5: WLAN 1-4 = 2.4GHz, WLAN 5 = 5GHz
         foreach ($detectedConfigs as $idx => &$config) {
             if ($config['band'] === null) {
-                // Check if 5GHz interfaces exist to determine if dual-band
-                $has5GHz = isset($detectedConfigs[5]) || isset($detectedConfigs[6]);
-                
                 if ($idx >= 1 && $idx <= 4) {
                     $config['band'] = '2.4GHz';
                     $config['role'] = ($idx == 1) ? 'main' : 'guest';
-                } elseif ($idx >= 5 && $idx <= 8) {
+                } elseif ($idx == 5) {
                     $config['band'] = '5GHz';
-                    $config['role'] = ($idx == 5) ? 'main' : 'guest';
+                    $config['role'] = 'main';
                 } else {
                     $config['band'] = "Radio {$idx}";
                     $config['role'] = 'unknown';
