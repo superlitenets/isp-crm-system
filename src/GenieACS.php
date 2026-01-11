@@ -525,11 +525,13 @@ class GenieACS {
      * Configure Layer 2 VLAN bridge for Guest WiFi on Huawei ONUs
      * This creates a bridge with VLAN tag and attaches WiFi interfaces to it
      * 
-     * HG8546M WLAN indices:
+     * HG8546M (2.4GHz only):
      *   - WLAN 1: 2.4GHz main (goes to LAN/NAT by default)
-     *   - WLAN 2: 2.4GHz guest (can be bridged to VLAN)
-     *   - WLAN 5: 5GHz main (goes to LAN/NAT by default)
-     *   - WLAN 6: 5GHz guest (can be bridged to VLAN)
+     *   - WLAN 2-4: 2.4GHz guest SSIDs (can be bridged to VLAN)
+     * 
+     * HG8145V5 (dual-band):
+     *   - WLAN 1: 2.4GHz main, WLAN 2: 2.4GHz guest
+     *   - WLAN 5: 5GHz main, WLAN 6: 5GHz guest
      * 
      * @param string $deviceId GenieACS device ID
      * @param array $config Bridge configuration:
