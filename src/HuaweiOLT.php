@@ -7125,6 +7125,123 @@ class HuaweiOLT {
     }
     
     /**
+     * Configure WiFi via TR-069/GenieACS
+     * Uses same method as configureWANViaTR069 for consistency
+     */
+    public function configureWiFiViaTR069(int $onuDbId, array $config): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $genieacsId = $onu['genieacs_id'] ?? null;
+        
+        // If genieacs_id not set, try to look up by serial
+        if (empty($genieacsId)) {
+            require_once __DIR__ . '/GenieACS.php';
+            $genieacs = new \App\GenieACS($this->db);
+            
+            $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
+            if (!empty($serial)) {
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
+                    $genieacsId = $deviceResult['device']['_id'];
+                    // Update the ONU record with the found ID
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                    $stmt->execute([$genieacsId, $onuDbId]);
+                }
+            }
+        }
+        
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
+        }
+        
+        $wlanIndex = (int)($config['wlan_index'] ?? 1);
+        $enabled = $config['enabled'] ?? true;
+        $ssid = $config['ssid'] ?? '';
+        $password = $config['password'] ?? '';
+        $channel = (int)($config['channel'] ?? 0);
+        $security = $config['security'] ?? 'WPA2-PSK';
+        
+        if (empty($ssid)) {
+            return ['success' => false, 'error' => 'SSID is required'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) {
+            return ['success' => false, 'error' => 'GenieACS URL not configured'];
+        }
+        
+        // Build TR-069 parameter values
+        $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
+        $paramValues = [
+            "{$basePath}.Enable" => ['value' => $enabled, 'type' => 'xsd:boolean'],
+            "{$basePath}.SSID" => ['value' => $ssid, 'type' => 'xsd:string']
+        ];
+        
+        if (!empty($password)) {
+            $paramValues["{$basePath}.PreSharedKey.1.PreSharedKey"] = ['value' => $password, 'type' => 'xsd:string'];
+            $paramValues["{$basePath}.KeyPassphrase"] = ['value' => $password, 'type' => 'xsd:string'];
+        }
+        
+        if ($channel > 0) {
+            $paramValues["{$basePath}.Channel"] = ['value' => $channel, 'type' => 'xsd:unsignedInt'];
+        }
+        
+        if (!empty($security)) {
+            $paramValues["{$basePath}.BeaconType"] = ['value' => $security, 'type' => 'xsd:string'];
+        }
+        
+        // Send setParameterValues task to GenieACS
+        $task = [
+            'name' => 'setParameterValues',
+            'parameterValues' => []
+        ];
+        
+        foreach ($paramValues as $path => $val) {
+            $task['parameterValues'][] = [$path, $val['value'], $val['type']];
+        }
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        $this->addLog([
+            'olt_id' => $onu['olt_id'],
+            'onu_id' => $onuDbId,
+            'action' => 'configure_wifi_tr069',
+            'status' => ($httpCode >= 200 && $httpCode < 300) ? 'success' : 'error',
+            'message' => "WiFi config: SSID={$ssid}, WLAN={$wlanIndex}",
+            'command_response' => json_encode(['http_code' => $httpCode, 'response' => $response]),
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return [
+                'success' => true,
+                'message' => "WiFi configuration sent via TR-069. SSID: {$ssid}",
+                'http_code' => $httpCode
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => "Failed to send WiFi config (HTTP {$httpCode}): " . ($curlError ?: $response),
+            'http_code' => $httpCode
+        ];
+    }
+    
+    /**
      * Attach a VLAN to an ONU - creates service-port on OLT
      */
     public function attachVlanToONU(int $onuDbId, int $vlanId): array {

@@ -3772,152 +3772,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         exit;
                     }
                     
-                    $onu = $huaweiOLT->getONU($onuId);
-                    if (!$onu) {
-                        echo json_encode(['success' => false, 'error' => 'ONU not found']);
-                        exit;
-                    }
+                    // Use the same method as configureWANViaTR069 for consistency
+                    $result = $huaweiOLT->configureWiFiViaTR069($onuId, [
+                        'wlan_index' => $wlanIndex,
+                        'enabled' => $enabled,
+                        'ssid' => $ssid,
+                        'password' => $password,
+                        'channel' => $channel,
+                        'security' => $security
+                    ]);
                     
-                    $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
-                    require_once __DIR__ . '/../src/GenieACS.php';
-                    $genieacs = new \App\GenieACS($db);
-                    
-                    // Check if GenieACS is configured
-                    if (!$genieacs->isConfigured()) {
-                        echo json_encode(['success' => false, 'error' => 'GenieACS is not configured. Go to Settings > GenieACS to configure.']);
-                        exit;
-                    }
-                    
-                    $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
-                    if (!$deviceResult['success'] || empty($deviceResult['device'])) {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS. Serial searched: ' . $serialForLookup . '. Make sure TR-069 is enabled on the ONU.']);
-                        exit;
-                    }
-                    $deviceId = $deviceResult['device']['_id'];
-                    
-                    // Build parameters to set
-                    $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}";
-                    $params = [
-                        "{$basePath}.Enable" => $enabled,
-                        "{$basePath}.SSID" => $ssid
-                    ];
-                    if ($password) {
-                        $params["{$basePath}.PreSharedKey.1.PreSharedKey"] = $password;
-                        $params["{$basePath}.KeyPassphrase"] = $password;
-                    }
-                    if ($channel > 0) {
-                        $params["{$basePath}.Channel"] = $channel;
-                    }
-                    if ($security) {
-                        $params["{$basePath}.BeaconType"] = $security;
-                    }
-                    
-                    $setResult = $genieacs->setParameterValues($deviceId, $params);
-                    if ($setResult['success']) {
-                        echo json_encode([
-                            'success' => true, 
-                            'message' => 'WiFi configuration pushed to device successfully',
-                            'device_id' => $deviceId,
-                            'http_code' => $setResult['http_code'] ?? 200
-                        ]);
-                    } else {
-                        echo json_encode([
-                            'success' => false, 
-                            'error' => 'Failed to push to device: ' . ($setResult['error'] ?? 'Unknown error'),
-                            'http_code' => $setResult['http_code'] ?? 0
-                        ]);
-                    }
+                    echo json_encode($result);
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
                 }
                 exit;
             case 'save_tr069_wan':
                 header('Content-Type: application/json');
-                $onuId = (int)($_POST['onu_id'] ?? 0);
-                $wanMode = $_POST['wan_mode'] ?? 'bridge';
-                $vlan = $_POST['vlan'] ?? '';
-                $pppoeUser = $_POST['pppoe_user'] ?? '';
-                $pppoePass = $_POST['pppoe_pass'] ?? '';
-                
-                if (!$onuId) {
-                    echo json_encode(['success' => false, 'error' => 'ONU ID required']);
-                    exit;
-                }
-                
-                $onu = $huaweiOLT->getONU($onuId);
-                if (!$onu) {
-                    echo json_encode(['success' => false, 'error' => 'ONU not found']);
-                    exit;
-                }
-                
-                // Update DB first
-                $updateData = [
-                    'wan_mode' => $wanMode,
-                    'pppoe_username' => $pppoeUser,
-                    'pppoe_password' => $pppoePass
-                ];
-                if ($vlan) $updateData['vlan_id'] = (int)$vlan;
-                $huaweiOLT->updateONU($onuId, $updateData);
-                
-                // If device is in GenieACS, push config via TR-069
-                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
-                $tr069Result = ['attempted' => false, 'success' => false];
-                
-                if (!empty($serialForLookup)) {
-                    try {
-                        require_once __DIR__ . '/../src/GenieACS.php';
-                        $genieacs = new \App\GenieACS($db);
-                        
-                        if (!$genieacs->isConfigured()) {
-                            $tr069Result['error'] = 'GenieACS not configured';
-                        } else {
-                            $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
-                            
-                            if ($deviceResult['success'] && !empty($deviceResult['device'])) {
-                                $deviceId = $deviceResult['device']['_id'];
-                                $tr069Result['attempted'] = true;
-                                $tr069Result['device_id'] = $deviceId;
-                                
-                                if ($wanMode === 'pppoe' && $pppoeUser) {
-                                    $configResult = $genieacs->configurePPPoE($deviceId, [
-                                        'username' => $pppoeUser,
-                                        'password' => $pppoePass,
-                                        'vlan' => (int)$vlan
-                                    ]);
-                                    $tr069Result['pppoe'] = $configResult;
-                                    $tr069Result['success'] = $configResult['success'] ?? false;
-                                } elseif ($wanMode === 'dhcp') {
-                                    $configResult = $genieacs->configureDHCP($deviceId, [
-                                        'vlan' => (int)$vlan
-                                    ]);
-                                    $tr069Result['dhcp'] = $configResult;
-                                    $tr069Result['success'] = $configResult['success'] ?? false;
-                                } else {
-                                    // Bridge mode - just save to DB, no TR-069 needed
-                                    $tr069Result['success'] = true;
-                                    $tr069Result['message'] = 'Bridge mode saved (no TR-069 config needed)';
-                                }
-                            } else {
-                                $tr069Result['error'] = 'Device not found in GenieACS. Serial: ' . $serialForLookup;
-                            }
-                        }
-                    } catch (Exception $e) {
-                        $tr069Result['error'] = $e->getMessage();
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    $wanMode = $_POST['wan_mode'] ?? 'bridge';
+                    $vlan = $_POST['vlan'] ?? '';
+                    $pppoeUser = $_POST['pppoe_user'] ?? '';
+                    $pppoePass = $_POST['pppoe_pass'] ?? '';
+                    
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
                     }
+                    
+                    if ($wanMode === 'bridge') {
+                        // Bridge mode - just update DB, no TR-069
+                        $huaweiOLT->updateONU($onuId, ['wan_mode' => $wanMode, 'vlan_id' => (int)$vlan ?: null]);
+                        echo json_encode(['success' => true, 'message' => 'Bridge mode saved (no TR-069 config needed)']);
+                        exit;
+                    }
+                    
+                    // Use the same method as the working API endpoint
+                    $result = $huaweiOLT->configureWANViaTR069($onuId, [
+                        'wan_mode' => $wanMode,
+                        'service_vlan' => (int)$vlan,
+                        'pppoe_username' => $pppoeUser,
+                        'pppoe_password' => $pppoePass
+                    ]);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
                 }
-                
-                $message = 'WAN configuration saved to database';
-                if ($tr069Result['attempted']) {
-                    $message .= $tr069Result['success'] ? ' and pushed to ONU' : ' but failed to push to ONU';
-                } else {
-                    $message .= ' (TR-069 not available)';
-                }
-                
-                echo json_encode([
-                    'success' => true, 
-                    'message' => $message,
-                    'tr069' => $tr069Result
-                ]);
                 exit;
             case 'get_tr069_full_config':
                 // Enhanced TR-069 full config with all data
