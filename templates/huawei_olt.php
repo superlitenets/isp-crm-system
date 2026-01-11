@@ -3756,6 +3756,128 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 echo json_encode($result);
                 exit;
+            case 'save_tr069_wifi':
+                header('Content-Type: application/json');
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                $wlanIndex = (int)($_POST['wlan_index'] ?? 1);
+                $enabled = ($_POST['enabled'] ?? '1') === '1';
+                $ssid = $_POST['ssid'] ?? '';
+                $password = $_POST['password'] ?? '';
+                
+                if (!$onuId || !$ssid) {
+                    echo json_encode(['success' => false, 'error' => 'ONU ID and SSID are required']);
+                    exit;
+                }
+                
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) {
+                    echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                    exit;
+                }
+                
+                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
+                try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new \App\GenieACS($db);
+                    $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
+                    if (!$deviceResult['success']) {
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                        exit;
+                    }
+                    $deviceId = $deviceResult['device']['_id'];
+                    
+                    // Build parameters to set
+                    $params = [
+                        "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.Enable" => $enabled,
+                        "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.SSID" => $ssid
+                    ];
+                    if ($password) {
+                        $params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.PreSharedKey.1.PreSharedKey"] = $password;
+                        $params["InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$wlanIndex}.KeyPassphrase"] = $password;
+                    }
+                    
+                    $setResult = $genieacs->setParameterValues($deviceId, $params);
+                    if ($setResult['success']) {
+                        echo json_encode(['success' => true, 'message' => 'WiFi configuration saved']);
+                    } else {
+                        echo json_encode(['success' => false, 'error' => $setResult['error'] ?? 'Failed to save']);
+                    }
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            case 'save_tr069_wan':
+                header('Content-Type: application/json');
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                $wanMode = $_POST['wan_mode'] ?? 'bridge';
+                $vlan = $_POST['vlan'] ?? '';
+                $pppoeUser = $_POST['pppoe_user'] ?? '';
+                $pppoePass = $_POST['pppoe_pass'] ?? '';
+                
+                if (!$onuId) {
+                    echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                    exit;
+                }
+                
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) {
+                    echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                    exit;
+                }
+                
+                // Update DB first
+                $updateData = [
+                    'wan_mode' => $wanMode,
+                    'pppoe_username' => $pppoeUser,
+                    'pppoe_password' => $pppoePass
+                ];
+                if ($vlan) $updateData['vlan_id'] = (int)$vlan;
+                $huaweiOLT->updateONU($onuId, $updateData);
+                
+                // If device is in GenieACS, push config via TR-069
+                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
+                $tr069Result = ['attempted' => false];
+                
+                if (!empty($serialForLookup)) {
+                    try {
+                        require_once __DIR__ . '/../src/GenieACS.php';
+                        $genieacs = new \App\GenieACS($db);
+                        $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
+                        
+                        if ($deviceResult['success'] && !empty($deviceResult['device'])) {
+                            $deviceId = $deviceResult['device']['_id'];
+                            $tr069Result['attempted'] = true;
+                            
+                            if ($wanMode === 'pppoe' && $pppoeUser) {
+                                // Configure PPPoE via TR-069
+                                $configResult = $genieacs->configurePPPoE($deviceId, [
+                                    'username' => $pppoeUser,
+                                    'password' => $pppoePass,
+                                    'vlan' => (int)$vlan,
+                                    'create_wan_device' => true,
+                                    'create_ppp_connection' => true
+                                ]);
+                                $tr069Result['pppoe'] = $configResult;
+                            } elseif ($wanMode === 'dhcp') {
+                                // Configure DHCP mode - just update existing WAN to DHCP
+                                $params = [
+                                    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.Enable' => true,
+                                    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.AddressingType' => 'DHCP'
+                                ];
+                                $tr069Result['dhcp'] = $genieacs->setParameterValues($deviceId, $params);
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $tr069Result['error'] = $e->getMessage();
+                    }
+                }
+                
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'WAN configuration saved' . ($tr069Result['attempted'] ? ' and pushed to ONU' : ' (TR-069 not available)'),
+                    'tr069' => $tr069Result
+                ]);
+                exit;
             case 'get_tr069_wan_status':
                 // Get WAN status via TR-069 (SmartOLT-style)
                 header('Content-Type: application/json');
@@ -15203,13 +15325,17 @@ echo "# ================================================\n";
         });
     }
     
+    let tr069CurrentData = null;
+    let tr069CurrentOnuId = null;
+    
     function getTR069Stat(onuId) {
         const modal = new bootstrap.Modal(document.getElementById('onuFullStatusModal'));
         const title = document.getElementById('onuFullStatusTitle');
         const body = document.getElementById('onuFullStatusBody');
         
-        title.textContent = 'TR-069 Full Configuration';
-        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching complete ONU configuration from GenieACS...</p></div>';
+        tr069CurrentOnuId = onuId;
+        title.textContent = 'TR-069 Configuration';
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching ONU configuration...</p></div>';
         modal.show();
         
         fetch('?page=huawei-olt', {
@@ -15219,105 +15345,105 @@ echo "# ================================================\n";
         })
         .then(r => r.json())
         .then(data => {
+            tr069CurrentData = data;
             if (!data.success) {
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No TR-069 data available') + '</div>';
                 return;
             }
             
             if (!data.found_in_acs) {
-                body.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Device not found in GenieACS. The ONU may not have connected to the ACS server yet.</div>' +
-                    '<div class="text-muted small mt-2"><strong>Serial:</strong> ' + escapeHtml(data.serial || '-') + '</div>' +
-                    (data.db_wan_mode ? '<div class="text-muted small"><strong>DB WAN Mode:</strong> ' + escapeHtml(data.db_wan_mode) + '</div>' : '');
+                body.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Device not found in GenieACS.</div>' +
+                    '<div class="text-muted small mt-2"><strong>Serial:</strong> ' + escapeHtml(data.serial || '-') + '</div>';
                 return;
             }
             
-            let statusBadge = data.status === 'online' ? '<span class="badge bg-success">Online</span>' : 
-                              data.status === 'offline' ? '<span class="badge bg-danger">Offline</span>' : 
-                              '<span class="badge bg-warning">Pending</span>';
-            
+            let statusBadge = data.status === 'online' ? '<span class="badge bg-success">Online</span>' : '<span class="badge bg-danger">Offline</span>';
             let html = '<div class="mb-3">' + statusBadge + ' <small class="text-muted ms-2">Last: ' + escapeHtml(data.last_inform || '-') + '</small></div>';
             
-            // Device Info (compact)
-            html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-cpu me-2"></i>Device Info</div>';
+            // Device Info (compact, read-only)
+            html += '<div class="card mb-2"><div class="card-header py-1 bg-light small"><i class="bi bi-cpu me-1"></i>Device</div>';
             html += '<div class="card-body py-2 small">';
-            html += '<div class="row"><div class="col-6"><strong>Model:</strong> ' + escapeHtml(data.model || '-') + '</div>';
-            html += '<div class="col-6"><strong>Manufacturer:</strong> ' + escapeHtml(data.manufacturer || '-') + '</div></div>';
-            html += '<div class="row"><div class="col-6"><strong>SW:</strong> <code>' + escapeHtml(data.sw_version || '-') + '</code></div>';
-            html += '<div class="col-6"><strong>HW:</strong> ' + escapeHtml(data.hw_version || '-') + '</div></div>';
-            html += '<div class="row"><div class="col-6"><strong>Serial:</strong> <code>' + escapeHtml(data.serial || '-') + '</code></div>';
-            html += '<div class="col-6"><strong>Uptime:</strong> ' + escapeHtml(data.uptime || '-') + '</div></div>';
-            html += '<div class="row"><div class="col-6"><strong>CPU:</strong> ' + escapeHtml(data.cpu_usage || '-') + '</div>';
-            html += '<div class="col-6"><strong>RAM:</strong> ' + escapeHtml(data.ram_usage || '-') + '</div></div>';
+            html += '<strong>' + escapeHtml(data.model || '-') + '</strong> | SW: <code>' + escapeHtml(data.sw_version || '-') + '</code> | Uptime: ' + escapeHtml(data.uptime || '-');
             if (data.admin_password && data.admin_password !== '-') {
-                html += '<div class="row mt-1"><div class="col-12"><strong>Admin:</strong> ' + escapeHtml(data.admin_user || 'admin') + ' / <code>' + escapeHtml(data.admin_password) + '</code></div></div>';
+                html += '<br>Admin: <code>' + escapeHtml(data.admin_user || 'admin') + ' / ' + escapeHtml(data.admin_password) + '</code>';
             }
             html += '</div></div>';
             
-            // WiFi Configuration
+            // WiFi Configuration (Editable)
             if (data.wifi && data.wifi.length > 0) {
-                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-wifi me-2"></i>WiFi Configuration</div>';
-                html += '<div class="card-body p-0"><table class="table table-sm mb-0 small">';
-                html += '<thead class="table-light"><tr><th>Band</th><th>SSID</th><th>Password</th><th>Channel</th><th>Status</th></tr></thead><tbody>';
-                data.wifi.forEach(w => {
-                    let enabledBadge = w.enabled ? '<span class="badge bg-success">On</span>' : '<span class="badge bg-secondary">Off</span>';
-                    html += '<tr><td>' + escapeHtml(w.band || '-') + '</td>';
-                    html += '<td><strong>' + escapeHtml(w.ssid || '-') + '</strong></td>';
-                    html += '<td><code>' + escapeHtml(w.password || '-') + '</code></td>';
-                    html += '<td>' + escapeHtml(w.channel || 'Auto') + '</td>';
-                    html += '<td>' + enabledBadge + '</td></tr>';
+                html += '<div class="card mb-2"><div class="card-header py-1 bg-primary text-white small"><i class="bi bi-wifi me-1"></i>WiFi <span class="badge bg-light text-dark ms-2">Editable</span></div>';
+                html += '<div class="card-body py-2">';
+                data.wifi.forEach((w, idx) => {
+                    html += '<div class="mb-3 pb-2 ' + (idx > 0 ? 'border-top pt-2' : '') + '">';
+                    html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+                    html += '<strong class="small">' + escapeHtml(w.band || 'WiFi ' + (idx+1)) + '</strong>';
+                    html += '<div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="wifiEnable' + idx + '" ' + (w.enabled ? 'checked' : '') + '><label class="form-check-label small" for="wifiEnable' + idx + '">Enabled</label></div>';
+                    html += '</div>';
+                    html += '<div class="row g-2">';
+                    html += '<div class="col-6"><label class="form-label small mb-0">SSID</label><input type="text" class="form-control form-control-sm" id="wifiSsid' + idx + '" value="' + escapeHtml(w.ssid || '') + '"></div>';
+                    html += '<div class="col-6"><label class="form-label small mb-0">Password</label><input type="text" class="form-control form-control-sm" id="wifiPass' + idx + '" value="' + escapeHtml(w.password || '') + '"></div>';
+                    html += '</div>';
+                    html += '<div class="mt-2"><button class="btn btn-success btn-sm" onclick="saveWifiConfig(' + idx + ', ' + w.index + ')"><i class="bi bi-check me-1"></i>Save ' + escapeHtml(w.band || '') + '</button></div>';
+                    html += '</div>';
                 });
-                html += '</tbody></table></div></div>';
+                html += '</div></div>';
             }
             
-            // WAN Configuration
+            // WAN Configuration (Editable)
+            html += '<div class="card mb-2"><div class="card-header py-1 bg-info text-white small"><i class="bi bi-globe me-1"></i>WAN Mode <span class="badge bg-light text-dark ms-2">Editable</span></div>';
+            html += '<div class="card-body py-2">';
+            let currentWanMode = 'bridge';
+            let currentPppUser = data.db_pppoe_user || '';
+            let currentPppPass = '';
+            let currentVlan = data.db_vlan || '';
             if (data.wan && data.wan.length > 0) {
-                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-globe me-2"></i>WAN Connections</div>';
-                html += '<div class="card-body p-0"><table class="table table-sm mb-0 small">';
-                html += '<thead class="table-light"><tr><th>Type</th><th>Name</th><th>VLAN</th><th>IP</th><th>Status</th></tr></thead><tbody>';
-                data.wan.forEach(w => {
-                    let statusBadge = w.status === 'Connected' ? '<span class="badge bg-success">Connected</span>' : '<span class="badge bg-secondary">' + escapeHtml(w.status || '-') + '</span>';
-                    html += '<tr><td><span class="badge bg-' + (w.type === 'PPPoE' ? 'info' : 'primary') + '">' + escapeHtml(w.type || '-') + '</span></td>';
-                    html += '<td>' + escapeHtml(w.name || '-') + (w.username ? '<br><small class="text-muted">' + escapeHtml(w.username) + '</small>' : '') + '</td>';
-                    html += '<td>' + escapeHtml(w.vlan || '-') + '</td>';
-                    html += '<td><code>' + escapeHtml(w.ip || '-') + '</code></td>';
-                    html += '<td>' + statusBadge + '</td></tr>';
-                });
-                html += '</tbody></table></div></div>';
+                const pppWan = data.wan.find(w => w.type === 'PPPoE');
+                const ipWan = data.wan.find(w => w.type === 'DHCP' || w.type === 'Static');
+                if (pppWan) { currentWanMode = 'pppoe'; currentPppUser = pppWan.username || currentPppUser; currentVlan = pppWan.vlan || currentVlan; }
+                else if (ipWan) { currentWanMode = ipWan.type.toLowerCase(); currentVlan = ipWan.vlan || currentVlan; }
             } else if (data.db_wan_mode) {
-                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-globe me-2"></i>WAN (from DB)</div>';
-                html += '<div class="card-body py-2 small">';
-                html += '<strong>Mode:</strong> ' + escapeHtml(data.db_wan_mode.toUpperCase()) + ' ';
-                if (data.db_pppoe_user) html += '| <strong>User:</strong> ' + escapeHtml(data.db_pppoe_user) + ' ';
-                if (data.db_vlan) html += '| <strong>VLAN:</strong> ' + escapeHtml(data.db_vlan);
-                html += '</div></div>';
+                currentWanMode = data.db_wan_mode;
             }
-            
-            // LAN Configuration
-            if (data.lan && data.lan.ip) {
-                html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-ethernet me-2"></i>LAN Configuration</div>';
-                html += '<div class="card-body py-2 small">';
-                html += '<div class="row"><div class="col-6"><strong>IP:</strong> ' + escapeHtml(data.lan.ip || '-') + '</div>';
-                html += '<div class="col-6"><strong>DHCP:</strong> ' + (data.lan.dhcp_enabled ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>') + '</div></div>';
-                if (data.lan.dhcp_enabled) {
-                    html += '<div class="row"><div class="col-6"><strong>Pool:</strong> ' + escapeHtml(data.lan.dhcp_start || '-') + ' - ' + escapeHtml(data.lan.dhcp_end || '-') + '</div>';
-                    html += '<div class="col-6"><strong>Lease:</strong> ' + escapeHtml(data.lan.lease_time || '-') + 's</div></div>';
-                }
-                html += '</div></div>';
-            }
-            
-            // TR-069 Connection
-            html += '<div class="card mb-3"><div class="card-header py-2 bg-light"><i class="bi bi-broadcast me-2"></i>TR-069 Connection</div>';
-            html += '<div class="card-body py-2 small">';
-            html += '<div class="row"><div class="col-6"><strong>Mgmt IP:</strong> <code>' + escapeHtml(data.ip || '-') + '</code></div>';
-            html += '<div class="col-6"><strong>Interval:</strong> ' + escapeHtml(data.inform_interval || '-') + 's</div></div>';
-            html += '<div class="text-muted text-break" style="font-size:0.75rem;"><strong>ACS:</strong> ' + escapeHtml(data.acs_url || '-') + '</div>';
+            html += '<div class="row g-2 mb-2">';
+            html += '<div class="col-6"><label class="form-label small mb-0">Mode</label><select class="form-select form-select-sm" id="wanMode" onchange="toggleWanModeFields()">';
+            html += '<option value="bridge" ' + (currentWanMode === 'bridge' ? 'selected' : '') + '>Bridge</option>';
+            html += '<option value="pppoe" ' + (currentWanMode === 'pppoe' ? 'selected' : '') + '>PPPoE</option>';
+            html += '<option value="dhcp" ' + (currentWanMode === 'dhcp' ? 'selected' : '') + '>DHCP</option>';
+            html += '</select></div>';
+            html += '<div class="col-6"><label class="form-label small mb-0">VLAN</label><input type="number" class="form-control form-control-sm" id="wanVlan" value="' + escapeHtml(currentVlan) + '" placeholder="Service VLAN"></div>';
+            html += '</div>';
+            html += '<div id="pppoeWanFields" style="display:' + (currentWanMode === 'pppoe' ? 'block' : 'none') + ';">';
+            html += '<div class="row g-2">';
+            html += '<div class="col-6"><label class="form-label small mb-0">PPPoE User</label><input type="text" class="form-control form-control-sm" id="wanPppUser" value="' + escapeHtml(currentPppUser) + '"></div>';
+            html += '<div class="col-6"><label class="form-label small mb-0">PPPoE Pass</label><input type="text" class="form-control form-control-sm" id="wanPppPass" value="' + escapeHtml(currentPppPass) + '"></div>';
             html += '</div></div>';
+            html += '<div class="mt-2"><button class="btn btn-info btn-sm text-white" onclick="saveWanConfig()"><i class="bi bi-check me-1"></i>Save WAN</button></div>';
+            // Show current WAN status
+            if (data.wan && data.wan.length > 0) {
+                html += '<div class="mt-2 small text-muted">Current: ';
+                data.wan.forEach((w, i) => {
+                    html += (i > 0 ? ', ' : '') + '<span class="badge bg-' + (w.status === 'Connected' ? 'success' : 'secondary') + '">' + escapeHtml(w.type) + (w.ip && w.ip !== '-' ? ': ' + w.ip : '') + '</span>';
+                });
+                html += '</div>';
+            }
+            html += '</div></div>';
+            
+            // LAN & TR-069 (compact, read-only)
+            if (data.lan && data.lan.ip) {
+                html += '<div class="card mb-2"><div class="card-header py-1 bg-light small"><i class="bi bi-ethernet me-1"></i>LAN</div>';
+                html += '<div class="card-body py-2 small">';
+                html += 'IP: <code>' + escapeHtml(data.lan.ip || '-') + '</code> | DHCP: ' + (data.lan.dhcp_enabled ? 'On' : 'Off');
+                if (data.lan.dhcp_enabled) html += ' (' + escapeHtml(data.lan.dhcp_start || '') + '-' + escapeHtml(data.lan.dhcp_end || '') + ')';
+                html += '</div></div>';
+            }
+            
+            html += '<div class="card mb-2"><div class="card-header py-1 bg-light small"><i class="bi bi-broadcast me-1"></i>TR-069</div>';
+            html += '<div class="card-body py-2 small">IP: <code>' + escapeHtml(data.ip || '-') + '</code> | Interval: ' + escapeHtml(data.inform_interval || '-') + 's</div></div>';
             
             // Quick Actions
-            html += '<div class="d-flex gap-2 flex-wrap">';
-            html += '<button class="btn btn-outline-primary btn-sm" onclick="openTR069Config(' + onuId + ')"><i class="bi bi-wifi me-1"></i>WiFi</button>';
-            html += '<button class="btn btn-outline-info btn-sm" onclick="openWANConfig(' + onuId + ')"><i class="bi bi-globe me-1"></i>WAN</button>';
-            html += '<button class="btn btn-outline-warning btn-sm" onclick="rebootONUViaTR069(' + onuId + ')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot</button>';
+            html += '<div class="d-flex gap-2 flex-wrap mt-3">';
+            html += '<button class="btn btn-outline-warning btn-sm" onclick="rebootONUViaTR069(' + onuId + ')"><i class="bi bi-arrow-clockwise me-1"></i>Reboot ONU</button>';
+            html += '<button class="btn btn-outline-secondary btn-sm" onclick="getTR069Stat(' + onuId + ')"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>';
             html += '</div>';
             
             body.innerHTML = html;
@@ -15325,6 +15451,89 @@ echo "# ================================================\n";
         .catch(err => {
             body.innerHTML = '<div class="alert alert-danger">Error: ' + err.message + '</div>';
         });
+    }
+    
+    function toggleWanModeFields() {
+        const mode = document.getElementById('wanMode').value;
+        document.getElementById('pppoeWanFields').style.display = mode === 'pppoe' ? 'block' : 'none';
+    }
+    
+    async function saveWifiConfig(formIdx, wlanIndex) {
+        const enabled = document.getElementById('wifiEnable' + formIdx).checked;
+        const ssid = document.getElementById('wifiSsid' + formIdx).value;
+        const password = document.getElementById('wifiPass' + formIdx).value;
+        
+        if (!ssid) { alert('SSID is required'); return; }
+        if (password && password.length < 8) { alert('Password must be at least 8 characters'); return; }
+        
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        
+        try {
+            const resp = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
+                      '&enabled=' + (enabled ? '1' : '0') + '&ssid=' + encodeURIComponent(ssid) + 
+                      '&password=' + encodeURIComponent(password)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
+                btn.className = 'btn btn-success btn-sm';
+                setTimeout(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check me-1"></i>Save'; }, 2000);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to save'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check me-1"></i>Save';
+            }
+        } catch (e) {
+            alert('Error: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Save';
+        }
+    }
+    
+    async function saveWanConfig() {
+        const mode = document.getElementById('wanMode').value;
+        const vlan = document.getElementById('wanVlan').value;
+        const pppUser = document.getElementById('wanPppUser')?.value || '';
+        const pppPass = document.getElementById('wanPppPass')?.value || '';
+        
+        if (mode === 'pppoe' && !pppUser) { alert('PPPoE username is required'); return; }
+        
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        
+        try {
+            const resp = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=save_tr069_wan&onu_id=' + tr069CurrentOnuId + '&wan_mode=' + mode + 
+                      '&vlan=' + encodeURIComponent(vlan) + '&pppoe_user=' + encodeURIComponent(pppUser) + 
+                      '&pppoe_pass=' + encodeURIComponent(pppPass)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
+                btn.className = 'btn btn-success btn-sm';
+                setTimeout(() => { 
+                    btn.disabled = false; 
+                    btn.className = 'btn btn-info btn-sm text-white';
+                    btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN'; 
+                }, 2000);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to save'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN';
+            }
+        } catch (e) {
+            alert('Error: ' + e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check me-1"></i>Save WAN';
+        }
     }
     
     let liveInterval = null;
