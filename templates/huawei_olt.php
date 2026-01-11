@@ -4676,6 +4676,22 @@ if ($view === 'onu_detail' && isset($_GET['onu_id'])) {
         exit;
     }
     
+    // Improve status detection: also check TR-069 last inform and SNMP status
+    // If TR-069 informed within last 5 minutes OR has valid optical power, mark as online
+    if ($currentOnu['status'] !== 'online') {
+        $isOnline = false;
+        // Check TR-069 last inform from GenieACS
+        if (!empty($currentOnu['tr069_last_inform'])) {
+            $lastInformTime = strtotime($currentOnu['tr069_last_inform']);
+            if ($lastInformTime >= time() - 300) $isOnline = true;
+        }
+        // Check if we have valid optical power readings (means ONU is responding)
+        if (!empty($currentOnu['rx_power']) && $currentOnu['rx_power'] > -40) $isOnline = true;
+        // Check SNMP status field
+        if (!empty($currentOnu['snmp_status']) && $currentOnu['snmp_status'] === 'online') $isOnline = true;
+        if ($isOnline) $currentOnu['status'] = 'online';
+    }
+    
     // Show cached optical data - refresh is now manual via AJAX button
     // This makes the config page load instantly instead of waiting for OLT query
     $onuRefreshResult = [
@@ -6969,48 +6985,11 @@ try {
             </div>
             <?php endif; ?>
             
-            <!-- SmartOLT-Style Gradient Status Bar -->
-            <div class="onu-status-bar <?= $currentOnu['status'] ?? 'offline' ?> text-white p-2 p-md-3 mb-3">
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-sm btn-light">
-                            <i class="bi bi-arrow-left"></i>
-                        </a>
-                        <div class="<?= $currentOnu['status'] === 'online' ? 'pulse-online' : '' ?> rounded-circle p-1 p-md-2 d-flex align-items-center justify-content-center" style="background: rgba(255,255,255,0.2);">
-                            <i class="bi bi-<?= $statusIcons[$currentOnu['status']] ?? 'question-circle' ?> status-icon"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold" style="font-size: 1rem;" data-live-status><?= ucfirst($currentOnu['status'] ?? 'Unknown') ?></div>
-                            <div class="status-label"><?= htmlspecialchars($currentOnu['name'] ?: $currentOnu['sn']) ?></div>
-                        </div>
-                    </div>
-                    <div class="d-none d-md-flex gap-3 text-center">
-                        <div class="px-2 border-start border-white border-opacity-25">
-                            <div class="status-label">RX</div>
-                            <div class="status-value" data-live-rx><?= $rx !== null ? number_format($rx, 1).' dBm' : '-' ?></div>
-                        </div>
-                        <div class="px-2 border-start border-white border-opacity-25">
-                            <div class="status-label">TX</div>
-                            <div class="status-value" data-live-tx><?= $tx !== null ? number_format($tx, 1).' dBm' : '-' ?></div>
-                        </div>
-                        <div class="px-2 border-start border-white border-opacity-25">
-                            <div class="status-label">Dist</div>
-                            <div class="status-value"><?= $distanceDisplay ?></div>
-                        </div>
-                        <div class="px-2 border-start border-white border-opacity-25">
-                            <div class="status-label">Uptime</div>
-                            <div class="status-value" data-live-uptime><?= $uptimeDisplay ?: '-' ?></div>
-                        </div>
-                    </div>
-                    <div class="d-flex gap-1">
-                        <button type="button" class="btn btn-sm btn-light" onclick="fetchLiveOnuData()" title="Refresh">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-light" id="liveBtn" onclick="toggleLiveMode()" title="Live Mode">
-                            <i class="bi bi-broadcast"></i>
-                        </button>
-                    </div>
-                </div>
+            <!-- Simple Back Button -->
+            <div class="mb-3">
+                <a href="?page=huawei-olt&view=onus<?= $currentOnu['olt_id'] ? '&olt_id='.$currentOnu['olt_id'] : '' ?>" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back to ONU List
+                </a>
             </div>
             
             <?php 
