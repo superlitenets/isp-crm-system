@@ -18336,7 +18336,7 @@ echo "# ================================================\n";
                     
                     html += '<div class="mb-3">';
                     html += '<label class="form-label">Connection Type</label>';
-                    html += '<select name="wan_type" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
+                    html += '<select name="wan_mode" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
                     html += '<option value="pppoe">PPPoE</option>';
                     html += '<option value="dhcp">DHCP (IPoE)</option>';
                     html += '<option value="static">Static IP</option>';
@@ -18345,7 +18345,7 @@ echo "# ================================================\n";
                     
                     html += '<div class="mb-3">';
                     html += '<label class="form-label">Internet VLAN</label>';
-                    html += '<input type="number" name="wan_vlan" class="form-control" value="' + (onu.service_vlan || 902) + '" min="1" max="4094">';
+                    html += '<input type="number" name="service_vlan" class="form-control" value="' + (onu.service_vlan || 902) + '" min="1" max="4094">';
                     html += '<div class="form-text">Service VLAN for internet traffic</div>';
                     html += '</div>';
                     
@@ -18400,7 +18400,7 @@ echo "# ================================================\n";
                     
                     html += '<div class="mb-3">';
                     html += '<label class="form-label">Connection Type</label>';
-                    html += '<select name="wan_type" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
+                    html += '<select name="wan_mode" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
                     html += '<option value="pppoe">PPPoE</option>';
                     html += '<option value="dhcp">DHCP (IPoE)</option>';
                     html += '<option value="static">Static IP</option>';
@@ -18409,7 +18409,7 @@ echo "# ================================================\n";
                     
                     html += '<div class="mb-3">';
                     html += '<label class="form-label">Internet VLAN</label>';
-                    html += '<input type="number" name="wan_vlan" class="form-control" value="902" min="1" max="4094">';
+                    html += '<input type="number" name="service_vlan" class="form-control" value="902" min="1" max="4094">';
                     html += '</div>';
                     
                     html += '<div id="pppoeFields">';
