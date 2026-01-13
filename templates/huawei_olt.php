@@ -809,6 +809,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'remove_onu_service_vlan') {
     exit;
 }
 
+// Verify WAN provisioning status
+if (isset($_GET['action']) && $_GET['action'] === 'verify_wan_provisioning') {
+    header('Content-Type: application/json');
+    
+    $onuId = (int)($_GET['onu_id'] ?? 0);
+    
+    if (!$onuId) {
+        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $result = $huaweiOLT->verifyWANProvisioning($onuId);
+        echo json_encode($result);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint for port capacity
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'port_capacity') {
     header('Content-Type: application/json');
@@ -15987,24 +16007,55 @@ echo "# ================================================\n";
                 : '<i class="bi bi-exclamation-triangle me-2"></i>Completed with errors';
             btn.className = allSuccess ? 'btn btn-lg btn-success' : 'btn btn-lg btn-warning';
             
-            // Show completion message
+            // Show completion message and start verification
             if (allSuccess) {
-                statusDiv.innerHTML += '<div class="alert alert-success mt-3 mb-0">' +
-                    '<i class="bi bi-check-circle-fill me-2"></i><strong>Configuration has been completed!</strong><br>' +
-                    '<small>PPPoE and WiFi settings have been sent to the device.</small><br>' +
-                    '<small class="text-muted"><i class="bi bi-info-circle me-1"></i>If changes don\'t appear immediately, the device will apply them on its next periodic inform (usually within 5 minutes).</small>' +
+                statusDiv.innerHTML += '<div class="alert alert-info mt-3 mb-0" id="quickSetupVerify">' +
+                    '<i class="spinner-border spinner-border-sm me-2"></i><strong>Verifying WAN connection...</strong><br>' +
+                    '<small>Waiting for device to establish PPPoE connection.</small>' +
                     '</div>';
+                
+                // Wait 5 seconds then verify WAN status
+                setTimeout(async () => {
+                    try {
+                        const verifyResp = await fetch(`?action=verify_wan_provisioning&onu_id=${onuId}`);
+                        const verifyData = await verifyResp.json();
+                        const verifyDiv = document.getElementById('quickSetupVerify');
+                        
+                        if (verifyData.provisioning_complete) {
+                            verifyDiv.className = 'alert alert-success mt-3 mb-0';
+                            verifyDiv.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i><strong>Connection verified!</strong><br>' +
+                                '<small>WAN connected with IP: ' + verifyData.external_ip + '</small>';
+                            showToast('WAN connection established!', 'success');
+                        } else if (verifyData.is_connected) {
+                            verifyDiv.className = 'alert alert-warning mt-3 mb-0';
+                            verifyDiv.innerHTML = '<i class="bi bi-check-circle me-2"></i><strong>WAN connected</strong><br>' +
+                                '<small>Status: ' + (verifyData.wan_status || 'Connected') + ' - Waiting for IP address.</small>';
+                        } else {
+                            verifyDiv.className = 'alert alert-info mt-3 mb-0';
+                            verifyDiv.innerHTML = '<i class="bi bi-clock me-2"></i><strong>Configuration sent</strong><br>' +
+                                '<small>' + (verifyData.message || 'Device will apply settings on next inform.') + '</small>';
+                        }
+                    } catch (e) {
+                        const verifyDiv = document.getElementById('quickSetupVerify');
+                        if (verifyDiv) {
+                            verifyDiv.className = 'alert alert-success mt-3 mb-0';
+                            verifyDiv.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i><strong>Configuration sent!</strong><br>' +
+                                '<small>Settings will apply on next device inform.</small>';
+                        }
+                    }
+                }, 5000);
+                
                 showToast('Configuration completed successfully!', 'success');
             } else {
                 statusDiv.innerHTML += '<div class="alert alert-warning mt-3 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Configuration completed with errors</strong><br><small>Some settings may not have been applied. Check the status above.</small></div>';
             }
             
-            // Refresh data after a delay
+            // Refresh data after a longer delay to allow verification to complete
             setTimeout(() => {
                 btn.innerHTML = '<i class="bi bi-lightning-charge me-2"></i>Apply Configuration';
                 btn.className = 'btn btn-lg btn-primary';
                 syncAndReload(onuId);
-            }, 3000);
+            }, 8000);
             
         } catch (err) {
             btn.disabled = false;
