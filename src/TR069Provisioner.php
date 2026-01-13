@@ -16,6 +16,7 @@ class TR069Provisioner {
     const STATE_VERIFY = 'verify';
     const STATE_COMPLETE = 'complete';
     const STATE_FAILED = 'failed';
+    const STATE_WAITING_FOR_INFORM = 'waiting_for_inform';
     
     public function __construct(\PDO $db) {
         $this->db = $db;
@@ -137,6 +138,9 @@ class TR069Provisioner {
             
             case self::STATE_FAILED:
                 return ['success' => false, 'state' => 'failed', 'error' => $state['last_error']];
+            
+            case self::STATE_WAITING_FOR_INFORM:
+                return $this->stepWaitingForInform($onuId, $state);
             
             default:
                 return ['success' => false, 'error' => 'Unknown state: ' . $currentState];
@@ -571,6 +575,29 @@ class TR069Provisioner {
     private function handleError(int $onuId, array $state, string $error): array {
         $retryCount = ($state['retry_count'] ?? 0) + 1;
         
+        // Check if this is a connection-request failure (401, timeout, etc.)
+        // SmartOLT behavior: Don't retry aggressively, wait for next natural inform
+        $isConnectionRequestFailure = preg_match('/401|timeout|connection.?request|Unexpected status/i', $error);
+        
+        if ($isConnectionRequestFailure) {
+            // Transition to WAITING state - don't retry, wait for next inform
+            $previousState = $state['state'];
+            $this->updateState($onuId, self::STATE_WAITING_FOR_INFORM, [
+                'last_error' => $error,
+                'previous_state' => $previousState,
+                'next_step_at' => null // Will be updated on next inform
+            ]);
+            $this->log($onuId, 'waiting_for_inform', "Connection-request failed, waiting for next inform. Previous state: {$previousState}");
+            
+            return [
+                'success' => true,
+                'state' => 'waiting_for_inform',
+                'message' => 'Waiting for device to reconnect. Will resume on next inform.',
+                'next_action' => 'wait',
+                'previous_state' => $previousState
+            ];
+        }
+        
         if ($retryCount >= 3) {
             $this->updateState($onuId, self::STATE_FAILED, [
                 'last_error' => $error,
@@ -597,6 +624,87 @@ class TR069Provisioner {
             'message' => "Retrying... ({$retryCount}/3)",
             'next_action' => 'retry'
         ];
+    }
+    
+    /**
+     * Handle WAITING_FOR_INFORM state
+     * SmartOLT behavior: Don't force connection-request, wait for natural inform
+     * Resume provisioning when device reconnects
+     */
+    private function stepWaitingForInform(int $onuId, array $state): array {
+        $deviceId = $state['device_id'];
+        
+        // Check if device has sent a new inform since we started waiting
+        $deviceResult = $this->genieacs->getDevice($deviceId);
+        if (!$deviceResult['success']) {
+            return [
+                'success' => true,
+                'state' => 'waiting_for_inform',
+                'message' => 'Still waiting for device to reconnect...',
+                'next_action' => 'wait'
+            ];
+        }
+        
+        $device = $deviceResult['data'];
+        $lastInform = $device['_lastInform'] ?? null;
+        
+        // Check if device has informed recently (within last 2 minutes)
+        if ($lastInform) {
+            $lastInformTime = is_array($lastInform) ? ($lastInform['_value'] ?? $lastInform) : $lastInform;
+            $lastInformTs = strtotime($lastInformTime);
+            $stateUpdatedTs = strtotime($state['updated_at'] ?? 'now');
+            
+            // Device informed AFTER we entered waiting state
+            if ($lastInformTs > $stateUpdatedTs) {
+                $this->log($onuId, 'inform_received', 'Device reconnected, resuming provisioning');
+                
+                // Get the previous state to resume from
+                $discovered = json_decode($state['discovered_objects'] ?? '{}', true);
+                $previousState = $discovered['previous_state'] ?? null;
+                
+                // Determine next state based on what we have
+                $nextState = $this->determineNextState($state);
+                $this->updateState($onuId, $nextState, [
+                    'retry_count' => 0,
+                    'last_error' => null
+                ]);
+                
+                return $this->processNextStep($onuId);
+            }
+        }
+        
+        // Still waiting
+        $waitingMinutes = round((time() - strtotime($state['updated_at'] ?? 'now')) / 60);
+        
+        return [
+            'success' => true,
+            'state' => 'waiting_for_inform',
+            'message' => "Waiting for device to reconnect ({$waitingMinutes} min). Will resume automatically on next inform.",
+            'next_action' => 'wait',
+            'waiting_since' => $state['updated_at']
+        ];
+    }
+    
+    /**
+     * Determine what state to resume from based on current progress
+     */
+    private function determineNextState(array $state): string {
+        $wanDevice = $state['wan_device_instance'] ?? null;
+        $wanConnDevice = $state['wan_conn_device_instance'] ?? null;
+        $wanPppConn = $state['wan_ppp_conn_instance'] ?? null;
+        
+        if ($wanPppConn !== null) {
+            return self::STATE_SET_PPP_PARAMS;
+        }
+        if ($wanConnDevice !== null) {
+            return self::STATE_CREATE_WAN_PPP_CONN;
+        }
+        if ($wanDevice !== null) {
+            return self::STATE_CREATE_WAN_CONN_DEVICE;
+        }
+        
+        // Re-discover to get current state
+        return self::STATE_DISCOVER;
     }
     
     private function getOnu(int $onuId): ?array {

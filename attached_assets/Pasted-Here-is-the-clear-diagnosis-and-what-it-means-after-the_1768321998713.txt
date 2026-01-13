@@ -1,0 +1,189 @@
+Here is the clear diagnosis and what it means after the fix.
+
+1️⃣ High-level verdict (important)
+
+✅ You FIXED the original problem
+❌ You exposed the next, deeper constraint (expected)
+
+This is progress, not failure.
+
+2️⃣ What CHANGED compared to the previous faults file
+Before (old CSV)
+
+Many Invalid parameter path
+
+Mixed ADD + SET in same session
+
+cwmp.9002 cascading failures
+
+PPPoE objects not existing
+
+After (new CSV)
+
+❌ Almost no Invalid parameter path
+
+❌ No mass 9002 cascades
+
+❌ No duplicate WAN creation
+
+❌ No policy route explosions
+
+👉 This confirms the multi-session state machine is working.
+
+3️⃣ What errors STILL remain (and why)
+
+In the new CSV, the dominant faults are now:
+
+Connection request error: Unexpected status code 401
+
+
+and a few:
+
+Task timed out waiting for inform
+
+
+⚠️ These are NOT provisioning logic errors anymore.
+
+They are session-triggering errors.
+
+4️⃣ What this means technically (very important)
+
+You are now in this situation:
+
+Provisioning logic is correct,
+but GenieACS cannot reliably force the next CWMP session.
+
+That means:
+
+Tasks are correct
+
+State transitions are correct
+
+But the next Inform does not always happen immediately
+
+This is exactly where SmartOLT uses fallback logic.
+
+5️⃣ Why this is happening (root cause)
+🔴 Cause #1 — Connection-request authentication still unstable
+
+The 401s mean:
+
+ONU receives the request
+
+Rejects it due to auth mismatch or stale state
+
+Huawei HG8546M is very strict here:
+
+It may cache old credentials
+
+It may reset them internally after WAN changes
+
+It may require a new Inform before accepting them
+
+So during multi-session provisioning:
+
+Session N works
+
+Session N+1 connection-request fails (401)
+
+ONU only informs later (periodic / reboot)
+
+🔴 Cause #2 — You are now doing MANY sessions (by design)
+
+Your new flow requires:
+
+Inform after WANDevice
+
+Inform after WANConnectionDevice
+
+Inform after WANPPPConnection
+
+…
+
+That increases dependence on connection-request reliability.
+
+Your logic is correct — but TR-069 reality is imperfect.
+
+6️⃣ This is the missing SmartOLT behavior (critical insight)
+
+SmartOLT does NOT require connection-request to succeed every time.
+
+It does this instead:
+
+SmartOLT rule:
+
+If connection-request fails → WAIT, don’t retry aggressively
+
+Specifically:
+
+It queues the next state
+
+It does NOT rebuild objects
+
+It waits for:
+
+PeriodicInform
+
+Natural reboot
+
+Manual reconnect
+
+Your system currently still expects instant progress.
+
+7️⃣ What you MUST add now (this is the final piece)
+✅ Add a WAITING state
+
+Extend your state machine:
+
+WAN_DEVICE_CREATED
+→ WAITING_FOR_INFORM
+→ WAN_CONN_DEVICE_CREATED
+
+Logic:
+if (connectionRequestFailed) {
+    setState('WAITING_FOR_INFORM');
+    return;
+}
+
+
+Then:
+
+Do NOTHING
+
+Do NOT resend tasks
+
+Do NOT rollback
+
+Resume when next Inform arrives
+
+8️⃣ Why this solves the remaining faults
+Current symptom	Fixed by
+401 on connection-request	Stop forcing
+Task timeout	Wait naturally
+“Stuck” feeling	State persistence
+Reboot dependency	Accept async nature
+
+This is exactly how SmartOLT avoids loops.
+
+9️⃣ What NOT to “fix” (important)
+
+❌ Do NOT shorten inform interval further
+❌ Do NOT retry connection-request rapidly
+❌ Do NOT reset credentials repeatedly
+❌ Do NOT rebuild WAN on timeout
+
+All of these make HG8546M worse.
+
+🔟 Final interpretation (clear)
+
+After the fix:
+
+✅ Your provisioning logic is now correct
+
+✅ Object creation order is correct
+
+✅ Errors are now session-timing related, not logic bugs
+
+⚠️ You must accept eventual consistency in TR-069
+
+You are now exactly where commercial systems are internally.
