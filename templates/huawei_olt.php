@@ -3851,7 +3851,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 echo json_encode($result);
                 exit;
             
-            case 'get_tr069_device_info':
+                        case 'get_tr069_device_info':
                 header('Content-Type: application/json');
                 try {
                     $onuId = (int)($_GET['onu_id'] ?? 0);
@@ -3861,7 +3861,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Get ONU details to find serial number
-                    $stmt = $db->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
+                    $stmt = $db->prepare("SELECT sn, tr069_serial FROM huawei_onus WHERE id = ?");
                     $stmt->execute([$onuId]);
                     $onu = $stmt->fetch(PDO::FETCH_ASSOC);
                     
@@ -3870,27 +3870,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         exit;
                     }
                     
-                    // Query GenieACS for device
+                    // Query GenieACS for device - try multiple serial formats
                     $genieACS = new GenieACS($db);
-                    $device = $genieACS->findDeviceBySerial($onu['serial_number']);
+                    $serial = !empty($onu['tr069_serial']) ? $onu['tr069_serial'] : $onu['sn'];
+                    
+                    $searchFormats = [$serial, strtoupper($serial)];
+                    $upperSerial = strtoupper($serial);
+                    if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $upperSerial)) {
+                        $searchFormats[] = $genieACS->convertOltSerialToGenieacs($upperSerial);
+                    }
+                    
+                    $device = null;
+                    foreach ($searchFormats as $sn) {
+                        if (empty($sn)) continue;
+                        $result = $genieACS->getDeviceBySerial($sn);
+                        if ($result['success'] && !empty($result['device'])) {
+                            $device = $result['device'];
+                            break;
+                        }
+                    }
                     
                     if ($device) {
+                        // Return full device object for status display
                         echo json_encode([
                             'success' => true, 
-                            'device' => [
-                                '_id' => $device['_id'] ?? null,
-                                '_lastInform' => $device['_lastInform'] ?? null,
-                                '_registered' => $device['_registered'] ?? null,
-                                '_deviceId' => $device['_deviceId'] ?? null
-                            ]
+                            'device' => $device
                         ]);
                     } else {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS', 'tried' => $searchFormats]);
                     }
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
+
             
             case 'get_tr069_device_by_serial':
                 header('Content-Type: application/json');
