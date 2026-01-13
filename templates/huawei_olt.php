@@ -7325,31 +7325,51 @@ try {
             }
             ?>
             
-            <!-- Action Toolbar -->
+            <!-- Action Toolbar - Separated into OLT and TR-069 sections -->
             <div class="action-toolbar p-2 mb-3">
-                <div class="d-flex flex-wrap gap-1 gap-md-2 align-items-center">
-                    <span class="text-muted small me-1 d-none d-md-inline"><i class="bi bi-lightning-charge"></i> Actions:</span>
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)" title="Config">
-                        <i class="bi bi-code-slash"></i><span class="d-none d-md-inline ms-1">Config</span>
-                    </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="openTR069Config(<?= $currentOnu['id'] ?>)" title="TR-069 Info">
-                        <i class="bi bi-broadcast"></i><span class="d-none d-md-inline ms-1">TR-069</span>
-                    </button>
-                    <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
-                        <input type="hidden" name="action" value="reboot_onu">
-                        <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Reboot">
-                            <i class="bi bi-arrow-clockwise"></i><span class="d-none d-md-inline ms-1">Reboot</span>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <!-- OLT Operations -->
+                    <div class="btn-group btn-group-sm" role="group">
+                        <span class="btn btn-secondary disabled" style="opacity:0.7"><i class="bi bi-hdd-network"></i> OLT</span>
+                        <button type="button" class="btn btn-outline-primary" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)" title="Show OLT Config">
+                            <i class="bi bi-code-slash"></i><span class="d-none d-lg-inline ms-1">Config</span>
                         </button>
-                    </form>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="WAN Config">
-                        <i class="bi bi-ethernet"></i><span class="d-none d-md-inline ms-1">WAN</span>
-                    </button>
+                        <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
+                            <input type="hidden" name="action" value="reboot_onu">
+                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                            <button type="submit" class="btn btn-outline-warning" title="Reboot ONU">
+                                <i class="bi bi-arrow-clockwise"></i><span class="d-none d-lg-inline ms-1">Reboot</span>
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline" onsubmit="return confirm('Push TR-069 OMCI config to OLT?')">
+                            <input type="hidden" name="action" value="configure_tr069">
+                            <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
+                            <button type="submit" class="btn btn-outline-info" title="Push TR-069 OMCI Config (enables device to connect to GenieACS)">
+                                <i class="bi bi-broadcast"></i><span class="d-none d-lg-inline ms-1">Push TR-069</span>
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- TR-069/GenieACS Operations -->
+                    <div class="btn-group btn-group-sm" role="group">
+                        <span class="btn btn-info disabled text-white" style="opacity:0.8"><i class="bi bi-cloud"></i> TR-069</span>
+                        <button type="button" class="btn btn-outline-info" onclick="openTR069Config(<?= $currentOnu['id'] ?>)" title="TR-069 Device Info & Status">
+                            <i class="bi bi-info-circle"></i><span class="d-none d-lg-inline ms-1">Status</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="Configure PPPoE/IPoE WAN via TR-069">
+                            <i class="bi bi-ethernet"></i><span class="d-none d-lg-inline ms-1">WAN</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="openTR069WiFiConfig('<?= $currentOnu['sn'] ?>')" title="Configure WiFi via TR-069">
+                            <i class="bi bi-wifi"></i><span class="d-none d-lg-inline ms-1">WiFi</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Delete -->
                     <div class="ms-auto">
                         <form method="post" class="d-inline" onsubmit="return confirm('DELETE this ONU from OLT?')">
                             <input type="hidden" name="action" value="delete_onu_olt">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete from OLT">
                                 <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Delete</span>
                             </button>
                         </form>
