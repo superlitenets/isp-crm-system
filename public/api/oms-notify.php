@@ -85,14 +85,24 @@ try {
             date('Y-m-d H:i:s')
         ], $template);
         
-        $result = $whatsapp->sendGroupMessage($groupId, $message);
+        $result = $whatsapp->sendToGroup($groupId, $message);
         
-        echo json_encode([
-            'success' => true, 
-            'message' => 'Notification sent',
-            'group_id' => $groupId,
-            'onu_count' => count($discoveries)
-        ]);
+        if ($result['success']) {
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Notification sent',
+                'group_id' => $groupId,
+                'onu_count' => count($discoveries),
+                'messageId' => $result['messageId'] ?? null
+            ]);
+        } else {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false, 
+                'error' => $result['error'] ?? 'Failed to send WhatsApp message',
+                'group_id' => $groupId
+            ]);
+        }
     } elseif ($type === 'onu_fault') {
         // Handle ONU fault notifications (using $faults extracted above)
         $oltName = $input['olt_name'] ?? 'Unknown OLT';
@@ -131,14 +141,24 @@ try {
             date('Y-m-d H:i:s')
         ], $template);
         
-        $result = $whatsapp->sendGroupMessage($groupId, $message);
+        $result = $whatsapp->sendToGroup($groupId, $message);
         
-        echo json_encode([
-            'success' => true, 
-            'message' => 'Fault notification sent',
-            'group_id' => $groupId,
-            'fault_count' => count($faults)
-        ]);
+        if ($result['success']) {
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Fault notification sent',
+                'group_id' => $groupId,
+                'fault_count' => count($faults),
+                'messageId' => $result['messageId'] ?? null
+            ]);
+        } else {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false, 
+                'error' => $result['error'] ?? 'Failed to send WhatsApp message',
+                'group_id' => $groupId
+            ]);
+        }
     } else {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Unknown notification type']);
