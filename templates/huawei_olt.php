@@ -959,6 +959,75 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'create_los_ticket' && $_SERVER['R
     exit;
 }
 
+// TR-069 Device Info (GET)
+if (isset($_GET['action']) && $_GET['action'] === 'get_tr069_device_info') {
+    header('Content-Type: application/json');
+    try {
+        $onuId = (int)($_GET['onu_id'] ?? 0);
+        if (!$onuId) {
+            echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+            exit;
+        }
+        
+        $stmt = $db->prepare("SELECT sn FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            exit;
+        }
+        
+        $genieACS = new \App\GenieACS($db);
+        $device = $genieACS->findDeviceBySerial($onu['sn']);
+        
+        if ($device) {
+            echo json_encode([
+                'success' => true, 
+                'device' => [
+                    '_id' => $device['_id'] ?? null,
+                    '_lastInform' => $device['_lastInform'] ?? null,
+                    '_registered' => $device['_registered'] ?? null,
+                    '_deviceId' => $device['_deviceId'] ?? null
+                ]
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// TR-069 Connection Request (POST)
+if (isset($_GET['action']) && $_GET['action'] === 'tr069_connection_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    try {
+        $onuId = (int)($_POST['onu_id'] ?? $_GET['onu_id'] ?? 0);
+        if (!$onuId) {
+            echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+            exit;
+        }
+        
+        $stmt = $db->prepare("SELECT sn FROM huawei_onus WHERE id = ?");
+        $stmt->execute([$onuId]);
+        $onu = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$onu) {
+            echo json_encode(['success' => false, 'error' => 'ONU not found']);
+            exit;
+        }
+        
+        $genieACS = new \App\GenieACS($db);
+        $result = $genieACS->sendConnectionRequest($onu['sn']);
+        echo json_encode($result);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
     try {
         switch ($action) {
