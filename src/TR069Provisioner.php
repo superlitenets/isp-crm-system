@@ -787,4 +787,162 @@ class TR069Provisioner {
         
         return $this->processNextStep($state['onu_id']);
     }
+    
+    /**
+     * Simplified provision-based WAN configuration
+     * Uses GenieACS provisions instead of step-by-step state machine
+     * This is the recommended approach for new integrations
+     * 
+     * @param int $onuId ONU ID from database
+     * @param array $config Configuration with pppoe_username, pppoe_password, service_vlan
+     * @return array Result with success status
+     */
+    public function provisionWANSimple(int $onuId, array $config): array {
+        $onu = $this->getOnu($onuId);
+        if (!$onu) {
+            return ['success' => false, 'error' => 'ONU not found'];
+        }
+        
+        $serial = $onu['serial_number'] ?? $onu['sn'] ?? '';
+        if (empty($serial)) {
+            return ['success' => false, 'error' => 'ONU serial number not found'];
+        }
+        
+        // Find device in GenieACS
+        $device = $this->genieacs->findDeviceBySerial($serial);
+        if (!$device) {
+            return ['success' => false, 'error' => 'Device not found in GenieACS. Ensure TR-069 is configured.'];
+        }
+        
+        $deviceId = $device['_id'] ?? null;
+        if (!$deviceId) {
+            return ['success' => false, 'error' => 'GenieACS device ID not found'];
+        }
+        
+        $this->log($onuId, 'provision_simple_start', 'Starting provision-based WAN config', $config);
+        
+        // Use the provision-based approach
+        $connectionType = $config['connection_type'] ?? 'pppoe';
+        
+        if ($connectionType === 'pppoe') {
+            $username = $config['pppoe_username'] ?? '';
+            $password = $config['pppoe_password'] ?? '';
+            $vlan = (int)($config['service_vlan'] ?? $config['wan_vlan'] ?? 0);
+            
+            if (empty($username) || empty($password)) {
+                return ['success' => false, 'error' => 'PPPoE username and password are required'];
+            }
+            
+            // Use the comprehensive huawei-wan-pppoe provision
+            $result = $this->genieacs->configureWANViaProv($deviceId, $username, $password, $vlan);
+            
+            if ($result['success']) {
+                $this->log($onuId, 'provision_pppoe_queued', 'PPPoE configuration queued via provision', [
+                    'username' => $username,
+                    'vlan' => $vlan
+                ]);
+                
+                // Update ONU record
+                try {
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET 
+                        pppoe_username = ?,
+                        wan_mode = 'pppoe',
+                        tr069_device_id = ?
+                        WHERE id = ?");
+                    $stmt->execute([$username, $deviceId, $onuId]);
+                } catch (\Exception $e) {
+                    // Ignore if columns don't exist
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'PPPoE configuration queued. Device will apply settings on next inform.',
+                    'device_id' => $deviceId,
+                    'method' => 'provision'
+                ];
+            } else {
+                $this->log($onuId, 'provision_pppoe_failed', 'PPPoE provision failed', $result);
+                return [
+                    'success' => false,
+                    'error' => 'Failed to queue PPPoE configuration: ' . ($result['error'] ?? 'Unknown'),
+                    'device_id' => $deviceId
+                ];
+            }
+        } else {
+            // IPoE/DHCP
+            $vlan = (int)($config['service_vlan'] ?? $config['wan_vlan'] ?? 0);
+            $addressingType = $config['addressing_type'] ?? 'DHCP';
+            
+            $result = $this->genieacs->configureIPoEViaProv($deviceId, $vlan, $addressingType);
+            
+            if ($result['success']) {
+                $this->log($onuId, 'provision_ipoe_queued', 'IPoE configuration queued via provision', [
+                    'vlan' => $vlan,
+                    'addressing' => $addressingType
+                ]);
+                
+                try {
+                    $stmt = $this->db->prepare("UPDATE huawei_onus SET 
+                        wan_mode = 'dhcp',
+                        tr069_device_id = ?
+                        WHERE id = ?");
+                    $stmt->execute([$deviceId, $onuId]);
+                } catch (\Exception $e) {}
+                
+                return [
+                    'success' => true,
+                    'message' => 'IPoE configuration queued. Device will apply settings on next inform.',
+                    'device_id' => $deviceId,
+                    'method' => 'provision'
+                ];
+            } else {
+                $this->log($onuId, 'provision_ipoe_failed', 'IPoE provision failed', $result);
+                return [
+                    'success' => false,
+                    'error' => 'Failed to queue IPoE configuration: ' . ($result['error'] ?? 'Unknown'),
+                    'device_id' => $deviceId
+                ];
+            }
+        }
+    }
+    
+    /**
+     * Check if GenieACS provisions are configured
+     * Returns list of available provisions for WAN configuration
+     */
+    public function checkProvisions(): array {
+        $result = $this->genieacs->getProvisions();
+        if (!$result['success']) {
+            return ['success' => false, 'error' => 'Cannot fetch provisions from GenieACS'];
+        }
+        
+        $provisions = $result['data'] ?? [];
+        $wanProvisions = [];
+        $requiredProvisions = [
+            'huawei-wan-pppoe',
+            'wan-create',
+            'wan-pppoe-config',
+            'wan-ipoe-config',
+            'wan-discover'
+        ];
+        
+        foreach ($provisions as $prov) {
+            $name = $prov['_id'] ?? '';
+            if (in_array($name, $requiredProvisions)) {
+                $wanProvisions[$name] = true;
+            }
+        }
+        
+        $missing = array_diff($requiredProvisions, array_keys($wanProvisions));
+        
+        return [
+            'success' => true,
+            'configured' => empty($missing),
+            'available' => array_keys($wanProvisions),
+            'missing' => $missing,
+            'message' => empty($missing) 
+                ? 'All WAN provisions are configured' 
+                : 'Run setup-genieacs.sh to configure missing provisions: ' . implode(', ', $missing)
+        ];
+    }
 }

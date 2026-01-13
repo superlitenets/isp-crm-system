@@ -2243,4 +2243,179 @@ class GenieACS {
             'default_wan' => $defaultWan
         ];
     }
+    
+    /**
+     * Run a GenieACS provision on a device
+     * Provisions are pre-configured scripts stored in GenieACS that can be triggered via API
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $provisionName Name of the provision to run (e.g., 'huawei-wan-pppoe')
+     * @param array $args Arguments to pass to the provision
+     * @param bool $connectionRequest Whether to send connection request for immediate execution
+     * @return array Result with success status
+     */
+    public function runProvision(string $deviceId, string $provisionName, array $args = [], bool $connectionRequest = true): array {
+        $encodedId = rawurlencode($deviceId);
+        $endpoint = "/devices/{$encodedId}/tasks" . ($connectionRequest ? '?connection_request' : '');
+        
+        $task = [
+            'name' => 'provision',
+            'provision' => $provisionName,
+            'args' => $args
+        ];
+        
+        $result = $this->request('POST', $endpoint, $task);
+        
+        error_log("[GenieACS] runProvision {$provisionName} on {$deviceId}: " . json_encode([
+            'args' => $args,
+            'success' => $result['success'] ?? false,
+            'http_code' => $result['http_code'] ?? 0
+        ]));
+        
+        return $result;
+    }
+    
+    /**
+     * Configure PPPoE WAN via GenieACS provision
+     * Uses the huawei-wan-pppoe provision for reliable WAN object creation and configuration
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password
+     * @param int $vlan Service VLAN (0 for untagged)
+     * @return array Result with success status
+     */
+    public function configureWANViaProv(string $deviceId, string $username, string $password, int $vlan = 0): array {
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'Username and password are required'];
+        }
+        
+        return $this->runProvision($deviceId, 'huawei-wan-pppoe', [$username, $password, (string)$vlan]);
+    }
+    
+    /**
+     * Create WAN objects via provision
+     * Uses wan-create provision to create WANDevice/WANConnectionDevice/WANPPPConnection structure
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param int $wanDeviceIndex WANDevice index (default 1)
+     * @param int $wanConnDeviceIndex WANConnectionDevice index (default 1)
+     * @param string $connectionType 'pppoe' or 'ipoe'
+     * @return array Result with success status
+     */
+    public function createWANObjects(string $deviceId, int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1, string $connectionType = 'pppoe'): array {
+        return $this->runProvision($deviceId, 'wan-create', [
+            (string)$wanDeviceIndex,
+            (string)$wanConnDeviceIndex,
+            $connectionType
+        ]);
+    }
+    
+    /**
+     * Configure PPPoE credentials via provision (after WAN objects exist)
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password
+     * @param int $vlan Service VLAN
+     * @param int $wanDeviceIndex WANDevice index
+     * @param int $wanConnDeviceIndex WANConnectionDevice index
+     * @param int $pppConnIndex WANPPPConnection index
+     * @return array Result with success status
+     */
+    public function configurePPPoEViaProv(string $deviceId, string $username, string $password, int $vlan = 0, 
+                                           int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1, int $pppConnIndex = 1): array {
+        return $this->runProvision($deviceId, 'wan-pppoe-config', [
+            $username,
+            $password,
+            (string)$vlan,
+            (string)$wanDeviceIndex,
+            (string)$wanConnDeviceIndex,
+            (string)$pppConnIndex
+        ]);
+    }
+    
+    /**
+     * Configure IPoE/DHCP via provision
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param int $vlan Service VLAN
+     * @param string $addressingType 'DHCP' or 'Static'
+     * @param int $wanDeviceIndex WANDevice index
+     * @param int $wanConnDeviceIndex WANConnectionDevice index
+     * @param int $ipConnIndex WANIPConnection index
+     * @return array Result with success status
+     */
+    public function configureIPoEViaProv(string $deviceId, int $vlan = 0, string $addressingType = 'DHCP',
+                                          int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1, int $ipConnIndex = 1): array {
+        return $this->runProvision($deviceId, 'wan-ipoe-config', [
+            (string)$vlan,
+            $addressingType,
+            (string)$wanDeviceIndex,
+            (string)$wanConnDeviceIndex,
+            (string)$ipConnIndex
+        ]);
+    }
+    
+    /**
+     * Discover WAN objects via provision
+     * Refreshes the WAN device tree in GenieACS
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @return array Result with success status
+     */
+    public function discoverWAN(string $deviceId): array {
+        return $this->runProvision($deviceId, 'wan-discover', []);
+    }
+    
+    /**
+     * Full WAN provisioning workflow for Huawei ONUs
+     * Step 1: Discover existing WAN structure
+     * Step 2: Create WAN objects if needed
+     * Step 3: Configure PPPoE/IPoE
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param array $config WAN configuration
+     * @return array Result with success status and steps
+     */
+    public function provisionWAN(string $deviceId, array $config): array {
+        $results = [];
+        $connectionType = $config['connection_type'] ?? 'pppoe';
+        
+        // Step 1: Discover WAN structure
+        $discoverResult = $this->discoverWAN($deviceId);
+        $results['discover'] = $discoverResult;
+        
+        // Step 2: Use the comprehensive provision for the connection type
+        if ($connectionType === 'pppoe') {
+            $username = $config['pppoe_username'] ?? '';
+            $password = $config['pppoe_password'] ?? '';
+            $vlan = (int)($config['service_vlan'] ?? $config['wan_vlan'] ?? 0);
+            
+            if (empty($username) || empty($password)) {
+                return [
+                    'success' => false,
+                    'error' => 'PPPoE username and password are required',
+                    'results' => $results
+                ];
+            }
+            
+            $configResult = $this->configureWANViaProv($deviceId, $username, $password, $vlan);
+            $results['configure'] = $configResult;
+        } else {
+            $vlan = (int)($config['service_vlan'] ?? $config['wan_vlan'] ?? 0);
+            $addressingType = $config['addressing_type'] ?? 'DHCP';
+            
+            $configResult = $this->configureIPoEViaProv($deviceId, $vlan, $addressingType);
+            $results['configure'] = $configResult;
+        }
+        
+        return [
+            'success' => $configResult['success'] ?? false,
+            'results' => $results,
+            'message' => $configResult['success'] 
+                ? 'WAN provisioning queued successfully' 
+                : 'WAN provisioning failed: ' . ($configResult['error'] ?? 'Unknown error')
+        ];
+    }
 }
