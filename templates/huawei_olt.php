@@ -15891,9 +15891,17 @@ echo "# ================================================\n";
         function updateStatus() {
             let html = '<div class="small">';
             steps.forEach(s => {
-                let icon = s.status === 'pending' ? 'hourglass' : s.status === 'running' ? 'arrow-repeat spin' : s.status === 'success' ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
-                html += '<div class="d-flex align-items-center mb-1"><i class="bi bi-' + icon + ' me-2"></i>' + s.name;
-                if (s.message) html += ' <span class="text-muted ms-2">- ' + s.message + '</span>';
+                let icon, iconClass = '';
+                if (s.status === 'pending') { icon = 'hourglass'; }
+                else if (s.status === 'running' || s.status === 'applying') { icon = 'arrow-repeat'; iconClass = 'spin'; }
+                else if (s.status === 'success') { icon = 'check-circle-fill'; iconClass = 'text-success'; }
+                else { icon = 'x-circle-fill'; iconClass = 'text-danger'; }
+                
+                html += '<div class="d-flex align-items-center mb-1"><i class="bi bi-' + icon + ' ' + iconClass + ' me-2"></i>' + s.name;
+                if (s.message) {
+                    const msgClass = s.status === 'applying' ? 'text-info' : 'text-muted';
+                    html += ' <span class="' + msgClass + ' ms-2">- ' + s.message + '</span>';
+                }
                 html += '</div>';
             });
             html += '</div>';
@@ -15917,11 +15925,14 @@ echo "# ================================================\n";
             const wanData = await wanResp.json();
             
             if (wanData.success) {
-                steps[0].status = 'success';
-                steps[0].message = 'Done';
+                steps[0].status = 'applying';
+                steps[0].message = 'Applying to device...';
+                updateStatus();
                 // Wait for PPPoE tasks to be applied before sending WiFi config
                 // This prevents WiFi connection_request from interfering with PPPoE tasks
                 await new Promise(resolve => setTimeout(resolve, 3000));
+                steps[0].status = 'success';
+                steps[0].message = 'Done';
             } else {
                 steps[0].status = 'error';
                 steps[0].message = wanData.error || 'Failed';
@@ -15975,6 +15986,14 @@ echo "# ================================================\n";
                 ? '<i class="bi bi-check-circle me-2"></i>Setup Complete!' 
                 : '<i class="bi bi-exclamation-triangle me-2"></i>Completed with errors';
             btn.className = allSuccess ? 'btn btn-lg btn-success' : 'btn btn-lg btn-warning';
+            
+            // Show completion message
+            if (allSuccess) {
+                statusDiv.innerHTML += '<div class="alert alert-success mt-3 mb-0"><i class="bi bi-check-circle-fill me-2"></i><strong>Configuration has been completed!</strong><br><small>PPPoE and WiFi settings have been applied to the device.</small></div>';
+                showToast('Configuration completed successfully!', 'success');
+            } else {
+                statusDiv.innerHTML += '<div class="alert alert-warning mt-3 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Configuration completed with errors</strong><br><small>Some settings may not have been applied. Check the status above.</small></div>';
+            }
             
             // Refresh data after a delay
             setTimeout(() => {
