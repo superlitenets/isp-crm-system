@@ -15744,7 +15744,7 @@ echo "# ================================================\n";
     let tr069CurrentData = null;
     let tr069CurrentOnuId = null;
     let tr069AutoRefresh = null;
-    let tr069ActiveTab = 'wifi';
+    let tr069ActiveTab = 'setup';
     
     function getTR069Stat(onuId, autoSync = true) {
         const modal = new bootstrap.Modal(document.getElementById('onuFullStatusModal'));
@@ -15795,6 +15795,128 @@ echo "# ================================================\n";
         loadTR069Config(onuId);
     }
     
+    async function runQuickSetup(onuId) {
+        const btn = document.getElementById('quickSetupBtn');
+        const statusDiv = document.getElementById('quickSetupStatus');
+        
+        const vlan = document.getElementById('setupVlan')?.value || '';
+        const pppUser = document.getElementById('setupPppUser')?.value || '';
+        const pppPass = document.getElementById('setupPppPass')?.value || '';
+        const wifiSsid = document.getElementById('setupWifiSsid')?.value || '';
+        const wifiPass = document.getElementById('setupWifiPass')?.value || '';
+        const sync5GHz = document.getElementById('setupSync5GHz')?.checked ?? true;
+        
+        if (!pppUser) { alert('PPPoE Username is required'); return; }
+        if (!pppPass) { alert('PPPoE Password is required'); return; }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Configuring...';
+        
+        let steps = [
+            { name: 'PPPoE WAN', status: 'pending' },
+            { name: 'WiFi Settings', status: 'pending' }
+        ];
+        
+        function updateStatus() {
+            let html = '<div class="small">';
+            steps.forEach(s => {
+                let icon = s.status === 'pending' ? 'hourglass' : s.status === 'running' ? 'arrow-repeat spin' : s.status === 'success' ? 'check-circle-fill text-success' : 'x-circle-fill text-danger';
+                html += '<div class="d-flex align-items-center mb-1"><i class="bi bi-' + icon + ' me-2"></i>' + s.name;
+                if (s.message) html += ' <span class="text-muted ms-2">- ' + s.message + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+            statusDiv.innerHTML = html;
+        }
+        
+        updateStatus();
+        
+        try {
+            // Step 1: Configure PPPoE WAN
+            steps[0].status = 'running';
+            updateStatus();
+            
+            const wanResp = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=save_tr069_wan&onu_id=' + onuId + '&wan_mode=pppoe' + 
+                      '&vlan=' + encodeURIComponent(vlan) + '&pppoe_user=' + encodeURIComponent(pppUser) + 
+                      '&pppoe_pass=' + encodeURIComponent(pppPass)
+            });
+            const wanData = await wanResp.json();
+            
+            if (wanData.success) {
+                steps[0].status = 'success';
+                steps[0].message = 'Done';
+            } else {
+                steps[0].status = 'error';
+                steps[0].message = wanData.error || 'Failed';
+            }
+            updateStatus();
+            
+            // Step 2: Configure WiFi (if SSID provided)
+            if (wifiSsid) {
+                steps[1].status = 'running';
+                updateStatus();
+                
+                // Configure 2.4GHz
+                const wifiResp = await fetch('?page=huawei-olt', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wifi_index=1' +
+                          '&ssid=' + encodeURIComponent(wifiSsid) + '&password=' + encodeURIComponent(wifiPass) +
+                          '&enabled=1&security=WPA2-PSK'
+                });
+                const wifiData = await wifiResp.json();
+                
+                // Configure 5GHz if checkbox is checked and device has 5GHz
+                if (sync5GHz && tr069CurrentData.wifi && tr069CurrentData.wifi.length > 1) {
+                    const wifi5Idx = tr069CurrentData.wifi.find(w => w.band && w.band.includes('5'))?.index || 2;
+                    await fetch('?page=huawei-olt', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wifi_index=' + wifi5Idx +
+                              '&ssid=' + encodeURIComponent(wifiSsid + '_5G') + '&password=' + encodeURIComponent(wifiPass) +
+                              '&enabled=1&security=WPA2-PSK'
+                    });
+                }
+                
+                if (wifiData.success) {
+                    steps[1].status = 'success';
+                    steps[1].message = 'Done';
+                } else {
+                    steps[1].status = 'error';
+                    steps[1].message = wifiData.error || 'Failed';
+                }
+            } else {
+                steps[1].status = 'success';
+                steps[1].message = 'Skipped (no SSID)';
+            }
+            updateStatus();
+            
+            // Final status
+            const allSuccess = steps.every(s => s.status === 'success');
+            btn.disabled = false;
+            btn.innerHTML = allSuccess 
+                ? '<i class="bi bi-check-circle me-2"></i>Setup Complete!' 
+                : '<i class="bi bi-exclamation-triangle me-2"></i>Completed with errors';
+            btn.className = allSuccess ? 'btn btn-lg btn-success' : 'btn btn-lg btn-warning';
+            
+            // Refresh data after a delay
+            setTimeout(() => {
+                btn.innerHTML = '<i class="bi bi-lightning-charge me-2"></i>Apply Configuration';
+                btn.className = 'btn btn-lg btn-primary';
+                syncAndReload(onuId);
+            }, 3000);
+            
+        } catch (err) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Error';
+            btn.className = 'btn btn-lg btn-danger';
+            statusDiv.innerHTML = '<div class="alert alert-danger small">Error: ' + err.message + '</div>';
+        }
+    }
+    
     function loadTR069Config(onuId) {
         const body = document.getElementById('onuFullStatusBody');
         
@@ -15829,6 +15951,7 @@ echo "# ================================================\n";
             
             // Tab Navigation
             html += '<ul class="nav nav-tabs nav-fill small mb-2" role="tablist">';
+            html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'setup' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'setup\')"><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Setup</a></li>';
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'wifi' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'wifi\')"><i class="bi bi-wifi"></i> WiFi</a></li>';
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'wan' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'wan\')"><i class="bi bi-globe"></i> WAN</a></li>';
             html += '<li class="nav-item"><a class="nav-link ' + (tr069ActiveTab === 'lan' ? 'active' : '') + '" href="#" onclick="switchTR069Tab(\'lan\')"><i class="bi bi-ethernet"></i> LAN</a></li>';
@@ -15868,7 +15991,51 @@ echo "# ================================================\n";
     function buildTR069TabContent(data, tab, onuId) {
         let html = '';
         
-        if (tab === 'wifi') {
+        if (tab === 'setup') {
+            // Quick Setup - Combined WAN + WiFi configuration
+            html += '<div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Configure PPPoE and WiFi in one step. Settings are pushed to the device immediately.</div>';
+            
+            // Get current values
+            let currentWanMode = data.db_wan_mode || 'pppoe';
+            let currentPppUser = data.db_pppoe_user || '';
+            let currentVlan = data.db_vlan || '';
+            if (data.wan && data.wan.length > 0) {
+                const pppWan = data.wan.find(w => w.type === 'PPPoE');
+                if (pppWan) { currentPppUser = pppWan.username || currentPppUser; currentVlan = pppWan.vlan || currentVlan; }
+            }
+            let wifiData = data.wifi && data.wifi.length > 0 ? data.wifi[0] : { ssid: '', password: '' };
+            
+            html += '<div class="card mb-3"><div class="card-header py-2 bg-primary text-white"><i class="bi bi-globe me-1"></i>Step 1: Internet (PPPoE)</div>';
+            html += '<div class="card-body py-2">';
+            html += '<div class="row g-2 mb-2">';
+            html += '<div class="col-4"><label class="form-label small mb-0">Service VLAN</label><input type="number" class="form-control form-control-sm" id="setupVlan" value="' + escapeHtml(currentVlan) + '" placeholder="e.g. 100"></div>';
+            html += '<div class="col-4"><label class="form-label small mb-0">PPPoE Username</label><input type="text" class="form-control form-control-sm" id="setupPppUser" value="' + escapeHtml(currentPppUser) + '"></div>';
+            html += '<div class="col-4"><label class="form-label small mb-0">PPPoE Password</label><input type="password" class="form-control form-control-sm" id="setupPppPass" placeholder="Enter password"></div>';
+            html += '</div></div></div>';
+            
+            html += '<div class="card mb-3"><div class="card-header py-2 bg-success text-white"><i class="bi bi-wifi me-1"></i>Step 2: WiFi</div>';
+            html += '<div class="card-body py-2">';
+            html += '<div class="row g-2 mb-2">';
+            html += '<div class="col-6"><label class="form-label small mb-0">WiFi Name (SSID)</label><input type="text" class="form-control form-control-sm" id="setupWifiSsid" value="' + escapeHtml(wifiData.ssid || '') + '"></div>';
+            html += '<div class="col-6"><label class="form-label small mb-0">WiFi Password</label><input type="text" class="form-control form-control-sm" id="setupWifiPass" value="' + escapeHtml(wifiData.password || '') + '"></div>';
+            html += '</div>';
+            if (data.wifi && data.wifi.length > 1) {
+                let wifi5 = data.wifi.find(w => w.band && w.band.includes('5'));
+                if (wifi5) {
+                    html += '<div class="form-check mt-2"><input type="checkbox" class="form-check-input" id="setupSync5GHz" checked><label class="form-check-label small">Apply same settings to 5GHz band</label></div>';
+                }
+            }
+            html += '</div></div>';
+            
+            html += '<div class="d-grid">';
+            html += '<button class="btn btn-lg btn-primary" onclick="runQuickSetup(' + onuId + ')" id="quickSetupBtn">';
+            html += '<i class="bi bi-lightning-charge me-2"></i>Apply Configuration</button>';
+            html += '</div>';
+            
+            html += '<div id="quickSetupStatus" class="mt-3"></div>';
+        }
+        
+        else if (tab === 'wifi') {
             // WiFi Configuration Tab
             if (data.wifi && data.wifi.length > 0) {
                 data.wifi.forEach((w, idx) => {
