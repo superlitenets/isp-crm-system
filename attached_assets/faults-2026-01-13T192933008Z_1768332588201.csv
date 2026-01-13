@@ -1,7 +1,0 @@
-"Device","Channel","Code","Message","Detail","Retries","Timestamp"
-"00259E-HG8546M-48575443F2D53A8B","task_69669cee975d3329a0324de0","script.Error","Invalid parameter path","name: Error
-message: Invalid parameter path
-stack: |-
-  Error: Invalid parameter path
-      at instances
-",0,"2026-01-13T19:28:46.246Z"
