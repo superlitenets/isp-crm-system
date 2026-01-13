@@ -894,8 +894,8 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             }
         }
         
-        // Get ONU from database for reference
-        $stmt = $db->prepare("SELECT id, sn, tr069_status, provisioning_stage, status FROM huawei_onus WHERE sn = ? OR sn = ?");
+        // Get ONU from database for reference (use minimal columns for compatibility)
+        $stmt = $db->prepare("SELECT id, sn, tr069_status, status FROM huawei_onus WHERE sn = ? OR sn = ?");
         $stmt->execute([$serialNumber, strtoupper($serialNumber)]);
         $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -910,11 +910,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
                     'device_id' => null
                 ]);
             } else {
-                $provStage = (int)($onu['provisioning_stage'] ?? 0);
                 $blockReason = 'Device not connected to GenieACS yet';
-                if ($provStage < 2) {
-                    $blockReason = 'TR-069 OMCI config may not be pushed yet (Stage ' . $provStage . '/2)';
-                }
                 echo json_encode([
                     'reachable' => false,
                     'blocked' => false,
@@ -951,7 +947,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
         
         // Auto-update database if device is in GenieACS (sync status)
         if ($onu && $isReachable) {
-            $stmt = $db->prepare("UPDATE huawei_onus SET tr069_status = 'online', provisioning_stage = GREATEST(provisioning_stage, 2) WHERE id = ?");
+            $stmt = $db->prepare("UPDATE huawei_onus SET tr069_status = 'online' WHERE id = ?");
             $stmt->execute([$onu['id']]);
         }
         
