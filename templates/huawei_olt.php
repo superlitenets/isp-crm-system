@@ -7678,7 +7678,12 @@ try {
             
             <!-- Optical Signal Card (Mobile shows on status bar) -->
             <div class="onu-info-card signal-card p-3 mb-3 d-md-block">
-                <div class="section-header mb-3"><i class="bi bi-reception-4 me-2"></i>Optical Signal</div>
+                <div class="section-header mb-3 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-reception-4 me-2"></i>Optical Signal</span>
+                    <button type="button" class="btn btn-link btn-sm p-0" onclick="refreshOpticalData(<?= $currentOnu['id'] ?>)" title="Refresh optical data">
+                        <i class="bi bi-arrow-clockwise" id="opticalRefreshIcon"></i>
+                    </button>
+                </div>
                 <div class="row align-items-center g-2">
                     <div class="col-4 col-md-3 text-center">
                         <div class="h4 text-<?= $rxClass ?> fw-bold mb-0" data-live-rx><?= $rx !== null ? number_format($rx, 1) : '-' ?></div>
@@ -8048,9 +8053,57 @@ try {
                 
                 // Initial load
                 loadSignalHistory(7);
+                
+                // Auto-refresh optical data if missing
+                <?php if ($rx === null || $tx === null): ?>
+                setTimeout(() => refreshOpticalData(<?= $currentOnu['id'] ?>), 500);
+                <?php endif; ?>
+                
+                // Auto-refresh TR-069 IP if missing
+                <?php if (empty($currentOnu['tr069_ip'])): ?>
+                setTimeout(() => refreshTR069IP(true), 1000);
+                <?php endif; ?>
             })();
             
-            // Management IP refresh function
+            // Refresh optical data (RX/TX power, distance)
+            async function refreshOpticalData(onuId) {
+                const icon = document.getElementById('opticalRefreshIcon');
+                if (icon) icon.classList.add('spin-animation');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'refresh_onu_optical');
+                    formData.append('onu_id', onuId);
+                    
+                    const resp = await fetch('?page=huawei-olt', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await resp.json();
+                    
+                    if (icon) icon.classList.remove('spin-animation');
+                    
+                    if (data.success) {
+                        const rxEl = document.querySelector('[data-live-rx]');
+                        const txEl = document.querySelector('[data-live-tx]');
+                        
+                        if (rxEl && data.rx_power !== undefined) {
+                            rxEl.textContent = data.rx_power !== null ? parseFloat(data.rx_power).toFixed(1) : '-';
+                        }
+                        if (txEl && data.tx_power !== undefined) {
+                            txEl.textContent = data.tx_power !== null ? parseFloat(data.tx_power).toFixed(1) : '-';
+                        }
+                        
+                        showToast('Optical data refreshed', 'success', 2000);
+                    } else {
+                        showToast('Failed to refresh: ' + (data.message || 'Unknown error'), 'warning');
+                    }
+                } catch (err) {
+                    if (icon) icon.classList.remove('spin-animation');
+                    showToast('Refresh failed: ' + err.message, 'error');
+                }
+            }
+            
             async function refreshTR069IP(silent = false) {
                 const icon = document.getElementById('tr069RefreshIcon');
                 const display = document.getElementById('tr069IpDisplay');
