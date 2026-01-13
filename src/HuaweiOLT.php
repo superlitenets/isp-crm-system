@@ -7243,6 +7243,9 @@ class HuaweiOLT {
             $pppConnIndex = 1;
             $tasksSent[] = 'Using existing WANConnectionDevice.2.WANPPPConnection.1';
             
+            error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
+            error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
+            
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
             $credParams = [
                 ["{$pppPath}.Enable", true, 'xsd:boolean'],
@@ -7255,6 +7258,8 @@ class HuaweiOLT {
             ];
             $credTaskName = "PPPoE Credentials: Username={$pppoeUsername}, NATEnabled=1, LcpEcho=10";
             $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $credParams], $credTaskName);
+            error_log("[WAN_CONFIG] Credentials task result: HTTP {$result['code']}, success: " . ($result['success'] ? 'true' : 'false'));
+            error_log("[WAN_CONFIG] Credentials response: " . substr($result['response'] ?? '', 0, 500));
             if ($result['success']) {
                 $tasksSent[] = 'Set PPPoE credentials';
             } else {
