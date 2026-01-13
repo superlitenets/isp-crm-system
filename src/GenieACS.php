@@ -184,6 +184,10 @@ class GenieACS {
             return ['success' => false, 'error' => 'Device ID not found'];
         }
         
+        // Check ConnectionRequestURL reachability
+        $connReqUrl = $this->getConnectionRequestURL($device);
+        $reachable = !empty($connReqUrl) && $this->isConnectionRequestReachable($connReqUrl);
+        
         // Create a simple getParameterValues task with connection_request to trigger immediate inform
         $encodedId = urlencode($deviceId);
         $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
@@ -194,7 +198,101 @@ class GenieACS {
         return [
             'success' => true,
             'message' => 'Connection request sent',
-            'task_result' => $result
+            'connection_request_url' => $connReqUrl,
+            'reachable' => $reachable,
+            'task_result' => $result,
+            'note' => $reachable ? 'Immediate push attempted' : 'ConnectionRequestURL may not be reachable - config will apply on next device inform'
+        ];
+    }
+    
+    /**
+     * Get ConnectionRequestURL from device data
+     */
+    public function getConnectionRequestURL(array $device): ?string {
+        // Try different paths for ConnectionRequestURL
+        $paths = [
+            'InternetGatewayDevice.ManagementServer.ConnectionRequestURL._value',
+            'InternetGatewayDevice.ManagementServer.ConnectionRequestURL'
+        ];
+        
+        foreach ($paths as $path) {
+            $parts = explode('.', $path);
+            $value = $device;
+            foreach ($parts as $part) {
+                if (isset($value[$part])) {
+                    $value = $value[$part];
+                } else {
+                    $value = null;
+                    break;
+                }
+            }
+            if (!empty($value) && is_string($value)) {
+                return $value;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if ConnectionRequestURL is reachable
+     */
+    public function isConnectionRequestReachable(?string $url): bool {
+        if (empty($url)) {
+            return false;
+        }
+        
+        // Parse the URL to get host and port
+        $parsed = parse_url($url);
+        if (!$parsed || empty($parsed['host'])) {
+            return false;
+        }
+        
+        // Reject localhost/loopback
+        $host = $parsed['host'];
+        if (in_array($host, ['127.0.0.1', 'localhost', '::1'])) {
+            return false;
+        }
+        
+        // Quick socket connect test (2 second timeout)
+        $port = $parsed['port'] ?? ($parsed['scheme'] === 'https' ? 443 : 80);
+        $socket = @fsockopen($host, $port, $errno, $errstr, 2);
+        if ($socket) {
+            fclose($socket);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check device connection request capability
+     */
+    public function checkConnectionRequestCapability(string $serial): array {
+        $device = $this->findDeviceBySerial($serial);
+        if (!$device) {
+            return ['success' => false, 'error' => 'Device not found'];
+        }
+        
+        $connReqUrl = $this->getConnectionRequestURL($device);
+        $reachable = !empty($connReqUrl) && $this->isConnectionRequestReachable($connReqUrl);
+        
+        $lastInform = $device['_lastInform'] ?? null;
+        $lastInformTime = $lastInform ? strtotime($lastInform) : null;
+        $informAge = $lastInformTime ? (time() - $lastInformTime) : null;
+        
+        return [
+            'success' => true,
+            'connection_request_url' => $connReqUrl,
+            'reachable' => $reachable,
+            'last_inform' => $lastInform,
+            'inform_age_seconds' => $informAge,
+            'instant_push_possible' => $reachable,
+            'recommendation' => $reachable 
+                ? 'Instant push is available' 
+                : ($connReqUrl 
+                    ? 'ConnectionRequestURL exists but is not reachable - check firewall/NAT' 
+                    : 'ConnectionRequestURL is empty - device may be behind NAT or in bridge mode')
         ];
     }
     

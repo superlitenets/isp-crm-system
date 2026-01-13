@@ -15989,7 +15989,11 @@ echo "# ================================================\n";
             
             // Show completion message
             if (allSuccess) {
-                statusDiv.innerHTML += '<div class="alert alert-success mt-3 mb-0"><i class="bi bi-check-circle-fill me-2"></i><strong>Configuration has been completed!</strong><br><small>PPPoE and WiFi settings have been applied to the device.</small></div>';
+                statusDiv.innerHTML += '<div class="alert alert-success mt-3 mb-0">' +
+                    '<i class="bi bi-check-circle-fill me-2"></i><strong>Configuration has been completed!</strong><br>' +
+                    '<small>PPPoE and WiFi settings have been sent to the device.</small><br>' +
+                    '<small class="text-muted"><i class="bi bi-info-circle me-1"></i>If changes don\'t appear immediately, the device will apply them on its next periodic inform (usually within 5 minutes).</small>' +
+                    '</div>';
                 showToast('Configuration completed successfully!', 'success');
             } else {
                 statusDiv.innerHTML += '<div class="alert alert-warning mt-3 mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Configuration completed with errors</strong><br><small>Some settings may not have been applied. Check the status above.</small></div>';
