@@ -7235,35 +7235,13 @@ class HuaweiOLT {
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
-            // Huawei ONUs come with pre-configured WANDevice.1.WANConnectionDevice.1
-            // Do NOT try to create these via addObject - it will fail with "Invalid parameter path"
-            // We only need to create WANPPPConnection within the existing container
-            
-            // Always use WANDevice.1.WANConnectionDevice.1 (pre-configured on Huawei ONUs)
-            $wanDeviceIndex = 1;
-            $wanConnDeviceIndex = 1;
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
-            $tasksSent[] = 'Using existing WANDevice.1.WANConnectionDevice.1';
-            
-            // Step 3c: Create WANPPPConnection (only if not exists)
-            if (!$existingPppPath) {
-                $addPppConnTask = [
-                    'name' => 'addObject',
-                    'objectName' => "{$wanConnPath}.WANPPPConnection."
-                ];
-                $result = $sendTask($addPppConnTask, 'Create WANPPPConnection');
-                if ($result['success']) {
-                    $tasksSent[] = 'Create WANPPPConnection';
-                    $respData = json_decode($result['response'], true);
-                    if (!empty($respData['instanceNumber'])) {
-                        $pppConnIndex = (int)$respData['instanceNumber'];
-                    }
-                }
-            } else {
-                $tasksSent[] = 'Using existing WANPPPConnection.' . $pppConnIndex;
-            }
-            $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
-            $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
+            // Huawei ONUs: WANConnectionDevice.1 = Management, WANConnectionDevice.2 = Internet WAN
+            // Use existing WANPPPConnection.1 - don't try to create via addObject
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2";
+            $pppPath = "{$wanConnPath}.WANPPPConnection.1";
+            $wanName = "wan1.2.ppp1";
+            $pppConnIndex = 1;
+            $tasksSent[] = 'Using existing WANConnectionDevice.2.WANPPPConnection.1';
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
             $credParams = [
@@ -7298,18 +7276,40 @@ class HuaweiOLT {
                 $errors[] = "PPPoE VLAN failed (HTTP {$result['code']})";
             }
             
-            // Step 4: Set provisioning code only (X_HW_ params may not be supported)
-            // Skip X_HW_WanDefaultWanName and X_HW_policy_route - not all devices support these
-            // The PPPoE connection will work without policy routes - all LAN ports route through PPPoE by default
+            // Step 4: Set default WAN and provisioning code
+            $defaultWanParams = [
+                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
+            ];
+            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
+            $tasksSent[] = 'Set default WAN';
             
-            // Final task - trigger connection_request to apply settings immediately
-            $refreshTask = ['name' => 'getParameterValues', 'parameterNames' => ["{$pppPath}."]];
-            $sendTask($refreshTask, 'Apply PPPoE settings', true);
-            $tasksSent[] = 'PPPoE configuration complete';
+            // Step 5: Create policy route to bind LAN ports and WiFi to WAN
+            $addRouteTask = [
+                'name' => 'addObject',
+                'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
+            ];
+            $routeResult = $sendTask($addRouteTask);
+            $routeIndex = 1;
+            if ($routeResult['success']) {
+                $respData = json_decode($routeResult['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $routeIndex = (int)$respData['instanceNumber'];
+                }
+            }
+            
+            $routeParams = [
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
+            ];
+            // Final task - trigger connection_request for immediate execution
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], 'Configure policy route', true);
+            if ($result['success']) $tasksSent[] = 'Create policy route';
             
         } elseif ($wanMode === 'dhcp') {
-            // Use existing WANDevice.1.WANConnectionDevice.1 for DHCP
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
+            // Use WANConnectionDevice.2 for internet WAN (WANConnectionDevice.1 is management)
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2";
             
             // Create WANIPConnection for DHCP
             $addIpConnTask = [
@@ -7347,8 +7347,8 @@ class HuaweiOLT {
             $sendTask($refreshTask, 'Apply DHCP settings', true);
             
         } elseif ($wanMode === 'static') {
-            // Use existing WANDevice.1.WANConnectionDevice.1 for Static IP
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
+            // Use WANConnectionDevice.2 for internet WAN (WANConnectionDevice.1 is management)
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2";
             
             $staticIp = $config['static_ip'] ?? '';
             $subnetMask = $config['subnet_mask'] ?? '255.255.255.0';
