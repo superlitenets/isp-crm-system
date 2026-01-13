@@ -279,6 +279,31 @@ class GenieACS {
     }
     
     /**
+     * Push multiple tasks to device in sequence (addObject, deleteObject, etc)
+     * Used for creating WAN objects before configuring them
+     */
+    public function pushTasks(string $deviceId, array $tasks): array {
+        $encodedId = rawurlencode($deviceId);
+        
+        $results = [];
+        foreach ($tasks as $task) {
+            $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task);
+            $results[] = $result;
+            
+            // Log the task
+            error_log("[GenieACS] pushTask {$task['name']} to {$deviceId}: " . json_encode([
+                'objectName' => $task['objectName'] ?? '',
+                'success' => $result['success'] ?? false
+            ]));
+        }
+        
+        return [
+            'success' => true,
+            'results' => $results
+        ];
+    }
+    
+    /**
      * Configure PPPoE WAN connection via TR-069
      */
     public function configurePPPoE(string $deviceId, array $config): array {
@@ -1177,15 +1202,8 @@ class GenieACS {
     
     /**
      * SmartOLT-style Internet WAN configuration via TR-069
-     * Configures existing Internet WAN connection (PPPoE or IPoE/DHCP)
-     * 
-     * IMPORTANT: Huawei ONUs do NOT allow ACS to create WAN objects.
-     * The WANPPPConnection.1 or WANIPConnection.1 must already exist from:
-     * - OLT OMCI configuration (service port with native VLAN)
-     * - Factory default profile
-     * 
-     * ACS can only EDIT existing WAN instances, not create them.
-     * Parameters must be pushed in correct order: VLAN → Credentials → NAT → Enable
+     * Creates WAN objects using addObject then configures them
+     * Matches Huawei ONU firmware behavior and SmartOLT provisioning
      */
     public function configureInternetWAN(string $deviceId, array $config): array {
         $results = [];
@@ -1193,175 +1211,78 @@ class GenieACS {
         
         $connectionType = $config['connection_type'] ?? 'pppoe'; // pppoe, dhcp, static
         $serviceVlan = (int)($config['service_vlan'] ?? 0);
-        $wanIndex = (int)($config['wan_index'] ?? 1); // WANConnectionDevice index (1 is default)
-        $connIndex = (int)($config['conn_index'] ?? 1); // Connection index within the device
         
-        $wanDeviceBase = "InternetGatewayDevice.WANDevice.1";
-        $wanConnDeviceBase = "{$wanDeviceBase}.WANConnectionDevice.{$wanIndex}";
+        // Step 1: Lock management access (disable WAN HTTP)
+        $secureResult = $this->secureDevice($deviceId);
+        $results['secure_device'] = $secureResult;
         
-        // Step 1: Configure based on connection type
-        // NOTE: Huawei ONUs require WAN objects to already exist - we do NOT use addObject
+        // Step 2: Create WAN structure and configure based on connection type
         if ($connectionType === 'pppoe') {
-            $pppBase = "{$wanConnDeviceBase}.WANPPPConnection.{$connIndex}";
-            $wanName = "wan{$wanIndex}.{$connIndex}.ppp{$connIndex}";
-            
-            // Push parameters in correct order for Huawei:
-            // 1. VLAN first (Huawei won't start PPPoE if VLAN is missing when Enable is set)
-            if ($serviceVlan > 0) {
-                $vlanResult = $this->setParameterValues($deviceId, [
-                    ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt']
-                ]);
-                $results['vlan_config'] = $vlanResult;
-                if (!$vlanResult['success']) {
-                    $errors[] = 'Failed to set VLAN: ' . ($vlanResult['error'] ?? 'Unknown');
-                }
-            }
-            
-            // 2. Username and Password
-            if (!empty($config['pppoe_username']) || !empty($config['pppoe_password'])) {
-                $credParams = [];
-                if (!empty($config['pppoe_username'])) {
-                    $credParams[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
-                }
-                if (!empty($config['pppoe_password'])) {
-                    $credParams[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
-                }
-                $credResult = $this->setParameterValues($deviceId, $credParams);
-                $results['credentials_config'] = $credResult;
-                if (!$credResult['success']) {
-                    $errors[] = 'Failed to set credentials: ' . ($credResult['error'] ?? 'Unknown');
-                }
-            }
-            
-            // 3. NAT, Connection Type, and other settings
-            $settingsParams = [
-                ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
-                ["{$pppBase}.ConnectionType", 'IP_Routed', 'xsd:string']
+            // PPPoE Route Mode - create WAN objects then set all params in one call
+            $createTasks = [
+                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
+                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.']
             ];
             
-            // Optional: Connection name
-            if (!empty($config['connection_name'])) {
-                $settingsParams[] = ["{$pppBase}.Name", $config['connection_name'], 'xsd:string'];
-            }
+            $createResult = $this->pushTasks($deviceId, $createTasks);
+            $results['create_wan'] = $createResult;
             
-            // Optional: LCP Echo settings (keep-alive)
-            if (!isset($config['skip_lcp']) || !$config['skip_lcp']) {
-                $settingsParams[] = ["{$pppBase}.X_HW_LcpEchoReqCheck", true, 'xsd:boolean'];
-                $settingsParams[] = ["{$pppBase}.PPPLCPEcho", 10, 'xsd:unsignedInt'];
-            }
+            // Build all parameters in one setParameterValues call
+            $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+            $wanName = 'wan1.1.ppp1';
             
-            $settingsResult = $this->setParameterValues($deviceId, $settingsParams);
-            $results['settings_config'] = $settingsResult;
-            if (!$settingsResult['success']) {
-                $errors[] = 'Failed to set connection settings: ' . ($settingsResult['error'] ?? 'Unknown');
+            $params = [];
+            if (!empty($config['pppoe_username'])) {
+                $params[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
             }
-            
-            // 4. Enable the connection (after all other WAN parameters are set)
-            $enableResult = $this->setParameterValues($deviceId, [
-                ["{$pppBase}.Enable", true, 'xsd:boolean']
-            ]);
-            $results['enable_config'] = $enableResult;
-            if (!$enableResult['success']) {
-                $errors[] = 'Failed to enable connection: ' . ($enableResult['error'] ?? 'Unknown');
+            if (!empty($config['pppoe_password'])) {
+                $params[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
             }
+            $params[] = ["{$pppBase}.NATEnabled", true, 'xsd:boolean'];
+            if ($serviceVlan > 0) {
+                $params[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+            }
+            $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
             
-            // 5. Enable L3 (Router Mode) on ETH1-4 ports
-            if (!isset($config['skip_l3_enable']) || !$config['skip_l3_enable']) {
-                $l3Params = [
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable', true, 'xsd:boolean']
-                ];
-                $l3Result = $this->setParameterValues($deviceId, $l3Params);
-                $results['l3_enable'] = $l3Result;
-                if (!$l3Result['success']) {
-                    // L3 enable failure is not critical - may not be supported on all devices
-                    error_log("[GenieACS] L3 enable failed (non-critical): " . ($l3Result['error'] ?? 'Unknown'));
-                }
+            $configResult = $this->setParameterValues($deviceId, $params);
+            $results['pppoe_config'] = $configResult;
+            if (!$configResult['success']) {
+                $errors[] = 'PPPoE config failed: ' . ($configResult['error'] ?? 'Unknown');
             }
             
         } else {
-            // DHCP or Static IP (IPoE)
-            $ipBase = "{$wanConnDeviceBase}.WANIPConnection.{$connIndex}";
-            $wanName = "wan{$wanIndex}.{$connIndex}.ip{$connIndex}";
+            // Bridge Mode (DHCP/Static) - WANIPConnection with IP_Bridged
+            $createTasks = [
+                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
+                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.']
+            ];
             
-            // 1. VLAN first
+            $createResult = $this->pushTasks($deviceId, $createTasks);
+            $results['create_wan'] = $createResult;
+            
+            $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
+            $wanName = 'wan1.1.ip1';
+            
+            $params = [
+                ["{$ipBase}.ConnectionType", 'IP_Bridged', 'xsd:string']
+            ];
             if ($serviceVlan > 0) {
-                $vlanResult = $this->setParameterValues($deviceId, [
-                    ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt']
-                ]);
-                $results['vlan_config'] = $vlanResult;
-                if (!$vlanResult['success']) {
-                    $errors[] = 'Failed to set VLAN: ' . ($vlanResult['error'] ?? 'Unknown');
-                }
+                $params[] = ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
+            $params[] = ["{$ipBase}.Enable", true, 'xsd:boolean'];
             
-            // 2. IP settings
-            $ipParams = [];
-            $connectionName = $config['connection_name'] ?? 'Internet_DHCP';
-            $ipParams[] = ["{$ipBase}.Name", $connectionName, 'xsd:string'];
-            
-            if ($connectionType === 'dhcp') {
-                $ipParams[] = ["{$ipBase}.AddressingType", 'DHCP', 'xsd:string'];
-            } else {
-                $ipParams[] = ["{$ipBase}.AddressingType", 'Static', 'xsd:string'];
-                if (!empty($config['static_ip'])) {
-                    $ipParams[] = ["{$ipBase}.ExternalIPAddress", $config['static_ip'], 'xsd:string'];
-                }
-                if (!empty($config['static_mask'])) {
-                    $ipParams[] = ["{$ipBase}.SubnetMask", $config['static_mask'], 'xsd:string'];
-                }
-                if (!empty($config['static_gateway'])) {
-                    $ipParams[] = ["{$ipBase}.DefaultGateway", $config['static_gateway'], 'xsd:string'];
-                }
+            $configResult = $this->setParameterValues($deviceId, $params);
+            $results['bridge_config'] = $configResult;
+            if (!$configResult['success']) {
+                $errors[] = 'Bridge config failed: ' . ($configResult['error'] ?? 'Unknown');
             }
-            
-            // NAT
-            $ipParams[] = ["{$ipBase}.NATEnabled", true, 'xsd:boolean'];
-            
-            $ipResult = $this->setParameterValues($deviceId, $ipParams);
-            $results['ip_config'] = $ipResult;
-            if (!$ipResult['success']) {
-                $errors[] = 'Failed to configure IP connection: ' . ($ipResult['error'] ?? 'Unknown');
-            }
-            
-            // 3. Enable (after IP settings)
-            $enableResult = $this->setParameterValues($deviceId, [
-                ["{$ipBase}.Enable", true, 'xsd:boolean']
-            ]);
-            $results['enable_config'] = $enableResult;
-            if (!$enableResult['success']) {
-                $errors[] = 'Failed to enable connection: ' . ($enableResult['error'] ?? 'Unknown');
-            }
-            
-            // 4. Enable L3 (Router Mode) on ETH1-4 ports
-            if (!isset($config['skip_l3_enable']) || !$config['skip_l3_enable']) {
-                $l3Params = [
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable', true, 'xsd:boolean'],
-                    ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable', true, 'xsd:boolean']
-                ];
-                $l3Result = $this->setParameterValues($deviceId, $l3Params);
-                $results['l3_enable'] = $l3Result;
-            }
-        }
-        
-        // Step 2: Set provisioning code (optional - identifies configuration source)
-        if (!isset($config['skip_provisioning_code']) || !$config['skip_provisioning_code']) {
-            $provCode = $config['provisioning_code'] ?? 'sOLT.r' . strtoupper(substr($connectionType, 0, 3));
-            $provResult = $this->setParameterValues($deviceId, [
-                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', $provCode, 'xsd:string']
-            ]);
-            $results['provisioning_code'] = $provResult;
         }
         
         // Step 3: Log the action
         $this->logTR069Action($deviceId, 'internet_wan_config', [
             'connection_type' => $connectionType,
             'service_vlan' => $serviceVlan,
-            'wan_name' => $wanName,
+            'wan_name' => $wanName ?? 'unknown',
             'success' => empty($errors)
         ]);
         
@@ -1370,7 +1291,133 @@ class GenieACS {
             'message' => empty($errors) ? 'Internet WAN configured successfully' : 'Some errors occurred',
             'errors' => $errors,
             'results' => $results,
-            'wan_name' => $wanName
+            'wan_name' => $wanName ?? 'wan1.1.ppp1'
+        ];
+    }
+    
+    /**
+     * Secure device by disabling WAN HTTP access
+     */
+    public function secureDevice(string $deviceId): array {
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable', false, 'xsd:boolean']
+        ]);
+    }
+    
+    /**
+     * Provision WiFi VLAN Bridge (for guest networks or separate VLAN)
+     */
+    public function provisionBridge(string $deviceId, int $vlan): array {
+        $createTasks = [
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.']
+        ];
+        
+        $this->pushTasks($deviceId, $createTasks);
+        
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionType', 'IP_Bridged', 'xsd:string'],
+            ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_HW_VLAN', $vlan, 'xsd:unsignedInt'],
+            ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Enable', true, 'xsd:boolean']
+        ]);
+    }
+    
+    /**
+     * Configure WiFi interface - simple version (SSID, password, enable)
+     * Used by provisionCustomer for quick WiFi setup
+     */
+    public function configureWiFiSimple(string $deviceId, int $ssidIndex, string $ssid, string $password): array {
+        $wlanBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$ssidIndex}";
+        
+        return $this->setParameterValues($deviceId, [
+            ["{$wlanBase}.SSID", $ssid, 'xsd:string'],
+            ["{$wlanBase}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'],
+            ["{$wlanBase}.Enable", true, 'xsd:boolean'],
+            ["{$wlanBase}.WPS.Enable", false, 'xsd:boolean']
+        ]);
+    }
+    
+    /**
+     * Bind WiFi interface to WAN using policy routing
+     */
+    public function bindWiFiToWAN(string $deviceId, int $ssidIndex, string $wanName): array {
+        $createTask = [
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.']
+        ];
+        
+        $this->pushTasks($deviceId, $createTask);
+        
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PhyPortName', "SSID{$ssidIndex}", 'xsd:string'],
+            ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PolicyRouteType', 'SourcePhyPort', 'xsd:string'],
+            ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.WanName', $wanName, 'xsd:string']
+        ]);
+    }
+    
+    /**
+     * Full SmartOLT-style customer provisioning flow
+     */
+    public function provisionCustomer(string $deviceId, array $config): array {
+        $results = [];
+        $errors = [];
+        
+        $mode = $config['mode'] ?? 'route'; // route or bridge
+        $pppoeUser = $config['pppoe_username'] ?? '';
+        $pppoePass = $config['pppoe_password'] ?? '';
+        $internetVlan = (int)($config['internet_vlan'] ?? 0);
+        $wifiVlan = (int)($config['wifi_vlan'] ?? 0);
+        $ssid = $config['ssid'] ?? '';
+        $wifiKey = $config['wifi_password'] ?? '';
+        
+        // 1. Lock management access
+        $results['secure1'] = $this->secureDevice($deviceId);
+        
+        // 2. Internet service (PPPoE)
+        if ($mode === 'route' && !empty($pppoeUser)) {
+            $results['pppoe'] = $this->configureInternetWAN($deviceId, [
+                'connection_type' => 'pppoe',
+                'pppoe_username' => $pppoeUser,
+                'pppoe_password' => $pppoePass,
+                'service_vlan' => $internetVlan
+            ]);
+            if (!$results['pppoe']['success']) {
+                $errors[] = 'PPPoE failed';
+            }
+        }
+        
+        // 3. WiFi bridge VLAN (if different from internet VLAN)
+        if ($wifiVlan > 0 && $wifiVlan !== $internetVlan) {
+            $results['bridge'] = $this->provisionBridge($deviceId, $wifiVlan);
+        }
+        
+        // 4. WiFi setup
+        if (!empty($ssid) && !empty($wifiKey)) {
+            $results['wifi'] = $this->configureWiFiSimple($deviceId, 1, $ssid, $wifiKey);
+            if (!$results['wifi']['success']) {
+                $errors[] = 'WiFi failed';
+            }
+            
+            // 5. Bind WiFi to bridge WAN
+            if ($wifiVlan > 0) {
+                $results['bind'] = $this->bindWiFiToWAN($deviceId, 1, 'wan1.3.ip1');
+            }
+        }
+        
+        // 6. Lock again
+        $results['secure2'] = $this->secureDevice($deviceId);
+        
+        $this->logTR069Action($deviceId, 'provision_customer', [
+            'mode' => $mode,
+            'internet_vlan' => $internetVlan,
+            'wifi_vlan' => $wifiVlan,
+            'ssid' => $ssid,
+            'success' => empty($errors)
+        ]);
+        
+        return [
+            'success' => empty($errors),
+            'errors' => $errors,
+            'results' => $results
         ];
     }
     

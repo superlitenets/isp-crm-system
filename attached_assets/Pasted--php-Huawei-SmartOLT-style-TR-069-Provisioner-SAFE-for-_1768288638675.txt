@@ -1,0 +1,196 @@
+<?php
+
+/**
+ * Huawei SmartOLT-style TR-069 Provisioner
+ * SAFE for production
+ * Matches Huawei ONU firmware behavior
+ */
+
+class HuaweiSmartOLTProvisioner
+{
+    private string $acs;
+    private string $user;
+    private string $pass;
+
+    public function __construct(string $acsUrl, string $username, string $password)
+    {
+        $this->acs  = rtrim($acsUrl, '/');
+        $this->user = $username;
+        $this->pass = $password;
+    }
+
+    /* =========================================================
+       LOW LEVEL TASK PUSH
+    ========================================================= */
+
+    private function push(string $deviceId, array $tasks): void
+    {
+        $ch = curl_init("{$this->acs}/devices/$deviceId/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD        => "{$this->user}:{$this->pass}",
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($tasks),
+            CURLOPT_TIMEOUT        => 30
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+
+    /* =========================================================
+       STEP 1 — LOCK MANAGEMENT (NO WAN HTTP)
+    ========================================================= */
+
+    public function secureDevice(string $deviceId): void
+    {
+        $this->push($deviceId, [[
+            "name" => "setParameterValues",
+            "parameterValues" => [
+                ["InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable", false, "xsd:boolean"]
+            ]
+        ]]);
+    }
+
+    /* =========================================================
+       STEP 2 — ROUTE MODE (PPPoE)
+       Matches:
+       WANPPPConnection + X_HW_VLAN
+    ========================================================= */
+
+    public function provisionPPPoE(
+        string $deviceId,
+        string $pppoeUser,
+        string $pppoePass,
+        int $vlan
+    ): void {
+        $this->push($deviceId, [
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.WANDevice."],
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice."],
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection."],
+
+            ["name" => "setParameterValues",
+             "parameterValues" => [
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username", $pppoeUser, "xsd:string"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password", $pppoePass, "xsd:string"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled", true, "xsd:boolean"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN", $vlan, "xsd:unsignedInt"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable", true, "xsd:boolean"]
+             ]]
+        ]);
+    }
+
+    /* =========================================================
+       STEP 3 — BRIDGE MODE (Wi-Fi VLAN)
+       Matches:
+       WANIPConnection + IP_Bridged
+    ========================================================= */
+
+    public function provisionBridge(
+        string $deviceId,
+        int $vlan
+    ): void {
+        $this->push($deviceId, [
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice."],
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection."],
+
+            ["name" => "setParameterValues",
+             "parameterValues" => [
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionType", "IP_Bridged", "xsd:string"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.X_HW_VLAN", $vlan, "xsd:unsignedInt"],
+                ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Enable", true, "xsd:boolean"]
+             ]]
+        ]);
+    }
+
+    /* =========================================================
+       STEP 4 — WIFI CONFIGURATION
+    ========================================================= */
+
+    public function configureWiFi(
+        string $deviceId,
+        int $ssidIndex,
+        string $ssid,
+        string $wifiKey
+    ): void {
+        $this->push($deviceId, [[
+            "name" => "setParameterValues",
+            "parameterValues" => [
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.$ssidIndex.SSID", $ssid, "xsd:string"],
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.$ssidIndex.PreSharedKey.1.KeyPassphrase", $wifiKey, "xsd:string"],
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.$ssidIndex.Enable", true, "xsd:boolean"],
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.$ssidIndex.WPS.Enable", false, "xsd:boolean"]
+            ]
+        ]]);
+    }
+
+    /* =========================================================
+       STEP 5 — WIFI → WAN BINDING
+       Uses Huawei policy routing
+    ========================================================= */
+
+    public function bindWiFiToWAN(
+        string $deviceId,
+        int $ssidIndex,
+        string $wanName
+    ): void {
+        $this->push($deviceId, [
+
+            ["name" => "addObject",
+             "objectName" => "InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route."],
+
+            ["name" => "setParameterValues",
+             "parameterValues" => [
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PhyPortName", "SSID{$ssidIndex}", "xsd:string"],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PolicyRouteType", "SourcePhyPort", "xsd:string"],
+                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.WanName", $wanName, "xsd:string"]
+             ]]
+        ]);
+    }
+
+    /* =========================================================
+       FULL SMARTOLT-STYLE FLOW
+    ========================================================= */
+
+    public function provisionCustomer(
+        string $deviceId,
+        string $mode,              // route | bridge
+        string $pppoeUser,
+        string $pppoePass,
+        int $internetVlan,
+        int $wifiVlan,
+        string $ssid,
+        string $wifiKey
+    ): void {
+
+        // 1. Lock management access
+        $this->secureDevice($deviceId);
+
+        // 2. Internet service
+        if ($mode === 'route') {
+            $this->provisionPPPoE($deviceId, $pppoeUser, $pppoePass, $internetVlan);
+        }
+
+        // 3. Wi-Fi bridge VLAN
+        $this->provisionBridge($deviceId, $wifiVlan);
+
+        // 4. Wi-Fi setup
+        $this->configureWiFi($deviceId, 1, $ssid, $wifiKey);
+
+        // 5. Bind Wi-Fi to bridge WAN
+        $this->bindWiFiToWAN($deviceId, 1, "wan1.3.ip1");
+
+        // 6. Lock again (paranoia = good)
+        $this->secureDevice($deviceId);
+    }
+}
