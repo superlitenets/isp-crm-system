@@ -16389,6 +16389,7 @@ echo "# ================================================\n";
             
             // Check last inform time
             const device = genieData.device;
+            const genieacsDeviceId = device._id || deviceId;  // Extract GenieACS device ID from lookup
             const lastInform = device._lastInform ? new Date(device._lastInform) : null;
             const now = new Date();
             const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
@@ -16411,9 +16412,9 @@ echo "# ================================================\n";
                 if (recheckData.success && recheckData.device) {
                     const newLastInform = recheckData.device._lastInform ? new Date(recheckData.device._lastInform) : null;
                     if (newLastInform && newLastInform >= fiveMinutesAgo) {
-                        // Device is now reachable
+                        // Device is now reachable - use GenieACS device ID from lookup
                         showToast('ONU is reachable', 'success');
-                        openWifiConfigDirect(deviceId, serialNumber);
+                        openWifiConfigDirect(recheckData.device._id || genieacsDeviceId, serialNumber);
                         return;
                     }
                 }
@@ -16425,9 +16426,9 @@ echo "# ================================================\n";
                 return;
             }
             
-            // Device is reachable - open config modal
+            // Device is reachable - open config modal using GenieACS device ID
             showToast('ONU is reachable via ACS', 'success');
-            openWifiConfigDirect(deviceId, serialNumber);
+            openWifiConfigDirect(genieacsDeviceId, serialNumber);
             
         } catch (err) {
             hideToast(loadingToast);
