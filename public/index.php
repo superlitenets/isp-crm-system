@@ -1119,9 +1119,9 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
             'pppoe_username' => $_POST['pppoe_username'] ?? '',
             'pppoe_password' => $_POST['pppoe_password'] ?? '',
             'static_ip' => $_POST['static_ip'] ?? '',
-            'subnet_mask' => $_POST['subnet_mask'] ?? '255.255.255.0',
-            'gateway' => $_POST['gateway'] ?? '',
-            'dns_servers' => $_POST['dns_servers'] ?? '8.8.8.8,8.8.4.4',
+            'subnet_mask' => $_POST['static_mask'] ?? $_POST['subnet_mask'] ?? '255.255.255.0',
+            'gateway' => $_POST['static_gateway'] ?? $_POST['gateway'] ?? '',
+            'dns_servers' => $_POST['static_dns'] ?? $_POST['dns_servers'] ?? '8.8.8.8,8.8.4.4',
             'bind_lan_ports' => isset($_POST['bind_lan_ports']),
             'bind_wifi' => isset($_POST['bind_wifi'])
         ];
