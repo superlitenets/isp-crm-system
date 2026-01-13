@@ -604,11 +604,17 @@ class GenieACS {
             $params[] = ["{$basePath}.WPAEncryptionModes", 'AESEncryption', 'xsd:string'];
             $params[] = ["{$basePath}.WPAAuthenticationMode", 'PSKAuthentication', 'xsd:string'];
             
-            // Pre-shared key (password)
+            // Pre-shared key (password) - validate first
             if (!empty($password)) {
-                $params[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
-                // Also try KeyPassphrase for compatibility
-                $params[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+                // HG8546M and similar devices require 8-63 chars
+                if (strlen($password) < 8) {
+                    $errors[] = "WiFi password must be at least 8 characters";
+                } elseif (strlen($password) > 63) {
+                    $errors[] = "WiFi password must be 63 characters or less";
+                } else {
+                    // Use PreSharedKey only - KeyPassphrase path often doesn't exist on Huawei devices
+                    $params[] = ["{$basePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
+                }
             }
             
             // Channel (0 = auto)
@@ -631,8 +637,8 @@ class GenieACS {
                 if (!empty($ssid)) {
                     $altParams[] = ["{$altBasePath}.SSID", $ssid, 'xsd:string'];
                 }
-                if (!empty($password)) {
-                    $altParams[] = ["{$altBasePath}.PreSharedKey.1.KeyPassphrase", $password, 'xsd:string'];
+                if (!empty($password) && strlen($password) >= 8 && strlen($password) <= 63) {
+                    $altParams[] = ["{$altBasePath}.PreSharedKey.1.PreSharedKey", $password, 'xsd:string'];
                 }
                 if ($channel > 0) {
                     $altParams[] = ["{$altBasePath}.Channel", $channel, 'xsd:unsignedInt'];
