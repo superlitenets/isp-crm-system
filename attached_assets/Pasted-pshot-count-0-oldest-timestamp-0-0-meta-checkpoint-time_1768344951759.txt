@@ -1,0 +1,59 @@
+pshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 121951"}}
+isp_crm_nginx           | 93.174.93.12 - - [13/Jan/2026:22:53:47 +0000] "GET / HTTP/1.0" 301 169 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36" "-"
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 170 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont-srvprofile gpon all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (1191 chars)
+isp_crm_olt_service     | [Discovery] Parsed 2 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D53A8B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] CLI found 2 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D53A8B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D9044B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [OLT 1] SSH multi-line command (4 lines)
+isp_crm_olt_service     | [OLT 1] SSH sending: "ont-srvprofile gpon profile-id 20 profile-name HG8546M"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:01:53:55 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.82 - - [13/Jan/2026:22:53:55 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_db              | 2026-01-13 22:53:59.217 UTC [26] LOG:  checkpoint starting: time
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 78ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T22:54:00.783+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1768344840:783422][1:0x7ce3a9afb700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 113, snapshot max: 113 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 121951"}}
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_db              | 2026-01-13 22:54:03.872 UTC [26] LOG:  checkpoint complete: wrote 47 buffers (0.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.623 s, sync=0.025 s, total=4.656 s; sync files=34, longest=0.020 s, average=0.001 s; distance=310 kB, estimate=539 kB
+isp_crm_php             | [14-Jan-2026 01:54:16] WARNING: [pool www] server reached pm.max_children setting (5), consider raising it
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 131 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "ont-port eth 4 pots 1 catv 0"
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 59ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_nginx           | 185.16.39.146 - - [13/Jan/2026:22:54:46 +0000] "GET / HTTP/1.1" 301 169 "-" "Mozilla/5.0" "-"
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 104 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "commit"
+isp_crm_php             | NOTICE: PHP message: Failed to create service profile HG8546M on OLT 1: Unknown error
+isp_crm_olt_service     | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 71ms - Success: 2, Failed: 0
+isp_crm_olt_service     | [Discovery] Already running, skipping...
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T22:55:00.794+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1768344900:794831][1:0x7ce3a9afb700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 115, snapshot max: 115 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 121951"}}
+^C
