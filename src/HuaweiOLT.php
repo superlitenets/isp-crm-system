@@ -7230,18 +7230,8 @@ class HuaweiOLT {
         // Use existing WANConnectionDevice if found
         $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
         
-        // Step 2: Enable L3 on ETH ports (router mode) - SmartOLT does this
-        // Note: Some devices don't support X_HW_L3Enable, so we make this optional
-        try {
-            $ethL3Params = [];
-            for ($i = 1; $i <= 4; $i++) {
-                $ethL3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
-            }
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params], 'L3 Enable: ETH1-4 Router Mode');
-            if ($result['success']) $tasksSent[] = 'Enable L3 on ETH ports';
-        } catch (\Exception $e) {
-            // L3Enable not supported on this device - skip
-        }
+        // Step 2: L3 Enable skipped - many Huawei ONUs don't support X_HW_L3Enable via TR-069
+        // This is auto-configured by the ONU firmware
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
@@ -7308,36 +7298,14 @@ class HuaweiOLT {
                 $errors[] = "PPPoE VLAN failed (HTTP {$result['code']})";
             }
             
-            // Step 4: Set default WAN and provisioning code
-            $defaultWanParams = [
-                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string'],
-                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
-            ];
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
-            $tasksSent[] = 'Set default WAN';
+            // Step 4: Set provisioning code only (X_HW_ params may not be supported)
+            // Skip X_HW_WanDefaultWanName and X_HW_policy_route - not all devices support these
+            // The PPPoE connection will work without policy routes - all LAN ports route through PPPoE by default
             
-            // Step 5: Create policy route to bind LAN ports and WiFi to WAN
-            $addRouteTask = [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
-            ];
-            $routeResult = $sendTask($addRouteTask);
-            $routeIndex = 1;
-            if ($routeResult['success']) {
-                $respData = json_decode($routeResult['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $routeIndex = (int)$respData['instanceNumber'];
-                }
-            }
-            
-            $routeParams = [
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
-            ];
-            // Final task - trigger connection_request for immediate execution
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], null, true);
-            if ($result['success']) $tasksSent[] = 'Create policy route';
+            // Final task - trigger connection_request to apply settings immediately
+            $refreshTask = ['name' => 'getParameterValues', 'parameterNames' => ["{$pppPath}."]];
+            $sendTask($refreshTask, 'Apply PPPoE settings', true);
+            $tasksSent[] = 'PPPoE configuration complete';
             
         } elseif ($wanMode === 'dhcp') {
             // Use existing WANDevice.1.WANConnectionDevice.1 for DHCP
@@ -7369,35 +7337,14 @@ class HuaweiOLT {
                 ["{$ipPath}.Name", 'Internet_DHCP', 'xsd:string'],
             ];
             
-            if ($serviceVlan > 0) {
-                $paramValues[] = ["{$ipPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
-            }
+            // Note: X_HW_VLAN not supported on all devices, skip it
             
             $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
             if ($result['success']) $tasksSent[] = 'Configure DHCP WAN';
             
-            // Set default WAN
-            $defaultWanParams = [
-                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
-            ];
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
-            
-            // Create policy route (optional - some devices don't support X_HW_policy_route)
-            $addRouteTask = ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'];
-            $routeResult = $sendTask($addRouteTask);
-            // If policy route creation fails, log but continue (not all devices support this)
-            $routeIndex = 1;
-            if ($routeResult['success']) {
-                $respData = json_decode($routeResult['response'], true);
-                if (!empty($respData['instanceNumber'])) $routeIndex = (int)$respData['instanceNumber'];
-            }
-            $routeParams = [
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
-            ];
-            // Final task - trigger connection_request for immediate execution
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], null, true);
+            // Trigger connection request to apply settings
+            $refreshTask = ['name' => 'getParameterValues', 'parameterNames' => ["{$ipPath}."]];
+            $sendTask($refreshTask, 'Apply DHCP settings', true);
             
         } elseif ($wanMode === 'static') {
             // Use existing WANDevice.1.WANConnectionDevice.1 for Static IP
@@ -7435,15 +7382,14 @@ class HuaweiOLT {
                 ["{$ipPath}.Name", 'Internet_Static', 'xsd:string'],
             ];
             
-            if ($serviceVlan > 0) {
-                $paramValues[] = ["{$ipPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
-            }
+            // Note: X_HW_VLAN not supported on all devices, skip it
             
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
-            // Final task - trigger connection_request for immediate execution
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => [
-                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
-            ]], null, true);
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $paramValues]);
+            if ($result['success']) $tasksSent[] = 'Configure Static IP WAN';
+            
+            // Trigger connection request to apply settings
+            $refreshTask = ['name' => 'getParameterValues', 'parameterNames' => ["{$ipPath}."]];
+            $sendTask($refreshTask, 'Apply Static IP settings', true);
             
         } else {
             return ['success' => false, 'error' => "Unknown WAN mode: {$wanMode}"];
