@@ -1,0 +1,255 @@
+Below is a SmartOLT-grade improvement checklist, ordered by impact.
+
+This is exactly how commercial systems mature after they “work”.
+
+1️⃣ Make provisioning state-driven, not event-driven (HIGH IMPACT)
+
+Right now, provisioning is still trigger-based (inform, CRM action).
+
+Improve to a hard state machine
+
+Add explicit states and never skip them:
+
+DISCOVERED
+→ INFORMED
+→ OWNED
+→ TIME_SYNCED
+→ READY
+→ PROVISIONING
+→ ACTIVE
+→ FAILED
+
+Rules (non-negotiable)
+
+❌ No configs unless READY
+
+❌ No re-provision if ACTIVE
+
+❌ FAILED must backoff (not retry instantly)
+
+This alone eliminates:
+
+Duplicate WANs
+
+Reset loops
+
+“Worked after reboot” bugs
+
+2️⃣ Add connection-request diagnostics (VERY IMPORTANT)
+
+You already use ?connection_request, but you don’t observe its outcome.
+
+Add a watchdog:
+
+After pushing tasks:
+
+Wait 5–10 seconds
+
+Did a new Inform arrive?
+
+If not:
+
+Mark device WAITING_INFORM
+
+Do NOT retry
+
+Do NOT rebuild WAN
+
+Let periodic inform handle it
+
+This mimics SmartOLT’s silent fallback.
+
+3️⃣ Validate ConnectionRequestURL reachability (KEY FIX)
+
+Before attempting instant push, verify:
+
+ManagementServer.ConnectionRequestURL
+
+Improve by:
+
+Parsing IP from URL
+
+Verifying it’s in the management subnet
+
+Optionally pinging / TCP check from ACS host
+
+If unreachable:
+
+Skip instant push
+
+Log reason clearly
+
+This turns “it didn’t work” into actionable diagnostics.
+
+4️⃣ Add NTP gating as code, not logic (CRITICAL)
+
+You conceptually understand NTP gating — now enforce it.
+
+Hard rule in code:
+if ($year < 2020) {
+    pushNtpOnly();
+    return;
+}
+
+
+Never allow:
+
+WAN creation
+
+Wi-Fi
+
+Policy routing
+
+before time is valid.
+
+This removes:
+
+1981-01-01 issues
+
+Silent task failures
+
+Log corruption
+
+5️⃣ Introduce idempotent object handling (NEXT BIG STEP)
+
+You currently:
+
+Create objects
+
+Then set values
+
+Improve to:
+
+Detect existing WAN / PPP / policy
+
+Reuse instead of recreate
+
+Minimum improvement (practical)
+
+Store created instance paths once
+
+Reuse them on retries
+
+Example:
+
+WANPPPConnectionPath = WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+
+
+This avoids:
+
+WAN duplication
+
+Policy route explosion
+
+6️⃣ Add post-provision verification (QUALITY BOOST)
+
+After provisioning, always verify:
+
+WANPPPConnection.Status
+ExternalIPAddress
+
+
+Then:
+
+If OK → ACTIVE
+
+If not → FAILED (soft) → retry later
+
+Never assume success just because tasks returned Success.
+
+7️⃣ Implement safe rollback rules (STABILITY)
+
+If provisioning fails:
+
+❌ Do NOT delete WAN immediately
+
+❌ Do NOT reboot
+
+Instead:
+
+Disable WAN
+
+Clear policy routes
+
+Retry later
+
+This prevents customer outages during retries.
+
+8️⃣ Improve logging for humans (OPS QUALITY)
+
+Add reasoned logs, not raw events:
+
+❌ Bad:
+
+Provision failed
+
+
+✅ Good:
+
+Provision blocked: ConnectionRequestURL unreachable
+Provision blocked: Device time invalid
+Provision skipped: Device already ACTIVE
+
+
+This saves hours of troubleshooting.
+
+9️⃣ Add a cool-down / debounce window (SCALE)
+
+If ONU flaps:
+
+LOS
+
+Power reset
+
+Re-register
+
+Add:
+
+min 5–10 minutes between provisioning attempts
+
+
+SmartOLT does this silently.
+
+10️⃣ Optional but powerful: separate service layers
+
+Instead of “one provisioning blob”, split into:
+
+Core (ACS ownership, time, identity)
+
+Internet service (PPPoE)
+
+Access service (Wi-Fi, LAN)
+
+Extra services (IPTV, guest, VoIP)
+
+This lets you:
+
+Modify Wi-Fi without touching WAN
+
+Suspend service cleanly
+
+Add products later
+
+11️⃣ What NOT to touch (you did this right already)
+
+✔ Don’t add CLI provisioning
+✔ Don’t add SNMP config writes
+✔ Don’t enable WAN HTTP
+✔ Don’t force reboots
+✔ Don’t shorten inform interval too much
+
+You’re already past these traps.
+
+Final assessment (honest)
+
+You are now at ~90–95% of a commercial ACS platform.
+
+What remains is:
+
+Guardrails
+
+Observability
+
+Determinism
+
+Not protocol work.

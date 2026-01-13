@@ -6961,7 +6961,7 @@ class HuaweiOLT {
     public function configureWANViaTR069(int $onuDbId, array $config): array {
         $onu = $this->getONU($onuDbId);
         if (!$onu) {
-            return ['success' => false, 'error' => 'ONU not found'];
+            return ['success' => false, 'error' => 'Provision blocked: ONU not found'];
         }
         
         $genieacsId = $onu['genieacs_id'] ?? null;
@@ -6985,7 +6985,62 @@ class HuaweiOLT {
         }
         
         if (empty($genieacsId)) {
-            return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
+            return ['success' => false, 'error' => 'Provision blocked: ONU not registered in GenieACS'];
+        }
+        
+        // GUARDRAIL 1: Cool-down check - prevent rapid re-provisioning (5 min minimum)
+        $cooldownMinutes = 5;
+        $lastProvision = $onu['last_provision_at'] ?? null;
+        if ($lastProvision) {
+            $lastProvisionTime = strtotime($lastProvision);
+            $cooldownEnd = $lastProvisionTime + ($cooldownMinutes * 60);
+            if (time() < $cooldownEnd) {
+                $waitSeconds = $cooldownEnd - time();
+                return [
+                    'success' => false, 
+                    'error' => "Provision blocked: Cool-down active. Please wait {$waitSeconds} seconds before retrying.",
+                    'cooldown_remaining' => $waitSeconds
+                ];
+            }
+        }
+        
+        // GUARDRAIL 2: Check device time via GenieACS (NTP gating)
+        $genieacsUrl = $this->getGenieACSUrl();
+        if ($genieacsUrl) {
+            $queryUrl = "{$genieacsUrl}/devices?query=" . urlencode('{"_id":"' . $genieacsId . '"}');
+            $ch = curl_init($queryUrl);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]);
+            $deviceData = curl_exec($ch);
+            curl_close($ch);
+            
+            if ($deviceData) {
+                $devices = json_decode($deviceData, true);
+                $device = $devices[0] ?? null;
+                if ($device) {
+                    // Check device time from DeviceInfo.X_HW_SysTime or similar
+                    $deviceTime = $device['InternetGatewayDevice']['DeviceInfo']['X_HW_SysTime']['_value'] ?? null;
+                    if ($deviceTime) {
+                        $deviceYear = (int)date('Y', strtotime($deviceTime));
+                        if ($deviceYear < 2020) {
+                            // Push NTP config only, then return
+                            $this->pushNTPConfigOnly($genieacsId, $genieacsUrl);
+                            return [
+                                'success' => false,
+                                'error' => "Provision blocked: Device time invalid (year {$deviceYear}). NTP pushed, will retry after time sync.",
+                                'requires_time_sync' => true
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update last_provision_at timestamp
+        try {
+            $stmt = $this->db->prepare("UPDATE huawei_onus SET last_provision_at = NOW() WHERE id = ?");
+            $stmt->execute([$onuDbId]);
+        } catch (\Exception $e) {
+            // Column may not exist yet, ignore
         }
         
         $wanMode = $config['wan_mode'] ?? '';
@@ -7773,6 +7828,96 @@ class HuaweiOLT {
             // Table likely already exists or column already correct, ignore
             $checked = true;
         }
+    }
+    
+    /**
+     * Push NTP configuration only (used when device time is invalid)
+     */
+    private function pushNTPConfigOnly(string $genieacsId, string $genieacsUrl): array {
+        $ntpParams = [
+            ['InternetGatewayDevice.Time.Enable', true, 'xsd:boolean'],
+            ['InternetGatewayDevice.Time.NTPServer1', 'pool.ntp.org', 'xsd:string'],
+            ['InternetGatewayDevice.Time.NTPServer2', 'time.google.com', 'xsd:string'],
+            ['InternetGatewayDevice.Time.LocalTimeZoneName', 'UTC', 'xsd:string'],
+        ];
+        
+        $task = ['name' => 'setParameterValues', 'parameterValues' => $ntpParams];
+        $requestJson = json_encode($task);
+        
+        $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $requestJson,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 30
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return [
+            'success' => $httpCode >= 200 && $httpCode < 300,
+            'message' => 'NTP configuration pushed',
+            'http_code' => $httpCode
+        ];
+    }
+    
+    /**
+     * Verify WAN provisioning status after configuration
+     */
+    public function verifyWANProvisioning(int $onuDbId): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu || empty($onu['genieacs_id'])) {
+            return ['success' => false, 'error' => 'ONU or GenieACS ID not found'];
+        }
+        
+        $genieacsUrl = $this->getGenieACSUrl();
+        if (!$genieacsUrl) {
+            return ['success' => false, 'error' => 'GenieACS not configured'];
+        }
+        
+        // Query device for WAN status
+        $queryUrl = "{$genieacsUrl}/devices?query=" . urlencode('{"_id":"' . $onu['genieacs_id'] . '"}');
+        $ch = curl_init($queryUrl);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10]);
+        $deviceData = curl_exec($ch);
+        curl_close($ch);
+        
+        if (!$deviceData) {
+            return ['success' => false, 'error' => 'Could not query GenieACS'];
+        }
+        
+        $devices = json_decode($deviceData, true);
+        $device = $devices[0] ?? null;
+        if (!$device) {
+            return ['success' => false, 'error' => 'Device not found'];
+        }
+        
+        // Check PPPoE connection status
+        $wanStatus = null;
+        $externalIP = null;
+        $pppConnection = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['1']['WANPPPConnection']['1'] ?? null;
+        
+        if ($pppConnection) {
+            $wanStatus = $pppConnection['ConnectionStatus']['_value'] ?? null;
+            $externalIP = $pppConnection['ExternalIPAddress']['_value'] ?? null;
+        }
+        
+        $isConnected = $wanStatus === 'Connected';
+        $hasPublicIP = !empty($externalIP) && $externalIP !== '0.0.0.0';
+        
+        return [
+            'success' => true,
+            'wan_status' => $wanStatus,
+            'external_ip' => $externalIP,
+            'is_connected' => $isConnected,
+            'has_public_ip' => $hasPublicIP,
+            'provisioning_complete' => $isConnected && $hasPublicIP,
+            'message' => $isConnected 
+                ? ($hasPublicIP ? "WAN connected with IP: {$externalIP}" : "WAN connected but no public IP yet")
+                : "WAN not connected (status: " . ($wanStatus ?? 'unknown') . ")"
+        ];
     }
     
     /**
