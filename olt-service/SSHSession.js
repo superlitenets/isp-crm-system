@@ -27,7 +27,8 @@ class SSHSession {
             this.client.on('ready', () => {
                 console.log(`[OLT ${this.oltId}] SSH connected to ${this.config.host}`);
                 
-                this.client.shell({ term: 'vt100', cols: 200, rows: 50 }, (err, stream) => {
+                // Use 'dumb' terminal to prevent VT100 escape sequence issues that strip spaces
+                this.client.shell({ term: 'dumb', cols: 200, rows: 50, modes: {} }, (err, stream) => {
                     if (err) {
                         clearTimeout(timeout);
                         reject(err);

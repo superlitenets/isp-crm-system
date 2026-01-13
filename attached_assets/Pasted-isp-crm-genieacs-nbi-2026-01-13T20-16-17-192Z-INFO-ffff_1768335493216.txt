@@ -1,0 +1,137 @@
+isp_crm_genieacs_nbi    | 2026-01-13T20:16:17.192Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:17 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:16:17 +0000] "GET /?page=api&action=check_tr069_reachability&serial=48575443F2D53A8B HTTP/2.0" 200 111 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_db              | 2026-01-13 20:16:17.434 UTC [80] ERROR:  relation "genieacs_config" does not exist at character 15
+isp_crm_db              | 2026-01-13 20:16:17.434 UTC [80] STATEMENT:  SELECT * FROM genieacs_config WHERE is_active = TRUE LIMIT 1
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:17 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:16:17 +0000] "GET /?page=api&action=get_wan_config&onu_id=86198 HTTP/2.0" 200 1848 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:19 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:16:19 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_nbi    | 2026-01-13T20:16:22.866Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_db              | 2026-01-13 20:16:22.904 UTC [82] ERROR:  column "last_provision_at" of relation "huawei_onus" does not exist at character 24
+isp_crm_db              | 2026-01-13 20:16:22.904 UTC [82] STATEMENT:  UPDATE huawei_onus SET last_provision_at = NOW() WHERE id = $1
+isp_crm_genieacs_nbi    | 2026-01-13T20:16:22.926Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-13T20:16:23.004Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86198, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Calling OMCI to create PPPoE WAN structure first...
+isp_crm_olt_service     | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service     | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service     | [OLT 1] SSH sending: "ont wan-config 0 1 ip-index 1 profile-id 1 wan-mode pppoe pppoe-proxy enable vlan 902 priority 0"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_freepbx         | [INFO] ** [cron] Starting cron
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 83ms - Success: 2, Failed: 0
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:16:39 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86192" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0" "-"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:49 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:16:49 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 201 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [OLT 1] SSH multi-line command (3 lines)
+isp_crm_olt_service     | [OLT 1] SSH sending: "interface gpon 0/1"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (659 chars)
+isp_crm_olt_service     | [Discovery] Parsed 1 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] First ONU: {"index":"1","fsp":"0/1/0","sn":"48575443F2D9044B","vendorId":"HWTC","version":"10C7.A","softwareVer":"V5R019C10S125","eqid":"HG8546M"}
+isp_crm_olt_service     | [Discovery] CLI found 1 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Matched 48575443F2D9044B (HG8546M) to ONU type ID 5
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [OLT 1] SSH sending: "ont ipconfig 0 1 pppoe vlan 902 priority 0"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_olt_service     | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service     | [OLT 1] SSH sending: "service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902 tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 87ms - Success: 2, Failed: 0
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:08.436+00:00"},"s":"I",  "c":"STORAGE",  "id":22430,   "ctx":"WTCheckpointThread","msg":"WiredTiger message","attr":{"message":"[1768335428:436946][1:0x742d3f003700], WT_SESSION.checkpoint: [WT_VERB_CHECKPOINT_PROGRESS] saving checkpoint snapshot min: 138, snapshot max: 138 snapshot count: 0, oldest timestamp: (0, 0) , meta checkpoint timestamp: (0, 0) base write gen: 121293"}}
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:17:09 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:17:09 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86192" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0" "-"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:17:19 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:17:19 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 292 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] OMCI result: {"success":true,"message":"PPPoE WAN configured via OMCI. Credentials queued for TR-069 push when device connects to ACS.","pppoe_vlan":902,"errors":[],"output":"[Step 1: PPPoE WAN Config]\ninterface gpon 0\/1\r\n\r\nMA5683T(config-if-gpon-0\/1)#ont wan-config01ip-index1profile-id1wan-modepppoeppp \u001b[1Doe-proxyenablevlan902priority0\r\n                                ^\r\n  % Unknown command, the error locates at '^'\r\n\r\nMA5683T(config-if-gpon-0\/1)#quit\r\n\r\nMA5683T(config)#\n[Step 1 Alt: PPPoE via ipconfig]\ninterface gpon 0\/1\r\n\r\nMA5683T(config-if-gpon-0\/1)#ont ipconfig 0 1 pppoe vlan 902 priority 0\r\n{ <cr> }:quit\r\n\r\n  Command:\r\n          ont ipconfig 0 1 pppoe vlan 902 priority 0 quit\r\n                                                     ^\r\n  % Too many parameters, the error locates at '^'\r\n\r\nMA5683T(config-if-gpon-0\/1)#\n[Step 2: Service Port for PPPoE]\nservice-portvlan902gpon0\/1\/0ont1gemport2multi-servic \u001b[1Deuser-vlan902tag-transformtranslateinboundtraffic-tableindex8outboundtraffic-tab \u001b[1Dleindex9\r\n                            ^\r\n  % Unknown command, the error locates at '^'\r\n\r\nMA5683T(config-if-gpon-0\/1)#\r\n\r\nMA5683T(config-if-gpon-0\/1)#\n[Note: Service port may already exist from authorization]\n[Step 3: TR-069 Config Queued]\nPPPoE credentials queued for TR-069 push\n"}
+isp_crm_olt_service     | [Discovery] Parsing autofind output (155 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Marked 48575443F2D9044B as authorized (no longer in autofind)
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_genieacs_nbi    | 2026-01-13T20:17:28.826Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:29.121+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37382","connectionId":342,"connectionCount":323}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:29.122+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37396","connectionId":343,"connectionCount":324}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:29.124+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn342","msg":"client metadata","attr":{"remote":"172.18.0.9:37382","client":"conn342","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:29.125+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn343","msg":"client metadata","attr":{"remote":"172.18.0.9:37396","client":"conn343","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:29.267Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="61" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:29.314Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bb9019c710000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 200
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (155 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_genieacs_nbi    | 2026-01-13T20:17:32.556Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] No PPPoE connection found in device tree - creating new WAN structure
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Creating WANConnectionDevice.2
+isp_crm_genieacs_nbi    | 2026-01-13T20:17:32.585Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:32.871+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37400","connectionId":344,"connectionCount":325}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:32.872+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37412","connectionId":345,"connectionCount":326}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:32.875+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn344","msg":"client metadata","attr":{"remote":"172.18.0.9:37400","client":"conn344","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:32.876+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn345","msg":"client metadata","attr":{"remote":"172.18.0.9:37412","client":"conn345","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:33.033Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="62" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:33.076Z [WARN] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_6966a85c4f9a48bc5279dd6a" retries=0 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:33.100Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bb901ab220000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] addObject WANConnectionDevice: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Creating WANPPPConnection under WANConnectionDevice.2
+isp_crm_genieacs_nbi    | 2026-01-13T20:17:36.306Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:36.590+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37428","connectionId":346,"connectionCount":327}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:36.591+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.9:37432","connectionId":347,"connectionCount":328}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:36.595+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn346","msg":"client metadata","attr":{"remote":"172.18.0.9:37428","client":"conn346","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T20:17:36.597+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn347","msg":"client metadata","attr":{"remote":"172.18.0.9:37432","client":"conn347","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:36.741Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="63" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:36.782Z [WARN] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_6966a860f3f46121cd22f7a1" retries=0 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_genieacs_cwmp   | 2026-01-13T20:17:36.802Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bb901b9a30000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] addObject WANPPPConnection: HTTP 202
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 84ms - Success: 2, Failed: 0
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:17:39 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:17:39 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86192" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0" "-"
+isp_crm_genieacs_nbi    | 2026-01-13T20:17:42.040Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] After creation, PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Failed to create PPPoE connection - device may not support TR-069 object creation
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:23:16:22 +0300 "POST /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:20:17:42 +0000] "POST /?page=api&action=configure_wan_tr069 HTTP/2.0" 200 241 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+^C
