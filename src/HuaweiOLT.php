@@ -7237,54 +7237,122 @@ class HuaweiOLT {
         if ($wanMode === 'pppoe') {
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
             
-            // Step 1: Discover WAN tree to find available WANConnectionDevice
-            $discoverTask = [
-                'name' => 'getParameterValues',
-                'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
-            ];
-            $discoverResult = $sendTask($discoverTask, 'Discover WAN tree');
-            error_log("[WAN_CONFIG] WAN discovery result: HTTP {$discoverResult['code']}");
+            // Use WANConnectionDevice.1 which exists (has management WAN)
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
             
-            // Parse discovery to find existing WANConnectionDevice paths
-            $wanConnDeviceIndex = 1; // Default to .1 which should exist (management WAN)
-            if ($discoverResult['success']) {
-                $taskData = json_decode($discoverResult['response'], true);
-                error_log("[WAN_CONFIG] Discovery response: " . substr($discoverResult['response'] ?? '', 0, 500));
+            // Step 1: Discover existing WANPPPConnection instances
+            $discoverPppTask = [
+                'name' => 'getParameterValues',
+                'parameterNames' => ["{$wanConnPath}.WANPPPConnection."]
+            ];
+            // Send with connection_request to get immediate response
+            $discoverUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
+            $discoverResult = $sendTask($discoverPppTask, 'Discover WANPPPConnection');
+            error_log("[WAN_CONFIG] WANPPPConnection discovery result: HTTP {$discoverResult['code']}");
+            
+            // Wait briefly for the device to respond (connection request takes ~1s)
+            usleep(2000000); // 2 second wait
+            
+            // Check device data for existing WANPPPConnection instances
+            $deviceDataUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId);
+            $ch = curl_init($deviceDataUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            $deviceData = curl_exec($ch);
+            curl_close($ch);
+            
+            $pppConnIndex = null;
+            $existingInstances = [];
+            
+            if ($deviceData) {
+                $device = json_decode($deviceData, true);
+                // Parse device data to find WANPPPConnection instances
+                // GenieACS stores parameters like: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username
+                foreach ($device as $key => $value) {
+                    if (preg_match('/WANConnectionDevice\.1\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
+                        $existingInstances[(int)$matches[1]] = true;
+                    }
+                }
+                $existingInstances = array_keys($existingInstances);
+                sort($existingInstances);
+                error_log("[WAN_CONFIG] Existing WANPPPConnection instances: " . json_encode($existingInstances));
             }
             
-            // Use WANConnectionDevice.1 which is known to exist (has management WAN)
-            // WANConnectionDevice.2 may not exist on all devices
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanConnDeviceIndex}";
-            error_log("[WAN_CONFIG] Using WAN connection path: {$wanConnPath}");
-            
-            // Step 2: Create WANPPPConnection object under existing WANConnectionDevice
-            $addPppTask = [
-                'name' => 'addObject',
-                'objectName' => "{$wanConnPath}.WANPPPConnection."
-            ];
-            $addResult = $sendTask($addPppTask, 'Create WANPPPConnection');
-            error_log("[WAN_CONFIG] addObject WANPPPConnection result: HTTP {$addResult['code']}, response: " . substr($addResult['response'] ?? '', 0, 300));
-            
-            $pppConnIndex = 1;
-            if ($addResult['success']) {
-                $tasksSent[] = 'Created WANPPPConnection';
-                $respData = json_decode($addResult['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $pppConnIndex = (int)$respData['instanceNumber'];
-                    error_log("[WAN_CONFIG] New WANPPPConnection instance: {$pppConnIndex}");
-                } else {
-                    // Check if response has the instance in a different format
-                    error_log("[WAN_CONFIG] No instanceNumber in response, using default 1");
-                }
+            if (count($existingInstances) > 0) {
+                // Use the highest instance number (most recent) or find one without PPPoE configured
+                $pppConnIndex = max($existingInstances);
+                error_log("[WAN_CONFIG] Using existing WANPPPConnection instance: {$pppConnIndex}");
+                $tasksSent[] = "Using existing WANPPPConnection.{$pppConnIndex}";
             } else {
-                // If addObject failed, check if WANPPPConnection already exists
-                error_log("[WAN_CONFIG] addObject failed - WANPPPConnection may already exist, trying instance 2");
-                // Try instance 2 since instance 1 might be in use by management
-                $pppConnIndex = 2;
+                // No existing instances - need to create one and wait for Inform
+                error_log("[WAN_CONFIG] No WANPPPConnection found, creating new one");
+                
+                $addPppTask = [
+                    'name' => 'addObject',
+                    'objectName' => "{$wanConnPath}.WANPPPConnection."
+                ];
+                $addResult = $sendTask($addPppTask, 'Create WANPPPConnection');
+                error_log("[WAN_CONFIG] addObject result: HTTP {$addResult['code']}");
+                
+                if ($addResult['success']) {
+                    $tasksSent[] = 'Created WANPPPConnection (pending Inform)';
+                    
+                    // Trigger connection request and wait for Inform
+                    $connReqTask = ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']];
+                    $connReqUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
+                    $ch = curl_init($connReqUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_POST => true,
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_POSTFIELDS => json_encode($connReqTask),
+                        CURLOPT_TIMEOUT => 10
+                    ]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                    
+                    // Wait for Inform (device needs to respond with new instance)
+                    error_log("[WAN_CONFIG] Waiting 5s for device Inform after addObject...");
+                    sleep(5);
+                    
+                    // Re-fetch device data to find new instance
+                    $ch = curl_init($deviceDataUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 10
+                    ]);
+                    $deviceData = curl_exec($ch);
+                    curl_close($ch);
+                    
+                    if ($deviceData) {
+                        $device = json_decode($deviceData, true);
+                        $newInstances = [];
+                        foreach ($device as $key => $value) {
+                            if (preg_match('/WANConnectionDevice\.1\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
+                                $newInstances[(int)$matches[1]] = true;
+                            }
+                        }
+                        $newInstances = array_keys($newInstances);
+                        sort($newInstances);
+                        error_log("[WAN_CONFIG] After Inform, WANPPPConnection instances: " . json_encode($newInstances));
+                        
+                        if (count($newInstances) > 0) {
+                            $pppConnIndex = max($newInstances);
+                            error_log("[WAN_CONFIG] Using new instance: {$pppConnIndex}");
+                        }
+                    }
+                }
+                
+                if ($pppConnIndex === null) {
+                    error_log("[WAN_CONFIG] Failed to create/find WANPPPConnection instance");
+                    return ['success' => false, 'error' => 'Failed to create PPPoE connection object. Please try again in 30 seconds.'];
+                }
             }
             
             $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
-            $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
+            $wanName = "wan1.1.ppp{$pppConnIndex}";
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)

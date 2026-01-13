@@ -1,0 +1,45 @@
+
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:49 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:49 +0000] "GET /?page=api&action=get_onu_details&id=86198 HTTP/2.0" 200 1615 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:49.875Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:49 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:49 +0000] "GET /?page=huawei-olt&action=get_tr069_device_info&onu_id=86198 HTTP/2.0" 200 287 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:49.993Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:49 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:50 +0000] "GET /?page=huawei-olt&action=get_tr069_device_info&onu_id=86198 HTTP/2.0" 200 287 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | NOTICE: PHP message: [TR069 Reachability] Checking serial: 48575443F2D53A8B
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:53.975Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:53 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:53 +0000] "GET /?page=api&action=check_tr069_reachability&serial=48575443F2D53A8B HTTP/2.0" 200 110 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_db              | 2026-01-13 19:32:54.092 UTC [4882] ERROR:  relation "genieacs_config" does not exist at character 15
+isp_crm_db              | 2026-01-13 19:32:54.092 UTC [4882] STATEMENT:  SELECT * FROM genieacs_config WHERE is_active = TRUE LIMIT 1
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:54 +0000] "GET /?page=api&action=get_wan_config&onu_id=86198 HTTP/2.0" 200 1848 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:54 +0300 "GET /index.php" 200
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 94ms - Success: 2, Failed: 0
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:56.935Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_db              | 2026-01-13 19:32:56.951 UTC [4883] ERROR:  column "last_provision_at" of relation "huawei_onus" does not exist at character 24
+isp_crm_db              | 2026-01-13 19:32:56.951 UTC [4883] STATEMENT:  UPDATE huawei_onus SET last_provision_at = NOW() WHERE id = $1
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:56.959Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.004Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86198, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.017Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] WAN discovery result: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovery response: {"name":"getParameterValues","parameterNames":["InternetGatewayDevice.WANDevice.1.WANConnectionDevice."],"device":"00259E-HG8546M-48575443F2D53A8B","timestamp":"2026-01-13T19:32:57.024Z","_id":"69669de9b5ae2582a049d508"}
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Using WAN connection path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.035Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] addObject WANPPPConnection result: HTTP 202, response: {"name":"addObject","objectName":"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.","device":"00259E-HG8546M-48575443F2D53A8B","timestamp":"2026-01-13T19:32:57.044Z","_id":"69669de9bb78f316cf701195"}
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] No instanceNumber in response, using default 1
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE Path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1, Username: muturi@superlite.co.ke, VLAN: 902
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.059Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.079Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Credentials task result: HTTP 202, success: true
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Credentials response: {"name":"setParameterValues","parameterValues":[["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ConnectionType","IP_Routed","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","muturi@superlite.co.ke","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","Mgathoni.2016"
+isp_crm_genieacs_nbi    | 2026-01-13T19:32:57.100Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_cwmp   | 2026-01-13T19:32:57.224Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="49" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-13T19:32:57.247Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bb8d8d6e90000" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-13T19:32:57.324Z [WARN] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Channel has faulted; channel="task_69669de9bb78f316cf701195" retries=0 faultCode="script.Error" faultMessage="Invalid parameter path"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:32:56 +0300 "POST /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:32:57 +0000] "POST /?page=api&action=configure_wan_tr069 HTTP/2.0" 200 237 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86198" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"

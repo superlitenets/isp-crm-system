@@ -1,0 +1,184 @@
+Perfect — this log finally shows the real failure, and now we can be 100% precise.
+
+You have made progress (good discovery + addObject), but you’ve hit a classic GenieACS + TR-069 trap.
+
+🔴 The exact failure (now confirmed)
+
+This line is the key:
+
+[WARN] Channel has faulted;
+faultCode="script.Error"
+faultMessage="Invalid parameter path"
+
+
+And it references:
+
+task_69669de9bb78f316cf701195
+
+
+👉 That task is the setParameterValues you sent immediately after addObject.
+
+🧠 What actually happened (important)
+
+Let’s replay the sequence exactly as the device sees it:
+
+1️⃣ You sent:
+addObject:
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.
+
+
+GenieACS accepted it:
+
+HTTP 202
+
+
+✅ So far so good.
+
+2️⃣ You assumed the instance number is .1
+
+Your log confirms this assumption:
+
+[WAN_CONFIG] No instanceNumber in response, using default 1
+
+
+🚨 This is the mistake.
+
+3️⃣ Reality in TR-069
+
+In TR-069:
+
+addObject does NOT create the instance immediately
+
+The instance number is:
+
+Assigned by the CPE
+
+Only visible after the next Inform
+
+GenieACS does not return the instance number synchronously
+
+So when you immediately send:
+
+WANPPPConnection.1.Username
+
+
+The ONU responds:
+
+Invalid parameter path
+
+
+Because WANPPPConnection.1 does not exist yet.
+
+✅ Why this time you DO see an error
+
+Earlier:
+
+You were writing to a non-existent path → Huawei silently ignored it
+
+Now:
+
+You are writing to a partially-created object
+
+Huawei correctly faults with Invalid parameter path
+
+This is actually progress.
+
+❗ Golden rule (this fixes everything)
+
+You MUST wait for a full Inform AFTER addObject before setting parameters
+
+There is no shortcut.
+
+✅ Correct, production-safe PPPoE flow (FINAL)
+STEP 1 — Discover WANConnectionDevice (you did this ✔)
+getParameterValues:
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.
+
+
+✔ Correct
+
+STEP 2 — addObject WANPPPConnection (you did this ✔)
+addObject:
+InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.
+
+
+✔ Correct
+
+❌ STEP 3 — You skipped this (this is the bug)
+YOU MUST WAIT FOR INFORM
+
+Do nothing until:
+
+Inform received
+
+STEP 4 — Re-discover WANPPPConnection (mandatory)
+
+After the Inform, send:
+
+{
+  "name": "getParameterValues",
+  "parameterNames": [
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection."
+  ]
+}
+
+
+Now parse the response and find the actual instance number:
+
+Example:
+
+WANPPPConnection.3
+
+
+⚠️ It may NOT be .1.
+
+STEP 5 — Only now set credentials (this will work)
+{
+  "name": "setParameterValues",
+  "parameterValues": [
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.3.Username", "..."],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.3.Password", "..."],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.3.X_HW_VLAN", 902],
+    ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.3.Enable", true]
+  ]
+}
+
+🔧 What you MUST change in your PHP code
+❌ Current (broken)
+addObject(...);
+$instance = 1; // ❌ WRONG
+setParameterValues(...WANPPPConnection.1...);
+
+✅ Correct (robust)
+addObject(...);
+
+// STOP here
+return [
+  'state' => 'WAITING_FOR_INFORM',
+  'next_action' => 'DISCOVER_PPP_INSTANCE'
+];
+
+
+Then on next Inform / next request:
+
+$instances = discoverWanPppConnections();
+$instance = max($instances); // or last created
+setPppoeCredentials($instance);
+
+🧩 Why SmartOLT & others use state machines
+
+This is exactly why single-shot provisioning does not work.
+
+You MUST split provisioning into states:
+
+DISCOVER
+
+CREATE
+
+WAIT
+
+VERIFY
+
+CONFIGURE
+
+You are now implementing this correctly — you just need the WAIT + VERIFY steps.
