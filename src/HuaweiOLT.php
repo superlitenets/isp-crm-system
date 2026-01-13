@@ -7237,122 +7237,94 @@ class HuaweiOLT {
         if ($wanMode === 'pppoe') {
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
             
-            // Use WANConnectionDevice.1 which exists (has management WAN)
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
-            
-            // Step 1: Discover existing WANPPPConnection instances
-            $discoverPppTask = [
-                'name' => 'getParameterValues',
-                'parameterNames' => ["{$wanConnPath}.WANPPPConnection."]
-            ];
-            // Send with connection_request to get immediate response
-            $discoverUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
-            $discoverResult = $sendTask($discoverPppTask, 'Discover WANPPPConnection');
-            error_log("[WAN_CONFIG] WANPPPConnection discovery result: HTTP {$discoverResult['code']}");
-            
-            // Wait briefly for the device to respond (connection request takes ~1s)
-            usleep(2000000); // 2 second wait
-            
-            // Check device data for existing WANPPPConnection instances
+            // SmartOLT approach: OMCI creates WANDevice tree, TR-069 only modifies
+            // First, fetch device data to discover the actual WAN hierarchy
             $deviceDataUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId);
             $ch = curl_init($deviceDataUrl);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10
+                CURLOPT_TIMEOUT => 15
             ]);
             $deviceData = curl_exec($ch);
             curl_close($ch);
             
-            $pppConnIndex = null;
-            $existingInstances = [];
+            $wanTree = [];
+            $pppConnections = [];
             
             if ($deviceData) {
                 $device = json_decode($deviceData, true);
-                // Parse device data to find WANPPPConnection instances
-                // GenieACS stores parameters like: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username
-                foreach ($device as $key => $value) {
-                    if (preg_match('/WANConnectionDevice\.1\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
-                        $existingInstances[(int)$matches[1]] = true;
-                    }
-                }
-                $existingInstances = array_keys($existingInstances);
-                sort($existingInstances);
-                error_log("[WAN_CONFIG] Existing WANPPPConnection instances: " . json_encode($existingInstances));
-            }
-            
-            if (count($existingInstances) > 0) {
-                // Use the highest instance number (most recent) or find one without PPPoE configured
-                $pppConnIndex = max($existingInstances);
-                error_log("[WAN_CONFIG] Using existing WANPPPConnection instance: {$pppConnIndex}");
-                $tasksSent[] = "Using existing WANPPPConnection.{$pppConnIndex}";
-            } else {
-                // No existing instances - need to create one and wait for Inform
-                error_log("[WAN_CONFIG] No WANPPPConnection found, creating new one");
-                
-                $addPppTask = [
-                    'name' => 'addObject',
-                    'objectName' => "{$wanConnPath}.WANPPPConnection."
-                ];
-                $addResult = $sendTask($addPppTask, 'Create WANPPPConnection');
-                error_log("[WAN_CONFIG] addObject result: HTTP {$addResult['code']}");
-                
-                if ($addResult['success']) {
-                    $tasksSent[] = 'Created WANPPPConnection (pending Inform)';
-                    
-                    // Trigger connection request and wait for Inform
-                    $connReqTask = ['name' => 'getParameterValues', 'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']];
-                    $connReqUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
-                    $ch = curl_init($connReqUrl);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_POST => true,
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_POSTFIELDS => json_encode($connReqTask),
-                        CURLOPT_TIMEOUT => 10
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
-                    
-                    // Wait for Inform (device needs to respond with new instance)
-                    error_log("[WAN_CONFIG] Waiting 5s for device Inform after addObject...");
-                    sleep(5);
-                    
-                    // Re-fetch device data to find new instance
-                    $ch = curl_init($deviceDataUrl);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 10
-                    ]);
-                    $deviceData = curl_exec($ch);
-                    curl_close($ch);
-                    
-                    if ($deviceData) {
-                        $device = json_decode($deviceData, true);
-                        $newInstances = [];
-                        foreach ($device as $key => $value) {
-                            if (preg_match('/WANConnectionDevice\.1\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
-                                $newInstances[(int)$matches[1]] = true;
+                if (is_array($device)) {
+                    // Parse device data to find all WANPPPConnection paths
+                    // GenieACS stores like: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.Username
+                    foreach ($device as $key => $value) {
+                        if (preg_match('/WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
+                            $wanDevIdx = (int)$matches[1];
+                            $connDevIdx = (int)$matches[2];
+                            $pppIdx = (int)$matches[3];
+                            $pathKey = "{$wanDevIdx}.{$connDevIdx}.{$pppIdx}";
+                            if (!isset($pppConnections[$pathKey])) {
+                                $pppConnections[$pathKey] = [
+                                    'wan_device' => $wanDevIdx,
+                                    'conn_device' => $connDevIdx,
+                                    'ppp_instance' => $pppIdx,
+                                    'path' => "InternetGatewayDevice.WANDevice.{$wanDevIdx}.WANConnectionDevice.{$connDevIdx}.WANPPPConnection.{$pppIdx}"
+                                ];
                             }
                         }
-                        $newInstances = array_keys($newInstances);
-                        sort($newInstances);
-                        error_log("[WAN_CONFIG] After Inform, WANPPPConnection instances: " . json_encode($newInstances));
-                        
-                        if (count($newInstances) > 0) {
-                            $pppConnIndex = max($newInstances);
-                            error_log("[WAN_CONFIG] Using new instance: {$pppConnIndex}");
+                        // Also check for WANIPConnection (for DHCP/Static IP)
+                        if (preg_match('/WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANIPConnection\.(\d+)\./', $key, $matches)) {
+                            $wanDevIdx = (int)$matches[1];
+                            $connDevIdx = (int)$matches[2];
+                            $ipIdx = (int)$matches[3];
+                            $wanTree["ip.{$wanDevIdx}.{$connDevIdx}.{$ipIdx}"] = [
+                                'type' => 'ip',
+                                'wan_device' => $wanDevIdx,
+                                'conn_device' => $connDevIdx,
+                                'instance' => $ipIdx
+                            ];
                         }
                     }
                 }
-                
-                if ($pppConnIndex === null) {
-                    error_log("[WAN_CONFIG] Failed to create/find WANPPPConnection instance");
-                    return ['success' => false, 'error' => 'Failed to create PPPoE connection object. Please try again in 30 seconds.'];
-                }
             }
             
-            $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
-            $wanName = "wan1.1.ppp{$pppConnIndex}";
+            error_log("[WAN_CONFIG] Discovered PPPoE connections: " . json_encode(array_keys($pppConnections)));
+            
+            $pppPath = null;
+            $wanName = null;
+            
+            if (count($pppConnections) > 0) {
+                // Use existing PPPoE connection - prefer WANConnectionDevice.2 (Internet WAN) over .1 (Management)
+                $selected = null;
+                foreach ($pppConnections as $key => $conn) {
+                    // Prefer connections on WANConnectionDevice.2 or higher (Internet WAN)
+                    if ($conn['conn_device'] >= 2) {
+                        $selected = $conn;
+                        break;
+                    }
+                }
+                // Fall back to first available if no .2+ found
+                if (!$selected) {
+                    $selected = reset($pppConnections);
+                }
+                
+                $pppPath = $selected['path'];
+                $wanName = "wan1.{$selected['conn_device']}.ppp{$selected['ppp_instance']}";
+                error_log("[WAN_CONFIG] Using existing PPPoE path: {$pppPath}");
+                $tasksSent[] = "Using existing PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
+            } else {
+                // No PPPoE connection found - OMCI must create it first
+                // Check if this ONU has service-port configured on OLT
+                error_log("[WAN_CONFIG] No PPPoE connection found in device tree");
+                error_log("[WAN_CONFIG] PPPoE WAN must be created via OMCI (OLT service-port), not TR-069");
+                
+                // Return helpful error message
+                return [
+                    'success' => false, 
+                    'error' => 'No PPPoE connection found on device. Please ensure the ONU has a service-port configured on the OLT with PPPoE VLAN, then refresh the device in GenieACS.',
+                    'hint' => 'OMCI creates WAN objects via OLT service-port. TR-069 can only modify existing WAN connections.'
+                ];
+            }
+            
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
