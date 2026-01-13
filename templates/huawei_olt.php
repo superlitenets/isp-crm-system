@@ -18001,6 +18001,31 @@ echo "# ================================================\n";
     }
     
     // Actually open the TR-069 config modal (after reachability check passes)
+    // Helper to get value from GenieACS flat key structure
+    function getGenieValue(device, path) {
+        // GenieACS stores params with dot notation keys like "InternetGatewayDevice.DeviceInfo.SoftwareVersion"
+        const val = device[path];
+        if (val && typeof val === 'object' && '_value' in val) {
+            return val._value || '-';
+        }
+        return val || '-';
+    }
+    
+    // Find External IP from various WAN connection paths
+    function getExternalIP(device) {
+        const paths = [
+            'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress',
+            'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1.ExternalIPAddress',
+            'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress',
+            'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANIPConnection.1.ExternalIPAddress'
+        ];
+        for (const path of paths) {
+            const val = getGenieValue(device, path);
+            if (val && val !== '-' && val !== '0.0.0.0') return val;
+        }
+        return '-';
+    }
+    
     function openTR069ConfigModal(onuId, serialNumber) {
         // Fetch and show TR-069 device info in a modal
         showToast('Loading device info...', 'info', 3000);
@@ -18016,6 +18041,13 @@ echo "# ================================================\n";
                 const device = data.device;
                 const lastInform = device._lastInform ? new Date(device._lastInform) : null;
                 const isOnline = lastInform && (Date.now() - lastInform.getTime() < 300000);
+                
+                // Extract values using flat key paths
+                const softwareVer = getGenieValue(device, 'InternetGatewayDevice.DeviceInfo.SoftwareVersion');
+                const hardwareVer = getGenieValue(device, 'InternetGatewayDevice.DeviceInfo.HardwareVersion');
+                const connReqUrl = getGenieValue(device, 'InternetGatewayDevice.ManagementServer.ConnectionRequestURL');
+                const acsUrl = getGenieValue(device, 'InternetGatewayDevice.ManagementServer.URL');
+                const externalIP = getExternalIP(device);
                 
                 // Build device info HTML
                 let html = `
@@ -18040,8 +18072,8 @@ echo "# ================================================\n";
                                                     <tr><th>Serial Number</th><td>${device._deviceId?._SerialNumber || serialNumber}</td></tr>
                                                     <tr><th>Manufacturer</th><td>${device._deviceId?._Manufacturer || '-'}</td></tr>
                                                     <tr><th>Product Class</th><td>${device._deviceId?._ProductClass || '-'}</td></tr>
-                                                    <tr><th>Software Ver</th><td>${device.InternetGatewayDevice?.DeviceInfo?.SoftwareVersion?._value || '-'}</td></tr>
-                                                    <tr><th>Hardware Ver</th><td>${device.InternetGatewayDevice?.DeviceInfo?.HardwareVersion?._value || '-'}</td></tr>
+                                                    <tr><th>Software Ver</th><td>${softwareVer}</td></tr>
+                                                    <tr><th>Hardware Ver</th><td>${hardwareVer}</td></tr>
                                                 </table>
                                             </div>
                                         </div>
@@ -18056,9 +18088,9 @@ echo "# ================================================\n";
                                                         <td><span class="badge bg-${isOnline ? 'success' : 'secondary'}">${isOnline ? 'Online' : 'Offline'}</span></td>
                                                     </tr>
                                                     <tr><th>Last Inform</th><td>${lastInform ? lastInform.toLocaleString() : 'Never'}</td></tr>
-                                                    <tr><th>Connection URL</th><td class="text-break small">${device.InternetGatewayDevice?.ManagementServer?.ConnectionRequestURL?._value || '-'}</td></tr>
-                                                    <tr><th>ACS URL</th><td class="text-break small">${device.InternetGatewayDevice?.ManagementServer?.URL?._value || '-'}</td></tr>
-                                                    <tr><th>External IP</th><td>${device.InternetGatewayDevice?.WANDevice?.['1']?.WANConnectionDevice?.['1']?.WANPPPConnection?.['1']?.ExternalIPAddress?._value || device.InternetGatewayDevice?.WANDevice?.['1']?.WANConnectionDevice?.['2']?.WANPPPConnection?.['1']?.ExternalIPAddress?._value || '-'}</td></tr>
+                                                    <tr><th>Connection URL</th><td class="text-break small">${connReqUrl}</td></tr>
+                                                    <tr><th>ACS URL</th><td class="text-break small">${acsUrl}</td></tr>
+                                                    <tr><th>External IP</th><td>${externalIP}</td></tr>
                                                 </table>
                                             </div>
                                         </div>
