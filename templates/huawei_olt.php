@@ -3826,6 +3826,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
                 }
                 exit;
+            
+            case 'tr069_sync_device':
+                header('Content-Type: application/json');
+                $onuId = (int)($_POST['onu_id'] ?? 0);
+                if (!$onuId) { echo json_encode(['success' => false, 'error' => 'ONU ID required']); exit; }
+                
+                $onu = $huaweiOLT->getONU($onuId);
+                if (!$onu) { echo json_encode(['success' => false, 'error' => 'ONU not found']); exit; }
+                
+                require_once __DIR__ . '/../src/GenieACS.php';
+                $genieacs = new \App\GenieACS($db);
+                $serialForLookup = $onu['tr069_serial'] ?? $onu['sn'] ?? '';
+                
+                $deviceResult = $genieacs->getDeviceBySerial($serialForLookup);
+                if (!$deviceResult['success'] || empty($deviceResult['device'])) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                    exit;
+                }
+                
+                $deviceId = $deviceResult['device']['_id'];
+                
+                $refreshTask = [
+                    'name' => 'refreshObject',
+                    'objectName' => 'InternetGatewayDevice'
+                ];
+                
+                $genieacsUrl = '';
+                $stmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'genieacs_url'");
+                if ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $genieacsUrl = rtrim($row['setting_value'], '/');
+                    $genieacsUrl = preg_replace('/:\d+$/', ':7557', parse_url($genieacsUrl, PHP_URL_SCHEME) . '://' . parse_url($genieacsUrl, PHP_URL_HOST));
+                }
+                if (!$genieacsUrl) { $genieacsUrl = 'http://localhost:7557'; }
+                
+                $ch = curl_init("{$genieacsUrl}/devices/" . urlencode($deviceId) . "/tasks?connection_request");
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($refreshTask));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                sleep(2);
+                
+                echo json_encode(['success' => $httpCode >= 200 && $httpCode < 300, 'message' => 'Sync triggered']);
+                exit;
+                
             case 'get_tr069_full_config':
                 // Enhanced TR-069 full config with all data
                 header('Content-Type: application/json');
@@ -15697,16 +15746,52 @@ echo "# ================================================\n";
     let tr069AutoRefresh = null;
     let tr069ActiveTab = 'wifi';
     
-    function getTR069Stat(onuId) {
+    function getTR069Stat(onuId, autoSync = true) {
         const modal = new bootstrap.Modal(document.getElementById('onuFullStatusModal'));
         const title = document.getElementById('onuFullStatusTitle');
         const body = document.getElementById('onuFullStatusBody');
         
         tr069CurrentOnuId = onuId;
         title.textContent = 'ONU Configuration';
-        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Loading configuration...</p></div>';
+        body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Syncing from device...</p></div>';
         modal.show();
         
+        if (autoSync) {
+            // First trigger a connection request to get fresh data, then load
+            syncTR069Device(onuId).then(() => {
+                loadTR069Config(onuId);
+            });
+        } else {
+            loadTR069Config(onuId);
+        }
+    }
+    
+    async function syncTR069Device(onuId) {
+        try {
+            const response = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=tr069_sync_device&onu_id=' + onuId
+            });
+            const data = await response.json();
+            return data;
+        } catch (e) {
+            console.error('Sync failed:', e);
+            return {success: false};
+        }
+    }
+    
+    async function syncAndReload(onuId) {
+        const btn = document.getElementById('syncBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Syncing...';
+        }
+        await syncTR069Device(onuId);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Sync';
+        }
         loadTR069Config(onuId);
     }
     
@@ -15734,11 +15819,13 @@ echo "# ================================================\n";
             
             let html = '';
             
-            // Auto-refresh toggle
+            // Auto-refresh toggle and sync button
             html += '<div class="d-flex justify-content-between align-items-center mb-2">';
             html += '<div class="form-check form-switch"><input type="checkbox" class="form-check-input" id="autoRefreshToggle" onchange="toggleAutoRefresh(' + onuId + ')"><label class="form-check-label small" for="autoRefreshToggle">Auto-refresh</label></div>';
-            html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadTR069Config(' + onuId + ')"><i class="bi bi-arrow-repeat"></i></button>';
-            html += '</div>';
+            html += '<div class="btn-group">';
+            html += '<button class="btn btn-primary btn-sm" onclick="syncAndReload(' + onuId + ')" id="syncBtn"><i class="bi bi-cloud-download me-1"></i>Sync</button>';
+            html += '<button class="btn btn-outline-secondary btn-sm" onclick="loadTR069Config(' + onuId + ')" title="Refresh from cache"><i class="bi bi-arrow-repeat"></i></button>';
+            html += '</div></div>';
             
             // Tab Navigation
             html += '<ul class="nav nav-tabs nav-fill small mb-2" role="tablist">';
