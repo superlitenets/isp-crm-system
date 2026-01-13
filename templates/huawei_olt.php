@@ -18529,38 +18529,54 @@ echo "# ================================================\n";
     }
     
     // Handle WAN Config Modal Form submission via API
-    document.getElementById('wanConfigModalForm')?.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const form = e.target;
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying...';
-        submitBtn.disabled = true;
-        
-        try {
+    console.log('[WAN] Looking for wanConfigModalForm...');
+    const wanForm = document.getElementById('wanConfigModalForm');
+    console.log('[WAN] Form found:', wanForm ? 'yes' : 'no');
+    if (wanForm) {
+        wanForm.addEventListener('submit', async function(e) {
+            console.log('[WAN] Form submit triggered');
+            e.preventDefault();
+            
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            // Log form data
             const formData = new FormData(form);
-            const response = await fetch('?page=api&action=configure_wan_tr069', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                showToast(result.message || 'WAN configuration applied successfully', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('wanConfigModal'))?.hide();
-            } else {
-                showToast(result.error || 'Failed to apply WAN configuration', 'danger');
+            console.log('[WAN] Form data:');
+            for (let [key, value] of formData.entries()) {
+                console.log('[WAN]   ' + key + ':', value);
             }
-        } catch (err) {
-            showToast('Error: ' + err.message, 'danger');
-        } finally {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
-    });
+            
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('?page=api&action=configure_wan_tr069', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('[WAN] Response status:', response.status);
+                const result = await response.json();
+                console.log('[WAN] Response:', result);
+                
+                if (result.success) {
+                    showToast(result.message || 'WAN configuration applied successfully', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('wanConfigModal'))?.hide();
+                } else {
+                    showToast(result.error || 'Failed to apply WAN configuration', 'danger');
+                }
+            } catch (err) {
+                console.error('[WAN] Error:', err);
+                showToast('Error: ' + err.message, 'danger');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+        console.log('[WAN] Form submit handler attached');
+    }
     </script>
 </body>
 </html>
