@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../src/WhatsApp.php';
 require_once __DIR__ . '/../../src/Settings.php';
 
 use App\Settings;
+use App\WhatsApp;
 
 header('Content-Type: application/json');
 
