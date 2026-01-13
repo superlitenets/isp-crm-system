@@ -34,6 +34,12 @@ The system features a clean, responsive design, including a mobile PWA for field
     - Configuration sequence: Create WANConnectionDevice → Add WANPPPConnection/WANIPConnection → Set credentials and VLAN → Configure policy routes (bind LAN ports and WiFi to WAN) → Set default WAN
     - Management WAN (VLAN 69) uses DHCP for TR-069 connectivity; Internet WAN (service VLAN) uses PPPoE/IPoE
   - **TR-069 Auto-Provisioning via OMCI**: Automatic TR-069 configuration during ONU authorization. Auto-detects TR-069 VLAN, configures native VLAN on ETH port, sets DHCP mode, pushes ACS URL via OMCI, and enables periodic inform. Provides detailed success/failure notifications with manual fallback option.
+  - **Production Guardrails**: SmartOLT-grade protection mechanisms including:
+    - **NTP Gating**: Blocks provisioning if device time is invalid (year < 2020), pushes NTP config first
+    - **Cool-down/Debounce**: 5-minute minimum between provisioning attempts to prevent rapid re-provisioning
+    - **ConnectionRequestURL Validation**: Verifies device reachability before instant push attempts
+    - **Post-Provision Verification**: Checks WANPPPConnection.Status and ExternalIPAddress after config
+    - **Idempotent Object Handling**: Detects and reuses existing WAN objects instead of creating duplicates
   - **OLT Profile Sync**: Sync line profiles and service profiles directly from OLT with caching in database for quick access.
   - **SmartOLT Migration**: Toolkit for migrating from SmartOLT to direct OLT management.
 - **Reporting & Activity Logs**: Comprehensive reports and detailed activity logging.
