@@ -1421,6 +1421,208 @@ class GenieACS {
         ];
     }
     
+    // ========================================================================
+    // TR-181 (Device:2) Data Model Support
+    // For ONUs that use the newer TR-181 data model instead of TR-098 IGD
+    // ========================================================================
+    
+    /**
+     * Detect which data model the ONU supports
+     * Returns 'tr098' for IGD model or 'tr181' for Device:2 model
+     */
+    public function detectDataModel(string $deviceId): string {
+        $result = $this->getDevice($deviceId);
+        if (!$result['success'] || empty($result['data'])) {
+            return 'tr098'; // Default to TR-098
+        }
+        
+        $device = $result['data'];
+        
+        // Check for TR-181 specific paths
+        $hasTR181 = isset($device['Device']) || 
+                    $this->getNestedValue($device, 'InternetGatewayDevice.PPP.Interface') !== null ||
+                    $this->getNestedValue($device, 'InternetGatewayDevice.Ethernet.VLANTermination') !== null;
+        
+        // Check for TR-098 specific paths
+        $hasTR098 = $this->getNestedValue($device, 'InternetGatewayDevice.WANDevice') !== null;
+        
+        if ($hasTR181 && !$hasTR098) {
+            return 'tr181';
+        }
+        
+        return 'tr098';
+    }
+    
+    /**
+     * TR-181: Create VLAN termination
+     */
+    public function createVlanTerminationTR181(string $deviceId, int $vlan): array {
+        $tasks = [
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Ethernet.VLANTermination.'],
+            ['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.Ethernet.VLANTermination.1.VLANID', $vlan, 'xsd:unsignedInt'],
+                ['InternetGatewayDevice.Ethernet.VLANTermination.1.Enable', true, 'xsd:boolean']
+            ]]
+        ];
+        
+        return $this->pushTasks($deviceId, $tasks);
+    }
+    
+    /**
+     * TR-181: Configure PPPoE using PPP.Interface and IP.Interface
+     */
+    public function configurePPPoETR181(string $deviceId, string $username, string $password): array {
+        $tasks = [
+            // Create IP Interface linked to VLAN termination
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.IP.Interface.'],
+            ['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.IP.Interface.3.LowerLayers', 'InternetGatewayDevice.Ethernet.VLANTermination.1', 'xsd:string'],
+                ['InternetGatewayDevice.IP.Interface.3.Enable', true, 'xsd:boolean']
+            ]],
+            
+            // Create PPP Interface linked to IP Interface
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.PPP.Interface.'],
+            ['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.PPP.Interface.2.LowerLayers', 'InternetGatewayDevice.IP.Interface.3', 'xsd:string'],
+                ['InternetGatewayDevice.PPP.Interface.2.Username', $username, 'xsd:string'],
+                ['InternetGatewayDevice.PPP.Interface.2.Password', $password, 'xsd:string'],
+                ['InternetGatewayDevice.PPP.Interface.2.Enable', true, 'xsd:boolean']
+            ]]
+        ];
+        
+        return $this->pushTasks($deviceId, $tasks);
+    }
+    
+    /**
+     * TR-181: Configure Bridge mode
+     */
+    public function configureBridgeTR181(string $deviceId): array {
+        $tasks = [
+            // Create Bridge
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Bridging.Bridge.'],
+            ['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.Bridging.Bridge.1.Enable', true, 'xsd:boolean']
+            ]],
+            
+            // Create Bridge Port linked to VLAN
+            ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Bridging.Bridge.1.Port.'],
+            ['name' => 'setParameterValues', 'parameterValues' => [
+                ['InternetGatewayDevice.Bridging.Bridge.1.Port.1.Interface', 'InternetGatewayDevice.Ethernet.VLANTermination.1', 'xsd:string']
+            ]]
+        ];
+        
+        return $this->pushTasks($deviceId, $tasks);
+    }
+    
+    /**
+     * TR-181: Configure WiFi
+     */
+    public function configureWiFiTR181(string $deviceId, string $ssid, string $password): array {
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.WLANConfiguration.1.SSID', $ssid, 'xsd:string'],
+            ['InternetGatewayDevice.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $password, 'xsd:string'],
+            ['InternetGatewayDevice.WLANConfiguration.1.Enable', true, 'xsd:boolean']
+        ]);
+    }
+    
+    /**
+     * TR-181: Bind WiFi to WAN using LowerLayers
+     */
+    public function bindWiFiToWANTR181(string $deviceId, string $mode = 'route'): array {
+        $lowerLayer = ($mode === 'bridge') 
+            ? 'InternetGatewayDevice.Bridging.Bridge.1'
+            : 'InternetGatewayDevice.PPP.Interface.2';
+        
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.WLANConfiguration.1.LowerLayers', $lowerLayer, 'xsd:string']
+        ]);
+    }
+    
+    /**
+     * Unified provisioning - auto-detects data model and uses appropriate methods
+     */
+    public function provisionCustomerAuto(string $deviceId, array $config): array {
+        $dataModel = $this->detectDataModel($deviceId);
+        $results = [];
+        $errors = [];
+        
+        $mode = $config['mode'] ?? 'route';
+        $vlan = (int)($config['vlan'] ?? $config['internet_vlan'] ?? 0);
+        $pppoeUser = $config['pppoe_username'] ?? '';
+        $pppoePass = $config['pppoe_password'] ?? '';
+        $ssid = $config['ssid'] ?? '';
+        $wifiPass = $config['wifi_password'] ?? '';
+        
+        $this->logTR069Action($deviceId, 'provision_auto_start', ['data_model' => $dataModel]);
+        
+        if ($dataModel === 'tr181') {
+            // TR-181 Data Model
+            
+            // 1. Create VLAN termination
+            if ($vlan > 0) {
+                $results['vlan'] = $this->createVlanTerminationTR181($deviceId, $vlan);
+            }
+            
+            // 2. Configure PPPoE or Bridge
+            if ($mode === 'route' && !empty($pppoeUser)) {
+                $results['pppoe'] = $this->configurePPPoETR181($deviceId, $pppoeUser, $pppoePass);
+                if (!($results['pppoe']['success'] ?? true)) {
+                    $errors[] = 'TR181 PPPoE failed';
+                }
+            } elseif ($mode === 'bridge') {
+                $results['bridge'] = $this->configureBridgeTR181($deviceId);
+            }
+            
+            // 3. Configure WiFi
+            if (!empty($ssid) && !empty($wifiPass)) {
+                $results['wifi'] = $this->configureWiFiTR181($deviceId, $ssid, $wifiPass);
+                $results['wifi_bind'] = $this->bindWiFiToWANTR181($deviceId, $mode);
+            }
+            
+        } else {
+            // TR-098 Data Model (default - Huawei ONUs)
+            
+            // 1. Secure device
+            $results['secure'] = $this->secureDevice($deviceId);
+            
+            // 2. Configure Internet WAN
+            if ($mode === 'route' && !empty($pppoeUser)) {
+                $results['pppoe'] = $this->configureInternetWAN($deviceId, [
+                    'connection_type' => 'pppoe',
+                    'pppoe_username' => $pppoeUser,
+                    'pppoe_password' => $pppoePass,
+                    'service_vlan' => $vlan
+                ]);
+                if (!$results['pppoe']['success']) {
+                    $errors[] = 'TR098 PPPoE failed';
+                }
+            } elseif ($mode === 'bridge') {
+                $results['bridge'] = $this->provisionBridge($deviceId, $vlan);
+            }
+            
+            // 3. Configure WiFi
+            if (!empty($ssid) && !empty($wifiPass)) {
+                $results['wifi'] = $this->configureWiFiSimple($deviceId, 1, $ssid, $wifiPass);
+                if ($mode === 'bridge') {
+                    $results['wifi_bind'] = $this->bindWiFiToWAN($deviceId, 1, 'wan1.1.ip1');
+                }
+            }
+        }
+        
+        $this->logTR069Action($deviceId, 'provision_auto_complete', [
+            'data_model' => $dataModel,
+            'mode' => $mode,
+            'success' => empty($errors)
+        ]);
+        
+        return [
+            'success' => empty($errors),
+            'data_model' => $dataModel,
+            'errors' => $errors,
+            'results' => $results
+        ];
+    }
+    
     /**
      * Check if WAN connection object exists on device
      * Returns the connection type (pppoe/ip) and index if found
