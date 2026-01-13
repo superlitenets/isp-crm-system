@@ -866,59 +866,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
     }
     
     try {
-        // GUARDRAIL: Check ONU provisioning state first
-        $stmt = $db->prepare("SELECT id, sn, tr069_status, provisioning_stage, status FROM huawei_onus WHERE sn = ? OR sn = ?");
-        $stmt->execute([$serialNumber, strtoupper($serialNumber)]);
-        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$onu) {
-            echo json_encode([
-                'reachable' => false,
-                'blocked' => true,
-                'block_reason' => 'ONU not found in database',
-                'last_inform' => 'N/A',
-                'device_id' => null
-            ]);
-            exit;
-        }
-        
-        // Check if ONU is in a READY/ACTIVE state for TR-069 operations
-        $tr069Status = strtolower($onu['tr069_status'] ?? '');
-        $provStage = (int)($onu['provisioning_stage'] ?? 0);
-        $onuStatus = strtolower($onu['status'] ?? '');
-        
-        // Allow TR-069 WAN/WiFi only if:
-        // - tr069_status is 'ready', 'active', 'configured', or 'online'
-        // - OR provisioning_stage >= 2 (TR-069 OMCI config complete)
-        // - AND status is not 'provisioning' or 'pending'
-        $allowedTr069States = ['ready', 'active', 'configured', 'online', 'connected'];
-        $blockedOnuStates = ['provisioning', 'pending', 'authorizing'];
-        
-        $isStateReady = in_array($tr069Status, $allowedTr069States) || $provStage >= 2;
-        $isBlocked = in_array($onuStatus, $blockedOnuStates);
-        
-        if ($isBlocked || !$isStateReady) {
-            $blockReason = 'ONU is still being provisioned';
-            if ($provStage < 2) {
-                $blockReason = 'TR-069 OMCI config not yet pushed (Stage ' . $provStage . '/2)';
-            } elseif (in_array($onuStatus, $blockedOnuStates)) {
-                $blockReason = 'ONU status is "' . $onuStatus . '" - wait for provisioning to complete';
-            }
-            
-            echo json_encode([
-                'reachable' => false,
-                'blocked' => true,
-                'block_reason' => $blockReason,
-                'provisioning_stage' => $provStage,
-                'tr069_status' => $onu['tr069_status'],
-                'onu_status' => $onu['status'],
-                'last_inform' => 'N/A',
-                'device_id' => null
-            ]);
-            exit;
-        }
-        
-        // Now check GenieACS reachability
+        // First check GenieACS reachability - if device is there and online, allow config
         $genieAcs = new \App\GenieACS();
         
         $device = null;
@@ -936,16 +884,39 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             }
         }
         
+        // Get ONU from database for reference
+        $stmt = $db->prepare("SELECT id, sn, tr069_status, provisioning_stage, status FROM huawei_onus WHERE sn = ? OR sn = ?");
+        $stmt->execute([$serialNumber, strtoupper($serialNumber)]);
+        $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         if (!$device) {
-            echo json_encode([
-                'reachable' => false,
-                'blocked' => false,
-                'last_inform' => 'Never connected to GenieACS',
-                'device_id' => null
-            ]);
+            // Device not in GenieACS - check database state for guidance
+            if (!$onu) {
+                echo json_encode([
+                    'reachable' => false,
+                    'blocked' => true,
+                    'block_reason' => 'ONU not found in database or GenieACS',
+                    'last_inform' => 'N/A',
+                    'device_id' => null
+                ]);
+            } else {
+                $provStage = (int)($onu['provisioning_stage'] ?? 0);
+                $blockReason = 'Device not connected to GenieACS yet';
+                if ($provStage < 2) {
+                    $blockReason = 'TR-069 OMCI config may not be pushed yet (Stage ' . $provStage . '/2)';
+                }
+                echo json_encode([
+                    'reachable' => false,
+                    'blocked' => false,
+                    'block_reason' => $blockReason,
+                    'last_inform' => 'Never connected',
+                    'device_id' => null
+                ]);
+            }
             exit;
         }
         
+        // Device found in GenieACS - check if online
         $lastInformStr = $device['_lastInform'] ?? null;
         $isReachable = false;
         $lastInformFormatted = 'Unknown';
@@ -955,7 +926,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             $now = time();
             $diff = $now - $lastInform;
             
-            $isReachable = ($diff < 300);
+            $isReachable = ($diff < 300); // Online if informed within 5 minutes
             
             if ($diff < 60) {
                 $lastInformFormatted = $diff . ' seconds ago';
@@ -966,6 +937,12 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             } else {
                 $lastInformFormatted = round($diff / 86400) . ' days ago';
             }
+        }
+        
+        // Auto-update database if device is in GenieACS (sync status)
+        if ($onu && $isReachable) {
+            $stmt = $db->prepare("UPDATE huawei_onus SET tr069_status = 'online', provisioning_stage = GREATEST(provisioning_stage, 2) WHERE id = ?");
+            $stmt->execute([$onu['id']]);
         }
         
         echo json_encode([
