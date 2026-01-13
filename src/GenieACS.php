@@ -1204,95 +1204,193 @@ class GenieACS {
      * SmartOLT-style Internet WAN configuration via TR-069
      * Creates WAN objects using addObject then configures them
      * Matches Huawei ONU firmware behavior and SmartOLT provisioning
+     * 
+     * SAFEGUARDS IMPLEMENTED:
+     * 1. Device state guard (NEW→PROVISIONING→ACTIVE)
+     * 2. Idempotency check (don't create duplicate WAN objects)
+     * 3. NTP gate (check device time before provisioning)
+     * 4. Rate limiting (10 min cooldown between provisions)
+     * 5. Final HTTP lock even on failure
      */
     public function configureInternetWAN(string $deviceId, array $config): array {
         $results = [];
         $errors = [];
+        $wanName = 'wan1.1.ppp1';
         
-        $connectionType = $config['connection_type'] ?? 'pppoe'; // pppoe, dhcp, static
+        $connectionType = $config['connection_type'] ?? 'pppoe';
         $serviceVlan = (int)($config['service_vlan'] ?? 0);
+        $skipChecks = $config['skip_safety_checks'] ?? false;
         
-        // Step 1: Lock management access (disable WAN HTTP)
-        $secureResult = $this->secureDevice($deviceId);
-        $results['secure_device'] = $secureResult;
-        
-        // Step 2: Create WAN structure and configure based on connection type
-        if ($connectionType === 'pppoe') {
-            // PPPoE Route Mode - create WAN objects then set all params in one call
-            $createTasks = [
-                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
-                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.']
+        try {
+            // =====================================================
+            // SAFEGUARD 1: Device State Guard
+            // =====================================================
+            if (!$skipChecks) {
+                $stateCheck = $this->checkProvisioningState($deviceId);
+                if (!$stateCheck['can_provision']) {
+                    return [
+                        'success' => false,
+                        'error' => $stateCheck['reason'],
+                        'state' => $stateCheck['state']
+                    ];
+                }
+                
+                // Mark as PROVISIONING
+                $this->setProvisioningState($deviceId, 'PROVISIONING');
+            }
+            
+            // =====================================================
+            // SAFEGUARD 2: NTP Gate - Check device time
+            // =====================================================
+            if (!$skipChecks) {
+                $ntpCheck = $this->checkDeviceTime($deviceId);
+                if (!$ntpCheck['time_valid']) {
+                    // Push NTP config and wait for next inform
+                    $this->pushNTPConfig($deviceId);
+                    $this->setProvisioningState($deviceId, 'NEW'); // Reset to NEW
+                    return [
+                        'success' => false,
+                        'error' => 'Device time invalid (year < 2020). NTP pushed, waiting for next inform.',
+                        'ntp_pushed' => true
+                    ];
+                }
+            }
+            
+            // =====================================================
+            // SAFEGUARD 3: Rate Limiting (10 min cooldown)
+            // =====================================================
+            if (!$skipChecks) {
+                $rateCheck = $this->checkProvisioningCooldown($deviceId, 600); // 10 minutes
+                if (!$rateCheck['allowed']) {
+                    return [
+                        'success' => false,
+                        'error' => 'Rate limit: Last provision was ' . $rateCheck['seconds_ago'] . 's ago. Wait ' . (600 - $rateCheck['seconds_ago']) . 's.',
+                        'rate_limited' => true
+                    ];
+                }
+            }
+            
+            // =====================================================
+            // SAFEGUARD 4: Idempotency - Check existing WAN objects
+            // =====================================================
+            $existingWAN = $this->checkExistingWANObjects($deviceId);
+            $results['existing_wan_check'] = $existingWAN;
+            
+            // Step 1: Lock management access (disable WAN HTTP)
+            $secureResult = $this->secureDevice($deviceId);
+            $results['secure_device'] = $secureResult;
+            
+            // Step 2: Create WAN structure and configure based on connection type
+            if ($connectionType === 'pppoe') {
+                $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+                $wanName = 'wan1.1.ppp1';
+                
+                // Only addObject if WAN doesn't exist (idempotency)
+                if (!$existingWAN['has_pppoe']) {
+                    $createTasks = [
+                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
+                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.']
+                    ];
+                    $createResult = $this->pushTasks($deviceId, $createTasks);
+                    $results['create_wan'] = $createResult;
+                } else {
+                    $results['create_wan'] = ['skipped' => true, 'reason' => 'PPPoE WAN already exists'];
+                }
+                
+                // Build all parameters in one setParameterValues call
+                $params = [];
+                if (!empty($config['pppoe_username'])) {
+                    $params[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
+                }
+                if (!empty($config['pppoe_password'])) {
+                    $params[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
+                }
+                $params[] = ["{$pppBase}.NATEnabled", true, 'xsd:boolean'];
+                if ($serviceVlan > 0) {
+                    $params[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                }
+                $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
+                
+                $configResult = $this->setParameterValues($deviceId, $params);
+                $results['pppoe_config'] = $configResult;
+                if (!$configResult['success']) {
+                    $errors[] = 'PPPoE config failed: ' . ($configResult['error'] ?? 'Unknown');
+                }
+                
+            } else {
+                // Bridge Mode (DHCP/Static) - WANIPConnection with IP_Bridged
+                $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
+                $wanName = 'wan1.1.ip1';
+                
+                // Only addObject if WAN doesn't exist (idempotency)
+                if (!$existingWAN['has_ip']) {
+                    $createTasks = [
+                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
+                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.']
+                    ];
+                    $createResult = $this->pushTasks($deviceId, $createTasks);
+                    $results['create_wan'] = $createResult;
+                } else {
+                    $results['create_wan'] = ['skipped' => true, 'reason' => 'IP WAN already exists'];
+                }
+                
+                $params = [
+                    ["{$ipBase}.ConnectionType", 'IP_Bridged', 'xsd:string']
+                ];
+                if ($serviceVlan > 0) {
+                    $params[] = ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                }
+                $params[] = ["{$ipBase}.Enable", true, 'xsd:boolean'];
+                
+                $configResult = $this->setParameterValues($deviceId, $params);
+                $results['bridge_config'] = $configResult;
+                if (!$configResult['success']) {
+                    $errors[] = 'Bridge config failed: ' . ($configResult['error'] ?? 'Unknown');
+                }
+            }
+            
+            // Mark as ACTIVE on success
+            if (!$skipChecks && empty($errors)) {
+                $this->setProvisioningState($deviceId, 'ACTIVE');
+                $this->recordProvisioningTime($deviceId);
+            }
+            
+            // Step 3: Log the action
+            $this->logTR069Action($deviceId, 'internet_wan_config', [
+                'connection_type' => $connectionType,
+                'service_vlan' => $serviceVlan,
+                'wan_name' => $wanName,
+                'success' => empty($errors)
+            ]);
+            
+            return [
+                'success' => empty($errors),
+                'message' => empty($errors) ? 'Internet WAN configured successfully' : 'Some errors occurred',
+                'errors' => $errors,
+                'results' => $results,
+                'wan_name' => $wanName
             ];
             
-            $createResult = $this->pushTasks($deviceId, $createTasks);
-            $results['create_wan'] = $createResult;
-            
-            // Build all parameters in one setParameterValues call
-            $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
-            $wanName = 'wan1.1.ppp1';
-            
-            $params = [];
-            if (!empty($config['pppoe_username'])) {
-                $params[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
+        } catch (\Exception $e) {
+            // Mark as FAILED
+            if (!$skipChecks) {
+                $this->setProvisioningState($deviceId, 'FAILED');
             }
-            if (!empty($config['pppoe_password'])) {
-                $params[] = ["{$pppBase}.Password", $config['pppoe_password'], 'xsd:string'];
-            }
-            $params[] = ["{$pppBase}.NATEnabled", true, 'xsd:boolean'];
-            if ($serviceVlan > 0) {
-                $params[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
-            }
-            $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
+            $errors[] = 'Exception: ' . $e->getMessage();
             
-            $configResult = $this->setParameterValues($deviceId, $params);
-            $results['pppoe_config'] = $configResult;
-            if (!$configResult['success']) {
-                $errors[] = 'PPPoE config failed: ' . ($configResult['error'] ?? 'Unknown');
-            }
-            
-        } else {
-            // Bridge Mode (DHCP/Static) - WANIPConnection with IP_Bridged
-            $createTasks = [
-                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
-                ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.']
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'errors' => $errors,
+                'results' => $results
             ];
             
-            $createResult = $this->pushTasks($deviceId, $createTasks);
-            $results['create_wan'] = $createResult;
-            
-            $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
-            $wanName = 'wan1.1.ip1';
-            
-            $params = [
-                ["{$ipBase}.ConnectionType", 'IP_Bridged', 'xsd:string']
-            ];
-            if ($serviceVlan > 0) {
-                $params[] = ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
-            }
-            $params[] = ["{$ipBase}.Enable", true, 'xsd:boolean'];
-            
-            $configResult = $this->setParameterValues($deviceId, $params);
-            $results['bridge_config'] = $configResult;
-            if (!$configResult['success']) {
-                $errors[] = 'Bridge config failed: ' . ($configResult['error'] ?? 'Unknown');
-            }
+        } finally {
+            // =====================================================
+            // SAFEGUARD 5: Final HTTP lock even on failure
+            // =====================================================
+            $this->secureDevice($deviceId);
         }
-        
-        // Step 3: Log the action
-        $this->logTR069Action($deviceId, 'internet_wan_config', [
-            'connection_type' => $connectionType,
-            'service_vlan' => $serviceVlan,
-            'wan_name' => $wanName ?? 'unknown',
-            'success' => empty($errors)
-        ]);
-        
-        return [
-            'success' => empty($errors),
-            'message' => empty($errors) ? 'Internet WAN configured successfully' : 'Some errors occurred',
-            'errors' => $errors,
-            'results' => $results,
-            'wan_name' => $wanName ?? 'wan1.1.ppp1'
-        ];
     }
     
     /**
@@ -1302,6 +1400,186 @@ class GenieACS {
         return $this->setParameterValues($deviceId, [
             ['InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable', false, 'xsd:boolean']
         ]);
+    }
+    
+    // ========================================================================
+    // SAFEGUARD HELPER FUNCTIONS
+    // ========================================================================
+    
+    /**
+     * Check provisioning state - prevents re-provisioning already active devices
+     * States: NEW, PROVISIONING, ACTIVE, FAILED
+     */
+    public function checkProvisioningState(string $deviceId): array {
+        // Get state from database
+        $stmt = $this->db->prepare("
+            SELECT provision_state, last_provision_at 
+            FROM tr069_devices 
+            WHERE device_id = ?
+        ");
+        $stmt->execute([$deviceId]);
+        $device = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$device) {
+            // Device not in DB yet - allow provisioning
+            return ['can_provision' => true, 'state' => 'NEW'];
+        }
+        
+        $state = $device['provision_state'] ?? 'NEW';
+        
+        // State machine logic
+        switch ($state) {
+            case 'NEW':
+            case 'FAILED':
+                return ['can_provision' => true, 'state' => $state];
+            case 'PROVISIONING':
+                return ['can_provision' => false, 'state' => $state, 'reason' => 'Device is currently being provisioned'];
+            case 'ACTIVE':
+                return ['can_provision' => false, 'state' => $state, 'reason' => 'Device already provisioned. Use force=true to re-provision.'];
+            default:
+                return ['can_provision' => true, 'state' => $state];
+        }
+    }
+    
+    /**
+     * Set provisioning state in database
+     */
+    public function setProvisioningState(string $deviceId, string $state): bool {
+        try {
+            // Check if device exists
+            $stmt = $this->db->prepare("SELECT device_id FROM tr069_devices WHERE device_id = ?");
+            $stmt->execute([$deviceId]);
+            
+            if ($stmt->fetch()) {
+                // Update existing
+                $stmt = $this->db->prepare("UPDATE tr069_devices SET provision_state = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?");
+                $stmt->execute([$state, $deviceId]);
+            } else {
+                // Insert new
+                $stmt = $this->db->prepare("INSERT INTO tr069_devices (device_id, provision_state) VALUES (?, ?)");
+                $stmt->execute([$deviceId, $state]);
+            }
+            return true;
+        } catch (\Exception $e) {
+            error_log("[GenieACS] Failed to set provisioning state: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check device time - NTP gate to prevent provisioning before time sync
+     */
+    public function checkDeviceTime(string $deviceId): array {
+        $result = $this->getDevice($deviceId);
+        if (!$result['success'] || empty($result['data'])) {
+            return ['time_valid' => true]; // Allow if we can't check
+        }
+        
+        $device = $result['data'];
+        
+        // Get CurrentTime from device
+        $currentTime = $this->getNestedValue($device, 'InternetGatewayDevice.DeviceInfo.CurrentTime._value');
+        $upTime = $this->getNestedValue($device, 'InternetGatewayDevice.DeviceInfo.UpTime._value');
+        
+        if ($currentTime) {
+            $year = (int)date('Y', strtotime($currentTime));
+            if ($year < 2020) {
+                return [
+                    'time_valid' => false,
+                    'device_time' => $currentTime,
+                    'year' => $year,
+                    'uptime' => $upTime
+                ];
+            }
+        }
+        
+        return ['time_valid' => true, 'device_time' => $currentTime, 'uptime' => $upTime];
+    }
+    
+    /**
+     * Push NTP configuration to device
+     */
+    public function pushNTPConfig(string $deviceId): array {
+        return $this->setParameterValues($deviceId, [
+            ['InternetGatewayDevice.Time.Enable', true, 'xsd:boolean'],
+            ['InternetGatewayDevice.Time.NTPServer1', 'pool.ntp.org', 'xsd:string'],
+            ['InternetGatewayDevice.Time.NTPServer2', 'time.google.com', 'xsd:string']
+        ]);
+    }
+    
+    /**
+     * Check provisioning cooldown - rate limiting
+     */
+    public function checkProvisioningCooldown(string $deviceId, int $cooldownSeconds = 600): array {
+        $stmt = $this->db->prepare("
+            SELECT last_provision_at 
+            FROM tr069_devices 
+            WHERE device_id = ?
+        ");
+        $stmt->execute([$deviceId]);
+        $device = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$device || empty($device['last_provision_at'])) {
+            return ['allowed' => true, 'seconds_ago' => null];
+        }
+        
+        $lastProvision = strtotime($device['last_provision_at']);
+        $secondsAgo = time() - $lastProvision;
+        
+        if ($secondsAgo < $cooldownSeconds) {
+            return ['allowed' => false, 'seconds_ago' => $secondsAgo];
+        }
+        
+        return ['allowed' => true, 'seconds_ago' => $secondsAgo];
+    }
+    
+    /**
+     * Record provisioning time for rate limiting
+     */
+    public function recordProvisioningTime(string $deviceId): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE tr069_devices 
+                SET last_provision_at = CURRENT_TIMESTAMP 
+                WHERE device_id = ?
+            ");
+            $stmt->execute([$deviceId]);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Check existing WAN objects - idempotency check
+     */
+    public function checkExistingWANObjects(string $deviceId): array {
+        $result = $this->getDevice($deviceId);
+        if (!$result['success'] || empty($result['data'])) {
+            return ['has_pppoe' => false, 'has_ip' => false, 'has_policy_route' => false];
+        }
+        
+        $device = $result['data'];
+        
+        // Check for existing PPPoE
+        $pppPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+        $hasPPPoE = $this->getNestedValue($device, $pppPath . '.Enable') !== null ||
+                    $this->getNestedValue($device, $pppPath . '.Username') !== null;
+        
+        // Check for existing IP connection
+        $ipPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
+        $hasIP = $this->getNestedValue($device, $ipPath . '.Enable') !== null;
+        
+        // Check for existing policy routes
+        $routePath = 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1';
+        $hasRoute = $this->getNestedValue($device, $routePath . '.WanName') !== null;
+        
+        return [
+            'has_pppoe' => $hasPPPoE,
+            'has_ip' => $hasIP,
+            'has_policy_route' => $hasRoute,
+            'pppoe_username' => $hasPPPoE ? $this->getNestedValue($device, $pppPath . '.Username._value') : null
+        ];
     }
     
     /**
