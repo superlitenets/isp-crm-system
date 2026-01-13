@@ -7276,36 +7276,11 @@ class HuaweiOLT {
                 $errors[] = "PPPoE VLAN failed (HTTP {$result['code']})";
             }
             
-            // Step 4: Set default WAN and provisioning code
-            $defaultWanParams = [
-                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string'],
-                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string'],
-            ];
-            $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
-            $tasksSent[] = 'Set default WAN';
-            
-            // Step 5: Create policy route to bind LAN ports and WiFi to WAN
-            $addRouteTask = [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'
-            ];
-            $routeResult = $sendTask($addRouteTask);
-            $routeIndex = 1;
-            if ($routeResult['success']) {
-                $respData = json_decode($routeResult['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $routeIndex = (int)$respData['instanceNumber'];
-                }
-            }
-            
-            $routeParams = [
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PhyPortName", 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.PolicyRouteType", 'SourcePhyPort', 'xsd:string'],
-                ["InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.{$routeIndex}.WanName", $wanName, 'xsd:string'],
-            ];
-            // Final task - trigger connection_request for immediate execution
-            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], 'Configure policy route', true);
-            if ($result['success']) $tasksSent[] = 'Create policy route';
+            // Configuration complete - trigger connection request to apply settings
+            // Note: Policy routes are optional - PPPoE will work without them for basic internet access
+            $refreshTask = ['name' => 'getParameterValues', 'parameterNames' => ["{$pppPath}."]];
+            $sendTask($refreshTask, 'Apply PPPoE config', true);
+            $tasksSent[] = 'PPPoE configuration sent';
             
         } elseif ($wanMode === 'dhcp') {
             // Use WANConnectionDevice.2 for internet WAN (WANConnectionDevice.1 is management)
