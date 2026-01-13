@@ -15863,7 +15863,7 @@ echo "# ================================================\n";
                 const wifiResp = await fetch('?page=huawei-olt', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wifi_index=1' +
+                    body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wlan_index=1' +
                           '&ssid=' + encodeURIComponent(wifiSsid) + '&password=' + encodeURIComponent(wifiPass) +
                           '&enabled=1&security=WPA2-PSK'
                 });
@@ -15875,7 +15875,7 @@ echo "# ================================================\n";
                     await fetch('?page=huawei-olt', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                        body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wifi_index=' + wifi5Idx +
+                        body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wlan_index=' + wifi5Idx +
                               '&ssid=' + encodeURIComponent(wifiSsid + '_5G') + '&password=' + encodeURIComponent(wifiPass) +
                               '&enabled=1&security=WPA2-PSK'
                     });
