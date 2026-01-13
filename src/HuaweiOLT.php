@@ -8429,7 +8429,7 @@ class HuaweiOLT {
         ];
     }
     
-    public function deleteONUFromOLT(int $onuId, bool $async = true): array {
+    public function deleteONUFromOLT(int $onuId, bool $async = false): array {
         $onu = $this->getONU($onuId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
@@ -8441,15 +8441,24 @@ class HuaweiOLT {
         $onuIdNum = $onu['onu_id'];
         $oltId = $onu['olt_id'];
         
+        // Validate ONU ID exists
+        if ($onuIdNum === null || $onuIdNum === '') {
+            // ONU not authorized on OLT, just delete from DB
+            $this->deleteONU($onuId, false);
+            return ['success' => true, 'message' => "ONU {$onu['sn']} deleted from database (was not authorized on OLT)"];
+        }
+        
         // Build combined command for delete (with service-port cleanup and confirmation)
         $command = "interface gpon {$frame}/{$slot}\r\nont delete {$port} {$onuIdNum}\r\ny\r\nquit";
         
         if ($async && $this->isOLTServiceAvailable()) {
-            // Fast async execution - delete from DB immediately, OLT command runs in background
-            // Pass false to avoid infinite recursion (don't call deleteONUFromOLT again)
-            $this->deleteONU($onuId, false);
-            
+            // Async execution via OLT service - but verify command first
             $result = $this->executeAsyncViaService($oltId, $command);
+            
+            // Only delete from DB if command was accepted
+            if ($result['success'] ?? false) {
+                $this->deleteONU($onuId, false);
+            }
             
             $this->addLog([
                 'olt_id' => $oltId,
