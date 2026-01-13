@@ -71,6 +71,7 @@ echo " Done"
 # =====================================================
 # PROVISION: wan-discover - Force discovery of WAN/LAN objects
 # Huawei ONUs hide objects until explicitly declared
+# Uses correct GenieACS declare syntax: declare(path, timestamps, values)
 # =====================================================
 echo "Creating provision: wan-discover..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-discover" \
@@ -78,35 +79,34 @@ curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-discover" \
   -d '
 const now = Date.now();
 
-// Force full WAN discovery (Huawei hides objects otherwise)
-declare("InternetGatewayDevice.WANDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
+// Force full WAN discovery - request fresh path info from device
+// {path: now} in timestamps forces rediscovery of child objects
+declare("InternetGatewayDevice.WANDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.*", {path: now});
 
 // Force LAN / WiFi discovery
-declare("InternetGatewayDevice.LANDevice.", {path: 1});
-declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.*", {path: now});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.*", {path: now});
 
-// Layer 3 forwarding for default WAN
-declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
-
-// Now refresh values
-declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
-declare("InternetGatewayDevice.LANDevice.*", {path: now, value: now});
+// Layer 3 forwarding
 declare("InternetGatewayDevice.Layer3Forwarding.*", {path: now, value: now});
 
-log("WAN/LAN discovery completed (forced object creation)");
+// Device info and management server
+declare("InternetGatewayDevice.DeviceInfo.*", {path: now, value: now});
+declare("InternetGatewayDevice.ManagementServer.*", {path: now, value: now});
+
+log("WAN/LAN discovery completed");
 '
 echo " Done"
 
 # =====================================================
 # PROVISION: wan-create - Create WAN objects for PPPoE/IPoE
 # This provision creates the necessary WAN structure:
-# - WANDevice
-# - WANConnectionDevice  
-# - WANPPPConnection (for PPPoE) or WANIPConnection (for IPoE)
-# Forces object discovery first (Huawei hides objects)
+# - WANDevice.1.WANConnectionDevice.1
+# - WANPPPConnection.* (for PPPoE) or WANIPConnection.* (for IPoE)
+# Uses correct GenieACS syntax: declare(path, timestamps, values)
 # =====================================================
 echo "Creating provision: wan-create..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-create" \
@@ -119,54 +119,27 @@ let wanDeviceIndex = args[0] || 1;
 let wanConnDeviceIndex = args[1] || 1;
 let connectionType = args[2] || "pppoe"; // pppoe or ipoe
 
-log("WAN Create: Starting with wanDevice=" + wanDeviceIndex + ", wanConnDevice=" + wanConnDeviceIndex + ", type=" + connectionType);
+log("WAN Create: wanDevice=" + wanDeviceIndex + ", wanConnDevice=" + wanConnDeviceIndex + ", type=" + connectionType);
 
-// Force full WAN discovery first (Huawei hides objects otherwise)
-declare("InternetGatewayDevice.WANDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
-
-// Refresh the structure
-declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
-
-// Check if WANDevice exists
-let wanDevicePath = "InternetGatewayDevice.WANDevice." + wanDeviceIndex;
-let wanDevice = declare(wanDevicePath + ".*", {path: now});
-
-// Create WANDevice if needed - Huawei ONUs typically have WANDevice.1 pre-created
-if (!wanDevice.value || wanDevice.value.length === 0) {
-    log("WAN Create: Creating WANDevice." + wanDeviceIndex);
-    declare("InternetGatewayDevice.WANDevice.*", {path: now}, {path: 1});
-}
-
-// Check/create WANConnectionDevice
-let wanConnPath = wanDevicePath + ".WANConnectionDevice." + wanConnDeviceIndex;
-let wanConnDevice = declare(wanConnPath + ".*", {path: now});
-
-if (!wanConnDevice.value || wanConnDevice.value.length === 0) {
-    log("WAN Create: Creating WANConnectionDevice." + wanConnDeviceIndex);
-    declare(wanDevicePath + ".WANConnectionDevice.*", {path: now}, {path: 1});
-}
+// First refresh the WAN structure to discover what exists
+declare("InternetGatewayDevice.WANDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice.*", {path: now});
 
 if (connectionType === "pppoe") {
-    // Check/create WANPPPConnection
-    let pppPath = wanConnPath + ".WANPPPConnection.1";
-    let pppConn = declare(pppPath + ".*", {path: now});
+    // Ensure we have a WANPPPConnection instance (creates one if none exist)
+    // {path: 1} in values means "ensure at least 1 instance exists"
+    log("WAN Create: Creating WANPPPConnection (if necessary)");
+    declare("InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANPPPConnection.*", null, {path: 1});
     
-    if (!pppConn.value || pppConn.value.length === 0) {
-        log("WAN Create: Creating WANPPPConnection.1");
-        declare(wanConnPath + ".WANPPPConnection.*", {path: now}, {path: 1});
-    }
+    // Refresh the newly created node
+    declare("InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANPPPConnection.*.*", {path: now});
 } else {
-    // Check/create WANIPConnection
-    let ipPath = wanConnPath + ".WANIPConnection.1";
-    let ipConn = declare(ipPath + ".*", {path: now});
+    // Ensure we have a WANIPConnection instance
+    log("WAN Create: Creating WANIPConnection (if necessary)");
+    declare("InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANIPConnection.*", null, {path: 1});
     
-    if (!ipConn.value || ipConn.value.length === 0) {
-        log("WAN Create: Creating WANIPConnection.1");
-        declare(wanConnPath + ".WANIPConnection.*", {path: now}, {path: 1});
-    }
+    // Refresh the newly created node
+    declare("InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANIPConnection.*.*", {path: now});
 }
 
 log("WAN Create: Structure creation complete");
@@ -176,6 +149,7 @@ echo " Done"
 # =====================================================
 # PROVISION: wan-pppoe-config - Configure PPPoE credentials and settings
 # Args: username, password, vlan, wanDeviceIndex, wanConnDeviceIndex, pppConnIndex
+# Assumes WANPPPConnection already exists (use wan-create first)
 # =====================================================
 echo "Creating provision: wan-pppoe-config..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-pppoe-config" \
@@ -189,7 +163,6 @@ let password = args[1] || "";
 let vlan = parseInt(args[2]) || 0;
 let wanDeviceIndex = args[3] || 1;
 let wanConnDeviceIndex = args[4] || 1;
-let pppConnIndex = args[5] || 1;
 
 if (!username || !password) {
     log("WAN PPPoE Config: ERROR - Username and password required");
@@ -198,35 +171,40 @@ if (!username || !password) {
 
 log("WAN PPPoE Config: user=" + username + ", vlan=" + vlan);
 
-// Build base path
+// Build base path with wildcard to apply to all PPP instances
 let basePath = "InternetGatewayDevice.WANDevice." + wanDeviceIndex + 
                ".WANConnectionDevice." + wanConnDeviceIndex + 
-               ".WANPPPConnection." + pppConnIndex;
+               ".WANPPPConnection.*";
 
-// Set PPPoE parameters
-declare(basePath + ".Enable", {value: now}, {value: true});
-declare(basePath + ".Username", {value: now}, {value: username});
-declare(basePath + ".Password", {value: now}, {value: password});
+// First refresh the PPP connection to get current state
+declare(basePath + ".*", {path: now});
+
+// Set PPPoE parameters - {value: now} ensures we are setting fresh values
+declare(basePath + ".Name", {value: now}, {value: "Internet_PPPoE"});
 declare(basePath + ".ConnectionType", {value: now}, {value: "IP_Routed"});
 declare(basePath + ".NATEnabled", {value: now}, {value: true});
-declare(basePath + ".Name", {value: now}, {value: "Internet_PPPoE"});
+declare(basePath + ".Username", {value: now}, {value: username});
+declare(basePath + ".Password", {value: now}, {value: password});
+declare(basePath + ".Enable", {value: now}, {value: true});
 
 // Set VLAN if specified (Huawei specific parameter)
 if (vlan > 0) {
     declare(basePath + ".X_HW_VLAN", {value: now}, {value: vlan});
 }
 
-// Set as default connection
-declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", 
-        {value: now}, {value: basePath});
+// Refresh Layer3Forwarding and set as default connection
+declare("InternetGatewayDevice.Layer3Forwarding.*", {value: now});
+declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", {value: now}, 
+        {value: "InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANPPPConnection.1"});
 
-log("WAN PPPoE Config: Configuration complete for " + basePath);
+log("WAN PPPoE Config: Configuration complete");
 '
 echo " Done"
 
 # =====================================================
 # PROVISION: wan-ipoe-config - Configure IPoE/DHCP settings
-# Args: vlan, addressingType, wanDeviceIndex, wanConnDeviceIndex, ipConnIndex
+# Args: vlan, addressingType, wanDeviceIndex, wanConnDeviceIndex
+# Assumes WANIPConnection already exists (use wan-create first)
 # =====================================================
 echo "Creating provision: wan-ipoe-config..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-ipoe-config" \
@@ -239,32 +217,35 @@ let vlan = parseInt(args[0]) || 0;
 let addressingType = args[1] || "DHCP"; // DHCP or Static
 let wanDeviceIndex = args[2] || 1;
 let wanConnDeviceIndex = args[3] || 1;
-let ipConnIndex = args[4] || 1;
 
 log("WAN IPoE Config: vlan=" + vlan + ", addressing=" + addressingType);
 
-// Build base path
+// Build base path with wildcard
 let basePath = "InternetGatewayDevice.WANDevice." + wanDeviceIndex + 
                ".WANConnectionDevice." + wanConnDeviceIndex + 
-               ".WANIPConnection." + ipConnIndex;
+               ".WANIPConnection.*";
+
+// First refresh the IP connection to get current state
+declare(basePath + ".*", {path: now});
 
 // Set IPoE parameters
-declare(basePath + ".Enable", {value: now}, {value: true});
+declare(basePath + ".Name", {value: now}, {value: "Internet_IPoE"});
 declare(basePath + ".ConnectionType", {value: now}, {value: "IP_Routed"});
 declare(basePath + ".AddressingType", {value: now}, {value: addressingType});
 declare(basePath + ".NATEnabled", {value: now}, {value: true});
-declare(basePath + ".Name", {value: now}, {value: "Internet_IPoE"});
+declare(basePath + ".Enable", {value: now}, {value: true});
 
 // Set VLAN if specified (Huawei specific parameter)
 if (vlan > 0) {
     declare(basePath + ".X_HW_VLAN", {value: now}, {value: vlan});
 }
 
-// Set as default connection
-declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", 
-        {value: now}, {value: basePath});
+// Refresh Layer3Forwarding and set as default connection
+declare("InternetGatewayDevice.Layer3Forwarding.*", {value: now});
+declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", {value: now}, 
+        {value: "InternetGatewayDevice.WANDevice." + wanDeviceIndex + ".WANConnectionDevice." + wanConnDeviceIndex + ".WANIPConnection.1"});
 
-log("WAN IPoE Config: Configuration complete for " + basePath);
+log("WAN IPoE Config: Configuration complete");
 '
 echo " Done"
 
@@ -354,7 +335,7 @@ echo " Done"
 
 # =====================================================
 # PROVISION: full-refresh - Complete device discovery
-# Forces object tree creation before refresh (Huawei-compatible)
+# Forces discovery of all parameters from device
 # =====================================================
 echo "Creating provision: full-refresh..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/full-refresh" \
@@ -362,23 +343,23 @@ curl -s -X PUT "$GENIEACS_NBI_URL/provisions/full-refresh" \
   -d '
 const now = Date.now();
 
-// Force object tree creation (Huawei hides objects otherwise)
-declare("InternetGatewayDevice.DeviceInfo.", {path: 1});
-declare("InternetGatewayDevice.ManagementServer.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
-declare("InternetGatewayDevice.LANDevice.", {path: 1});
-declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
-declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
-declare("InternetGatewayDevice.Time.", {path: 1});
+// Force full discovery - {path: now} requests fresh path info from device
+declare("InternetGatewayDevice.DeviceInfo.*", {path: now, value: now});
+declare("InternetGatewayDevice.ManagementServer.*", {path: now, value: now});
+declare("InternetGatewayDevice.WANDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.*", {path: now});
+declare("InternetGatewayDevice.LANDevice.*", {path: now});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.*", {path: now});
+declare("InternetGatewayDevice.Layer3Forwarding.*", {path: now, value: now});
+declare("InternetGatewayDevice.Time.*", {path: now, value: now});
 
-// Now refresh all values
-declare("InternetGatewayDevice.*", {path: now, value: now});
-declare("Device.*", {path: now, value: now});
+// TR-181 devices
+declare("Device.DeviceInfo.*", {path: now, value: now});
+declare("Device.ManagementServer.*", {path: now, value: now});
 
-log("Full device refresh completed (with forced object discovery)");
+log("Full device refresh completed");
 '
 echo " Done"
 
@@ -409,7 +390,7 @@ echo " Done"
 # PROVISION: huawei-wan-pppoe - Complete Huawei PPPoE setup
 # This is the main provision for configuring PPPoE on Huawei ONUs
 # Args: username, password, vlan
-# Forces object discovery first (Huawei hides objects)
+# Uses correct GenieACS syntax based on official wiki examples
 # =====================================================
 echo "Creating provision: huawei-wan-pppoe..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/huawei-wan-pppoe" \
@@ -426,52 +407,45 @@ if (!username || !password) {
     return;
 }
 
-log("Huawei WAN PPPoE: Starting configuration for user " + username + " with VLAN " + vlan);
+log("Huawei WAN PPPoE: Starting for user " + username + " with VLAN " + vlan);
 
-// Force full WAN/LAN discovery first (Huawei hides objects otherwise)
-declare("InternetGatewayDevice.WANDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
-declare("InternetGatewayDevice.LANDevice.", {path: 1});
-declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
-declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
+// First refresh the WAN structure to discover what exists
+declare("InternetGatewayDevice.WANDevice.*", {path: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: now});
 
-// Refresh WAN structure
-declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
+// Disable any existing WANIPConnection (we want PPPoE, not IPoE)
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.*.Enable", {path: now, value: now}, {value: false});
 
-// Standard paths for Huawei ONUs
-// Most Huawei ONUs use WANDevice.1.WANConnectionDevice.1 for internet
-let basePath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1";
+// Ensure we have a WANPPPConnection instance (creates one if none exist)
+log("Huawei WAN PPPoE: Creating WANPPPConnection (if necessary)");
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*", null, {path: 1});
 
-// Check if PPP connection exists after forced discovery
-let existingPpp = declare(basePath + ".*", {path: now});
-if (!existingPpp.value || Object.keys(existingPpp.value).length === 0) {
-    log("Huawei WAN PPPoE: Creating WAN PPP objects");
-    // Create the connection structure
-    declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: now}, {path: 1});
-    declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*", {path: now}, {path: 1});
-}
+// Refresh the newly created node to get all parameters
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.*", {path: now});
 
-// Configure PPPoE parameters
+// Configure PPPoE parameters using wildcard to apply to all instances
 log("Huawei WAN PPPoE: Setting PPPoE parameters");
-declare(basePath + ".Enable", {value: now}, {value: true});
-declare(basePath + ".Username", {value: now}, {value: username});
-declare(basePath + ".Password", {value: now}, {value: password});
-declare(basePath + ".ConnectionType", {value: now}, {value: "IP_Routed"});
-declare(basePath + ".NATEnabled", {value: now}, {value: true});
-declare(basePath + ".Name", {value: now}, {value: "Internet_PPPoE"});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Name", {value: now}, {value: "Internet_PPPoE"});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ConnectionType", {value: now}, {value: "IP_Routed"});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.NATEnabled", {value: now}, {value: true});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Username", {value: now}, {value: username});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Password", {value: now}, {value: password});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Enable", {value: now}, {value: true});
 
 // Huawei specific VLAN configuration
 if (vlan > 0) {
     log("Huawei WAN PPPoE: Setting VLAN " + vlan);
-    declare(basePath + ".X_HW_VLAN", {value: now}, {value: vlan});
-    declare(basePath + ".X_HW_VLANMODE", {value: now}, {value: 1}); // Tagged
+    declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.X_HW_VLAN", {value: now}, {value: vlan});
 }
 
-// Set as default WAN connection (Huawei specific)
-declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", 
-        {value: now}, {value: basePath});
+// Set as default WAN connection (Huawei specific) - refresh first
+declare("InternetGatewayDevice.Layer3Forwarding.*", {value: now});
+declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", {value: now}, 
+        {value: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1"});
+
+// Refresh the status to see if it connected
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ConnectionStatus", {value: now});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ExternalIPAddress", {value: now});
 
 log("Huawei WAN PPPoE: Configuration complete");
 '
