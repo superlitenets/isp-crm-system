@@ -1123,7 +1123,8 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
             'gateway' => $_POST['static_gateway'] ?? $_POST['gateway'] ?? '',
             'dns_servers' => $_POST['static_dns'] ?? $_POST['dns_servers'] ?? '8.8.8.8,8.8.4.4',
             'bind_lan_ports' => isset($_POST['bind_lan_ports']),
-            'bind_wifi' => isset($_POST['bind_wifi'])
+            'bind_wifi' => isset($_POST['bind_wifi']),
+            'wan_profile_id' => isset($_POST['wan_profile_id']) ? (int)$_POST['wan_profile_id'] : 1
         ];
         
         $result = $huaweiOLT->configureWANViaTR069($onuId, $config);

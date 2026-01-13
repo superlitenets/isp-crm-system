@@ -6744,6 +6744,7 @@ class HuaweiOLT {
         $gemPort = (int)($config['gemport'] ?? 2);
         $natEnabled = $config['nat_enabled'] ?? true;
         $priority = (int)($config['priority'] ?? 0);
+        $wanProfileId = (int)($config['wan_profile_id'] ?? 1);
         
         if (empty($pppoeUsername) || empty($pppoePassword)) {
             return ['success' => false, 'message' => 'PPPoE username and password are required'];
@@ -6773,7 +6774,7 @@ class HuaweiOLT {
         
         // 1b. Apply WAN config (profile-id determines PPPoE mode)
         $output .= "[Step 1b: WAN Config]\n";
-        $result1b = $this->executeCommand($oltId, "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1");
+        $result1b = $this->executeCommand($oltId, "ont wan-config {$port} {$onuId} ip-index 1 profile-id {$wanProfileId}");
         $output .= ($result1b['output'] ?? '') . "\n";
         usleep(500000); // 500ms delay
         
@@ -6784,7 +6785,7 @@ class HuaweiOLT {
         // Check if command succeeded (ignore "already exists" messages)
         $step1Failed = $hasRealError($result1b['output'] ?? '');
         if ($step1Failed) {
-            $errors[] = "WAN profile config may have failed - check OLT profile-id 1 exists and is PPPoE type";
+            $errors[] = "WAN profile config may have failed - check OLT profile-id exists and is PPPoE type";
         }
         
         // Step 2: Create service-port for PPPoE VLAN
@@ -7255,7 +7256,8 @@ class HuaweiOLT {
                     'pppoe_password' => $pppoePassword,
                     'gemport' => 2,
                     'nat_enabled' => true,
-                    'priority' => 0
+                    'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1
                 ];
                 $omciResult = $this->configureWANPPPoE($onuDbId, $omciConfig);
                 error_log("[WAN_CONFIG] OMCI result: " . json_encode($omciResult));
@@ -11006,31 +11008,37 @@ class HuaweiOLT {
             case 'bridge':
                 // All ports access mode, same VLAN
                 for ($i = 1; $i <= $ethPorts; $i++) {
-                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 }
                 break;
                 
             case 'router':
                 // Port 1: WAN (access, internet VLAN), Ports 2-4: LAN (transparent)
-                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 for ($i = 2; $i <= $ethPorts; $i++) {
-                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 }
                 break;
                 
             case 'iptv':
                 // Port 4: IPTV (access, multicast VLAN), Others: Internet
                 for ($i = 1; $i <= $ethPorts - 1; $i++) {
-                    $portConfigs[$i] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                    $portConfigs[$i] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 }
                 $portConfigs[$ethPorts] = ['mode' => 'access', 'vlan_id' => 500, 'priority' => 5];
                 break;
                 
             case 'voip':
                 // Port 1: Internet, Port 4: VoIP (high priority)
-                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0];
+                $portConfigs[1] = ['mode' => 'access', 'vlan_id' => 100, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 for ($i = 2; $i <= $ethPorts - 1; $i++) {
-                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0];
+                    $portConfigs[$i] = ['mode' => 'transparent', 'vlan_id' => null, 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 }
                 $portConfigs[$ethPorts] = ['mode' => 'access', 'vlan_id' => 300, 'priority' => 6];
                 break;
@@ -11038,7 +11046,8 @@ class HuaweiOLT {
             case 'trunk_all':
                 // All ports trunk mode
                 for ($i = 1; $i <= $ethPorts; $i++) {
-                    $portConfigs[$i] = ['mode' => 'trunk', 'vlan_id' => null, 'allowed_vlans' => '100-999', 'priority' => 0];
+                    $portConfigs[$i] = ['mode' => 'trunk', 'vlan_id' => null, 'allowed_vlans' => '100-999', 'priority' => 0,
+                    'wan_profile_id' => $config['wan_profile_id'] ?? 1];
                 }
                 break;
                 

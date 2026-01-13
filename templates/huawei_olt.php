@@ -8625,6 +8625,18 @@ try {
                                     <?php endif; ?>
                                 </div>
                                 
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">WAN Profile ID <small class="text-muted">(OLT WAN profile for PPPoE/DHCP mode)</small></label>
+                                    <input type="number" name="wan_profile_id" id="wanProfileId" class="form-control" 
+                                           value="<?= htmlspecialchars($currentOnu['wan_profile_id'] ?? '1') ?>" 
+                                           min="1" max="255" placeholder="1">
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Run <code>display ont wan-profile all</code> on OLT to find available profiles. 
+                                        Use a profile with <strong>Mode: PPPoE</strong> for PPPoE connections.
+                                    </div>
+                                </div>
                                 <div id="pppoeFields" style="display: none;">
                                     <div class="mb-3">
                                         <label class="form-label">PPPoE Username</label>
