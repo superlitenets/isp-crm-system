@@ -7238,7 +7238,29 @@ class HuaweiOLT {
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
             
             // SmartOLT approach: OMCI creates WANDevice tree, TR-069 only modifies
-            // First, fetch device data to discover the actual WAN hierarchy
+            // Step 1: Refresh WAN tree in GenieACS to ensure we have the latest OMCI-created paths
+            $refreshWanTask = [
+                'name' => 'getParameterValues',
+                'parameterNames' => ['InternetGatewayDevice.WANDevice.']
+            ];
+            $refreshUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
+            $ch = curl_init($refreshUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode($refreshWanTask),
+                CURLOPT_TIMEOUT => 15
+            ]);
+            $refreshResult = curl_exec($ch);
+            $refreshCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            error_log("[WAN_CONFIG] Refreshing WAN tree: HTTP {$refreshCode}");
+            
+            // Wait for device to respond with updated WAN tree
+            sleep(3);
+            
+            // Step 2: Fetch device data to discover the actual WAN hierarchy
             $deviceDataUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId);
             $ch = curl_init($deviceDataUrl);
             curl_setopt_array($ch, [
