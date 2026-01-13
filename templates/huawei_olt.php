@@ -8138,9 +8138,6 @@ try {
                 <?php if (empty($currentOnu['tr069_ip'])): ?>
                 setTimeout(() => refreshTR069IP(true), 1000);
                 <?php endif; ?>
-                
-                // Auto-refresh live ONU status on page load
-                setTimeout(() => refreshLiveStatus(true), 300);
             })();
             
             // Refresh live ONU status (online/offline) via SNMP
@@ -8192,6 +8189,9 @@ try {
                     if (!silent) showToast('Error fetching live status', 'danger', 5000);
                 }
             }
+            
+            // Auto-refresh live ONU status on page load
+            setTimeout(() => refreshLiveStatus(true), 300);
             
             // Refresh optical data (RX/TX power, distance)
             async function refreshOpticalData(onuId) {
