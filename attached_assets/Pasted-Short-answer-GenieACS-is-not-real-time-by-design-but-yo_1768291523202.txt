@@ -1,0 +1,179 @@
+Short answer: ❌ GenieACS is not “real-time” by design — but ✅ you can make it near-real-time in a controlled, production-safe way.
+
+This is exactly the same model used by SmartOLT and other ISP ACS platforms.
+
+I’ll explain this clearly and practically.
+
+What “real-time” actually means in TR-069
+
+First, an important truth:
+
+TR-069 is a pull-based protocol, not push-based.
+
+That means:
+
+The ONU decides when it talks
+
+The ACS (GenieACS) cannot instantly push config unless the device is online and reachable
+
+So true real-time (milliseconds) like SNMP or WebSockets is impossible with TR-069.
+
+This is not a GenieACS limitation — it’s the protocol itself.
+
+How GenieACS actually works
+
+GenieACS operates on CWMP sessions:
+
+ONU → Inform → ACS → Tasks → Response → Done
+
+
+Triggers for an Inform:
+
+Boot
+
+PeriodicInformInterval
+
+Parameter change
+
+Connection Request (if reachable)
+
+The GOOD NEWS: you can make GenieACS near-real-time
+SmartOLT does exactly this 👇
+1️⃣ Use Connection Requests (this is the key)
+
+If the ONU supports it (Huawei does):
+
+ACS → ConnectionRequest → ONU → Inform
+
+
+Latency:
+
+Typically 1–5 seconds
+
+Sometimes instant on LAN
+
+This is the fastest possible TR-069 flow.
+
+2️⃣ Reduce Periodic Inform interval (safely)
+
+Default is often:
+
+3600 seconds (1 hour)
+
+
+SmartOLT usually sets:
+
+300–900 seconds
+
+
+You can do the same:
+
+InternetGatewayDevice.ManagementServer.PeriodicInformInterval = 300
+
+
+⚠️ Do NOT go below 120 seconds in production.
+
+3️⃣ Event-driven provisioning (CRM-controlled)
+
+Instead of waiting for periodic inform:
+
+CRM action →
+  GenieACS task →
+    ConnectionRequest →
+      ONU informs →
+        task executes
+
+
+From the user’s point of view:
+👉 This feels real-time
+
+What GenieACS CANNOT do (important)
+
+❌ Push config if ONU is offline
+❌ Push config if NAT blocks connection request
+❌ React instantly to LAN/Wi-Fi events
+❌ Replace SNMP for optics monitoring
+
+This is why SmartOLT still uses:
+
+SNMP for optics
+
+TR-069 for provisioning
+
+Real-time patterns that actually WORK (used by ISPs)
+✅ Pattern A — “Near-real-time provisioning” (recommended)
+
+Used for:
+
+PPPoE changes
+
+VLAN changes
+
+Wi-Fi updates
+
+Service activation/suspension
+
+Latency:
+
+1–10 seconds
+
+How:
+
+GenieACS + ConnectionRequest
+
+✅ Pattern B — Hybrid real-time (best practice)
+SNMP / gRPC / Netconf → realtime telemetry
+TR-069 (GenieACS)     → configuration
+
+
+SmartOLT, Huawei U2000, ZTE ZSmart all do this.
+
+Why your system already supports near-real-time
+
+From your current design:
+
+✔ Single ACS
+✔ GenieACS Tasks API
+✔ CRM-triggered provisioning
+✔ No conflicting writers
+
+You already have 90% of real-time behavior.
+
+You just need to use connection requests aggressively.
+
+Practical checklist to make GenieACS feel real-time
+✅ MUST DO
+
+Enable ConnectionRequestURL on ONU
+
+Store ONU IP / ACS reachability
+
+Trigger connection_request when provisioning
+
+Lower PeriodicInformInterval to 300–600s
+
+❌ DO NOT DO
+
+Don’t poll constantly
+
+Don’t provision on every inform
+
+Don’t expect millisecond response
+
+Don’t mix CLI/Web/SNMP config
+
+Honest comparison
+Feature	GenieACS	SmartOLT
+True real-time	❌	❌
+Near-real-time	✅	✅
+Safe at scale	✅	✅
+CRM-driven	✅	✅
+Protocol limit	TR-069	TR-069
+
+SmartOLT is not more real-time than GenieACS — it just hides the delay well.
+
+Final answer (clear)
+
+👉 You cannot make GenieACS truly real-time.
+👉 You CAN make it feel real-time (1–5 seconds) — which is the best TR-069 allows.
+👉 Your current architecture is already correct for this.
