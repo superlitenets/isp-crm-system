@@ -18148,7 +18148,7 @@ echo "# ================================================\n";
         fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
             .then(r => r.json())
             .then(data => {
-                loadingToast.hide();
+                hideToast(loadingToast);
                 
                 // GUARDRAIL: Check if blocked due to provisioning state
                 if (data.blocked) {
@@ -18181,7 +18181,7 @@ echo "# ================================================\n";
                 }
             })
             .catch(err => {
-                loadingToast.hide();
+                hideToast(loadingToast);
                 showToast('Failed to check device readiness: ' + err.message, 'error');
             });
     }
@@ -18205,7 +18205,7 @@ echo "# ================================================\n";
         fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
             .then(r => r.json())
             .then(data => {
-                loadingToast.hide();
+                hideToast(loadingToast);
                 
                 // GUARDRAIL: Check if blocked due to provisioning state
                 if (data.blocked) {
@@ -18238,7 +18238,7 @@ echo "# ================================================\n";
                 }
             })
             .catch(err => {
-                loadingToast.hide();
+                hideToast(loadingToast);
                 showToast('Failed to check device readiness: ' + err.message, 'error');
             });
     }
