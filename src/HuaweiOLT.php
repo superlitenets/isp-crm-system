@@ -7235,19 +7235,35 @@ class HuaweiOLT {
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
-            // Huawei ONUs: WANConnectionDevice.1 = Management, WANConnectionDevice.2 = Internet WAN
-            // Need to CREATE WANPPPConnection first via addObject
-            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2";
-            
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
             
-            // Step 1: Create WANPPPConnection object first
+            // Step 1: Discover WAN tree to find available WANConnectionDevice
+            $discoverTask = [
+                'name' => 'getParameterValues',
+                'parameterNames' => ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.']
+            ];
+            $discoverResult = $sendTask($discoverTask, 'Discover WAN tree');
+            error_log("[WAN_CONFIG] WAN discovery result: HTTP {$discoverResult['code']}");
+            
+            // Parse discovery to find existing WANConnectionDevice paths
+            $wanConnDeviceIndex = 1; // Default to .1 which should exist (management WAN)
+            if ($discoverResult['success']) {
+                $taskData = json_decode($discoverResult['response'], true);
+                error_log("[WAN_CONFIG] Discovery response: " . substr($discoverResult['response'] ?? '', 0, 500));
+            }
+            
+            // Use WANConnectionDevice.1 which is known to exist (has management WAN)
+            // WANConnectionDevice.2 may not exist on all devices
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanConnDeviceIndex}";
+            error_log("[WAN_CONFIG] Using WAN connection path: {$wanConnPath}");
+            
+            // Step 2: Create WANPPPConnection object under existing WANConnectionDevice
             $addPppTask = [
                 'name' => 'addObject',
                 'objectName' => "{$wanConnPath}.WANPPPConnection."
             ];
             $addResult = $sendTask($addPppTask, 'Create WANPPPConnection');
-            error_log("[WAN_CONFIG] addObject result: HTTP {$addResult['code']}, response: " . substr($addResult['response'] ?? '', 0, 200));
+            error_log("[WAN_CONFIG] addObject WANPPPConnection result: HTTP {$addResult['code']}, response: " . substr($addResult['response'] ?? '', 0, 300));
             
             $pppConnIndex = 1;
             if ($addResult['success']) {
@@ -7256,13 +7272,19 @@ class HuaweiOLT {
                 if (!empty($respData['instanceNumber'])) {
                     $pppConnIndex = (int)$respData['instanceNumber'];
                     error_log("[WAN_CONFIG] New WANPPPConnection instance: {$pppConnIndex}");
+                } else {
+                    // Check if response has the instance in a different format
+                    error_log("[WAN_CONFIG] No instanceNumber in response, using default 1");
                 }
             } else {
-                error_log("[WAN_CONFIG] addObject failed, trying to use existing WANPPPConnection.1");
+                // If addObject failed, check if WANPPPConnection already exists
+                error_log("[WAN_CONFIG] addObject failed - WANPPPConnection may already exist, trying instance 2");
+                // Try instance 2 since instance 1 might be in use by management
+                $pppConnIndex = 2;
             }
             
             $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
-            $wanName = "wan1.2.ppp{$pppConnIndex}";
+            $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
