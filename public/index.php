@@ -867,7 +867,9 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
     
     try {
         // First check GenieACS reachability - if device is there and online, allow config
-        $genieAcs = new \App\GenieACS();
+        $genieAcs = new \App\GenieACS($db);
+        
+        error_log("[TR069 Reachability] Checking serial: {$serialNumber}");
         
         $device = null;
         $searchFormats = [
