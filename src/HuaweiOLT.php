@@ -6717,10 +6717,14 @@ class HuaweiOLT {
     }
     
     /**
-     * Configure PPPoE WAN via OMCI and queue TR-069 credentials push
-     * Step 1: Configure PPPoE WAN mode on OLT via OMCI
-     * Step 2: Create service-port for PPPoE VLAN
-     * Step 3: Queue PPPoE credentials for TR-069 push when device connects
+     * Configure PPPoE WAN - SmartOLT approach
+     * 
+     * SmartOLT method: ONU has factory-default Internet WAN, TR-069 configures it
+     * OMCI only handles TR-069 management WAN (DHCP on VLAN 69)
+     * 
+     * This function:
+     * Step 1: Create service-port for PPPoE VLAN (traffic flow)
+     * Step 2: Queue PPPoE credentials for TR-069 push to existing WAN
      */
     public function configureWANPPPoE(int $onuDbId, array $config): array {
         $onu = $this->getONU($onuDbId);
@@ -6744,7 +6748,6 @@ class HuaweiOLT {
         $gemPort = (int)($config['gemport'] ?? 2);
         $natEnabled = $config['nat_enabled'] ?? true;
         $priority = (int)($config['priority'] ?? 0);
-        $wanProfileId = (int)($config['wan_profile_id'] ?? 1);
         
         if (empty($pppoeUsername) || empty($pppoePassword)) {
             return ['success' => false, 'message' => 'PPPoE username and password are required'];
@@ -6762,62 +6765,20 @@ class HuaweiOLT {
             return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
         };
         
-        // Step 1: Configure PPPoE WAN via OMCI
-        // Uses: ont ipconfig + ont internet-config (MA5683T syntax)
-        // CRITICAL: Send each command SEPARATELY with delays
-        
-        $ipIndex = 1; // Use ip-index 1 for Internet WAN (0 is often TR-069)
-        
-        // 1a. Enter interface mode
-        $output .= "[Step 1a: Enter interface]\n";
-        $result1a = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
-        $output .= ($result1a['output'] ?? '') . "\n";
-        usleep(500000); // 500ms delay
-        
-        // 1b. Configure PPPoE WAN with credentials via OMCI
-        // Syntax: ont ipconfig {port} {onu_id} ip-index {N} pppoe user-account username {USER} password {PASS} vlan {VLAN} priority {P}
-        $output .= "[Step 1b: PPPoE IP Config]\n";
-        $pppoeCmd = "ont ipconfig {$port} {$onuId} ip-index {$ipIndex} pppoe user-account username {$pppoeUsername} password {$pppoePassword} vlan {$pppoeVlan} priority {$priority}";
-        $result1b = $this->executeCommand($oltId, $pppoeCmd);
-        $output .= ($result1b['output'] ?? '') . "\n";
-        usleep(500000); // 500ms delay
-        
-        // Check if command succeeded
-        $step1bFailed = $hasRealError($result1b['output'] ?? '');
-        if ($step1bFailed) {
-            $errors[] = "PPPoE IP config may have failed";
-        }
-        
-        // 1c. Set as Internet WAN (not TR-069 management)
-        // Syntax: ont internet-config {port} {onu_id} ip-index {N}
-        $output .= "[Step 1c: Internet Config]\n";
-        $result1c = $this->executeCommand($oltId, "ont internet-config {$port} {$onuId} ip-index {$ipIndex}");
-        $output .= ($result1c['output'] ?? '') . "\n";
-        usleep(500000); // 500ms delay
-        
-        $step1cFailed = $hasRealError($result1c['output'] ?? '');
-        if ($step1cFailed) {
-            $errors[] = "Internet config may have failed";
-        }
-        
-        // 1d. Exit interface mode
-        $result1d = $this->executeCommand($oltId, "quit");
-        $output .= "[Step 1d: Exit interface]\n" . ($result1d['output'] ?? '') . "\n";
-        
-        // Step 2: Create service-port for PPPoE VLAN
-        // CRITICAL: Send as single clean command (not in multi-line block)
-        usleep(500000); // 500ms delay before service-port
-        $output .= "[Step 2: Service Port]\n";
-        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
-        $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= ($result2['output'] ?? '') . "\n";
+        // Step 1: Create service-port for PPPoE VLAN (traffic flow)
+        // SmartOLT approach: ONU has factory-default Internet WAN
+        // We just need to ensure traffic can flow on the PPPoE VLAN
+        $output .= "[Step 1: Service Port for PPPoE VLAN]\n";
+        $cmd1 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
+        $result1 = $this->executeCommand($oltId, $cmd1);
+        $output .= ($result1['output'] ?? '') . "\n";
         
         // Not critical if service port already exists from authorization
-        if ($hasRealError($result2['output'] ?? '') && !preg_match('/already exist/i', $result2['output'] ?? '')) {
+        if ($hasRealError($result1['output'] ?? '') && !preg_match('/already exist/i', $result1['output'] ?? '')) {
             $output .= "[Note: Service port may already exist from authorization]\n";
         }
         
-        // Step 3: Queue PPPoE credentials for TR-069 push
+        // Step 2: Queue PPPoE credentials for TR-069 push
         // Create pending TR-069 config to be pushed when device connects to ACS
         try {
             // Ensure table exists
