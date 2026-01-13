@@ -6762,31 +6762,23 @@ class HuaweiOLT {
         };
         
         // Step 1: Configure PPPoE WAN via OMCI
-        // Note: Huawei OLT uses ont wan-config or ont pppoe-config command
-        // Try ont wan-config first (newer syntax)
+        // IMPORTANT: On MA5683T, wan-mode comes from the WAN profile, NOT the command
+        // Use simple ont wan-config with profile-id only (profile defines PPPoE mode)
         $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1 wan-mode pppoe pppoe-proxy enable vlan {$pppoeVlan} priority {$priority}\r\n";
+        $cmd1 .= "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1\r\n";
         $cmd1 .= "quit";
         $result1 = $this->executeCommand($oltId, $cmd1);
         $output .= "[Step 1: PPPoE WAN Config]\n" . ($result1['output'] ?? '') . "\n";
         
-        // If wan-config fails, try alternative syntax
-        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
-            // Try ont ipconfig with pppoe mode (alternative for some OLT versions)
-            $cmd1Alt = "interface gpon {$frame}/{$slot}\r\n";
-            $cmd1Alt .= "ont ipconfig {$port} {$onuId} pppoe vlan {$pppoeVlan} priority {$priority}\r\n";
-            $cmd1Alt .= "quit";
-            $result1Alt = $this->executeCommand($oltId, $cmd1Alt);
-            $output .= "[Step 1 Alt: PPPoE via ipconfig]\n" . ($result1Alt['output'] ?? '') . "\n";
-            
-            if (!$result1Alt['success'] || $hasRealError($result1Alt['output'] ?? '')) {
-                $errors[] = "PPPoE WAN config failed - try manual configuration";
-            }
+        // Check if command succeeded (ignore "already exists" messages)
+        $step1Failed = $hasRealError($result1['output'] ?? '');
+        if ($step1Failed) {
+            $errors[] = "WAN profile config may have failed - check OLT profile-id 1 exists and is PPPoE type";
         }
         
-        // Step 2: Create service-port for PPPoE VLAN (if not exists)
-        // Use traffic-table index syntax (matches SmartOLT) - service VLAN uses index 8/9
-        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9";
+        // Step 2: Create service-port for PPPoE VLAN (simplified syntax for MA5683T)
+        // Remove tag-transform and traffic-table options that may not be supported
+        $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
         $result2 = $this->executeCommand($oltId, $cmd2);
         $output .= "[Step 2: Service Port for PPPoE]\n" . ($result2['output'] ?? '') . "\n";
         
@@ -7362,129 +7354,35 @@ class HuaweiOLT {
                 error_log("[WAN_CONFIG] Using existing PPPoE path: {$pppPath}");
                 $tasksSent[] = "Using existing PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
             } else {
-                // No PPPoE connection found - need to create WANConnectionDevice.2 and WANPPPConnection
-                error_log("[WAN_CONFIG] No PPPoE connection found in device tree - creating new WAN structure");
+                // CRITICAL: No PPPoE connection found in TR-069 tree
+                // This means OMCI failed to create the WAN structure on the OLT
+                // TR-069 CANNOT create WANConnectionDevice/WANPPPConnection on Huawei ONUs
+                // The WAN structure MUST be created via OMCI (OLT commands) first
+                error_log("[WAN_CONFIG] OMCI PPPoE WAN not found in device tree. OMCI must create WAN first.");
                 
-                // SmartOLT approach: Create WANConnectionDevice.2.WANPPPConnection via TR-069
-                // Step A: First check if WANConnectionDevice.2 exists
-                $hasWanConnDev2 = false;
-                if (is_array($device)) {
-                    foreach ($device as $key => $value) {
-                        if (strpos($key, 'WANConnectionDevice.2.') !== false) {
-                            $hasWanConnDev2 = true;
-                            break;
-                        }
-                    }
-                }
+                // Provide helpful diagnostic commands for the user
+                $frame = $onu['frame'] ?? 0;
+                $slot = $onu['slot'];
+                $port = $onu['port'];
+                $onuIdNum = $onu['onu_id'];
                 
-                if (!$hasWanConnDev2) {
-                    // Create WANConnectionDevice.2
-                    error_log("[WAN_CONFIG] Creating WANConnectionDevice.2");
-                    $addConnDevTask = [
-                        'name' => 'addObject',
-                        'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
-                    ];
-                    $addConnUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
-                    $ch = curl_init($addConnUrl);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_POST => true,
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_POSTFIELDS => json_encode($addConnDevTask),
-                        CURLOPT_TIMEOUT => 15
-                    ]);
-                    $addConnResult = curl_exec($ch);
-                    $addConnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_close($ch);
-                    error_log("[WAN_CONFIG] addObject WANConnectionDevice: HTTP {$addConnCode}");
-                    
-                    // Wait for device to create the object
-                    sleep(3);
-                }
-                
-                // Step B: Create WANPPPConnection under WANConnectionDevice.2
-                error_log("[WAN_CONFIG] Creating WANPPPConnection under WANConnectionDevice.2");
-                $addPppTask = [
-                    'name' => 'addObject',
-                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.'
+                return [
+                    'success' => false,
+                    'error' => 'OMCI PPPoE WAN not found in device. The WAN structure must be created via OLT first.',
+                    'hint' => 'Run these commands on the OLT to verify and fix:',
+                    'diagnostic_commands' => [
+                        "display ont internet-config {$frame}/{$slot} {$port} {$onuIdNum}",
+                        "display service-port port 0/1/{$port} ont {$onuIdNum}",
+                        "display ont wan-config {$frame}/{$slot} {$port} {$onuIdNum}"
+                    ],
+                    'fix_commands' => [
+                        "interface gpon {$frame}/{$slot}",
+                        "ont wan-config {$port} {$onuIdNum} ip-index 1 profile-id 1",
+                        "quit",
+                        "service-port vlan {$serviceVlan} gpon {$frame}/{$slot}/{$port} ont {$onuIdNum} gemport 1 multi-service user-vlan {$serviceVlan}"
+                    ],
+                    'note' => 'After running fix commands, wait 30 seconds for OMCI to propagate, then retry WAN configuration.'
                 ];
-                $addPppUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
-                $ch = curl_init($addPppUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode($addPppTask),
-                    CURLOPT_TIMEOUT => 15
-                ]);
-                $addPppResult = curl_exec($ch);
-                $addPppCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                error_log("[WAN_CONFIG] addObject WANPPPConnection: HTTP {$addPppCode}");
-                
-                // Wait for device to create and report back
-                sleep(5);
-                
-                // Step C: Re-discover to find the new instance
-                $ch = curl_init($deviceDataUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 15
-                ]);
-                $deviceData = curl_exec($ch);
-                curl_close($ch);
-                
-                $pppConnections = [];
-                if ($deviceData) {
-                    $device = json_decode($deviceData, true);
-                    if (is_array($device)) {
-                        foreach ($device as $key => $value) {
-                            if (preg_match('/WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
-                                $wanDevIdx = (int)$matches[1];
-                                $connDevIdx = (int)$matches[2];
-                                $pppIdx = (int)$matches[3];
-                                $pathKey = "{$wanDevIdx}.{$connDevIdx}.{$pppIdx}";
-                                if (!isset($pppConnections[$pathKey])) {
-                                    $pppConnections[$pathKey] = [
-                                        'wan_device' => $wanDevIdx,
-                                        'conn_device' => $connDevIdx,
-                                        'ppp_instance' => $pppIdx,
-                                        'path' => "InternetGatewayDevice.WANDevice.{$wanDevIdx}.WANConnectionDevice.{$connDevIdx}.WANPPPConnection.{$pppIdx}"
-                                    ];
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                error_log("[WAN_CONFIG] After creation, PPPoE connections: " . json_encode(array_keys($pppConnections)));
-                
-                if (count($pppConnections) > 0) {
-                    // Use the newly created connection
-                    $selected = null;
-                    foreach ($pppConnections as $key => $conn) {
-                        if ($conn['conn_device'] >= 2) {
-                            $selected = $conn;
-                            break;
-                        }
-                    }
-                    if (!$selected) {
-                        $selected = reset($pppConnections);
-                    }
-                    
-                    $pppPath = $selected['path'];
-                    $wanName = "wan1.{$selected['conn_device']}.ppp{$selected['ppp_instance']}";
-                    error_log("[WAN_CONFIG] Using newly created PPPoE path: {$pppPath}");
-                    $tasksSent[] = "Created new PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
-                } else {
-                    // Still no PPPoE after creation attempts
-                    error_log("[WAN_CONFIG] Failed to create PPPoE connection - device may not support TR-069 object creation");
-                    return [
-                        'success' => false, 
-                        'error' => 'Failed to create PPPoE connection. The device may require configuration via OMCI or its web interface first.',
-                        'hint' => 'Try configuring PPPoE manually on the ONU web interface, then use TR-069 to modify credentials.'
-                    ];
-                }
             }
             
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
