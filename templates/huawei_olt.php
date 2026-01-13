@@ -3761,6 +3761,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 echo json_encode($result);
                 exit;
+            
+            case 'get_tr069_device_info':
+                header('Content-Type: application/json');
+                try {
+                    $onuId = (int)($_GET['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    // Get ONU details to find serial number
+                    $stmt = $pdo->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
+                    $stmt->execute([$onuId]);
+                    $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$onu) {
+                        echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                        exit;
+                    }
+                    
+                    // Query GenieACS for device
+                    $genieACS = new GenieACS();
+                    $device = $genieACS->findDeviceBySerial($onu['serial_number']);
+                    
+                    if ($device) {
+                        echo json_encode([
+                            'success' => true, 
+                            'device' => [
+                                '_id' => $device['_id'] ?? null,
+                                '_lastInform' => $device['_lastInform'] ?? null,
+                                '_registered' => $device['_registered'] ?? null,
+                                '_deviceId' => $device['_deviceId'] ?? null
+                            ]
+                        ]);
+                    } else {
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                    }
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+            case 'tr069_connection_request':
+                header('Content-Type: application/json');
+                try {
+                    $onuId = (int)($_POST['onu_id'] ?? $_GET['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    // Get ONU details
+                    $stmt = $pdo->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
+                    $stmt->execute([$onuId]);
+                    $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$onu) {
+                        echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                        exit;
+                    }
+                    
+                    // Send connection request via GenieACS
+                    $genieACS = new GenieACS();
+                    $result = $genieACS->sendConnectionRequest($onu['serial_number']);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
             case 'save_tr069_wifi':
                 header('Content-Type: application/json');
                 try {
@@ -17010,18 +17081,163 @@ echo "# ================================================\n";
     
     // Open TR-069 WiFi Config Modal
     function openTR069Config(onuId) {
+        // First check if ONU is reachable via GenieACS
+        const loadingToast = showToast('Checking ONU reachability...', 'info', 10000);
+        
         fetch('?page=api&action=get_onu_details&id=' + onuId)
             .then(r => r.json())
-            .then(data => {
-                if (data.success && data.onu) {
-                    document.getElementById('wifiDeviceId').value = onuId;
-                    document.getElementById('wifiDeviceSn').textContent = data.onu.serial_number || data.onu.sn || 'Unknown';
-                    new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
-                } else {
-                    alert('Error loading ONU details');
+            .then(async data => {
+                if (!data.success || !data.onu) {
+                    hideToast(loadingToast);
+                    showToast('Error loading ONU details', 'danger');
+                    return;
+                }
+                
+                const onu = data.onu;
+                const serialNumber = onu.serial_number || onu.sn || '';
+                
+                // Check GenieACS for this device
+                try {
+                    const genieResp = await fetch('?page=huawei-olt&action=get_tr069_device_info&onu_id=' + onuId);
+                    const genieData = await genieResp.json();
+                    
+                    hideToast(loadingToast);
+                    
+                    if (!genieData.success || !genieData.device) {
+                        // Device not found in GenieACS
+                        showTR069NotReachableModal(onuId, serialNumber, 'not_found', 
+                            'ONU not registered in GenieACS. The device may not have TR-069 configured or hasn\'t contacted the ACS yet.');
+                        return;
+                    }
+                    
+                    // Check last inform time
+                    const device = genieData.device;
+                    const lastInform = device._lastInform ? new Date(device._lastInform) : null;
+                    const now = new Date();
+                    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+                    
+                    if (!lastInform || lastInform < fiveMinutesAgo) {
+                        // Device hasn't informed recently - try connection request first
+                        showToast('Sending connection request to ONU...', 'info', 5000);
+                        
+                        const connResp = await fetch('?page=huawei-olt&action=tr069_connection_request&onu_id=' + onuId, {
+                            method: 'POST'
+                        });
+                        const connData = await connResp.json();
+                        
+                        // Wait a moment for device to respond
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        
+                        // Re-check device status
+                        const recheckResp = await fetch('?page=huawei-olt&action=get_tr069_device_info&onu_id=' + onuId);
+                        const recheckData = await recheckResp.json();
+                        
+                        if (recheckData.success && recheckData.device) {
+                            const newLastInform = recheckData.device._lastInform ? new Date(recheckData.device._lastInform) : null;
+                            if (newLastInform && newLastInform >= fiveMinutesAgo) {
+                                // Device is now reachable
+                                showToast('ONU is reachable', 'success');
+                                openTR069ConfigModal(onuId, serialNumber);
+                                return;
+                            }
+                        }
+                        
+                        // Still not reachable
+                        const lastSeenStr = lastInform ? formatTimeAgo(lastInform) : 'Never';
+                        showTR069NotReachableModal(onuId, serialNumber, 'stale', 
+                            'ONU last contacted ACS: ' + lastSeenStr + '. The device may be offline or have network issues.');
+                        return;
+                    }
+                    
+                    // Device is reachable - open config modal
+                    showToast('ONU is reachable via ACS', 'success');
+                    openTR069ConfigModal(onuId, serialNumber);
+                    
+                } catch (err) {
+                    hideToast(loadingToast);
+                    showToast('Error checking GenieACS: ' + err.message, 'danger');
                 }
             })
-            .catch(err => alert('Error: ' + err.message));
+            .catch(err => {
+                hideToast(loadingToast);
+                showToast('Error: ' + err.message, 'danger');
+            });
+    }
+    
+    // Helper to format time ago
+    function formatTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return seconds + ' seconds ago';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
+        const days = Math.floor(hours / 24);
+        return days + ' day' + (days > 1 ? 's' : '') + ' ago';
+    }
+    
+    // Show modal when ONU is not reachable
+    function showTR069NotReachableModal(onuId, serialNumber, reason, message) {
+        const html = `
+            <div class="modal fade" id="tr069NotReachableModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>ONU Not Reachable</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-wifi-off text-warning" style="font-size: 4rem;"></i>
+                            </div>
+                            <div class="alert alert-warning mb-3">
+                                <strong>Serial Number:</strong> ${escapeHtml(serialNumber)}<br>
+                                <small class="text-muted">${escapeHtml(message)}</small>
+                            </div>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">Troubleshooting Steps:</h6>
+                                    <ol class="mb-0 small">
+                                        <li>Verify the ONU has power and optical signal</li>
+                                        <li>Check that TR-069 profile is bound via OMCI</li>
+                                        <li>Verify management VLAN connectivity</li>
+                                        <li>Check firewall rules allow TR-069 (port 7547)</li>
+                                        <li>Try rebooting the ONU</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-warning" onclick="retryTR069Connection(${onuId})">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Retry Connection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existing = document.getElementById('tr069NotReachableModal');
+        if (existing) existing.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        new bootstrap.Modal(document.getElementById('tr069NotReachableModal')).show();
+    }
+    
+    // Retry TR-069 connection
+    function retryTR069Connection(onuId) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('tr069NotReachableModal'));
+        if (modal) modal.hide();
+        setTimeout(() => openTR069Config(onuId), 500);
+    }
+    
+    // Actually open the TR-069 config modal (after reachability check passes)
+    function openTR069ConfigModal(onuId, serialNumber) {
+        document.getElementById('wifiDeviceId').value = onuId;
+        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
+        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
     // Open WAN Config Modal

@@ -163,6 +163,42 @@ class GenieACS {
     }
     
     /**
+     * Find device by serial number - returns device array or null
+     */
+    public function findDeviceBySerial(string $serial): ?array {
+        $result = $this->getDeviceBySerial($serial);
+        return ($result['success'] && isset($result['device'])) ? $result['device'] : null;
+    }
+    
+    /**
+     * Send connection request to device to force immediate inform
+     */
+    public function sendConnectionRequest(string $serial): array {
+        $device = $this->findDeviceBySerial($serial);
+        if (!$device) {
+            return ['success' => false, 'error' => 'Device not found in GenieACS'];
+        }
+        
+        $deviceId = $device['_id'] ?? null;
+        if (!$deviceId) {
+            return ['success' => false, 'error' => 'Device ID not found'];
+        }
+        
+        // Create a simple getParameterValues task with connection_request to trigger immediate inform
+        $encodedId = urlencode($deviceId);
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+            'name' => 'getParameterValues',
+            'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => 'Connection request sent',
+            'task_result' => $result
+        ];
+    }
+    
+    /**
      * Convert OLT serial format (HWTCF2D53A8B) to GenieACS hex format (48575443F2D53A8B)
      * OLT stores vendor prefix as ASCII (HWTC), GenieACS stores as hex (48575443)
      */
