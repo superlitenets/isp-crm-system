@@ -1,0 +1,151 @@
+From the log you shared, PPPoE settings were written, but the PPPoE WAN object itself was NOT created.
+
+Let’s be very precise and tie this directly to your log.
+
+1️⃣ What your log actually proves (and what it does NOT)
+
+Your log lines:
+
+Type:Set, PPPoE VLAN: X_HW_VLAN=902, Name=Internet_PPPoE
+Type:Set, PPPoE Credentials: Username=2116, NATEnabled=1, LcpEcho=10
+
+
+❗ These lines mean SetParameterValues succeeded,
+❌ but they do NOT prove that WANPPPConnection was created.
+
+Huawei ONUs will happily accept a Set on a non-existent instance path and still return Success.
+
+This is a classic Huawei TR-069 trap.
+
+2️⃣ Why the PPPoE WAN was NOT created (root cause)
+🔴 Missing or incorrect addObject chain
+
+For Huawei TR-098, PPPoE WAN creation is a 3-step dependency chain:
+
+WANDevice
+ └─ WANConnectionDevice
+     └─ WANPPPConnection
+
+
+If any parent does not exist, PPPoE will never appear.
+
+From your log:
+
+Type:getParameterValues, Refresh WAN data
+
+
+But I do NOT see:
+
+Type:Add, InternetGatewayDevice.WANDevice
+Type:Add, InternetGatewayDevice.WANDevice.X.WANConnectionDevice
+Type:Add, InternetGatewayDevice.WANDevice.X.WANConnectionDevice.Y.WANPPPConnection
+
+
+So what happened is:
+
+👉 GenieACS sent SET commands
+👉 ONU had no WANPPPConnection instance
+👉 Huawei firmware silently ignored creation
+👉 Result: No PPPoE WAN
+
+This is expected behavior.
+
+3️⃣ How SmartOLT avoids this (important insight)
+
+SmartOLT never assumes instances exist.
+
+It always does:
+
+getParameterValues (WAN tree)
+
+If missing → addObject
+
+Read returned instance number
+
+THEN apply SetParameterValues
+
+Your flow currently jumps to step 4.
+
+4️⃣ The EXACT fix (this will solve it)
+
+You must explicitly create the PPPoE WAN before setting VLAN or credentials.
+
+✅ Correct SmartOLT-style order (mandatory)
+1. Add WANDevice
+2. Add WANConnectionDevice
+3. Add WANPPPConnection   ← THIS WAS MISSING
+4. Set PPPoE parameters
+5. Set default WAN
+
+5️⃣ Correct GenieACS task sequence (copy this)
+
+This is the minimum working PPPoE creation for Huawei ONUs.
+
+[
+  {
+    "name": "addObject",
+    "objectName": "InternetGatewayDevice.WANDevice."
+  },
+  {
+    "name": "addObject",
+    "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice."
+  },
+  {
+    "name": "addObject",
+    "objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection."
+  },
+  {
+    "name": "setParameterValues",
+    "parameterValues": [
+      ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username", "2116", "xsd:string"],
+      ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password", "password", "xsd:string"],
+      ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN", 902, "xsd:unsignedInt"],
+      ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled", true, "xsd:boolean"],
+      ["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable", true, "xsd:boolean"]
+    ]
+  }
+]
+
+
+⚠️ Without the third addObject, PPPoE will never exist.
+
+6️⃣ How to VERIFY PPPoE WAN creation (do this now)
+
+After provisioning, run:
+
+getParameterValues:
+InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANPPPConnection.*.Status
+
+
+You should see:
+
+Status = Up
+
+
+or at least:
+
+Status = Connecting
+
+
+If this path does not exist → PPPoE was not created.
+
+7️⃣ Why GenieACS said “Success” but nothing appeared
+
+This is normal with Huawei:
+
+SetParameterValues → Success
+
+Object missing → No error
+
+WAN silently not created
+
+That’s why instance creation must always be explicit.
+
+8️⃣ Final verdict (clear and direct)
+
+✅ Your PPPoE SET commands were correct
+❌ Your PPPoE WAN object was never created
+❌ Missing addObject … WANPPPConnection
+✅ Once you add it, PPPoE will appear immediately
+
+This is not a GenieACS bug and not your CRM logic failing — it’s a Huawei TR-069 requirement.

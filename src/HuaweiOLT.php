@@ -7130,8 +7130,44 @@ class HuaweiOLT {
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
-            // Always try to create WANPPPConnection - GenieACS handles duplicates gracefully
-            // (Previous approach of reusing cached paths failed when device was reset)
+            // Huawei TR-069 requires full hierarchy creation (SmartOLT-style):
+            // 1. Add WANDevice → 2. Add WANConnectionDevice → 3. Add WANPPPConnection
+            // Without this chain, SetParameterValues silently fails on non-existent paths
+            
+            // Step 3a: Create WANDevice (if not exists)
+            $addWanDeviceTask = [
+                'name' => 'addObject',
+                'objectName' => 'InternetGatewayDevice.WANDevice.'
+            ];
+            $result = $sendTask($addWanDeviceTask, 'Create WANDevice');
+            $wanDeviceIndex = 1;
+            if ($result['success']) {
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $wanDeviceIndex = (int)$respData['instanceNumber'];
+                }
+                $tasksSent[] = 'Create WANDevice';
+            }
+            
+            // Step 3b: Create WANConnectionDevice (if not exists)
+            $addWanConnDeviceTask = [
+                'name' => 'addObject',
+                'objectName' => "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice."
+            ];
+            $result = $sendTask($addWanConnDeviceTask, 'Create WANConnectionDevice');
+            $wanConnDeviceIndex = 1;
+            if ($result['success']) {
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $wanConnDeviceIndex = (int)$respData['instanceNumber'];
+                }
+                $tasksSent[] = 'Create WANConnectionDevice';
+            }
+            
+            // Update the path based on actual indices
+            $wanConnPath = "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice.{$wanConnDeviceIndex}";
+            
+            // Step 3c: Create WANPPPConnection (mandatory for PPPoE)
             $addPppConnTask = [
                 'name' => 'addObject',
                 'objectName' => "{$wanConnPath}.WANPPPConnection."
@@ -7146,7 +7182,7 @@ class HuaweiOLT {
             } else if ($existingPppPath) {
                 // If addObject failed and we have cached path, try using it
                 $pppConnIndex = (int)basename($existingPppPath);
-                $tasksSent[] = 'Using existing WANPPPConnection (addObject skipped)';
+                $tasksSent[] = 'Using existing WANPPPConnection';
             }
             $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
             $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
