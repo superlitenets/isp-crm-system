@@ -7130,26 +7130,25 @@ class HuaweiOLT {
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
-            // Use existing PPP connection if found, otherwise create new
-            if ($existingPppPath) {
-                $pppPath = $existingPppPath;
-                $tasksSent[] = 'Reusing existing WANPPPConnection';
-            } else {
-                // Create WANPPPConnection
-                $addPppConnTask = [
-                    'name' => 'addObject',
-                    'objectName' => "{$wanConnPath}.WANPPPConnection."
-                ];
-                $result = $sendTask($addPppConnTask);
-                if ($result['success']) {
-                    $tasksSent[] = 'Create WANPPPConnection';
-                    $respData = json_decode($result['response'], true);
-                    if (!empty($respData['instanceNumber'])) {
-                        $pppConnIndex = (int)$respData['instanceNumber'];
-                    }
+            // Always try to create WANPPPConnection - GenieACS handles duplicates gracefully
+            // (Previous approach of reusing cached paths failed when device was reset)
+            $addPppConnTask = [
+                'name' => 'addObject',
+                'objectName' => "{$wanConnPath}.WANPPPConnection."
+            ];
+            $result = $sendTask($addPppConnTask, 'Create WANPPPConnection');
+            if ($result['success']) {
+                $tasksSent[] = 'Create WANPPPConnection';
+                $respData = json_decode($result['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $pppConnIndex = (int)$respData['instanceNumber'];
                 }
-                $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
+            } else if ($existingPppPath) {
+                // If addObject failed and we have cached path, try using it
+                $pppConnIndex = (int)basename($existingPppPath);
+                $tasksSent[] = 'Using existing WANPPPConnection (addObject skipped)';
             }
+            $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
             $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
