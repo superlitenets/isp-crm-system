@@ -17911,7 +17911,7 @@ echo "# ================================================\n";
     <div class="modal fade" id="wanConfigModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form method="post" id="wanConfigForm">
+                <form method="post" id="wanConfigModalForm">
                     <input type="hidden" name="action" value="configure_wan_tr069">
                     <input type="hidden" name="onu_id" id="wanConfigOnuId">
                     <div class="modal-header bg-info bg-opacity-10 border-bottom">
@@ -17934,5 +17934,44 @@ echo "# ================================================\n";
             </div>
         </div>
     </div>
+
+    <script>
+    // Global showToast function
+    if (typeof window.showToast !== 'function') {
+        window.showToast = function(message, type, duration) {
+            duration = duration || 5000;
+            const toastId = 'toast_' + Date.now();
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = 'position-fixed bottom-0 end-0 p-3';
+            toast.style.zIndex = '9999';
+            toast.innerHTML = `
+                <div class="toast show align-items-center text-white bg-${type || 'info'} border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" onclick="this.closest('.position-fixed').remove()"></button>
+                    </div>
+                </div>`;
+            document.body.appendChild(toast);
+            if (duration > 0) {
+                setTimeout(() => { const el = document.getElementById(toastId); if (el) el.remove(); }, duration);
+            }
+            return toastId;
+        };
+    }
+    if (typeof window.hideToast !== 'function') {
+        window.hideToast = function(toastId) {
+            const el = document.getElementById(toastId);
+            if (el) el.remove();
+        };
+    }
+    if (typeof window.escapeHtml !== 'function') {
+        window.escapeHtml = function(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+    }
+    </script>
 </body>
 </html>
