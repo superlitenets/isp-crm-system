@@ -929,8 +929,11 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
         ];
         
         foreach ($searchFormats as $sn) {
-            $device = $genieAcs->getDevice($sn);
-            if ($device) break;
+            $result = $genieAcs->getDeviceBySerial($sn);
+            if ($result['success'] && !empty($result['device'])) {
+                $device = $result['device'];
+                break;
+            }
         }
         
         if (!$device) {
