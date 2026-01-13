@@ -8578,7 +8578,7 @@ try {
             </script>
             
             <!-- WAN Configuration Modal -->
-            <div class="modal fade" id="wanConfigModal" tabindex="-1">
+            <div class="modal fade" id="staticWanConfigModal" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
@@ -8928,7 +8928,7 @@ try {
                     
                     if (data.success) {
                         alert('WAN configuration applied successfully!');
-                        bootstrap.Modal.getInstance(document.getElementById('wanConfigModal')).hide();
+                        bootstrap.Modal.getInstance(document.getElementById('staticWanConfigModal')).hide();
                         location.reload();
                     } else {
                         alert('Error: ' + (data.error || 'Unknown error'));
