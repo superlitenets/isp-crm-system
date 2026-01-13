@@ -541,6 +541,17 @@ class DiscoveryWorker {
         `);
 
         if (result.rows.length === 0) {
+            // Debug: check if there are any pending but why they're not queued
+            const debugResult = await this.pool.query(`
+                SELECT COUNT(*) as total, 
+                       SUM(CASE WHEN notified = false AND authorized = false THEN 1 ELSE 0 END) as pending,
+                       SUM(CASE WHEN authorized = true THEN 1 ELSE 0 END) as authorized
+                FROM onu_discovery_log WHERE first_seen_at > NOW() - INTERVAL '1 hour'
+            `);
+            const stats = debugResult.rows[0];
+            if (parseInt(stats.total) > 0) {
+                console.log(`[Discovery] No pending notifications (last hour: ${stats.total} total, ${stats.pending} pending, ${stats.authorized} authorized)`);
+            }
             return;
         }
 
