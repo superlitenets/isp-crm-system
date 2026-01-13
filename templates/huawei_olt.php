@@ -7263,7 +7263,7 @@ try {
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="getOnuConfig(<?= $currentOnu['id'] ?>)" title="Config">
                         <i class="bi bi-code-slash"></i><span class="d-none d-md-inline ms-1">Config</span>
                     </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" onclick="getTR069Stat(<?= $currentOnu['id'] ?>)" title="TR-069 Info">
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="openTR069Config(<?= $currentOnu['id'] ?>)" title="TR-069 Info">
                         <i class="bi bi-broadcast"></i><span class="d-none d-md-inline ms-1">TR-069</span>
                     </button>
                     <form method="post" class="d-inline" onsubmit="return confirm('Reboot this ONU?')">
@@ -7273,9 +7273,6 @@ try {
                             <i class="bi bi-arrow-clockwise"></i><span class="d-none d-md-inline ms-1">Reboot</span>
                         </button>
                     </form>
-                    <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#tr069ConfigModal" title="Push TR-069">
-                        <i class="bi bi-gear"></i><span class="d-none d-md-inline ms-1">Push TR-069</span>
-                    </button>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="WAN Config">
                         <i class="bi bi-ethernet"></i><span class="d-none d-md-inline ms-1">WAN</span>
                     </button>
