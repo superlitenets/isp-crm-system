@@ -1,0 +1,184 @@
+"Device","Channel","Code","Message","Detail","Retries","Timestamp"
+"00259E-HG8546M-48575443F2D53A8B","task_696629df124cbbc87fee8082","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629dfd00f383e1c127adb","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629df7cbfd0d33a0f9425","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629dfa516b7a9beeaa6d5","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629dffa373cfd0ef856be","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa6cbde91a9325c57eb","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa650ab28091798b691","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa73abd16fe84a8d7dc","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa7124cbbc87fee8083","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa733370058da92cbec","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa77cbfd0d33a0f9426","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69662aa7802dec79b100e05a","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311af94b159395233f01","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311ac66ce6bcb3a97a58","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311a1a972e3bdaf0716b","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311adde04d528a2e1b17","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629df802dec79b100e059","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311b22ecdd7006d9894d","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311b06ae7945e77979cc","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696629df33370058da92cbeb","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966311ba32083e609ce9776","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",3,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401ef44e9be28ca1910","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401ae65b00a23e8b902","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966340167b8c932c877eba3","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401f94b159395233f02","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401c66ce6bcb3a97a59","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966343d1a972e3bdaf0716c","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: 
+  - parameterName: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase
+    faultCode: ""9007""
+    faultString: Invalid parameter value
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401e554af2c45527181","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663401f82f96c8ce3720ae","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",2,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663c905db0ebeceb103e0f","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",1,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663c90fb086ea811e27562","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",1,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663c90050f622a33307bbd","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at instances
+",1,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_6966409c5094a4730ce78b1b","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: 
+  - parameterName: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase
+    faultCode: ""9007""
+    faultString: Invalid parameter value
+",1,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69664099fb086ea811e27563","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: 
+  - parameterName: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase
+    faultCode: ""9007""
+    faultString: Invalid parameter value
+",1,"2026-01-13T15:09:32.321Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69663c90c448f435292c9d8d","cwmp.9002","Internal error","faultCode: ""9002""
+faultString: Internal error
+setParameterValuesFault: null
+",1,"2026-01-13T15:09:32.321Z"

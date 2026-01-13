@@ -3933,6 +3933,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => 'Exception: ' . $e->getMessage()]);
                 }
                 exit;
+            
+            case 'start_pppoe_provisioning':
+                header('Content-Type: application/json');
+                try {
+                    require_once __DIR__ . '/../src/TR069Provisioner.php';
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    $config = [
+                        'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                        'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                        'service_vlan' => (int)($_POST['vlan'] ?? $_POST['service_vlan'] ?? 0),
+                        'wan_mode' => 'pppoe'
+                    ];
+                    
+                    $provisioner = new \App\TR069Provisioner($db);
+                    $result = $provisioner->startProvisioning($onuId, $config);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+            case 'get_provisioning_status':
+                header('Content-Type: application/json');
+                try {
+                    require_once __DIR__ . '/../src/TR069Provisioner.php';
+                    $onuId = (int)($_GET['onu_id'] ?? $_POST['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    $provisioner = new \App\TR069Provisioner($db);
+                    $result = $provisioner->getProvisioningStatus($onuId);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+            case 'continue_provisioning':
+                header('Content-Type: application/json');
+                try {
+                    require_once __DIR__ . '/../src/TR069Provisioner.php';
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    $provisioner = new \App\TR069Provisioner($db);
+                    $result = $provisioner->processNextStep($onuId);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+            case 'cancel_provisioning':
+                header('Content-Type: application/json');
+                try {
+                    require_once __DIR__ . '/../src/TR069Provisioner.php';
+                    $onuId = (int)($_POST['onu_id'] ?? 0);
+                    if (!$onuId) {
+                        echo json_encode(['success' => false, 'error' => 'ONU ID required']);
+                        exit;
+                    }
+                    
+                    $provisioner = new \App\TR069Provisioner($db);
+                    $result = $provisioner->cancelProvisioning($onuId);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
             case 'save_tr069_wan':
                 header('Content-Type: application/json');
                 try {
@@ -14540,62 +14624,224 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <h5 class="modal-title"><i class="bi bi-router me-2"></i>Add Internet Service (PPPoE)</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="?page=huawei-olt">
-                    <input type="hidden" name="action" value="configure_pppoe_wan">
-                    <input type="hidden" name="onu_db_id" id="pppoeWanOnuId">
-                    <div class="modal-body">
+                <div class="modal-body">
+                    <div id="pppoeWanFormSection">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-1"></i>
-                            SmartOLT-style: This configures Internet WAN via TR-069 (GenieACS). LAN ports and WiFi will be bound to this WAN.
+                            <strong>Multi-Session Provisioning:</strong> This uses SmartOLT-grade state machine to configure PPPoE step-by-step via TR-069.
                         </div>
                         <p class="text-muted small">ONU: <strong id="pppoeWanOnuSn"></strong></p>
+                        <input type="hidden" id="pppoeWanOnuId">
                         
-                        <input type="hidden" name="gemport" value="1">
                         <div class="mb-3">
                             <label class="form-label">PPPoE VLAN</label>
-                            <input type="number" name="pppoe_vlan" class="form-control" value="902" required>
+                            <input type="number" id="pppoeWanVlan" class="form-control" value="902" required>
                             <small class="text-muted">Internet service VLAN</small>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">PPPoE Username <span class="text-danger">*</span></label>
-                            <input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com" required>
+                            <input type="text" id="pppoeWanUsername" class="form-control" placeholder="user@isp.com" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">PPPoE Password <span class="text-danger">*</span></label>
-                            <input type="text" name="pppoe_password" class="form-control" placeholder="password" required>
+                            <input type="text" id="pppoeWanPassword" class="form-control" placeholder="password" required>
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Priority</label>
-                                <input type="number" name="priority" class="form-control" value="0" min="0" max="7">
+                    </div>
+                    
+                    <div id="pppoeWanProgressSection" class="d-none">
+                        <div class="text-center mb-3">
+                            <div class="spinner-border text-primary" id="pppoeWanSpinner"></div>
+                        </div>
+                        <div id="pppoeWanStatus" class="alert alert-secondary"></div>
+                        <div id="pppoeWanSteps" class="small">
+                            <div class="d-flex align-items-center mb-2" data-step="discover">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Discover existing objects</span>
                             </div>
-                            <div class="col-md-6 mb-3 d-flex align-items-end">
-                                <div class="form-check">
-                                    <input type="checkbox" name="nat_enabled" class="form-check-input" id="pppoeNatEnabled" checked>
-                                    <label class="form-check-label" for="pppoeNatEnabled">Enable NAT</label>
-                                </div>
+                            <div class="d-flex align-items-center mb-2" data-step="create_wan_device">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Create WANDevice</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" data-step="create_wan_conn_device">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Create WANConnectionDevice</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" data-step="create_wan_ppp_conn">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Create WANPPPConnection</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" data-step="set_ppp_params">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Set PPPoE credentials</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" data-step="verify">
+                                <i class="bi bi-circle me-2 text-muted step-icon"></i>
+                                <span>Verify connection</span>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check me-1"></i> Configure PPPoE
-                        </button>
-                    </div>
-                </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="pppoeWanCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="pppoeWanStartBtn" onclick="startPPPoEProvisioning()">
+                        <i class="bi bi-play me-1"></i> Start Provisioning
+                    </button>
+                    <button type="button" class="btn btn-success d-none" id="pppoeWanContinueBtn" onclick="continuePPPoEProvisioning()">
+                        <i class="bi bi-arrow-right me-1"></i> Continue
+                    </button>
+                </div>
             </div>
         </div>
     </div>
     
     <script>
+    let pppoeProvisioningOnuId = null;
+    let pppoeProvisioningInterval = null;
+    
     function showPPPoEWanModal(onuDbId, serial) {
+        pppoeProvisioningOnuId = onuDbId;
         document.getElementById('pppoeWanOnuId').value = onuDbId;
         document.getElementById('pppoeWanOnuSn').textContent = serial;
+        
+        document.getElementById('pppoeWanFormSection').classList.remove('d-none');
+        document.getElementById('pppoeWanProgressSection').classList.add('d-none');
+        document.getElementById('pppoeWanStartBtn').classList.remove('d-none');
+        document.getElementById('pppoeWanContinueBtn').classList.add('d-none');
+        
+        document.querySelectorAll('#pppoeWanSteps .step-icon').forEach(icon => {
+            icon.className = 'bi bi-circle me-2 text-muted step-icon';
+        });
+        
         new bootstrap.Modal(document.getElementById('pppoeWanModal')).show();
     }
+    
+    async function startPPPoEProvisioning() {
+        const onuId = document.getElementById('pppoeWanOnuId').value;
+        const vlan = document.getElementById('pppoeWanVlan').value;
+        const username = document.getElementById('pppoeWanUsername').value;
+        const password = document.getElementById('pppoeWanPassword').value;
+        
+        if (!username) {
+            showToast('PPPoE username is required', 'danger');
+            return;
+        }
+        
+        document.getElementById('pppoeWanFormSection').classList.add('d-none');
+        document.getElementById('pppoeWanProgressSection').classList.remove('d-none');
+        document.getElementById('pppoeWanStartBtn').classList.add('d-none');
+        document.getElementById('pppoeWanStatus').textContent = 'Starting provisioning...';
+        
+        try {
+            const response = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `action=start_pppoe_provisioning&onu_id=${onuId}&vlan=${vlan}&pppoe_username=${encodeURIComponent(username)}&pppoe_password=${encodeURIComponent(password)}`
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                updateProvisioningUI(data);
+                startProvisioningPolling(onuId);
+            } else {
+                document.getElementById('pppoeWanStatus').innerHTML = '<span class="text-danger">' + (data.error || 'Failed to start') + '</span>';
+                document.getElementById('pppoeWanSpinner').classList.add('d-none');
+            }
+        } catch (err) {
+            document.getElementById('pppoeWanStatus').innerHTML = '<span class="text-danger">Error: ' + err.message + '</span>';
+            document.getElementById('pppoeWanSpinner').classList.add('d-none');
+        }
+    }
+    
+    function startProvisioningPolling(onuId) {
+        if (pppoeProvisioningInterval) clearInterval(pppoeProvisioningInterval);
+        
+        pppoeProvisioningInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`?page=huawei-olt&action=get_provisioning_status&onu_id=${onuId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateProvisioningUI(data);
+                    
+                    if (data.state === 'complete' || data.state === 'failed') {
+                        clearInterval(pppoeProvisioningInterval);
+                        document.getElementById('pppoeWanSpinner').classList.add('d-none');
+                        
+                        if (data.state === 'complete') {
+                            showToast('PPPoE provisioning complete!', 'success');
+                        }
+                    } else if (data.next_action === 'wait_for_inform') {
+                        document.getElementById('pppoeWanContinueBtn').classList.remove('d-none');
+                    }
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 5000);
+    }
+    
+    async function continuePPPoEProvisioning() {
+        const onuId = pppoeProvisioningOnuId;
+        document.getElementById('pppoeWanContinueBtn').classList.add('d-none');
+        document.getElementById('pppoeWanSpinner').classList.remove('d-none');
+        document.getElementById('pppoeWanStatus').textContent = 'Continuing...';
+        
+        try {
+            const response = await fetch('?page=huawei-olt', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `action=continue_provisioning&onu_id=${onuId}`
+            });
+            const data = await response.json();
+            updateProvisioningUI(data);
+        } catch (err) {
+            document.getElementById('pppoeWanStatus').innerHTML = '<span class="text-danger">Error: ' + err.message + '</span>';
+        }
+    }
+    
+    function updateProvisioningUI(data) {
+        const statusEl = document.getElementById('pppoeWanStatus');
+        const state = data.state || '';
+        
+        if (data.message) {
+            statusEl.innerHTML = data.message;
+        }
+        
+        if (state === 'complete') {
+            statusEl.className = 'alert alert-success';
+            statusEl.innerHTML = '<i class="bi bi-check-circle me-2"></i>' + (data.message || 'Complete!');
+        } else if (state === 'failed') {
+            statusEl.className = 'alert alert-danger';
+            statusEl.innerHTML = '<i class="bi bi-x-circle me-2"></i>' + (data.error || data.message || 'Failed');
+        } else {
+            statusEl.className = 'alert alert-info';
+        }
+        
+        const stepOrder = ['discover', 'create_wan_device', 'create_wan_conn_device', 'create_wan_ppp_conn', 'set_ppp_params', 'set_l3_hw', 'set_policy_routes', 'verify'];
+        const currentIndex = stepOrder.indexOf(state);
+        
+        document.querySelectorAll('#pppoeWanSteps [data-step]').forEach(el => {
+            const stepName = el.dataset.step;
+            const stepIndex = stepOrder.indexOf(stepName);
+            const icon = el.querySelector('.step-icon');
+            
+            if (stepIndex < currentIndex) {
+                icon.className = 'bi bi-check-circle-fill me-2 text-success step-icon';
+            } else if (stepIndex === currentIndex) {
+                icon.className = 'bi bi-arrow-right-circle-fill me-2 text-primary step-icon';
+            } else {
+                icon.className = 'bi bi-circle me-2 text-muted step-icon';
+            }
+        });
+    }
+    
+    document.getElementById('pppoeWanModal')?.addEventListener('hidden.bs.modal', function() {
+        if (pppoeProvisioningInterval) {
+            clearInterval(pppoeProvisioningInterval);
+            pppoeProvisioningInterval = null;
+        }
+    });
     </script>
     
     <div class="modal fade" id="configScriptModal" tabindex="-1">
