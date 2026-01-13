@@ -3802,7 +3802,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Query GenieACS for device
-                    $genieACS = new GenieACS();
+                    $genieACS = new GenieACS($db);
                     $device = $genieACS->findDeviceBySerial($onu['serial_number']);
                     
                     if ($device) {
@@ -3833,7 +3833,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Query GenieACS for device by serial
-                    $genieACS = new GenieACS();
+                    $genieACS = new GenieACS($db);
                     $device = $genieACS->findDeviceBySerial($serial);
                     
                     if ($device) {
@@ -3864,7 +3864,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Send connection request via GenieACS
-                    $genieACS = new GenieACS();
+                    $genieACS = new GenieACS($db);
                     $result = $genieACS->sendConnectionRequest($serial);
                     
                     echo json_encode($result);
@@ -3893,7 +3893,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Send connection request via GenieACS
-                    $genieACS = new GenieACS();
+                    $genieACS = new GenieACS($db);
                     $result = $genieACS->sendConnectionRequest($onu['serial_number']);
                     
                     echo json_encode($result);
