@@ -7334,17 +7334,129 @@ class HuaweiOLT {
                 error_log("[WAN_CONFIG] Using existing PPPoE path: {$pppPath}");
                 $tasksSent[] = "Using existing PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
             } else {
-                // No PPPoE connection found - OMCI must create it first
-                // Check if this ONU has service-port configured on OLT
-                error_log("[WAN_CONFIG] No PPPoE connection found in device tree");
-                error_log("[WAN_CONFIG] PPPoE WAN must be created via OMCI (OLT service-port), not TR-069");
+                // No PPPoE connection found - need to create WANConnectionDevice.2 and WANPPPConnection
+                error_log("[WAN_CONFIG] No PPPoE connection found in device tree - creating new WAN structure");
                 
-                // Return helpful error message
-                return [
-                    'success' => false, 
-                    'error' => 'No PPPoE connection found on device. Please ensure the ONU has a service-port configured on the OLT with PPPoE VLAN, then refresh the device in GenieACS.',
-                    'hint' => 'OMCI creates WAN objects via OLT service-port. TR-069 can only modify existing WAN connections.'
+                // SmartOLT approach: Create WANConnectionDevice.2.WANPPPConnection via TR-069
+                // Step A: First check if WANConnectionDevice.2 exists
+                $hasWanConnDev2 = false;
+                if (is_array($device)) {
+                    foreach ($device as $key => $value) {
+                        if (strpos($key, 'WANConnectionDevice.2.') !== false) {
+                            $hasWanConnDev2 = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!$hasWanConnDev2) {
+                    // Create WANConnectionDevice.2
+                    error_log("[WAN_CONFIG] Creating WANConnectionDevice.2");
+                    $addConnDevTask = [
+                        'name' => 'addObject',
+                        'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'
+                    ];
+                    $addConnUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
+                    $ch = curl_init($addConnUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_POST => true,
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_POSTFIELDS => json_encode($addConnDevTask),
+                        CURLOPT_TIMEOUT => 15
+                    ]);
+                    $addConnResult = curl_exec($ch);
+                    $addConnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    error_log("[WAN_CONFIG] addObject WANConnectionDevice: HTTP {$addConnCode}");
+                    
+                    // Wait for device to create the object
+                    sleep(3);
+                }
+                
+                // Step B: Create WANPPPConnection under WANConnectionDevice.2
+                error_log("[WAN_CONFIG] Creating WANPPPConnection under WANConnectionDevice.2");
+                $addPppTask = [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.'
                 ];
+                $addPppUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request";
+                $ch = curl_init($addPppUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode($addPppTask),
+                    CURLOPT_TIMEOUT => 15
+                ]);
+                $addPppResult = curl_exec($ch);
+                $addPppCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                error_log("[WAN_CONFIG] addObject WANPPPConnection: HTTP {$addPppCode}");
+                
+                // Wait for device to create and report back
+                sleep(5);
+                
+                // Step C: Re-discover to find the new instance
+                $ch = curl_init($deviceDataUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 15
+                ]);
+                $deviceData = curl_exec($ch);
+                curl_close($ch);
+                
+                $pppConnections = [];
+                if ($deviceData) {
+                    $device = json_decode($deviceData, true);
+                    if (is_array($device)) {
+                        foreach ($device as $key => $value) {
+                            if (preg_match('/WANDevice\.(\d+)\.WANConnectionDevice\.(\d+)\.WANPPPConnection\.(\d+)\./', $key, $matches)) {
+                                $wanDevIdx = (int)$matches[1];
+                                $connDevIdx = (int)$matches[2];
+                                $pppIdx = (int)$matches[3];
+                                $pathKey = "{$wanDevIdx}.{$connDevIdx}.{$pppIdx}";
+                                if (!isset($pppConnections[$pathKey])) {
+                                    $pppConnections[$pathKey] = [
+                                        'wan_device' => $wanDevIdx,
+                                        'conn_device' => $connDevIdx,
+                                        'ppp_instance' => $pppIdx,
+                                        'path' => "InternetGatewayDevice.WANDevice.{$wanDevIdx}.WANConnectionDevice.{$connDevIdx}.WANPPPConnection.{$pppIdx}"
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                error_log("[WAN_CONFIG] After creation, PPPoE connections: " . json_encode(array_keys($pppConnections)));
+                
+                if (count($pppConnections) > 0) {
+                    // Use the newly created connection
+                    $selected = null;
+                    foreach ($pppConnections as $key => $conn) {
+                        if ($conn['conn_device'] >= 2) {
+                            $selected = $conn;
+                            break;
+                        }
+                    }
+                    if (!$selected) {
+                        $selected = reset($pppConnections);
+                    }
+                    
+                    $pppPath = $selected['path'];
+                    $wanName = "wan1.{$selected['conn_device']}.ppp{$selected['ppp_instance']}";
+                    error_log("[WAN_CONFIG] Using newly created PPPoE path: {$pppPath}");
+                    $tasksSent[] = "Created new PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
+                } else {
+                    // Still no PPPoE after creation attempts
+                    error_log("[WAN_CONFIG] Failed to create PPPoE connection - device may not support TR-069 object creation");
+                    return [
+                        'success' => false, 
+                        'error' => 'Failed to create PPPoE connection. The device may require configuration via OMCI or its web interface first.',
+                        'hint' => 'Try configuring PPPoE manually on the ONU web interface, then use TR-069 to modify credentials.'
+                    ];
+                }
             }
             
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");

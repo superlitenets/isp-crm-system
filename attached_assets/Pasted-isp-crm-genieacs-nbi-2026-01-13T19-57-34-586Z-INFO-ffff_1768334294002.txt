@@ -1,0 +1,20 @@
+isp_crm_genieacs_nbi    | 2026-01-13T19:57:34.586Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_db              | 2026-01-13 19:57:34.623 UTC [90] ERROR:  column "last_provision_at" of relation "huawei_onus" does not exist at character 24
+isp_crm_db              | 2026-01-13 19:57:34.623 UTC [90] STATEMENT:  UPDATE huawei_onus SET last_provision_at = NOW() WHERE id = $1
+isp_crm_genieacs_nbi    | 2026-01-13T19:57:34.643Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-13T19:57:34.721Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86198, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_genieacs_nbi    | 2026-01-13T19:57:34.775Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T19:57:35.100+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.10:42416","connectionId":349,"connectionCount":323}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T19:57:35.102+00:00"},"s":"I",  "c":"NETWORK",  "id":22943,   "ctx":"listener","msg":"Connection accepted","attr":{"remote":"172.18.0.10:42418","connectionId":350,"connectionCount":324}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T19:57:35.103+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn349","msg":"client metadata","attr":{"remote":"172.18.0.10:42416","client":"conn349","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_mongo  | {"t":{"$date":"2026-01-13T19:57:35.104+00:00"},"s":"I",  "c":"NETWORK",  "id":51800,   "ctx":"conn350","msg":"client metadata","attr":{"remote":"172.18.0.10:42418","client":"conn350","doc":{"driver":{"name":"nodejs","version":"4.17.2"},"platform":"Node.js v18.20.8, LE","os":{"name":"linux","architecture":"x64","version":"6.8.0-90-generic","type":"Linux"}}}}
+isp_crm_genieacs_cwmp   | 2026-01-13T19:57:35.246Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="55" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-13T19:57:35.294Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bb8ef64480000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 200
+isp_crm_nginx           | 102.205.239.5 - - [13/Jan/2026:19:57:37 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86192" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0" "-"
+isp_crm_php             | 172.18.0.11 -  13/Jan/2026:22:57:37 +0300 "GET /api/olt-stats.php" 200
+isp_crm_genieacs_nbi    | 2026-01-13T19:57:38.537Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] No PPPoE connection found in device tree
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE WAN must be created via OMCI (OLT service-port), not TR-069
