@@ -7084,9 +7084,12 @@ class HuaweiOLT {
         
         // Query GenieACS for current WAN configuration
         $wanDevicePath = 'InternetGatewayDevice.WANDevice.1';
-        $wanConnDeviceIndex = 1; // Use existing WANConnectionDevice.1 (most devices only have this)
+        $wanDeviceIndex = 1;
+        $wanConnDeviceIndex = 1;
         $pppConnIndex = 1;
         $existingPppPath = null;
+        $hasExistingWanDevice = false;
+        $hasExistingWanConnDevice = false;
         
         // Check GenieACS for existing WANPPPConnection
         $queryUrl = "{$genieacsUrl}/devices?query=" . urlencode('{"_id":"' . $genieacsId . '"}');
@@ -7101,23 +7104,37 @@ class HuaweiOLT {
         if ($deviceData) {
             $devices = json_decode($deviceData, true);
             $device = $devices[0] ?? null;
-            // Look for existing PPPoE connection in WANConnectionDevice.1
             if (!empty($device)) {
-                $wanConn1Ppp = $device['InternetGatewayDevice']['WANDevice']['1']['WANConnectionDevice']['1']['WANPPPConnection'] ?? null;
-                if ($wanConn1Ppp) {
-                    foreach ($wanConn1Ppp as $idx => $conn) {
-                        if (is_numeric($idx)) {
-                            // Found existing PPP connection - reuse it
-                            $existingPppPath = "{$wanDevicePath}.WANConnectionDevice.1.WANPPPConnection.{$idx}";
-                            $pppConnIndex = (int)$idx;
-                            break;
+                // Check if WANDevice.1 exists
+                $wanDevice1 = $device['InternetGatewayDevice']['WANDevice']['1'] ?? null;
+                if ($wanDevice1) {
+                    $hasExistingWanDevice = true;
+                    $wanDeviceIndex = 1;
+                    
+                    // Check if WANConnectionDevice.1 exists
+                    $wanConnDevice1 = $wanDevice1['WANConnectionDevice']['1'] ?? null;
+                    if ($wanConnDevice1) {
+                        $hasExistingWanConnDevice = true;
+                        $wanConnDeviceIndex = 1;
+                        
+                        // Look for existing PPPoE connection
+                        $wanConn1Ppp = $wanConnDevice1['WANPPPConnection'] ?? null;
+                        if ($wanConn1Ppp) {
+                            foreach ($wanConn1Ppp as $idx => $conn) {
+                                if (is_numeric($idx)) {
+                                    $existingPppPath = "{$wanDevicePath}.WANConnectionDevice.1.WANPPPConnection.{$idx}";
+                                    $pppConnIndex = (int)$idx;
+                                    $tasksSent[] = "Found existing PPPoE at index {$idx}";
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         
-        // Always use WANConnectionDevice.1 (most HG8546M devices only have this)
+        // Use existing WANConnectionDevice if found
         $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
         
         // Step 2: Enable L3 on ETH ports (router mode) - SmartOLT does this
@@ -7132,57 +7149,63 @@ class HuaweiOLT {
         if ($wanMode === 'pppoe') {
             // Huawei TR-069 requires full hierarchy creation (SmartOLT-style):
             // 1. Add WANDevice → 2. Add WANConnectionDevice → 3. Add WANPPPConnection
-            // Without this chain, SetParameterValues silently fails on non-existent paths
+            // Skip creation if objects already exist to avoid failures
             
-            // Step 3a: Create WANDevice (if not exists)
-            $addWanDeviceTask = [
-                'name' => 'addObject',
-                'objectName' => 'InternetGatewayDevice.WANDevice.'
-            ];
-            $result = $sendTask($addWanDeviceTask, 'Create WANDevice');
-            $wanDeviceIndex = 1;
-            if ($result['success']) {
-                $respData = json_decode($result['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $wanDeviceIndex = (int)$respData['instanceNumber'];
+            // Step 3a: Create WANDevice (only if not exists)
+            if (!$hasExistingWanDevice) {
+                $addWanDeviceTask = [
+                    'name' => 'addObject',
+                    'objectName' => 'InternetGatewayDevice.WANDevice.'
+                ];
+                $result = $sendTask($addWanDeviceTask, 'Create WANDevice');
+                if ($result['success']) {
+                    $respData = json_decode($result['response'], true);
+                    if (!empty($respData['instanceNumber'])) {
+                        $wanDeviceIndex = (int)$respData['instanceNumber'];
+                    }
+                    $tasksSent[] = 'Create WANDevice';
                 }
-                $tasksSent[] = 'Create WANDevice';
+            } else {
+                $tasksSent[] = 'Using existing WANDevice.1';
             }
             
-            // Step 3b: Create WANConnectionDevice (if not exists)
-            $addWanConnDeviceTask = [
-                'name' => 'addObject',
-                'objectName' => "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice."
-            ];
-            $result = $sendTask($addWanConnDeviceTask, 'Create WANConnectionDevice');
-            $wanConnDeviceIndex = 1;
-            if ($result['success']) {
-                $respData = json_decode($result['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $wanConnDeviceIndex = (int)$respData['instanceNumber'];
+            // Step 3b: Create WANConnectionDevice (only if not exists)
+            if (!$hasExistingWanConnDevice) {
+                $addWanConnDeviceTask = [
+                    'name' => 'addObject',
+                    'objectName' => "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice."
+                ];
+                $result = $sendTask($addWanConnDeviceTask, 'Create WANConnectionDevice');
+                if ($result['success']) {
+                    $respData = json_decode($result['response'], true);
+                    if (!empty($respData['instanceNumber'])) {
+                        $wanConnDeviceIndex = (int)$respData['instanceNumber'];
+                    }
+                    $tasksSent[] = 'Create WANConnectionDevice';
                 }
-                $tasksSent[] = 'Create WANConnectionDevice';
+            } else {
+                $tasksSent[] = 'Using existing WANConnectionDevice.1';
             }
             
             // Update the path based on actual indices
             $wanConnPath = "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice.{$wanConnDeviceIndex}";
             
-            // Step 3c: Create WANPPPConnection (mandatory for PPPoE)
-            $addPppConnTask = [
-                'name' => 'addObject',
-                'objectName' => "{$wanConnPath}.WANPPPConnection."
-            ];
-            $result = $sendTask($addPppConnTask, 'Create WANPPPConnection');
-            if ($result['success']) {
-                $tasksSent[] = 'Create WANPPPConnection';
-                $respData = json_decode($result['response'], true);
-                if (!empty($respData['instanceNumber'])) {
-                    $pppConnIndex = (int)$respData['instanceNumber'];
+            // Step 3c: Create WANPPPConnection (only if not exists)
+            if (!$existingPppPath) {
+                $addPppConnTask = [
+                    'name' => 'addObject',
+                    'objectName' => "{$wanConnPath}.WANPPPConnection."
+                ];
+                $result = $sendTask($addPppConnTask, 'Create WANPPPConnection');
+                if ($result['success']) {
+                    $tasksSent[] = 'Create WANPPPConnection';
+                    $respData = json_decode($result['response'], true);
+                    if (!empty($respData['instanceNumber'])) {
+                        $pppConnIndex = (int)$respData['instanceNumber'];
+                    }
                 }
-            } else if ($existingPppPath) {
-                // If addObject failed and we have cached path, try using it
-                $pppConnIndex = (int)basename($existingPppPath);
-                $tasksSent[] = 'Using existing WANPPPConnection';
+            } else {
+                $tasksSent[] = 'Using existing WANPPPConnection.' . $pppConnIndex;
             }
             $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
             $wanName = "wan1.{$wanConnDeviceIndex}.ppp{$pppConnIndex}";

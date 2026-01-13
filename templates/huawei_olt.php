@@ -15919,6 +15919,9 @@ echo "# ================================================\n";
             if (wanData.success) {
                 steps[0].status = 'success';
                 steps[0].message = 'Done';
+                // Wait for PPPoE tasks to be applied before sending WiFi config
+                // This prevents WiFi connection_request from interfering with PPPoE tasks
+                await new Promise(resolve => setTimeout(resolve, 3000));
             } else {
                 steps[0].status = 'error';
                 steps[0].message = wanData.error || 'Failed';
