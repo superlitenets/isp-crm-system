@@ -6865,6 +6865,153 @@ class HuaweiOLT {
     }
     
     /**
+     * Configure DHCP/IPoE WAN via OMCI commands on the OLT
+     * Uses ont ipconfig + ont internet-config (not ont wan-config with profile)
+     * This creates the WAN structure that TR-069 can then configure
+     */
+    public function configureWANDHCP(int $onuDbId, array $config): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+            return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $dhcpVlan = (int)($config['dhcp_vlan'] ?? $config['service_vlan'] ?? 902);
+        $gemPort = (int)($config['gemport'] ?? 2);
+        $priority = (int)($config['priority'] ?? 0);
+        $ipIndex = (int)($config['ip_index'] ?? 1);
+        
+        $output = '';
+        $errors = [];
+        
+        // Helper to check for real errors
+        $hasRealError = function($output) {
+            if (empty($output)) return false;
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
+                return false;
+            }
+            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
+        };
+        
+        // Step 1: Configure DHCP WAN via OMCI
+        // CRITICAL: Send each command SEPARATELY with delays
+        
+        // 1a. Enter interface mode
+        $output .= "[Step 1a: Enter interface]\n";
+        $result1a = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
+        $output .= ($result1a['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        // 1b. Configure IP with DHCP mode
+        // Syntax: ont ipconfig {port} {onu_id} ip-index {index} dhcp vlan {vlan} priority {pri}
+        $output .= "[Step 1b: IP Config (DHCP)]\n";
+        $result1b = $this->executeCommand($oltId, "ont ipconfig {$port} {$onuId} ip-index {$ipIndex} dhcp vlan {$dhcpVlan} priority {$priority}");
+        $output .= ($result1b['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        // Check if command succeeded
+        $step1bFailed = $hasRealError($result1b['output'] ?? '');
+        if ($step1bFailed) {
+            $errors[] = "DHCP IP config may have failed";
+        }
+        
+        // 1c. Set as internet WAN
+        // Syntax: ont internet-config {port} {onu_id} ip-index {index}
+        $output .= "[Step 1c: Internet Config]\n";
+        $result1c = $this->executeCommand($oltId, "ont internet-config {$port} {$onuId} ip-index {$ipIndex}");
+        $output .= ($result1c['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        $step1cFailed = $hasRealError($result1c['output'] ?? '');
+        if ($step1cFailed) {
+            $errors[] = "Internet config may have failed";
+        }
+        
+        // 1d. Exit interface mode
+        $result1d = $this->executeCommand($oltId, "quit");
+        $output .= "[Step 1d: Exit interface]\n" . ($result1d['output'] ?? '') . "\n";
+        
+        // Step 2: Create service-port for DHCP VLAN
+        usleep(500000); // 500ms delay before service-port
+        $output .= "[Step 2: Service Port]\n";
+        $cmd2 = "service-port vlan {$dhcpVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$dhcpVlan}";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= ($result2['output'] ?? '') . "\n";
+        
+        // Not critical if service port already exists from authorization
+        if ($hasRealError($result2['output'] ?? '') && !preg_match('/already exist/i', $result2['output'] ?? '')) {
+            $output .= "[Note: Service port may already exist from authorization]\n";
+        }
+        
+        // Step 3: Queue TR-069 config for DHCP
+        try {
+            $this->db->exec("CREATE TABLE IF NOT EXISTS huawei_onu_tr069_config (
+                onu_id INTEGER PRIMARY KEY,
+                config_data TEXT,
+                status VARCHAR(20) DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP,
+                applied_at TIMESTAMP
+            )");
+            
+            $tr069Config = [
+                'onu_id' => $onuDbId,
+                'wan_vlan' => $dhcpVlan,
+                'connection_type' => 'dhcp',
+                'nat_enable' => true,
+                'config_type' => 'wan_dhcp'
+            ];
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO huawei_onu_tr069_config (onu_id, config_data, status, error_message, created_at)
+                VALUES (?, ?, 'pending', NULL, CURRENT_TIMESTAMP)
+                ON CONFLICT (onu_id) DO UPDATE SET
+                    config_data = EXCLUDED.config_data,
+                    status = 'pending',
+                    error_message = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+            ");
+            $stmt->execute([$onuDbId, json_encode($tr069Config)]);
+            $output .= "[Step 3: TR-069 Config Queued]\nDHCP WAN queued for TR-069 configuration\n";
+        } catch (\Exception $e) {
+            $errors[] = "Failed to queue TR-069 config: " . $e->getMessage();
+        }
+        
+        $success = empty($errors);
+        $message = $success 
+            ? "DHCP WAN configured via OMCI. Ready for TR-069 configuration when device connects to ACS."
+            : "DHCP configuration partially failed: " . implode(', ', $errors);
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'configure_wan_dhcp',
+            'status' => $success ? 'success' : 'partial',
+            'message' => $message,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => $success,
+            'message' => $message,
+            'dhcp_vlan' => $dhcpVlan,
+            'errors' => $errors,
+            'output' => $output
+        ];
+    }
+    
+    /**
      * Fetch TR-069 IP address from OLT for an ONU
      * Uses display ont wan-info command to get the DHCP-assigned IP
      */
