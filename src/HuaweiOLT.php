@@ -7237,7 +7237,35 @@ class HuaweiOLT {
         if ($wanMode === 'pppoe') {
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
             
-            // SmartOLT approach: OMCI creates WANDevice tree, TR-069 only modifies
+            // SmartOLT approach: FIRST create WAN via OMCI (OLT), THEN configure via TR-069
+            // Step 0: Call OMCI to create PPPoE WAN structure on OLT
+            $pppoeUsername = $config['pppoe_username'] ?? '';
+            $pppoePassword = $config['pppoe_password'] ?? '';
+            
+            if (!empty($pppoeUsername) && !empty($pppoePassword)) {
+                error_log("[WAN_CONFIG] Calling OMCI to create PPPoE WAN structure first...");
+                $omciConfig = [
+                    'pppoe_vlan' => $serviceVlan,
+                    'pppoe_username' => $pppoeUsername,
+                    'pppoe_password' => $pppoePassword,
+                    'gemport' => 2,
+                    'nat_enabled' => true,
+                    'priority' => 0
+                ];
+                $omciResult = $this->configureWANPPPoE($onuDbId, $omciConfig);
+                error_log("[WAN_CONFIG] OMCI result: " . json_encode($omciResult));
+                
+                if ($omciResult['success']) {
+                    $tasksSent[] = 'OMCI: PPPoE WAN structure created on OLT';
+                } else {
+                    error_log("[WAN_CONFIG] OMCI warning: " . ($omciResult['message'] ?? 'Unknown'));
+                    // Continue anyway - OMCI might have already been configured
+                }
+                
+                // Wait for OMCI to propagate to device and refresh TR-069
+                sleep(3);
+            }
+            
             // Step 1: Refresh WAN tree in GenieACS to ensure we have the latest OMCI-created paths
             $refreshWanTask = [
                 'name' => 'getParameterValues',
