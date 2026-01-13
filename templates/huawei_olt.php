@@ -3792,7 +3792,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Get ONU details to find serial number
-                    $stmt = $pdo->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
+                    $stmt = $db->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
                     $stmt->execute([$onuId]);
                     $onu = $stmt->fetch(PDO::FETCH_ASSOC);
                     
@@ -3883,7 +3883,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                     
                     // Get ONU details
-                    $stmt = $pdo->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
+                    $stmt = $db->prepare("SELECT serial_number FROM huawei_onus WHERE id = ?");
                     $stmt->execute([$onuId]);
                     $onu = $stmt->fetch(PDO::FETCH_ASSOC);
                     
