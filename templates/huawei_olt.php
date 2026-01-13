@@ -3901,9 +3901,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         exit;
                     }
                     
-                    // Query GenieACS for device by serial
+                    error_log("[TR069 Lookup] Serial: {$serial}");
+                    
+                    // Query GenieACS for device by serial - try multiple formats
                     $genieACS = new GenieACS($db);
-                    $device = $genieACS->findDeviceBySerial($serial);
+                    
+                    $searchFormats = [$serial, strtoupper($serial)];
+                    $upperSerial = strtoupper($serial);
+                    if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $upperSerial)) {
+                        $searchFormats[] = $genieACS->convertOltSerialToGenieacs($upperSerial);
+                    }
+                    
+                    $device = null;
+                    foreach ($searchFormats as $sn) {
+                        error_log("[TR069 Lookup] Trying format: {$sn}");
+                        $result = $genieACS->getDeviceBySerial($sn);
+                        if ($result['success'] && !empty($result['device'])) {
+                            $device = $result['device'];
+                            error_log("[TR069 Lookup] Found with format: {$sn}");
+                            break;
+                        }
+                    }
                     
                     if ($device) {
                         echo json_encode([
@@ -3916,12 +3934,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             ]
                         ]);
                     } else {
-                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS', 'tried' => $searchFormats]);
                     }
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
+
             
             case 'tr069_connection_request_by_serial':
                 header('Content-Type: application/json');
