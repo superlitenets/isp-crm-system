@@ -3823,6 +3823,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
             
+            case 'get_tr069_device_by_serial':
+                header('Content-Type: application/json');
+                try {
+                    $serial = $_GET['serial'] ?? '';
+                    if (empty($serial)) {
+                        echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                        exit;
+                    }
+                    
+                    // Query GenieACS for device by serial
+                    $genieACS = new GenieACS();
+                    $device = $genieACS->findDeviceBySerial($serial);
+                    
+                    if ($device) {
+                        echo json_encode([
+                            'success' => true, 
+                            'device' => [
+                                '_id' => $device['_id'] ?? null,
+                                '_lastInform' => $device['_lastInform'] ?? null,
+                                '_registered' => $device['_registered'] ?? null,
+                                '_deviceId' => $device['_deviceId'] ?? null
+                            ]
+                        ]);
+                    } else {
+                        echo json_encode(['success' => false, 'error' => 'Device not found in GenieACS']);
+                    }
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+            case 'tr069_connection_request_by_serial':
+                header('Content-Type: application/json');
+                try {
+                    $serial = $_POST['serial'] ?? $_GET['serial'] ?? '';
+                    if (empty($serial)) {
+                        echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                        exit;
+                    }
+                    
+                    // Send connection request via GenieACS
+                    $genieACS = new GenieACS();
+                    $result = $genieACS->sendConnectionRequest($serial);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
             case 'tr069_connection_request':
                 header('Content-Type: application/json');
                 try {
@@ -15754,7 +15804,77 @@ echo "# ================================================\n";
         document.querySelector('input[name="command"]').value = cmd;
     }
     
-    function openWifiConfig(deviceId, serialNumber) {
+    async function openWifiConfig(deviceId, serialNumber) {
+        if (!serialNumber) {
+            showToast('Serial number required', 'danger');
+            return;
+        }
+        
+        // First check if ONU is reachable via GenieACS
+        const loadingToast = showToast('Checking ONU reachability...', 'info', 10000);
+        
+        try {
+            // Check GenieACS for this device using serial number
+            const genieResp = await fetch('?page=huawei-olt&action=get_tr069_device_by_serial&serial=' + encodeURIComponent(serialNumber));
+            const genieData = await genieResp.json();
+            
+            hideToast(loadingToast);
+            
+            if (!genieData.success || !genieData.device) {
+                showTR069NotReachableModal(null, serialNumber, 'not_found', 
+                    'ONU not registered in GenieACS. The device may not have TR-069 configured or hasn\'t contacted the ACS yet.');
+                return;
+            }
+            
+            // Check last inform time
+            const device = genieData.device;
+            const lastInform = device._lastInform ? new Date(device._lastInform) : null;
+            const now = new Date();
+            const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+            
+            if (!lastInform || lastInform < fiveMinutesAgo) {
+                // Device hasn't informed recently - try connection request
+                showToast('Sending connection request to ONU...', 'info', 5000);
+                
+                const connResp = await fetch('?page=huawei-olt&action=tr069_connection_request_by_serial&serial=' + encodeURIComponent(serialNumber), {
+                    method: 'POST'
+                });
+                
+                // Wait for device to respond
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Re-check device status
+                const recheckResp = await fetch('?page=huawei-olt&action=get_tr069_device_by_serial&serial=' + encodeURIComponent(serialNumber));
+                const recheckData = await recheckResp.json();
+                
+                if (recheckData.success && recheckData.device) {
+                    const newLastInform = recheckData.device._lastInform ? new Date(recheckData.device._lastInform) : null;
+                    if (newLastInform && newLastInform >= fiveMinutesAgo) {
+                        // Device is now reachable
+                        showToast('ONU is reachable', 'success');
+                        openWifiConfigDirect(deviceId, serialNumber);
+                        return;
+                    }
+                }
+                
+                // Still not reachable
+                const lastSeenStr = lastInform ? formatTimeAgo(lastInform) : 'Never';
+                showTR069NotReachableModal(null, serialNumber, 'stale', 
+                    'ONU last contacted ACS: ' + lastSeenStr + '. The device may be offline or have network issues.');
+                return;
+            }
+            
+            // Device is reachable - open config modal
+            showToast('ONU is reachable via ACS', 'success');
+            openWifiConfigDirect(deviceId, serialNumber);
+            
+        } catch (err) {
+            hideToast(loadingToast);
+            showToast('Error checking GenieACS: ' + err.message, 'danger');
+        }
+    }
+    
+    function openWifiConfigDirect(deviceId, serialNumber) {
         document.getElementById('wifiDeviceId').value = deviceId || '';
         document.getElementById('wifiDeviceSn').textContent = serialNumber;
         // Close the full status modal first
@@ -15764,7 +15884,7 @@ echo "# ================================================\n";
         const modal = new bootstrap.Modal(document.getElementById('wifiConfigModal'));
         modal.show();
         
-        // Load current WiFi settings if serial number is provided
+        // Load current WiFi settings
         if (serialNumber) {
             loadWifiInterfaces(serialNumber);
         }
