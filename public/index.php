@@ -873,10 +873,18 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
         $searchFormats = [
             $serialNumber,
             strtoupper($serialNumber),
-            preg_replace('/^[A-Z]{4}/', '', strtoupper($serialNumber))
         ];
         
+        // Add converted format (HWTCF2D53A8B -> 48575443F2D53A8B)
+        $upperSerial = strtoupper($serialNumber);
+        if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $upperSerial)) {
+            $searchFormats[] = $genieAcs->convertOltSerialToGenieacs($upperSerial);
+        }
+        // Also try stripping 4-letter prefix as fallback
+        $searchFormats[] = preg_replace('/^[A-Z]{4}/', '', $upperSerial);
+        
         foreach ($searchFormats as $sn) {
+            if (empty($sn)) continue;
             $result = $genieAcs->getDeviceBySerial($sn);
             if ($result['success'] && !empty($result['device'])) {
                 $device = $result['device'];
