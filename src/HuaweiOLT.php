@@ -10705,14 +10705,15 @@ class HuaweiOLT {
     /**
      * Get the TR-069 server profile ID from settings
      * This profile-id is configured on the OLT and contains ACS URL, username, password
+     * Default: 3 (standard TR-069 profile on most Huawei OLTs)
      */
-    private function getTR069ProfileId(): ?int {
+    private function getTR069ProfileId(): int {
         try {
             $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_profile_id'");
             $profileId = $stmt->fetchColumn();
-            return $profileId ? (int)$profileId : null;
+            return $profileId ? (int)$profileId : 3;
         } catch (\Exception $e) {
-            return null;
+            return 3;
         }
     }
     
