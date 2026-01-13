@@ -6763,8 +6763,10 @@ class HuaweiOLT {
         };
         
         // Step 1: Configure PPPoE WAN via OMCI
-        // CRITICAL: Send each command SEPARATELY with delays (Huawei MA-series requirement)
-        // Multi-line blocks collapse spacing on Huawei CLI
+        // Uses: ont ipconfig + ont internet-config (MA5683T syntax)
+        // CRITICAL: Send each command SEPARATELY with delays
+        
+        $ipIndex = 1; // Use ip-index 1 for Internet WAN (0 is often TR-069)
         
         // 1a. Enter interface mode
         $output .= "[Step 1a: Enter interface]\n";
@@ -6772,21 +6774,35 @@ class HuaweiOLT {
         $output .= ($result1a['output'] ?? '') . "\n";
         usleep(500000); // 500ms delay
         
-        // 1b. Apply WAN config (profile-id determines PPPoE mode)
-        $output .= "[Step 1b: WAN Config]\n";
-        $result1b = $this->executeCommand($oltId, "ont wan-config {$port} {$onuId} ip-index 1 profile-id {$wanProfileId}");
+        // 1b. Configure PPPoE WAN with credentials via OMCI
+        // Syntax: ont ipconfig {port} {onu_id} ip-index {N} pppoe user-account username {USER} password {PASS} vlan {VLAN} priority {P}
+        $output .= "[Step 1b: PPPoE IP Config]\n";
+        $pppoeCmd = "ont ipconfig {$port} {$onuId} ip-index {$ipIndex} pppoe user-account username {$pppoeUsername} password {$pppoePassword} vlan {$pppoeVlan} priority {$priority}";
+        $result1b = $this->executeCommand($oltId, $pppoeCmd);
         $output .= ($result1b['output'] ?? '') . "\n";
         usleep(500000); // 500ms delay
         
-        // 1c. Exit interface mode
-        $result1c = $this->executeCommand($oltId, "quit");
-        $output .= "[Step 1c: Exit interface]\n" . ($result1c['output'] ?? '') . "\n";
-        
-        // Check if command succeeded (ignore "already exists" messages)
-        $step1Failed = $hasRealError($result1b['output'] ?? '');
-        if ($step1Failed) {
-            $errors[] = "WAN profile config may have failed - check OLT profile-id exists and is PPPoE type";
+        // Check if command succeeded
+        $step1bFailed = $hasRealError($result1b['output'] ?? '');
+        if ($step1bFailed) {
+            $errors[] = "PPPoE IP config may have failed";
         }
+        
+        // 1c. Set as Internet WAN (not TR-069 management)
+        // Syntax: ont internet-config {port} {onu_id} ip-index {N}
+        $output .= "[Step 1c: Internet Config]\n";
+        $result1c = $this->executeCommand($oltId, "ont internet-config {$port} {$onuId} ip-index {$ipIndex}");
+        $output .= ($result1c['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        $step1cFailed = $hasRealError($result1c['output'] ?? '');
+        if ($step1cFailed) {
+            $errors[] = "Internet config may have failed";
+        }
+        
+        // 1d. Exit interface mode
+        $result1d = $this->executeCommand($oltId, "quit");
+        $output .= "[Step 1d: Exit interface]\n" . ($result1d['output'] ?? '') . "\n";
         
         // Step 2: Create service-port for PPPoE VLAN
         // CRITICAL: Send as single clean command (not in multi-line block)
