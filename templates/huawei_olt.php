@@ -4636,11 +4636,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             case 'refresh_tr069_ip':
                 header('Content-Type: application/json');
-                $result = $huaweiOLT->refreshONUTR069IP((int)$_POST['onu_id']);
+                $onuId = (int)$_POST['onu_id'];
+                
+                // Get ONU data
+                $onuStmt = $db->prepare("SELECT sn, genieacs_id, tr069_status FROM huawei_onus WHERE id = ?");
+                $onuStmt->execute([$onuId]);
+                $onuData = $onuStmt->fetch(PDO::FETCH_ASSOC);
+                
+                $tr069Status = 'offline';
+                $ip = '-';
+                $found = false;
+                
+                if ($onuData) {
+                    // Try GenieACS first
+                    try {
+                        $genieAcs = new \App\GenieACS();
+                        $device = null;
+                        $searchFormats = [
+                            $onuData['sn'],
+                            strtoupper($onuData['sn']),
+                            preg_replace('/^[A-Z]{4}/', '', strtoupper($onuData['sn']))
+                        ];
+                        
+                        foreach ($searchFormats as $sn) {
+                            $device = $genieAcs->getDevice($sn);
+                            if ($device) break;
+                        }
+                        
+                        if ($device) {
+                            $found = true;
+                            $deviceId = $device['_id'] ?? null;
+                            
+                            // Check last inform time
+                            $lastInformStr = $device['_lastInform'] ?? null;
+                            if ($lastInformStr) {
+                                $lastInform = strtotime($lastInformStr);
+                                $diff = time() - $lastInform;
+                                $tr069Status = ($diff < 300) ? 'online' : 'offline';
+                            }
+                            
+                            // Try to get IP from GenieACS
+                            $wanPath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress';
+                            if (isset($device[$wanPath]['_value'])) {
+                                $ip = $device[$wanPath]['_value'];
+                            }
+                            
+                            // Update database with GenieACS info
+                            $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ?, tr069_status = ?, updated_at = NOW() WHERE id = ?");
+                            $updateStmt->execute([$deviceId, $tr069Status, $onuId]);
+                        }
+                    } catch (Exception $e) {
+                        // GenieACS check failed, continue to OLT method
+                    }
+                    
+                    // Fall back to OLT CLI if no IP from GenieACS
+                    if ($ip === '-') {
+                        $result = $huaweiOLT->refreshONUTR069IP($onuId);
+                        if ($result['success'] && !empty($result['tr069_ip'])) {
+                            $ip = $result['tr069_ip'];
+                        }
+                    }
+                }
+                
                 echo json_encode([
-                    'success' => $result['success'] ?? false,
-                    'ip' => $result['ip'] ?? '-',
-                    'message' => $result['message'] ?? ''
+                    'success' => $found || $ip !== '-',
+                    'ip' => $ip,
+                    'tr069_status' => $tr069Status,
+                    'message' => $found ? "Device found in GenieACS (Status: {$tr069Status})" : ($ip !== '-' ? "IP from OLT CLI" : 'Device not found')
                 ]);
                 exit;
             case 'refresh_ont_ip':
@@ -7484,7 +7546,7 @@ try {
                             <div class="info-label">TR-069 Status</div>
                             <div class="info-value">
                                 <?php $tr069Status = $currentOnu['tr069_status'] ?? 'pending'; ?>
-                                <span class="badge bg-<?= $tr069Status === 'configured' ? 'success' : 'warning' ?>"><?= ucfirst($tr069Status) ?></span>
+                                <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
                             </div>
                         </div>
                         <?php if ($pendingTr069Config && $pendingTr069Config['status'] === 'pending'): ?>
@@ -8124,14 +8186,30 @@ try {
                     
                     if (icon) icon.classList.remove('spin-animation');
                     
-                    if (data.success && data.ip && data.ip !== '-') {
-                        if (display) {
-                            display.textContent = data.ip;
-                            display.className = 'text-success fw-bold';
+                    if (data.success) {
+                        // Update TR-069 IP display
+                        if (display && data.ip && data.ip !== '-') {
+                            display.innerHTML = '<span class="text-success">' + data.ip + '</span>';
+                        }
+                        
+                        // Update TR-069 status badge
+                        const statusBadge = document.getElementById('tr069StatusBadge');
+                        if (statusBadge && data.tr069_status) {
+                            const status = data.tr069_status;
+                            let badgeClass = 'bg-warning';
+                            if (status === 'online') badgeClass = 'bg-success';
+                            else if (status === 'configured') badgeClass = 'bg-info';
+                            else if (status === 'offline') badgeClass = 'bg-secondary';
+                            
+                            statusBadge.className = 'badge ' + badgeClass;
+                            statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                        }
+                        
+                        if (!silent && data.message) {
+                            showToast(data.message, 'success', 3000);
                         }
                     } else if (!silent) {
-                        // Only reload on manual refresh
-                        location.reload();
+                        showToast(data.message || 'Device not found in GenieACS', 'warning', 5000);
                     }
                 } catch (e) {
                     console.error('Failed to refresh Management IP:', e);
