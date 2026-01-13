@@ -1,0 +1,128 @@
+<?php
+
+class HuaweiTR069Provisioner
+{
+    private string $genieacs;
+    private string $username;
+    private string $password;
+
+    public function __construct($url, $user, $pass)
+    {
+        $this->genieacs = rtrim($url, '/');
+        $this->username = $user;
+        $this->password = $pass;
+    }
+
+    /* ==============================
+       Core GenieACS POST
+    ============================== */
+    private function push(string $deviceId, array $tasks)
+    {
+        $ch = curl_init($this->genieacs . "/devices/$deviceId/tasks?connection_request");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => "{$this->username}:{$this->password}",
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($tasks)
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+
+    /* ==============================
+       VLAN Creation
+    ============================== */
+    public function createVlan($deviceId, int $vlan)
+    {
+        $this->push($deviceId, [
+            [
+                "name" => "addObject",
+                "objectName" => "InternetGatewayDevice.Ethernet.VLANTermination."
+            ],
+            [
+                "name" => "setParameterValues",
+                "parameterValues" => [
+                    ["InternetGatewayDevice.Ethernet.VLANTermination.1.VLANID", $vlan, "xsd:unsignedInt"],
+                    ["InternetGatewayDevice.Ethernet.VLANTermination.1.Enable", true, "xsd:boolean"]
+                ]
+            ]
+        ]);
+    }
+
+    /* ==============================
+       ROUTE MODE (PPPoE)
+    ============================== */
+    public function configurePPPoE($deviceId, string $user, string $pass)
+    {
+        $this->push($deviceId, [
+            ["name" => "addObject", "objectName" => "InternetGatewayDevice.IP.Interface."],
+            ["name" => "setParameterValues", "parameterValues" => [
+                ["InternetGatewayDevice.IP.Interface.3.LowerLayers", "InternetGatewayDevice.Ethernet.VLANTermination.1", "xsd:string"],
+                ["InternetGatewayDevice.IP.Interface.3.Enable", true, "xsd:boolean"]
+            ]],
+
+            ["name" => "addObject", "objectName" => "InternetGatewayDevice.PPP.Interface."],
+            ["name" => "setParameterValues", "parameterValues" => [
+                ["InternetGatewayDevice.PPP.Interface.2.LowerLayers", "InternetGatewayDevice.IP.Interface.3", "xsd:string"],
+                ["InternetGatewayDevice.PPP.Interface.2.Username", $user, "xsd:string"],
+                ["InternetGatewayDevice.PPP.Interface.2.Password", $pass, "xsd:string"],
+                ["InternetGatewayDevice.PPP.Interface.2.Enable", true, "xsd:boolean"]
+            ]]
+        ]);
+    }
+
+    /* ==============================
+       BRIDGE MODE
+    ============================== */
+    public function configureBridge($deviceId)
+    {
+        $this->push($deviceId, [
+            ["name" => "addObject", "objectName" => "InternetGatewayDevice.Bridging.Bridge."],
+            ["name" => "setParameterValues", "parameterValues" => [
+                ["InternetGatewayDevice.Bridging.Bridge.1.Enable", true, "xsd:boolean"]
+            ]],
+
+            ["name" => "addObject", "objectName" => "InternetGatewayDevice.Bridging.Bridge.1.Port."],
+            ["name" => "setParameterValues", "parameterValues" => [
+                ["InternetGatewayDevice.Bridging.Bridge.1.Port.1.Interface", "InternetGatewayDevice.Ethernet.VLANTermination.1", "xsd:string"]
+            ]]
+        ]);
+    }
+
+    /* ==============================
+       Wi-Fi Setup
+    ============================== */
+    public function configureWiFi($deviceId, $ssid, $password)
+    {
+        $this->push($deviceId, [
+            [
+                "name" => "setParameterValues",
+                "parameterValues" => [
+                    ["InternetGatewayDevice.WLANConfiguration.1.SSID", $ssid, "xsd:string"],
+                    ["InternetGatewayDevice.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase", $password, "xsd:string"],
+                    ["InternetGatewayDevice.WLANConfiguration.1.Enable", true, "xsd:boolean"]
+                ]
+            ]
+        ]);
+    }
+
+    /* ==============================
+       Wi-Fi → WAN Binding
+    ============================== */
+    public function bindWiFiToWAN($deviceId, $mode = 'route')
+    {
+        $lower = $mode == 'bridge'
+            ? "InternetGatewayDevice.Bridging.Bridge.1"
+            : "InternetGatewayDevice.PPP.Interface.2";
+
+        $this->push($deviceId, [
+            [
+                "name" => "setParameterValues",
+                "parameterValues" => [
+                    ["InternetGatewayDevice.WLANConfiguration.1.LowerLayers", $lower, "xsd:string"]
+                ]
+            ]
+        ]);
+    }
+}
