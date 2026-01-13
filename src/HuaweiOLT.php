@@ -7470,58 +7470,40 @@ class HuaweiOLT {
             
             error_log("[WAN_CONFIG] Discovered PPPoE connections: " . json_encode(array_keys($pppConnections)));
             
+            // SmartOLT approach: Factory default Internet WAN is always at:
+            // InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+            // This exists on HG8546M even if not visible in device tree yet
+            $defaultPppPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1";
+            
             $pppPath = null;
             $wanName = null;
             
             if (count($pppConnections) > 0) {
-                // Use existing PPPoE connection - prefer WANConnectionDevice.2 (Internet WAN) over .1 (Management)
+                // Use discovered PPPoE connection if found
                 $selected = null;
                 foreach ($pppConnections as $key => $conn) {
-                    // Prefer connections on WANConnectionDevice.2 or higher (Internet WAN)
-                    if ($conn['conn_device'] >= 2) {
+                    // Prefer connections on WANConnectionDevice.1 (factory default Internet WAN)
+                    if ($conn['conn_device'] == 1 && $conn['ppp_instance'] == 1) {
                         $selected = $conn;
                         break;
                     }
                 }
-                // Fall back to first available if no .2+ found
+                // Fall back to first available if no .1 found
                 if (!$selected) {
                     $selected = reset($pppConnections);
                 }
                 
                 $pppPath = $selected['path'];
                 $wanName = "wan1.{$selected['conn_device']}.ppp{$selected['ppp_instance']}";
-                error_log("[WAN_CONFIG] Using existing PPPoE path: {$pppPath}");
+                error_log("[WAN_CONFIG] Using discovered PPPoE path: {$pppPath}");
                 $tasksSent[] = "Using existing PPPoE connection at WANConnectionDevice.{$selected['conn_device']}";
             } else {
-                // CRITICAL: No PPPoE connection found in TR-069 tree
-                // This means OMCI failed to create the WAN structure on the OLT
-                // TR-069 CANNOT create WANConnectionDevice/WANPPPConnection on Huawei ONUs
-                // The WAN structure MUST be created via OMCI (OLT commands) first
-                error_log("[WAN_CONFIG] OMCI PPPoE WAN not found in device tree. OMCI must create WAN first.");
-                
-                // Provide helpful diagnostic commands for the user
-                $frame = $onu['frame'] ?? 0;
-                $slot = $onu['slot'];
-                $port = $onu['port'];
-                $onuIdNum = $onu['onu_id'];
-                
-                return [
-                    'success' => false,
-                    'error' => 'OMCI PPPoE WAN not found in device. The WAN structure must be created via OLT first.',
-                    'hint' => 'Run these commands on the OLT to verify and fix:',
-                    'diagnostic_commands' => [
-                        "display ont internet-config {$frame}/{$slot} {$port} {$onuIdNum}",
-                        "display service-port port 0/1/{$port} ont {$onuIdNum}",
-                        "display ont wan-config {$frame}/{$slot} {$port} {$onuIdNum}"
-                    ],
-                    'fix_commands' => [
-                        "interface gpon {$frame}/{$slot}",
-                        "ont wan-config {$port} {$onuIdNum} ip-index 1 profile-id 1",
-                        "quit",
-                        "service-port vlan {$serviceVlan} gpon {$frame}/{$slot}/{$port} ont {$onuIdNum} gemport 1 multi-service user-vlan {$serviceVlan}"
-                    ],
-                    'note' => 'After running fix commands, wait 30 seconds for OMCI to propagate, then retry WAN configuration.'
-                ];
+                // SmartOLT approach: Use factory default path even if not yet visible in tree
+                // The HG8546M has this WAN built-in from firmware
+                $pppPath = $defaultPppPath;
+                $wanName = "wan1.1.ppp1";
+                error_log("[WAN_CONFIG] Using SmartOLT default PPPoE path: {$pppPath}");
+                $tasksSent[] = "Using factory default PPPoE connection (SmartOLT method)";
             }
             
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
