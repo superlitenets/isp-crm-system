@@ -7231,57 +7231,29 @@ class HuaweiOLT {
         $wanConnPath = "{$wanDevicePath}.WANConnectionDevice.{$wanConnDeviceIndex}";
         
         // Step 2: Enable L3 on ETH ports (router mode) - SmartOLT does this
-        $ethL3Params = [];
-        for ($i = 1; $i <= 4; $i++) {
-            $ethL3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+        // Note: Some devices don't support X_HW_L3Enable, so we make this optional
+        try {
+            $ethL3Params = [];
+            for ($i = 1; $i <= 4; $i++) {
+                $ethL3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+            }
+            $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params], 'L3 Enable: ETH1-4 Router Mode');
+            if ($result['success']) $tasksSent[] = 'Enable L3 on ETH ports';
+        } catch (\Exception $e) {
+            // L3Enable not supported on this device - skip
         }
-        $result = $sendTask(['name' => 'setParameterValues', 'parameterValues' => $ethL3Params], 'L3 Enable: ETH1-4 Router Mode');
-        if ($result['success']) $tasksSent[] = 'Enable L3 on ETH ports';
         
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
-            // Huawei TR-069 requires full hierarchy creation (SmartOLT-style):
-            // 1. Add WANDevice → 2. Add WANConnectionDevice → 3. Add WANPPPConnection
-            // Skip creation if objects already exist to avoid failures
+            // Huawei ONUs come with pre-configured WANDevice.1.WANConnectionDevice.1
+            // Do NOT try to create these via addObject - it will fail with "Invalid parameter path"
+            // We only need to create WANPPPConnection within the existing container
             
-            // Step 3a: Create WANDevice (only if not exists)
-            if (!$hasExistingWanDevice) {
-                $addWanDeviceTask = [
-                    'name' => 'addObject',
-                    'objectName' => 'InternetGatewayDevice.WANDevice.'
-                ];
-                $result = $sendTask($addWanDeviceTask, 'Create WANDevice');
-                if ($result['success']) {
-                    $respData = json_decode($result['response'], true);
-                    if (!empty($respData['instanceNumber'])) {
-                        $wanDeviceIndex = (int)$respData['instanceNumber'];
-                    }
-                    $tasksSent[] = 'Create WANDevice';
-                }
-            } else {
-                $tasksSent[] = 'Using existing WANDevice.1';
-            }
-            
-            // Step 3b: Create WANConnectionDevice (only if not exists)
-            if (!$hasExistingWanConnDevice) {
-                $addWanConnDeviceTask = [
-                    'name' => 'addObject',
-                    'objectName' => "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice."
-                ];
-                $result = $sendTask($addWanConnDeviceTask, 'Create WANConnectionDevice');
-                if ($result['success']) {
-                    $respData = json_decode($result['response'], true);
-                    if (!empty($respData['instanceNumber'])) {
-                        $wanConnDeviceIndex = (int)$respData['instanceNumber'];
-                    }
-                    $tasksSent[] = 'Create WANConnectionDevice';
-                }
-            } else {
-                $tasksSent[] = 'Using existing WANConnectionDevice.1';
-            }
-            
-            // Update the path based on actual indices
-            $wanConnPath = "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice.{$wanConnDeviceIndex}";
+            // Always use WANDevice.1.WANConnectionDevice.1 (pre-configured on Huawei ONUs)
+            $wanDeviceIndex = 1;
+            $wanConnDeviceIndex = 1;
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
+            $tasksSent[] = 'Using existing WANDevice.1.WANConnectionDevice.1';
             
             // Step 3c: Create WANPPPConnection (only if not exists)
             if (!$existingPppPath) {
@@ -7368,6 +7340,9 @@ class HuaweiOLT {
             if ($result['success']) $tasksSent[] = 'Create policy route';
             
         } elseif ($wanMode === 'dhcp') {
+            // Use existing WANDevice.1.WANConnectionDevice.1 for DHCP
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
+            
             // Create WANIPConnection for DHCP
             $addIpConnTask = [
                 'name' => 'addObject',
@@ -7407,9 +7382,10 @@ class HuaweiOLT {
             ];
             $sendTask(['name' => 'setParameterValues', 'parameterValues' => $defaultWanParams]);
             
-            // Create policy route
+            // Create policy route (optional - some devices don't support X_HW_policy_route)
             $addRouteTask = ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.'];
             $routeResult = $sendTask($addRouteTask);
+            // If policy route creation fails, log but continue (not all devices support this)
             $routeIndex = 1;
             if ($routeResult['success']) {
                 $respData = json_decode($routeResult['response'], true);
@@ -7424,6 +7400,9 @@ class HuaweiOLT {
             $sendTask(['name' => 'setParameterValues', 'parameterValues' => $routeParams], null, true);
             
         } elseif ($wanMode === 'static') {
+            // Use existing WANDevice.1.WANConnectionDevice.1 for Static IP
+            $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1";
+            
             $staticIp = $config['static_ip'] ?? '';
             $subnetMask = $config['subnet_mask'] ?? '255.255.255.0';
             $gateway = $config['gateway'] ?? '';
