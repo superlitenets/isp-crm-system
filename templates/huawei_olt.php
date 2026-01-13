@@ -1812,9 +1812,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
-                // Queue TR-069 configuration if WAN/WiFi settings provided and auth succeeded
+                // Queue TR-069 configuration if PPPoE settings provided and auth succeeded
                 $tr069Queued = false;
-                if ($messageType === 'success' && (!empty($_POST['pppoe_username']) || !empty($_POST['wifi_ssid_24']))) {
+                if ($messageType === 'success' && !empty($_POST['pppoe_username'])) {
                     // Store TR-069 config to be applied when device connects to ACS
                     $tr069Config = [
                         'onu_id' => $onuId,
@@ -1823,10 +1823,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'pppoe_username' => $_POST['pppoe_username'] ?? '',
                         'pppoe_password' => $_POST['pppoe_password'] ?? '',
                         'nat_enable' => true,
-                        'wifi_ssid_24' => $_POST['wifi_ssid_24'] ?? '',
-                        'wifi_pass_24' => $_POST['wifi_pass_24'] ?? '',
-                        'wifi_ssid_5' => $_POST['wifi_ssid_5'] ?? '',
-                        'wifi_pass_5' => $_POST['wifi_pass_5'] ?? '',
+                        'wifi_ssid_24' => '',
+                        'wifi_pass_24' => '',
+                        'wifi_ssid_5' => '',
+                        'wifi_pass_5' => '',
                         'pppoe_omci_configured' => $pppoeConfigured
                     ];
                     
@@ -13498,28 +13498,8 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </div>
                         </div>
                         
-                        <h6 class="text-info mb-3"><i class="bi bi-wifi me-2"></i>WiFi Configuration (Optional)</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">WiFi SSID (2.4GHz)</label>
-                                    <input type="text" name="wifi_ssid_24" id="authWifiSsid" class="form-control" placeholder="e.g., MyNetwork">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">WiFi Password</label>
-                                    <div class="input-group">
-                                        <input type="password" name="wifi_pass_24" id="authWifiPass" class="form-control" placeholder="Min 8 characters" minlength="8">
-                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPassword()">
-                                            <i class="bi bi-eye" id="wifiEyeIcon"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <small class="text-muted d-block mb-3">
-                            <i class="bi bi-info-circle me-1"></i>PPPoE and WiFi will be configured via TR-069 after ONU connects to GenieACS. PPPoE is pushed first, then WiFi.
+                            <i class="bi bi-info-circle me-1"></i>PPPoE will be configured via TR-069 after all TR-069 prerequisites are met (NTP sync, ACS registration). WiFi can be configured separately via the TR-069 modal.
                         </small>
                         
                         <div class="alert alert-secondary small mb-0">
@@ -13569,17 +13549,6 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         }
     }
     
-    function toggleWifiPassword() {
-        const input = document.getElementById('authWifiPass');
-        const icon = document.getElementById('wifiEyeIcon');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.className = 'bi bi-eye-slash';
-        } else {
-            input.type = 'password';
-            icon.className = 'bi bi-eye';
-        }
-    }
     
     // Initialize customer search dropdown
     document.addEventListener('DOMContentLoaded', function() {
