@@ -18527,6 +18527,40 @@ echo "# ================================================\n";
             return div.innerHTML;
         };
     }
+    
+    // Handle WAN Config Modal Form submission via API
+    document.getElementById('wanConfigModalForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying...';
+        submitBtn.disabled = true;
+        
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('?page=api&action=configure_wan_tr069', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast(result.message || 'WAN configuration applied successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('wanConfigModal'))?.hide();
+            } else {
+                showToast(result.error || 'Failed to apply WAN configuration', 'danger');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
     </script>
 </body>
 </html>
