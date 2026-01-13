@@ -69,27 +69,44 @@ declare("Device.WiFi.*", {path: now, value: now});
 echo " Done"
 
 # =====================================================
-# PROVISION: wan-discover - Discover existing WAN objects
+# PROVISION: wan-discover - Force discovery of WAN/LAN objects
+# Huawei ONUs hide objects until explicitly declared
 # =====================================================
 echo "Creating provision: wan-discover..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-discover" \
   -H "Content-Type: application/javascript" \
   -d '
 const now = Date.now();
+
+// Force full WAN discovery (Huawei hides objects otherwise)
+declare("InternetGatewayDevice.WANDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
+
+// Force LAN / WiFi discovery
+declare("InternetGatewayDevice.LANDevice.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
+
+// Layer 3 forwarding for default WAN
+declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
+
+// Now refresh values
 declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
+declare("InternetGatewayDevice.LANDevice.*", {path: now, value: now});
 declare("InternetGatewayDevice.Layer3Forwarding.*", {path: now, value: now});
-declare("Device.IP.*", {path: now, value: now});
-declare("Device.PPP.*", {path: now, value: now});
-log("WAN discovery completed");
+
+log("WAN/LAN discovery completed (forced object creation)");
 '
 echo " Done"
 
 # =====================================================
-# PROVISION: wan-create - Create WAN objects for PPPoE
+# PROVISION: wan-create - Create WAN objects for PPPoE/IPoE
 # This provision creates the necessary WAN structure:
 # - WANDevice
 # - WANConnectionDevice  
-# - WANPPPConnection (for PPPoE)
+# - WANPPPConnection (for PPPoE) or WANIPConnection (for IPoE)
+# Forces object discovery first (Huawei hides objects)
 # =====================================================
 echo "Creating provision: wan-create..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/wan-create" \
@@ -104,15 +121,20 @@ let connectionType = args[2] || "pppoe"; // pppoe or ipoe
 
 log("WAN Create: Starting with wanDevice=" + wanDeviceIndex + ", wanConnDevice=" + wanConnDeviceIndex + ", type=" + connectionType);
 
-// First, discover existing structure
-declare("InternetGatewayDevice.WANDevice.*", {path: now});
+// Force full WAN discovery first (Huawei hides objects otherwise)
+declare("InternetGatewayDevice.WANDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
+
+// Refresh the structure
+declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
 
 // Check if WANDevice exists
 let wanDevicePath = "InternetGatewayDevice.WANDevice." + wanDeviceIndex;
 let wanDevice = declare(wanDevicePath + ".*", {path: now});
 
 // Create WANDevice if needed - Huawei ONUs typically have WANDevice.1 pre-created
-// So we check if it exists first
 if (!wanDevice.value || wanDevice.value.length === 0) {
     log("WAN Create: Creating WANDevice." + wanDeviceIndex);
     declare("InternetGatewayDevice.WANDevice.*", {path: now}, {path: 1});
@@ -332,15 +354,31 @@ echo " Done"
 
 # =====================================================
 # PROVISION: full-refresh - Complete device discovery
+# Forces object tree creation before refresh (Huawei-compatible)
 # =====================================================
 echo "Creating provision: full-refresh..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/full-refresh" \
   -H "Content-Type: application/javascript" \
   -d '
 const now = Date.now();
+
+// Force object tree creation (Huawei hides objects otherwise)
+declare("InternetGatewayDevice.DeviceInfo.", {path: 1});
+declare("InternetGatewayDevice.ManagementServer.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
+declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
+declare("InternetGatewayDevice.Time.", {path: 1});
+
+// Now refresh all values
 declare("InternetGatewayDevice.*", {path: now, value: now});
 declare("Device.*", {path: now, value: now});
-log("Full device refresh completed");
+
+log("Full device refresh completed (with forced object discovery)");
 '
 echo " Done"
 
@@ -371,6 +409,7 @@ echo " Done"
 # PROVISION: huawei-wan-pppoe - Complete Huawei PPPoE setup
 # This is the main provision for configuring PPPoE on Huawei ONUs
 # Args: username, password, vlan
+# Forces object discovery first (Huawei hides objects)
 # =====================================================
 echo "Creating provision: huawei-wan-pppoe..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/huawei-wan-pppoe" \
@@ -389,14 +428,23 @@ if (!username || !password) {
 
 log("Huawei WAN PPPoE: Starting configuration for user " + username + " with VLAN " + vlan);
 
+// Force full WAN/LAN discovery first (Huawei hides objects otherwise)
+declare("InternetGatewayDevice.WANDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANPPPConnection.", {path: 1});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*.WANIPConnection.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.", {path: 1});
+declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.", {path: 1});
+declare("InternetGatewayDevice.Layer3Forwarding.", {path: 1});
+
+// Refresh WAN structure
+declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
+
 // Standard paths for Huawei ONUs
 // Most Huawei ONUs use WANDevice.1.WANConnectionDevice.1 for internet
 let basePath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1";
 
-// First discover existing WAN structure
-declare("InternetGatewayDevice.WANDevice.*", {path: now, value: now});
-
-// Check if PPP connection exists, create if needed
+// Check if PPP connection exists after forced discovery
 let existingPpp = declare(basePath + ".*", {path: now});
 if (!existingPpp.value || Object.keys(existingPpp.value).length === 0) {
     log("Huawei WAN PPPoE: Creating WAN PPP objects");

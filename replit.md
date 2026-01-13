@@ -28,6 +28,12 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **Persistent Session Manager**: Node.js service for persistent Telnet/SSH sessions, command queuing, auto-reconnection, and HTTP API integration.
   - **SSH Protocol Support**: SSH can be used instead of Telnet to fix space-stripping issues with certain OLT VTY configurations. Per-OLT protocol selection with legacy algorithm support (diffie-hellman-group1-sha1, aes128-cbc) for older Huawei OLTs. Database columns: `cli_protocol` (telnet/ssh) and `ssh_port`.
   - **TR-069/GenieACS Integration**: Remote ONU configuration via TR-069 CWMP protocol with GenieACS ACS server integration for WiFi configuration, admin password change, device reboots, factory resets, and firmware upgrades. WiFi interfaces are dynamically detected from TR-069 data - single-band ONUs show only 2.4GHz tab, dual-band show both. Ethernet port configuration is done via OMCI through the OLT.
+  - **GenieACS Provisions for Huawei ONUs**: Pre-configured provisioning scripts (`scripts/setup-genieacs.sh`) that use forced object discovery to handle Huawei ONUs that hide TR-069 objects until explicitly declared. Key provisions:
+    - `wan-discover`: Forces WAN/LAN object tree discovery
+    - `wan-create`: Creates WANDevice/WANConnectionDevice/WANPPPConnection structure
+    - `huawei-wan-pppoe`: Complete PPPoE setup with VLAN support
+    - `full-refresh`: Complete device discovery with forced object creation
+    - `ntp-config`: Time server configuration for NTP gating
   - **SmartOLT-style Internet WAN Configuration**: Internet WAN (PPPoE/DHCP/Static) is configured via TR-069/GenieACS instead of OMCI. This follows SmartOLT's approach where:
     - **OMCI** handles service VLAN configuration only (service-ports, native VLAN on ETH)
     - **TR-069** handles Internet WAN setup (PPPoE credentials, IPoE/DHCP, policy routes)
