@@ -7236,14 +7236,33 @@ class HuaweiOLT {
         // Step 3: Create and configure WAN connection based on mode
         if ($wanMode === 'pppoe') {
             // Huawei ONUs: WANConnectionDevice.1 = Management, WANConnectionDevice.2 = Internet WAN
-            // Use existing WANPPPConnection.1 - don't try to create via addObject
+            // Need to CREATE WANPPPConnection first via addObject
             $wanConnPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2";
-            $pppPath = "{$wanConnPath}.WANPPPConnection.1";
-            $wanName = "wan1.2.ppp1";
-            $pppConnIndex = 1;
-            $tasksSent[] = 'Using existing WANConnectionDevice.2.WANPPPConnection.1';
             
             error_log("[WAN_CONFIG] Starting PPPoE config for ONU {$onuDbId}, GenieACS ID: {$genieacsId}");
+            
+            // Step 1: Create WANPPPConnection object first
+            $addPppTask = [
+                'name' => 'addObject',
+                'objectName' => "{$wanConnPath}.WANPPPConnection."
+            ];
+            $addResult = $sendTask($addPppTask, 'Create WANPPPConnection');
+            error_log("[WAN_CONFIG] addObject result: HTTP {$addResult['code']}, response: " . substr($addResult['response'] ?? '', 0, 200));
+            
+            $pppConnIndex = 1;
+            if ($addResult['success']) {
+                $tasksSent[] = 'Created WANPPPConnection';
+                $respData = json_decode($addResult['response'], true);
+                if (!empty($respData['instanceNumber'])) {
+                    $pppConnIndex = (int)$respData['instanceNumber'];
+                    error_log("[WAN_CONFIG] New WANPPPConnection instance: {$pppConnIndex}");
+                }
+            } else {
+                error_log("[WAN_CONFIG] addObject failed, trying to use existing WANPPPConnection.1");
+            }
+            
+            $pppPath = "{$wanConnPath}.WANPPPConnection.{$pppConnIndex}";
+            $wanName = "wan1.2.ppp{$pppConnIndex}";
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
             
             // SmartOLT-style: Send credentials first (Username, Password, NAT, LCP settings)
