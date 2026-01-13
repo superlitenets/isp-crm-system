@@ -17817,16 +17817,30 @@ echo "# ================================================\n";
             return;
         }
         
-        const loadingToast = showToast('Checking device reachability via TR-069...', 'info', 10000);
+        const loadingToast = showToast('Checking device readiness...', 'info', 10000);
         
-        // Check if device is reachable via GenieACS
+        // Check if device is reachable via GenieACS AND in READY/ACTIVE state
         fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
             .then(r => r.json())
             .then(data => {
                 loadingToast.hide();
                 
+                // GUARDRAIL: Check if blocked due to provisioning state
+                if (data.blocked) {
+                    showToast('<div class="text-start">' +
+                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not Ready for TR-069</strong><br>' +
+                        '<small class="text-warning">' + (data.block_reason || 'ONU not ready') + '</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small><strong>Required steps:</strong><br>' +
+                        '1. Complete OLT Authorization first<br>' +
+                        '2. Push TR-069 OMCI config<br>' +
+                        '3. Wait for device to connect to ACS</small>' +
+                        '</div>', 'warning', 15000);
+                    return;
+                }
+                
                 if (data.reachable) {
-                    // Device is online - open WiFi config modal
+                    // Device is online and ready - open WiFi config modal
                     openWifiConfigModal(serialNumber, data.device_id);
                 } else {
                     // Device is offline or not connected to GenieACS
@@ -17843,7 +17857,7 @@ echo "# ================================================\n";
             })
             .catch(err => {
                 loadingToast.hide();
-                showToast('Failed to check device reachability: ' + err.message, 'error');
+                showToast('Failed to check device readiness: ' + err.message, 'error');
             });
     }
     
@@ -17854,22 +17868,36 @@ echo "# ================================================\n";
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-    // Open TR-069 WAN Config (with reachability check)
+    // Open TR-069 WAN Config (with reachability check + state guardrail)
     function openTR069WANConfig(onuId, serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        const loadingToast = showToast('Checking device reachability via TR-069...', 'info', 10000);
+        const loadingToast = showToast('Checking device readiness...', 'info', 10000);
         
         fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
             .then(r => r.json())
             .then(data => {
                 loadingToast.hide();
                 
+                // GUARDRAIL: Check if blocked due to provisioning state
+                if (data.blocked) {
+                    showToast('<div class="text-start">' +
+                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not Ready for TR-069</strong><br>' +
+                        '<small class="text-warning">' + (data.block_reason || 'ONU not ready') + '</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small><strong>Required steps:</strong><br>' +
+                        '1. Complete OLT Authorization first<br>' +
+                        '2. Push TR-069 OMCI config<br>' +
+                        '3. Wait for device to connect to ACS</small>' +
+                        '</div>', 'warning', 15000);
+                    return;
+                }
+                
                 if (data.reachable) {
-                    // Device is online - open WAN config modal
+                    // Device is online and ready - open WAN config modal
                     openWANConfig(onuId);
                 } else {
                     // Device is offline
@@ -17886,7 +17914,7 @@ echo "# ================================================\n";
             })
             .catch(err => {
                 loadingToast.hide();
-                showToast('Failed to check device reachability: ' + err.message, 'error');
+                showToast('Failed to check device readiness: ' + err.message, 'error');
             });
     }
     
