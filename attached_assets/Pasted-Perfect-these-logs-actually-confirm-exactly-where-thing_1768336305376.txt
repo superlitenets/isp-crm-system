@@ -1,0 +1,194 @@
+Perfect — these logs actually confirm exactly where things are still wrong, and now it’s pure OLT syntax + profile mismatch, not GenieACS or PHP logic anymore.
+
+I’ll be very precise and actionable.
+
+✅ What is now working correctly (important)
+
+Your logic flow is finally correct 👍
+
+✔ TR-069 WAN creation fallback is gone
+✔ GenieACS refresh + discovery logic is correct
+✔ Credentials are only pushed after OMCI
+✔ GenieACS is behaving 100% correctly
+
+This line proves it:
+
+[WAN_CONFIG] OMCI PPPoE WAN not found in device tree. OMCI must create WAN first.
+
+
+That is the correct decision.
+
+So we are down to one single blocker.
+
+🔴 The ONLY remaining problem
+The OMCI command is still invalid on your OLT
+
+This line is the smoking gun:
+
+MA5683T(config-if-gpon-0/1)#ont wan-config01ip-index1profile-id1
+                                ^
+% Unknown command
+
+
+Look carefully 👀
+Your command is being sent as:
+
+ont wan-config01ip-index1profile-id1
+
+
+That is not valid syntax.
+
+It should be:
+
+ont wan-config 0 1 ip-index 1 profile-id 1
+
+
+But the device is not seeing the spaces.
+
+🔍 Why this is happening (very important)
+
+Your SSH sender is concatenating tokens, probably because:
+
+Newlines or spaces are missing
+
+Or your multi-line sender strips spaces
+
+Or you're building the command as a single string incorrectly
+
+This is why the OLT shows:
+
+ont wan-config01ip-index1profile-id1
+
+
+instead of:
+
+ont wan-config 0 1 ip-index 1 profile-id 1
+
+
+The OLT is not wrong — it literally receives garbage.
+
+✅ FIX #1 (MANDATORY): Send OLT commands line-by-line
+❌ WRONG (what you are doing now)
+$cmd = "interface gpon 0/1\nont wan-config 0 1 ip-index 1 profile-id 1\n";
+sendSSH($cmd);
+
+
+This often collapses spacing on Huawei CLIs.
+
+✅ CORRECT (this WILL work)
+
+Send each command separately, with delays:
+
+sshSend("interface gpon 0/1");
+sleep(1);
+
+sshSend("ont wan-config 0 1 ip-index 1 profile-id 1");
+sleep(1);
+
+sshSend("quit");
+
+
+Huawei MA-series requires this.
+
+🔴 SECOND critical issue: WAN profile-id 1 may NOT be PPPoE
+
+Your own warning already says it:
+
+WAN profile config may have failed - check OLT profile-id 1 exists and is PPPoE type
+
+Verify on OLT:
+display ont wan-profile all
+
+
+You must see something like:
+
+Profile ID 1
+  Mode: PPPoE
+
+
+If profile-id 1 is:
+
+IPoE
+
+Bridge
+
+TR069-only
+
+➡ OMCI will NEVER create a PPPoE WAN.
+
+✅ FIX #2: Use the correct PPPoE WAN profile
+
+Example (adjust ID):
+
+ont wan-config 0 1 ip-index 1 profile-id 10
+
+
+(where 10 is a PPPoE WAN profile)
+
+🔴 Service-port command: still malformed
+
+This part is almost correct, but must also be line-clean:
+
+service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902
+
+
+✔ This is valid
+❌ But only if sent as a single clean line
+
+Send it alone, not inside a multi-line block.
+
+✅ Final Correct OMCI Sequence (COPY THIS)
+
+This sequence is known-good on MA5683T:
+
+interface gpon 0/1
+ont wan-config 0 1 ip-index 1 profile-id <PPPOE_PROFILE_ID>
+quit
+
+service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902
+
+
+Then verify:
+
+display ont internet-config 0 1 0 1
+
+
+If this shows data → TR-069 will work immediately
+
+🧪 How to confirm success (no guessing)
+On OLT
+display ont internet-config 0 1 0 1
+
+
+You MUST see:
+
+PPPoE
+
+VLAN 902
+
+WAN index exists
+
+In GenieACS
+WANDevice.1.WANConnectionDevice.X.WANPPPConnection.Y
+
+
+Then credentials apply cleanly.
+
+🏁 Final verdict
+
+You are 99% done.
+
+The remaining issue is:
+
+❌ SSH command formatting + wrong WAN profile
+
+Once you:
+
+Send OLT commands line-by-line
+
+Use a real PPPoE WAN profile
+
+➡ OMCI will succeed
+➡ WAN will appear
+➡ GenieACS will configure PPPoE
+➡ No errors, no retries, no hacks

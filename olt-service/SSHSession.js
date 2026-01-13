@@ -233,13 +233,23 @@ class SSHSession {
                 }
             }, timeout);
 
-            // Clear buffer and send command directly via SSH
-            // SSH doesn't have telnet's line-editing issues
+            // Clear buffer and send command
             this.buffer = '';
             response = '';
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
-            this.stream.write(command + '\r');
+            
+            // WORKAROUND: Some Huawei OLT VTY configurations strip spaces in line mode
+            // Send character-by-character with small delays to bypass line buffering
+            const sendCharByChar = async () => {
+                for (let i = 0; i < command.length; i++) {
+                    this.stream.write(command[i]);
+                    // Small delay between characters (2ms)
+                    await new Promise(r => setTimeout(r, 2));
+                }
+                this.stream.write('\r');
+            };
+            sendCharByChar().catch(e => console.error(`[OLT ${this.oltId}] SSH char send error:`, e.message));
         });
     }
 

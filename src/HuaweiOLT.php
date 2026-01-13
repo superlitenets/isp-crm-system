@@ -6762,25 +6762,38 @@ class HuaweiOLT {
         };
         
         // Step 1: Configure PPPoE WAN via OMCI
-        // IMPORTANT: On MA5683T, wan-mode comes from the WAN profile, NOT the command
-        // Use simple ont wan-config with profile-id only (profile defines PPPoE mode)
-        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1\r\n";
-        $cmd1 .= "quit";
-        $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[Step 1: PPPoE WAN Config]\n" . ($result1['output'] ?? '') . "\n";
+        // CRITICAL: Send each command SEPARATELY with delays (Huawei MA-series requirement)
+        // Multi-line blocks collapse spacing on Huawei CLI
+        
+        // 1a. Enter interface mode
+        $output .= "[Step 1a: Enter interface]\n";
+        $result1a = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
+        $output .= ($result1a['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        // 1b. Apply WAN config (profile-id determines PPPoE mode)
+        $output .= "[Step 1b: WAN Config]\n";
+        $result1b = $this->executeCommand($oltId, "ont wan-config {$port} {$onuId} ip-index 1 profile-id 1");
+        $output .= ($result1b['output'] ?? '') . "\n";
+        usleep(500000); // 500ms delay
+        
+        // 1c. Exit interface mode
+        $result1c = $this->executeCommand($oltId, "quit");
+        $output .= "[Step 1c: Exit interface]\n" . ($result1c['output'] ?? '') . "\n";
         
         // Check if command succeeded (ignore "already exists" messages)
-        $step1Failed = $hasRealError($result1['output'] ?? '');
+        $step1Failed = $hasRealError($result1b['output'] ?? '');
         if ($step1Failed) {
             $errors[] = "WAN profile config may have failed - check OLT profile-id 1 exists and is PPPoE type";
         }
         
-        // Step 2: Create service-port for PPPoE VLAN (simplified syntax for MA5683T)
-        // Remove tag-transform and traffic-table options that may not be supported
+        // Step 2: Create service-port for PPPoE VLAN
+        // CRITICAL: Send as single clean command (not in multi-line block)
+        usleep(500000); // 500ms delay before service-port
+        $output .= "[Step 2: Service Port]\n";
         $cmd2 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
         $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[Step 2: Service Port for PPPoE]\n" . ($result2['output'] ?? '') . "\n";
+        $output .= ($result2['output'] ?? '') . "\n";
         
         // Not critical if service port already exists from authorization
         if ($hasRealError($result2['output'] ?? '') && !preg_match('/already exist/i', $result2['output'] ?? '')) {
