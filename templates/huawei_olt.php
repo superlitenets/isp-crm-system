@@ -18002,9 +18002,105 @@ echo "# ================================================\n";
     
     // Actually open the TR-069 config modal (after reachability check passes)
     function openTR069ConfigModal(onuId, serialNumber) {
-        document.getElementById('wifiDeviceId').value = onuId;
-        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
-        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+        // Fetch and show TR-069 device info in a modal
+        showToast('Loading device info...', 'info', 3000);
+        
+        fetch('?page=huawei-olt&action=get_tr069_device_info&onu_id=' + onuId)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.device) {
+                    showToast('Device not found in GenieACS', 'warning');
+                    return;
+                }
+                
+                const device = data.device;
+                const lastInform = device._lastInform ? new Date(device._lastInform) : null;
+                const isOnline = lastInform && (Date.now() - lastInform.getTime() < 300000);
+                
+                // Build device info HTML
+                let html = `
+                <div class="modal fade" id="tr069DeviceInfoModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-${isOnline ? 'success' : 'secondary'} text-white">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-${isOnline ? 'check-circle-fill' : 'x-circle'} me-2"></i>
+                                    TR-069 Device Status - ${serialNumber || 'Unknown'}
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-light"><i class="bi bi-info-circle me-2"></i>Device Info</div>
+                                            <div class="card-body small">
+                                                <table class="table table-sm mb-0">
+                                                    <tr><th>Device ID</th><td class="text-break">${device._id || '-'}</td></tr>
+                                                    <tr><th>Serial Number</th><td>${device._deviceId?._SerialNumber || serialNumber}</td></tr>
+                                                    <tr><th>Manufacturer</th><td>${device._deviceId?._Manufacturer || '-'}</td></tr>
+                                                    <tr><th>Product Class</th><td>${device._deviceId?._ProductClass || '-'}</td></tr>
+                                                    <tr><th>Software Ver</th><td>${device.InternetGatewayDevice?.DeviceInfo?.SoftwareVersion?._value || '-'}</td></tr>
+                                                    <tr><th>Hardware Ver</th><td>${device.InternetGatewayDevice?.DeviceInfo?.HardwareVersion?._value || '-'}</td></tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-light"><i class="bi bi-activity me-2"></i>Connection Status</div>
+                                            <div class="card-body small">
+                                                <table class="table table-sm mb-0">
+                                                    <tr>
+                                                        <th>Status</th>
+                                                        <td><span class="badge bg-${isOnline ? 'success' : 'secondary'}">${isOnline ? 'Online' : 'Offline'}</span></td>
+                                                    </tr>
+                                                    <tr><th>Last Inform</th><td>${lastInform ? lastInform.toLocaleString() : 'Never'}</td></tr>
+                                                    <tr><th>Connection URL</th><td class="text-break small">${device.InternetGatewayDevice?.ManagementServer?.ConnectionRequestURL?._value || '-'}</td></tr>
+                                                    <tr><th>ACS URL</th><td class="text-break small">${device.InternetGatewayDevice?.ManagementServer?.URL?._value || '-'}</td></tr>
+                                                    <tr><th>External IP</th><td>${device.InternetGatewayDevice?.WANDevice?.['1']?.WANConnectionDevice?.['1']?.WANPPPConnection?.['1']?.ExternalIPAddress?._value || device.InternetGatewayDevice?.WANDevice?.['1']?.WANConnectionDevice?.['2']?.WANPPPConnection?.['1']?.ExternalIPAddress?._value || '-'}</td></tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-primary" onclick="sendTR069ConnectionRequest(${onuId})">
+                                    <i class="bi bi-broadcast me-1"></i>Ping Device
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                
+                // Remove existing modal if present
+                const existingModal = document.getElementById('tr069DeviceInfoModal');
+                if (existingModal) existingModal.remove();
+                
+                // Add and show modal
+                document.body.insertAdjacentHTML('beforeend', html);
+                new bootstrap.Modal(document.getElementById('tr069DeviceInfoModal')).show();
+            })
+            .catch(err => {
+                showToast('Error loading device info: ' + err.message, 'danger');
+            });
+    }
+    
+    async function sendTR069ConnectionRequest(onuId) {
+        showToast('Sending connection request...', 'info', 5000);
+        try {
+            const resp = await fetch('?page=huawei-olt&action=tr069_connection_request&onu_id=' + onuId, { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('Connection request sent - device should inform shortly', 'success');
+            } else {
+                showToast('Failed: ' + (data.error || 'Unknown error'), 'warning');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'danger');
+        }
     }
     
     // Open TR-069 WiFi Config Modal (standalone WiFi configuration)
