@@ -848,6 +848,80 @@ if ($page === 'api' && $action === 'get_onu_details') {
     exit;
 }
 
+// Check TR-069 Reachability API
+if ($page === 'api' && $action === 'check_tr069_reachability') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $serialNumber = isset($_GET['serial']) ? trim($_GET['serial']) : '';
+    
+    if (empty($serialNumber)) {
+        echo json_encode(['reachable' => false, 'error' => 'Serial number required']);
+        exit;
+    }
+    
+    try {
+        $genieAcs = new \App\GenieACS();
+        
+        $device = null;
+        $searchFormats = [
+            $serialNumber,
+            strtoupper($serialNumber),
+            preg_replace('/^[A-Z]{4}/', '', strtoupper($serialNumber))
+        ];
+        
+        foreach ($searchFormats as $sn) {
+            $device = $genieAcs->getDevice($sn);
+            if ($device) break;
+        }
+        
+        if (!$device) {
+            echo json_encode([
+                'reachable' => false,
+                'last_inform' => 'Never connected to GenieACS',
+                'device_id' => null
+            ]);
+            exit;
+        }
+        
+        $lastInformStr = $device['_lastInform'] ?? null;
+        $isReachable = false;
+        $lastInformFormatted = 'Unknown';
+        
+        if ($lastInformStr) {
+            $lastInform = strtotime($lastInformStr);
+            $now = time();
+            $diff = $now - $lastInform;
+            
+            $isReachable = ($diff < 300);
+            
+            if ($diff < 60) {
+                $lastInformFormatted = $diff . ' seconds ago';
+            } elseif ($diff < 3600) {
+                $lastInformFormatted = round($diff / 60) . ' minutes ago';
+            } elseif ($diff < 86400) {
+                $lastInformFormatted = round($diff / 3600) . ' hours ago';
+            } else {
+                $lastInformFormatted = round($diff / 86400) . ' days ago';
+            }
+        }
+        
+        echo json_encode([
+            'reachable' => $isReachable,
+            'last_inform' => $lastInformFormatted,
+            'device_id' => $device['_id'] ?? null
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode(['reachable' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Get WAN Configuration API
 if ($page === 'api' && $action === 'get_wan_config') {
     ob_clean();

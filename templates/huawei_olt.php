@@ -7356,7 +7356,7 @@ try {
                         <button type="button" class="btn btn-outline-info" onclick="openTR069Config(<?= $currentOnu['id'] ?>)" title="TR-069 Device Info & Status">
                             <i class="bi bi-info-circle"></i><span class="d-none d-lg-inline ms-1">Status</span>
                         </button>
-                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#wanConfigModal" title="Configure PPPoE/IPoE WAN via TR-069">
+                        <button type="button" class="btn btn-outline-primary" onclick="openTR069WANConfig(<?= $currentOnu['id'] ?>, '<?= $currentOnu['sn'] ?>')" title="Configure PPPoE/IPoE WAN via TR-069">
                             <i class="bi bi-ethernet"></i><span class="d-none d-lg-inline ms-1">WAN</span>
                         </button>
                         <button type="button" class="btn btn-outline-success" onclick="openTR069WiFiConfig('<?= $currentOnu['sn'] ?>')" title="Configure WiFi via TR-069">
@@ -17810,7 +17810,87 @@ echo "# ================================================\n";
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-    // Open WAN Config Modal
+    // Open TR-069 WiFi Config Modal (standalone WiFi configuration)
+    function openTR069WiFiConfig(serialNumber) {
+        if (!serialNumber) {
+            showToast('No serial number available', 'error');
+            return;
+        }
+        
+        const loadingToast = showToast('Checking device reachability via TR-069...', 'info', 10000);
+        
+        // Check if device is reachable via GenieACS
+        fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
+            .then(r => r.json())
+            .then(data => {
+                loadingToast.hide();
+                
+                if (data.reachable) {
+                    // Device is online - open WiFi config modal
+                    openWifiConfigModal(serialNumber, data.device_id);
+                } else {
+                    // Device is offline or not connected to GenieACS
+                    showToast('<div class="text-start">' +
+                        '<strong>Device Offline</strong><br>' +
+                        '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small><strong>Troubleshooting:</strong><br>' +
+                        '1. Verify TR-069 OMCI config is pushed<br>' +
+                        '2. Check TR-069 VLAN connectivity<br>' +
+                        '3. Verify ACS URL is reachable from device</small>' +
+                        '</div>', 'warning', 15000);
+                }
+            })
+            .catch(err => {
+                loadingToast.hide();
+                showToast('Failed to check device reachability: ' + err.message, 'error');
+            });
+    }
+    
+    // Open WiFi Config Modal (after reachability check passed)
+    function openWifiConfigModal(serialNumber, deviceId) {
+        document.getElementById('wifiDeviceId').value = deviceId || serialNumber;
+        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
+        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+    }
+    
+    // Open TR-069 WAN Config (with reachability check)
+    function openTR069WANConfig(onuId, serialNumber) {
+        if (!serialNumber) {
+            showToast('No serial number available', 'error');
+            return;
+        }
+        
+        const loadingToast = showToast('Checking device reachability via TR-069...', 'info', 10000);
+        
+        fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
+            .then(r => r.json())
+            .then(data => {
+                loadingToast.hide();
+                
+                if (data.reachable) {
+                    // Device is online - open WAN config modal
+                    openWANConfig(onuId);
+                } else {
+                    // Device is offline
+                    showToast('<div class="text-start">' +
+                        '<strong>Device Offline</strong><br>' +
+                        '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small><strong>Troubleshooting:</strong><br>' +
+                        '1. Verify TR-069 OMCI config is pushed<br>' +
+                        '2. Check TR-069 VLAN connectivity<br>' +
+                        '3. Verify ACS URL is reachable from device</small>' +
+                        '</div>', 'warning', 15000);
+                }
+            })
+            .catch(err => {
+                loadingToast.hide();
+                showToast('Failed to check device reachability: ' + err.message, 'error');
+            });
+    }
+    
+    // Open WAN Config Modal (loads existing config)
     function openWANConfig(onuId) {
         const modal = document.getElementById('wanConfigModal');
         const body = document.getElementById('wanConfigBody');
