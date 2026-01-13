@@ -6617,27 +6617,42 @@ class HuaweiOLT {
             $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Push ACS URL (send commands separately to avoid SSH terminal issues)
+        // Step 2: Push TR-069 server config (send commands separately to avoid SSH terminal issues)
         $cmd2a = "interface gpon {$frame}/{$slot}";
         $result2a = $this->executeCommand($oltId, $cmd2a);
         $output .= "[Step 2a: Enter GPON Interface]\n" . ($result2a['output'] ?? '') . "\n";
         
-        // ACS URL command - no quotes (Huawei CLI doesn't support quoted URLs)
-        $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
-        $result2b = $this->executeCommand($oltId, $cmd2b);
-        $output .= "[Step 2b: ACS URL Config]\n" . ($result2b['output'] ?? '') . "\n";
-        $acsUrlFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
+        // Get TR-069 profile ID from settings
+        $tr069ProfileId = $this->getTR069ProfileId();
+        $configFailed = false;
         
-        // Periodic inform command
-        $cmd2c = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
-        $result2c = $this->executeCommand($oltId, $cmd2c);
-        $output .= "[Step 2c: Periodic Inform Config]\n" . ($result2c['output'] ?? '') . "\n";
+        if ($tr069ProfileId) {
+            // Use profile-id (preferred method - profile is pre-configured on OLT)
+            $cmd2b = "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
+            $result2b = $this->executeCommand($oltId, $cmd2b);
+            $output .= "[Step 2b: TR-069 Profile ID {$tr069ProfileId}]\n" . ($result2b['output'] ?? '') . "\n";
+            $configFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
+        } else {
+            // Fallback: ACS URL command directly - no quotes (Huawei CLI doesn't support quoted URLs)
+            $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
+            $result2b = $this->executeCommand($oltId, $cmd2b);
+            $output .= "[Step 2b: ACS URL Config]\n" . ($result2b['output'] ?? '') . "\n";
+            $configFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
+            
+            // Periodic inform command (only needed when using acs-url, profile has this built-in)
+            $cmd2c = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
+            $result2c = $this->executeCommand($oltId, $cmd2c);
+            $output .= "[Step 2c: Periodic Inform Config]\n" . ($result2c['output'] ?? '') . "\n";
+            if ($hasRealError($result2c['output'] ?? '')) {
+                $configFailed = true;
+            }
+        }
         
         $cmd2d = "quit";
         $this->executeCommand($oltId, $cmd2d);
         
-        if ($acsUrlFailed || $hasRealError($result2c['output'] ?? '')) {
-            $errors[] = "ACS URL config failed";
+        if ($configFailed) {
+            $errors[] = $tr069ProfileId ? "TR-069 profile config failed" : "ACS URL config failed";
         }
         
         // Step 3: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
