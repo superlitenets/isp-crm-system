@@ -7525,8 +7525,21 @@ try {
                 <div class="col-md-4">
                     <div class="onu-info-card h-100 p-3">
                         <div class="section-header mb-3"><i class="bi bi-cpu me-2"></i>Device Information</div>
-                        <div class="text-center mb-3">
+                        <div class="text-center mb-3 position-relative">
                             <i class="bi bi-router text-primary" style="font-size: 3rem;"></i>
+                            <?php
+                            $onuStatus = strtolower($currentOnu['status'] ?? 'offline');
+                            $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'][$onuStatus] ?? 'secondary';
+                            $statusIcon = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill'][$onuStatus] ?? 'circle';
+                            ?>
+                            <div class="mt-2">
+                                <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
+                                    <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
+                                </span>
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshLiveStatus()" title="Refresh live status">
+                                    <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="mb-2">
                             <div class="info-label">Model</div>
@@ -8125,7 +8138,60 @@ try {
                 <?php if (empty($currentOnu['tr069_ip'])): ?>
                 setTimeout(() => refreshTR069IP(true), 1000);
                 <?php endif; ?>
+                
+                // Auto-refresh live ONU status on page load
+                setTimeout(() => refreshLiveStatus(true), 300);
             })();
+            
+            // Refresh live ONU status (online/offline) via SNMP
+            async function refreshLiveStatus(silent = false) {
+                const icon = document.getElementById('liveStatusRefreshIcon');
+                if (icon) icon.classList.add('spin-animation');
+                
+                try {
+                    const resp = await fetch(`?page=api&action=huawei_live_onu&olt_id=${onuOltId}&frame=${onuFrame}&slot=${onuSlot}&port=${onuPort}&onu_id=${onuIdVal}&sn=${encodeURIComponent(onuSn)}`);
+                    const data = await resp.json();
+                    
+                    if (icon) icon.classList.remove('spin-animation');
+                    
+                    if (data.success && data.onu) {
+                        const onu = data.onu;
+                        const statusMap = {
+                            'online': { class: 'success', icon: 'check-circle-fill' },
+                            'offline': { class: 'secondary', icon: 'x-circle' },
+                            'los': { class: 'danger', icon: 'exclamation-triangle-fill' }
+                        };
+                        const st = statusMap[onu.status] || statusMap.offline;
+                        
+                        // Update status badge
+                        const badge = document.getElementById('onuStatusBadge');
+                        if (badge) {
+                            badge.className = `badge bg-${st.class} fs-6`;
+                            badge.innerHTML = `<i class="bi bi-${st.icon} me-1"></i>${onu.status ? onu.status.charAt(0).toUpperCase() + onu.status.slice(1) : 'Unknown'}`;
+                        }
+                        
+                        // Update optical power displays
+                        const rxEl = document.querySelector('[data-live-rx]');
+                        const txEl = document.querySelector('[data-live-tx]');
+                        if (rxEl && onu.rx_power !== null) {
+                            rxEl.textContent = onu.rx_power.toFixed(1);
+                        }
+                        if (txEl && onu.tx_power !== null) {
+                            txEl.textContent = onu.tx_power.toFixed(1);
+                        }
+                        
+                        if (!silent) {
+                            showToast(`Status: ${onu.status}, RX: ${onu.rx_power !== null ? onu.rx_power.toFixed(1) + ' dBm' : 'N/A'}`, 'success', 3000);
+                        }
+                    } else if (!silent) {
+                        showToast(data.error || 'Could not fetch live status', 'warning', 5000);
+                    }
+                } catch (e) {
+                    console.error('Failed to refresh live status:', e);
+                    if (icon) icon.classList.remove('spin-animation');
+                    if (!silent) showToast('Error fetching live status', 'danger', 5000);
+                }
+            }
             
             // Refresh optical data (RX/TX power, distance)
             async function refreshOpticalData(onuId) {
