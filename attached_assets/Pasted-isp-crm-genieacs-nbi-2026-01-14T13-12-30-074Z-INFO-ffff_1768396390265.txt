@@ -1,0 +1,34 @@
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:30.074Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:30.103Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:30.139Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86201, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Calling OMCI to create PPPoE WAN structure first...
+isp_crm_olt_service     | [OLT 1] SSH sending: "service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] OMCI result: {"success":true,"message":"PPPoE WAN configured via OMCI. Credentials queued for TR-069 push when device connects to ACS.","pppoe_vlan":902,"errors":[],"output":"[Step 1: Service Port for PPPoE VLAN]\nservice-port vlan 902 gpon 0\/1\/0 ont 1 gemport 2 multi-service u \u001b[1Dser-vlan 902\r\n{ <cr>\n[Step 3: TR-069 Config Queued]\nPPPoE credentials queued for TR-069 push\n"}
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:34.275Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_cwmp   | 2026-01-14T13:12:34.462Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="152" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-14T13:12:34.491Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbca2f3780000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 200
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:37.841Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Using SmartOLT default PPPoE path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE Path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1, Username: 2116, VLAN: 902
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Sending setParameterValues: [["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN",902,"xsd:unsignedInt"]]
+isp_crm_genieacs_nbi    | 2026-01-14T13:12:37.846Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request="" timeout="30000"
+isp_crm_genieacs_cwmp   | 2026-01-14T13:12:38.046Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="153" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-14T13:12:38.083Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbca301790100" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] setParameterValues result: HTTP 200, success: true
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Response: {"name":"setParameterValues","parameterValues":[["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevic
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:12:29 +0300 "POST /index.php" 200
+isp_crm_nginx  
