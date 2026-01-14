@@ -2303,7 +2303,8 @@ class GenieACS {
      * @return array Result with success status and step details
      */
     public function configurePPPoE4Step(string $deviceId, string $username, string $password, 
-                                         bool $natEnabled = true, int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1): array {
+                                         bool $natEnabled = true, int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1,
+                                         bool $useConnectionRequest = false): array {
         if (empty($username) || empty($password)) {
             return ['success' => false, 'error' => 'Username and password are required'];
         }
@@ -2312,57 +2313,39 @@ class GenieACS {
         $basePath = "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice.{$wanConnDeviceIndex}";
         $pppPath = "{$basePath}.WANPPPConnection";
         $encodedId = urlencode($deviceId);
-        $timeout = 30000; // 30 seconds
+        
+        // Use connection_request for immediate push, or queue for next inform
+        $endpoint = $useConnectionRequest 
+            ? "/devices/{$encodedId}/tasks?connection_request&timeout=30000"
+            : "/devices/{$encodedId}/tasks";
         
         // Step 1: Summon - Force discovery of WAN path
         error_log("[GenieACS] Step 1: Summon WAN path for {$deviceId}");
-        $summonResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $summonResult = $this->request('POST', $endpoint, [
             'name' => 'getParameterNames',
             'parameterPath' => $pppPath,
             'nextLevel' => false
         ]);
         $results['step1_summon'] = $summonResult;
         
-        if (!$summonResult['success']) {
-            return [
-                'success' => false,
-                'error' => 'Step 1 (Summon) failed: ' . ($summonResult['error'] ?? 'Unknown error'),
-                'results' => $results
-            ];
-        }
-        
-        // Wait a moment for the device to process
-        usleep(500000); // 0.5 seconds
-        
         // Step 2: AddObject - Create WANPPPConnection instance
         error_log("[GenieACS] Step 2: AddObject WANPPPConnection for {$deviceId}");
-        $addObjectResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $addObjectResult = $this->request('POST', $endpoint, [
             'name' => 'addObject',
             'objectName' => $pppPath
         ]);
         $results['step2_addObject'] = $addObjectResult;
         
-        // AddObject might fail if instance already exists - that's OK
         $instanceIndex = 1;
-        if ($addObjectResult['success'] && isset($addObjectResult['data']['instanceNumber'])) {
-            $instanceIndex = $addObjectResult['data']['instanceNumber'];
-        }
-        
         $pppInstancePath = "{$pppPath}.{$instanceIndex}";
-        
-        // Wait a moment
-        usleep(500000);
         
         // Step 3: Refresh - Get all parameters from the new instance
         error_log("[GenieACS] Step 3: Refresh parameters for {$pppInstancePath}");
-        $refreshResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $refreshResult = $this->request('POST', $endpoint, [
             'name' => 'getParameterValues',
             'parameterNames' => ["{$pppInstancePath}."]
         ]);
         $results['step3_refresh'] = $refreshResult;
-        
-        // Wait a moment
-        usleep(500000);
         
         // Step 4: SetParameterValues - Configure PPPoE credentials
         error_log("[GenieACS] Step 4: Set PPPoE credentials for {$pppInstancePath}");
@@ -2375,7 +2358,7 @@ class GenieACS {
             ["{$pppInstancePath}.ConnectionTrigger", 'AlwaysOn', 'xsd:string']
         ];
         
-        $setResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $setResult = $this->request('POST', $endpoint, [
             'name' => 'setParameterValues',
             'parameterValues' => $setParams
         ]);
@@ -2388,20 +2371,26 @@ class GenieACS {
             $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
         }
         
-        $l3Result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $l3Result = $this->request('POST', $endpoint, [
             'name' => 'setParameterValues',
             'parameterValues' => $l3Params
         ]);
         $results['step5_l3Enable'] = $l3Result;
         
-        $success = $setResult['success'] ?? false;
+        $allTasksQueued = ($summonResult['success'] ?? false) && 
+                          ($addObjectResult['success'] ?? false) && 
+                          ($setResult['success'] ?? false) && 
+                          ($l3Result['success'] ?? false);
         
         return [
-            'success' => $success,
-            'message' => $success 
-                ? "PPPoE configured successfully on {$pppInstancePath}" 
-                : 'PPPoE configuration failed at Step 4',
+            'success' => $allTasksQueued,
+            'message' => $allTasksQueued 
+                ? ($useConnectionRequest 
+                    ? "PPPoE configured successfully on {$pppInstancePath}" 
+                    : "PPPoE tasks queued for {$pppInstancePath} - will apply on next device inform")
+                : 'PPPoE configuration failed - check results for details',
             'instance_path' => $pppInstancePath,
+            'queued' => !$useConnectionRequest,
             'results' => $results
         ];
     }
@@ -2415,34 +2404,27 @@ class GenieACS {
      * @param string $password PPPoE password
      * @param bool $natEnabled Enable NAT
      * @param string $instancePath Full path to WANPPPConnection instance
+     * @param bool $useConnectionRequest If true, push immediately; if false, queue for next inform
      * @return array Result with success status
      */
     public function configurePPPoEOnExisting(string $deviceId, string $username, string $password, 
                                               bool $natEnabled = true, 
-                                              string $instancePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1'): array {
+                                              string $instancePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1',
+                                              bool $useConnectionRequest = false): array {
         if (empty($username) || empty($password)) {
             return ['success' => false, 'error' => 'Username and password are required'];
         }
         
         $encodedId = urlencode($deviceId);
-        $timeout = 30000;
+        $endpoint = $useConnectionRequest 
+            ? "/devices/{$encodedId}/tasks?connection_request&timeout=30000"
+            : "/devices/{$encodedId}/tasks";
         
         // First refresh to ensure parameters exist in GenieACS
-        $refreshResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $refreshResult = $this->request('POST', $endpoint, [
             'name' => 'getParameterValues',
             'parameterNames' => ["{$instancePath}."]
         ]);
-        
-        if (!$refreshResult['success']) {
-            return [
-                'success' => false,
-                'error' => 'Failed to refresh parameters: ' . ($refreshResult['error'] ?? 'Unknown'),
-                'refresh_result' => $refreshResult
-            ];
-        }
-        
-        // Wait for device to process
-        usleep(500000);
         
         // Set PPPoE parameters
         $setParams = [
@@ -2452,7 +2434,7 @@ class GenieACS {
             ["{$instancePath}.NATEnabled", $natEnabled, 'xsd:boolean']
         ];
         
-        $setResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $setResult = $this->request('POST', $endpoint, [
             'name' => 'setParameterValues',
             'parameterValues' => $setParams
         ]);
@@ -2463,17 +2445,22 @@ class GenieACS {
             $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
         }
         
-        $l3Result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+        $l3Result = $this->request('POST', $endpoint, [
             'name' => 'setParameterValues',
             'parameterValues' => $l3Params
         ]);
         
+        $success = ($setResult['success'] ?? false) && ($l3Result['success'] ?? false);
+        
         return [
-            'success' => $setResult['success'] ?? false,
-            'message' => ($setResult['success'] ?? false) 
-                ? "PPPoE credentials set on {$instancePath}"
+            'success' => $success,
+            'message' => $success 
+                ? ($useConnectionRequest 
+                    ? "PPPoE credentials set on {$instancePath}"
+                    : "PPPoE tasks queued for {$instancePath} - will apply on next device inform")
                 : 'Failed to set PPPoE credentials',
             'instance_path' => $instancePath,
+            'queued' => !$useConnectionRequest,
             'set_result' => $setResult,
             'l3_result' => $l3Result
         ];
