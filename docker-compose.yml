@@ -94,97 +94,58 @@ services:
     networks:
       - crm_network
 
-  genieacs-cwmp:
-    image: node:18-alpine
-    container_name: isp_crm_genieacs_cwmp
+  # GenieACS - All-in-one TR-069 ACS (drumsergio/genieacs)
+  genieacs:
+    depends_on:
+      genieacs-mongo:
+        condition: service_healthy
+    image: drumsergio/genieacs:1.2.13.2
     restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-cwmp"
+    container_name: isp_crm_genieacs
     environment:
-      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
-      - GENIEACS_CWMP_ACCESS_LOG_FILE=/dev/stdout
-      - NODE_OPTIONS=--max-old-space-size=256
+      GENIEACS_UI_JWT_SECRET: ${GENIEACS_JWT_SECRET:-isp-crm-genieacs-jwt-secret-2025}
+      GENIEACS_CWMP_ACCESS_LOG_FILE: /var/log/genieacs/genieacs-cwmp-access.log
+      GENIEACS_NBI_ACCESS_LOG_FILE: /var/log/genieacs/genieacs-nbi-access.log
+      GENIEACS_FS_ACCESS_LOG_FILE: /var/log/genieacs/genieacs-fs-access.log
+      GENIEACS_UI_ACCESS_LOG_FILE: /var/log/genieacs/genieacs-ui-access.log
+      GENIEACS_DEBUG_FILE: /var/log/genieacs/genieacs-debug.yaml
+      GENIEACS_EXT_DIR: /opt/genieacs/ext
+      GENIEACS_MONGODB_CONNECTION_URL: mongodb://genieacs-mongo:27017/genieacs
     ports:
       - "7547:7547"
-    depends_on:
-      - genieacs-mongo
-    networks:
-      - crm_network
-    mem_limit: 512m
-    memswap_limit: 512m
-
-  genieacs-nbi:
-    image: node:18-alpine
-    container_name: isp_crm_genieacs_nbi
-    restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-nbi"
-    environment:
-      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
-      - GENIEACS_NBI_ACCESS_LOG_FILE=/dev/stdout
-      - NODE_OPTIONS=--max-old-space-size=256
-    ports:
       - "7557:7557"
-    depends_on:
-      - genieacs-mongo
-    networks:
-      - crm_network
-    mem_limit: 512m
-    memswap_limit: 512m
-
-  genieacs-fs:
-    image: node:18-alpine
-    container_name: isp_crm_genieacs_fs
-    restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-fs"
-    environment:
-      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
-      - GENIEACS_FS_ACCESS_LOG_FILE=/dev/stdout
-      - NODE_OPTIONS=--max-old-space-size=256
-    ports:
       - "7567:7567"
+      - "3000:3000"
     volumes:
       - genieacs_ext:/opt/genieacs/ext
-    depends_on:
-      - genieacs-mongo
+      - genieacs_logs:/var/log/genieacs
     networks:
       - crm_network
-    mem_limit: 512m
-    memswap_limit: 512m
-
-  genieacs-ui:
-    image: node:18-alpine
-    container_name: isp_crm_genieacs_ui
-    restart: unless-stopped
-    working_dir: /app
-    command: sh -c "npm install -g genieacs@1.2.13 && genieacs-ui"
-    environment:
-      - GENIEACS_MONGODB_CONNECTION_URL=mongodb://genieacs-mongo:27017/genieacs
-      - GENIEACS_UI_JWT_SECRET=${GENIEACS_JWT_SECRET:-isp-crm-genieacs-jwt-secret-2025}
-      - GENIEACS_UI_ACCESS_LOG_FILE=/dev/stdout
-      - NODE_OPTIONS=--max-old-space-size=384
-    ports:
-      - "3000:3000"
-    depends_on:
-      - genieacs-mongo
-      - genieacs-nbi
-    networks:
-      - crm_network
-    mem_limit: 768m
-    memswap_limit: 768m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   genieacs-mongo:
-    image: mongo:4.4
+    image: mongo:8.0
     container_name: isp_crm_genieacs_mongo
     restart: unless-stopped
-    command: mongod --wiredTigerCacheSizeGB 0.25
+    environment:
+      MONGO_DATA_DIR: /data/db
+      MONGO_LOG_DIR: /var/log/mongodb
     volumes:
       - genieacs_mongo_data:/data/db
+      - genieacs_mongo_configdb:/data/configdb
     networks:
       - crm_network
-    mem_limit: 256m
-    memswap_limit: 256m
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   olt-service:
     build:
@@ -327,6 +288,7 @@ volumes:
   whatsapp_session:
   whatsapp_secret:
   genieacs_mongo_data:
+  genieacs_mongo_configdb:
   freepbx_certs:
   freepbx_data:
   freepbx_logs:
