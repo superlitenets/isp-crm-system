@@ -2591,4 +2591,150 @@ class GenieACS {
                 : 'WAN provisioning failed: ' . ($configResult['error'] ?? 'Unknown error')
         ];
     }
+    
+    /**
+     * SmartOLT-style PPPoE WAN Provisioning
+     * Exact replication of SmartOLT's TR-069 workflow for Huawei HG8546M
+     * 
+     * Based on SmartOLT device logs:
+     * 1. Add WANConnectionDevice
+     * 2. Add WANPPPConnection under WANConnectionDevice.2
+     * 3. Set PPPoE credentials with Huawei-specific params
+     * 4. Set default WAN and policy routes
+     */
+    public function provisionPPPoESmartOLTStyle(string $deviceId, array $config): array {
+        $results = [];
+        $errors = [];
+        
+        $username = $config['pppoe_username'] ?? '';
+        $password = $config['pppoe_password'] ?? '';
+        $vlan = (int)($config['wan_vlan'] ?? $config['service_vlan'] ?? 900);
+        $wanName = 'wan1.2.ppp1'; // SmartOLT uses WANConnectionDevice.2.WANPPPConnection.1
+        
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'PPPoE username and password required'];
+        }
+        
+        try {
+            // Step 1: Add WANConnectionDevice (creates index dynamically, SmartOLT uses .2)
+            error_log("[GenieACS SmartOLT] Step 1: Add WANConnectionDevice");
+            $addWanCD = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.');
+            $results['add_wan_connection_device'] = $addWanCD;
+            sleep(1);
+            
+            // Step 2: Add WANPPPConnection under WANConnectionDevice.2
+            error_log("[GenieACS SmartOLT] Step 2: Add WANPPPConnection");
+            $addPPP = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.');
+            $results['add_wan_ppp_connection'] = $addPPP;
+            sleep(1);
+            
+            // Step 3: Set PPPoE credentials with Huawei-specific parameters
+            $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1';
+            error_log("[GenieACS SmartOLT] Step 3: Set PPPoE credentials");
+            $pppoeParams = [
+                ["{$pppBase}.Username", $username, 'xsd:string'],
+                ["{$pppBase}.Password", $password, 'xsd:string'],
+                ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
+                ["{$pppBase}.X_HW_LcpEchoReqCheck", 1, 'xsd:unsignedInt'],
+                ["{$pppBase}.PPPLCPEcho", 10, 'xsd:unsignedInt']
+            ];
+            $credResult = $this->setParameterValues($deviceId, $pppoeParams);
+            $results['pppoe_credentials'] = $credResult;
+            sleep(1);
+            
+            // Step 4: Set VLAN and Name
+            error_log("[GenieACS SmartOLT] Step 4: Set VLAN and Name");
+            $vlanParams = [
+                ["{$pppBase}.X_HW_VLAN", $vlan, 'xsd:unsignedInt'],
+                ["{$pppBase}.Name", 'Internet_PPPoE', 'xsd:string']
+            ];
+            $vlanResult = $this->setParameterValues($deviceId, $vlanParams);
+            $results['pppoe_vlan'] = $vlanResult;
+            sleep(1);
+            
+            // Step 5: Set ProvisioningCode
+            error_log("[GenieACS SmartOLT] Step 5: Set ProvisioningCode");
+            $provCode = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string']
+            ]);
+            $results['provisioning_code'] = $provCode;
+            
+            // Step 6: Set DefaultConnectionService and X_HW_WanDefaultWanName
+            error_log("[GenieACS SmartOLT] Step 6: Set default WAN");
+            $defaultWan = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.Layer3Forwarding.DefaultConnectionService', "{$pppBase}", 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
+            ]);
+            $results['default_wan'] = $defaultWan;
+            sleep(1);
+            
+            // Step 7: Add policy route
+            error_log("[GenieACS SmartOLT] Step 7: Add policy route");
+            $addRoute = $this->addObject($deviceId, 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.');
+            $results['add_policy_route'] = $addRoute;
+            sleep(1);
+            
+            // Step 8: Configure policy route to bind all LAN ports and SSID1 to WAN
+            error_log("[GenieACS SmartOLT] Step 8: Configure policy route");
+            $routeParams = [
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PhyPortName', 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PolicyRouteType', 'SourcePhyPort', 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.WanName', $wanName, 'xsd:string']
+            ];
+            $routeResult = $this->setParameterValues($deviceId, $routeParams);
+            $results['policy_route'] = $routeResult;
+            
+            // Step 9: Enable the PPPoE connection
+            error_log("[GenieACS SmartOLT] Step 9: Enable PPPoE");
+            $enableResult = $this->setParameterValues($deviceId, [
+                ["{$pppBase}.Enable", true, 'xsd:boolean']
+            ]);
+            $results['enable_pppoe'] = $enableResult;
+            
+            // Log the action
+            $this->logTR069Action($deviceId, 'smartolt_pppoe_provision', [
+                'username' => $username,
+                'vlan' => $vlan,
+                'wan_name' => $wanName,
+                'success' => true
+            ]);
+            
+            return [
+                'success' => true,
+                'message' => 'SmartOLT-style PPPoE provisioning completed',
+                'wan_name' => $wanName,
+                'results' => $results
+            ];
+            
+        } catch (\Exception $e) {
+            error_log("[GenieACS SmartOLT] Exception: " . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'results' => $results
+            ];
+        }
+    }
+    
+    /**
+     * Simpler direct PPPoE configuration assuming WANConnectionDevice.1.WANPPPConnection.1 exists
+     * Use this when the ONU has been factory-default-ed and has base WAN structure
+     */
+    public function configureExistingPPPoE(string $deviceId, string $username, string $password, int $vlan = 0): array {
+        $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+        
+        $params = [
+            ["{$pppBase}.Enable", true, 'xsd:boolean'],
+            ["{$pppBase}.Username", $username, 'xsd:string'],
+            ["{$pppBase}.Password", $password, 'xsd:string'],
+            ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
+            ["{$pppBase}.X_HW_LcpEchoReqCheck", 1, 'xsd:unsignedInt']
+        ];
+        
+        if ($vlan > 0) {
+            $params[] = ["{$pppBase}.X_HW_VLAN", $vlan, 'xsd:unsignedInt'];
+        }
+        
+        return $this->setParameterValues($deviceId, $params);
+    }
 }
