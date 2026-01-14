@@ -129,23 +129,20 @@ services:
       start_period: 60s
 
   genieacs-mongo:
-    image: mongo:8.0
+    image: mongo:7.0
     container_name: isp_crm_genieacs_mongo
     restart: unless-stopped
-    environment:
-      MONGO_DATA_DIR: /data/db
-      MONGO_LOG_DIR: /var/log/mongodb
     volumes:
       - genieacs_mongo_data:/data/db
       - genieacs_mongo_configdb:/data/configdb
     networks:
       - crm_network
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 60s
 
   olt-service:
     build:
