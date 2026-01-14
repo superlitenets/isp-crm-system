@@ -395,8 +395,9 @@ class GenieACS {
             }
         }
         
-        // Use connection_request to execute immediately
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        // Use connection_request with timeout to execute immediately and wait for completion
+        // timeout=30000 (30s) ensures task executes during session, not just queued
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
         ]);
