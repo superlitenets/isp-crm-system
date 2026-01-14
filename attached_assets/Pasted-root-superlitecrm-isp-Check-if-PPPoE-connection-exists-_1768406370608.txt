@@ -1,0 +1,63 @@
+root@superlitecrm:~/isp# # Check if PPPoE connection exists and L3 is enabled
+curl -s 'http://localhost:7557/devices/00259E-HG8546M-48575443F2D53A8B' | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+# Check PPPoE
+for key in d:
+    if 'WANPPPConnection' in key and 'Username' in key:
+        print(f'{key}: {d[key].get(\"_value\", d[key])}'[:100])
+    if 'L3Enable' in key:
+        print(f'{key}: {d[key].get(\"_value\", d[key])}'[:100])
+"
+
+# Check completed tasks (not pending)
+curl -s 'http://localhost:7557/faults?query=%7B%22device%22%3A%2200259E-HG8546M-48575443F2D53A8B%22%7D' | python3 -m json.tool
+
+# Force device to inform and report current state
+curl -X POST 'http://localhost:7557/devices/00259E-HG8546M-48575443F2D53A8B/tasks?connection_request' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"getParameterValues","parameterNames":["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.","InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig."]}'
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 340, in decode
+    raise JSONDecodeError("Extra data", s, end)
+json.decoder.JSONDecodeError: Extra data: line 1 column 5 (char 4)
+[
+    {
+        "_id": "00259E-HG8546M-48575443F2D53A8B:inform",
+        "device": "00259E-HG8546M-48575443F2D53A8B",
+        "channel": "inform",
+        "timestamp": "2026-01-14T15:47:47.922Z",
+        "code": "cwmp.9002",
+        "message": "Internal error",
+        "detail": {
+            "faultCode": "9002",
+            "faultString": "Internal error",
+            "setParameterValuesFault": null
+        },
+        "retries": 2,
+        "provisions": "[[\"inform\"]]"
+    },
+    {
+        "_id": "00259E-HG8546M-48575443F2D53A8B:task_6967bcbdf8c269f08826fbbe",
+        "device": "00259E-HG8546M-48575443F2D53A8B",
+        "channel": "task_6967bcbdf8c269f08826fbbe",
+        "timestamp": "2026-01-14T15:56:45.562Z",
+        "code": "script.Error",
+        "message": "Invalid parameter path",
+        "detail": {
+            "name": "Error",
+            "message": "Invalid parameter path",
+            "stack": "Error: Invalid parameter path\n    at refresh"
+        },
+        "retries": 0,
+        "provisions": "[[\"refresh\",\"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.\"]]"
+    }
+]
+{"name":"getParameterValues","parameterNames":["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.","InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig."],"device":"00259E-HG8546M-48575443F2D53A8B","timestamp":"2026-01-14T15:59:07.469Z","_id":"6967bd4b43c6bcfdc8c48922"}root@superlitecrm:~/isp#
