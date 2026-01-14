@@ -7543,7 +7543,19 @@ class HuaweiOLT {
             $result = $sendTask([
                 'name' => 'setParameterValues', 
                 'parameterValues' => $credParams
-            ], "PPPoE Credentials", true);
+            ], "PPPoE Credentials", false);  // Don't trigger connection yet
+            
+            // Enable L3 routing on all LAN Ethernet ports (required for PPPoE routing)
+            $l3Params = [];
+            for ($i = 1; $i <= 4; $i++) {
+                $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+            }
+            
+            error_log("[WAN_CONFIG] Enabling X_HW_L3Enable on LAN ports");
+            $l3Result = $sendTask([
+                'name' => 'setParameterValues',
+                'parameterValues' => $l3Params
+            ], "L3 Enable LAN Ports", true);  // Trigger connection on final task
             
             error_log("[WAN_CONFIG] setParameterValues result: HTTP {$result['code']}, success: " . ($result['success'] ? 'true' : 'false'));
             error_log("[WAN_CONFIG] Response: " . substr($result['response'] ?? '', 0, 500));
