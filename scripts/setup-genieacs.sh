@@ -390,7 +390,7 @@ echo " Done"
 # PROVISION: huawei-wan-pppoe - Complete Huawei PPPoE setup
 # This is the main provision for configuring PPPoE on Huawei ONUs
 # Args: username, password, vlan
-# Uses correct GenieACS syntax based on official wiki examples
+# Uses explicit paths to avoid "Invalid parameter path" errors
 # =====================================================
 echo "Creating provision: huawei-wan-pppoe..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/huawei-wan-pppoe" \
@@ -407,45 +407,38 @@ if (!username || !password) {
     return;
 }
 
-log("Huawei WAN PPPoE: Starting for user " + username + " with VLAN " + vlan);
+log("Huawei WAN PPPoE: Starting for user " + username + " VLAN " + vlan);
 
-// First refresh the WAN structure to discover what exists
-declare("InternetGatewayDevice.WANDevice.*", {path: now});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.*", {path: now});
+// Huawei HG8546M has factory default PPPoE at WANConnectionDevice.1.WANPPPConnection.1
+// This path exists even if not fully populated in the device tree
+const pppPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1";
 
-// Disable any existing WANIPConnection (we want PPPoE, not IPoE)
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.*.Enable", {path: now, value: now}, {value: false});
+// Refresh the PPPoE path to discover its parameters
+log("Huawei WAN PPPoE: Refreshing path " + pppPath);
+declare(pppPath + ".*", {path: now, value: now});
 
-// Ensure we have a WANPPPConnection instance (creates one if none exist)
-log("Huawei WAN PPPoE: Creating WANPPPConnection (if necessary)");
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*", null, {path: 1});
+// Configure PPPoE parameters on the explicit path
+log("Huawei WAN PPPoE: Setting credentials");
+declare(pppPath + ".Enable", {value: now}, {value: true});
+declare(pppPath + ".ConnectionType", {value: now}, {value: "IP_Routed"});
+declare(pppPath + ".NATEnabled", {value: now}, {value: true});
+declare(pppPath + ".Username", {value: now}, {value: username});
+declare(pppPath + ".Password", {value: now}, {value: password});
+declare(pppPath + ".Name", {value: now}, {value: "Internet_PPPoE"});
 
-// Refresh the newly created node to get all parameters
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.*", {path: now});
+// Huawei specific LCP settings for keep-alive
+declare(pppPath + ".X_HW_LcpEchoReqCheck", {value: now}, {value: true});
+declare(pppPath + ".PPPLCPEcho", {value: now}, {value: 10});
 
-// Configure PPPoE parameters using wildcard to apply to all instances
-log("Huawei WAN PPPoE: Setting PPPoE parameters");
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Name", {value: now}, {value: "Internet_PPPoE"});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ConnectionType", {value: now}, {value: "IP_Routed"});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.NATEnabled", {value: now}, {value: true});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Username", {value: now}, {value: username});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Password", {value: now}, {value: password});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.Enable", {value: now}, {value: true});
-
-// Huawei specific VLAN configuration
+// VLAN configuration (Huawei specific)
 if (vlan > 0) {
     log("Huawei WAN PPPoE: Setting VLAN " + vlan);
-    declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.X_HW_VLAN", {value: now}, {value: vlan});
+    declare(pppPath + ".X_HW_VLAN", {value: now}, {value: vlan});
 }
 
-// Set as default WAN connection (Huawei specific) - refresh first
-declare("InternetGatewayDevice.Layer3Forwarding.*", {value: now});
-declare("InternetGatewayDevice.Layer3Forwarding.X_HW_DefaultConnectionService", {value: now}, 
-        {value: "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1"});
-
-// Refresh the status to see if it connected
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ConnectionStatus", {value: now});
-declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.*.ExternalIPAddress", {value: now});
+// Refresh status
+declare(pppPath + ".ConnectionStatus", {value: now});
+declare(pppPath + ".ExternalIPAddress", {value: now});
 
 log("Huawei WAN PPPoE: Configuration complete");
 '
