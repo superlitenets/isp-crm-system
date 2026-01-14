@@ -406,7 +406,7 @@ app.post('/wireguard/apply', async (req, res) => {
 
 const PORT = process.env.OLT_SERVICE_PORT || 3001;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '0 * * * * *'; // CLI autofind every 60s (for new ONUs only)
-const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 30; // SNMP polling every 30s (fast status updates)
+const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 300; // SNMP polling every 5 minutes (reduced to prevent slowdowns)
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`OLT Session Manager running on port ${PORT}`);
