@@ -1,0 +1,26 @@
+root@superlitecrm:~/isp# docker logs isp_crm_genieacs_cwmp 2>&1 | tail -5
+curl 'http://localhost:7557/tasks?limit=3'
+2026-01-14T13:37:54.310Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="170" informEvent="2 PERIODIC" informRetryCount=0
+2026-01-14T13:39:34.875Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="171" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+2026-01-14T13:39:34.919Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbcbbad1e0000" acsRequestName="GetParameterValues"
+2026-01-14T13:41:34.556Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="172" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+2026-01-14T13:42:53.847Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="173" informEvent="2 PERIODIC" informRetryCount=0
+[
+
+]root@superlitecrm:~/isp#curl -X PUT 'http://localhost:7557/provisions/pppoe-set' \\
+  -H 'Content-Type: text/plain' \
+  -d 'declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable", {value: Date.now()}, {value: true});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username", {value: Date.now()}, {value: args[0]});
+declare("InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password", {value: Date.now()}, {value: args[1]});'
+root@superlitecrm:~/isp# curl -X POST 'http://localhost:7557/devices/00259E-HG8546M-48575443F2D53A8B/tasks?connection_request&timeout=60000' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"provision","provision":"pppoe-set","args":["testuser","testpass"]}'
+curl: (52) Empty reply from server
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# curl -i -X POST 'http://localhost:7557/devices/00259E-HG8546M-48575443F2D53A8B/tasks?connection_request' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"provision","provision":"pppoe-set","args":["testuser","testpass"]}'
+curl: (52) Empty reply from server
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp#
+
