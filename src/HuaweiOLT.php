@@ -4060,28 +4060,34 @@ class HuaweiOLT {
             return null;
         }
         
-        // Build the service profile creation command
-        // Format: ont-srvprofile gpon profile-id X profile-name "NAME"
-        //         ont-port eth X pots Y catv Z
-        $commands = [
-            "ont-srvprofile gpon profile-id {$nextProfileId} profile-name {$onuType}",
-            "ont-port eth {$ethPorts} pots {$potsPorts} catv {$catvPorts}",
-            "commit",
-            "quit"
-        ];
+        error_log("Creating service profile '{$onuType}' with ID {$nextProfileId} (ETH:{$ethPorts}, POTS:{$potsPorts})");
         
-        $cliScript = implode("\r\n", $commands);
-        $result = $this->executeCommand($oltId, $cliScript);
-        
-        if (!$result['success']) {
-            error_log("Failed to create service profile {$onuType} on OLT {$oltId}: " . ($result['output'] ?? 'Unknown error'));
+        // Send commands one at a time to avoid space-stripping issues with multi-line scripts
+        // Step 1: Enter service profile context
+        $result1 = $this->executeCommand($oltId, "ont-srvprofile gpon profile-id {$nextProfileId} profile-name {$onuType}");
+        if (!$result1['success'] || preg_match('/Failure|Error:/i', $result1['output'] ?? '')) {
+            error_log("Failed to create service profile context: " . ($result1['output'] ?? 'Unknown error'));
             return null;
         }
         
-        // Check for errors in output
-        $output = $result['output'] ?? '';
-        if (preg_match('/(?:Failure|Error:|failed|Invalid)/i', $output)) {
-            error_log("Error creating service profile: {$output}");
+        // Step 2: Configure ports
+        $result2 = $this->executeCommand($oltId, "ont-port eth {$ethPorts} pots {$potsPorts} catv {$catvPorts}");
+        if (!$result2['success']) {
+            error_log("Failed to configure ports: " . ($result2['output'] ?? 'Unknown error'));
+            // Try to exit the profile context
+            $this->executeCommand($oltId, "quit");
+            return null;
+        }
+        
+        // Step 3: Commit
+        $result3 = $this->executeCommand($oltId, "commit");
+        
+        // Step 4: Quit profile context
+        $this->executeCommand($oltId, "quit");
+        
+        // Check if commit had errors
+        if (preg_match('/Failure|Error:/i', $result3['output'] ?? '')) {
+            error_log("Failed to commit service profile: " . ($result3['output'] ?? ''));
             return null;
         }
         
@@ -4106,23 +4112,32 @@ class HuaweiOLT {
         $lines = explode("\n", $output);
         
         foreach ($lines as $line) {
-            if (preg_match('/^\s*(\d+)\s+\S+\s+\d+\s*$/', trim($line), $matches)) {
+            // More robust regex - match ID at start of line followed by profile name
+            // Format: "  20          Generic_1_V902              1            "
+            $line = trim($line);
+            if (preg_match('/^(\d+)\s+\S+/', $line, $matches)) {
                 $usedIds[] = (int)$matches[1];
             }
         }
         
-        // Find next available ID (starting from 2)
+        // Debug log
+        error_log("[getNextAvailableOltSrvProfileId] Found " . count($usedIds) . " used IDs: " . implode(',', array_slice($usedIds, 0, 30)));
+        
+        // Find next available ID (starting from 2, skip gaps, but don't use IDs >= 100)
         sort($usedIds);
         $nextId = 2;
         foreach ($usedIds as $id) {
+            if ($id >= 100) continue; // Skip reserved high IDs
             if ($id == $nextId) {
                 $nextId++;
             } elseif ($id > $nextId) {
-                break;
+                break; // Found a gap
             }
         }
         
-        return min($nextId, 255); // Max profile ID is typically 255
+        error_log("[getNextAvailableOltSrvProfileId] Next available ID: {$nextId}");
+        
+        return min($nextId, 99); // Max profile ID before reserved range
     }
     
     /**
