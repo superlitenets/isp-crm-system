@@ -27,8 +27,18 @@ class SSHSession {
             this.client.on('ready', () => {
                 console.log(`[OLT ${this.oltId}] SSH connected to ${this.config.host}`);
                 
-                // Use 'dumb' terminal to prevent VT100 escape sequence issues that strip spaces
-                this.client.shell({ term: 'dumb', cols: 200, rows: 50, modes: {} }, (err, stream) => {
+                // Use 'vt100' terminal with raw mode settings to prevent space stripping
+                // Setting ICRNL=0 and ICANON=0 helps with character-level processing
+                const ptyModes = {
+                    ECHO: 0,        // Don't echo back locally
+                    ICANON: 0,      // Non-canonical mode (raw)
+                    ICRNL: 0,       // Don't translate CR to NL
+                    INLCR: 0,       // Don't translate NL to CR
+                    ISIG: 0,        // Don't process signals
+                    TTY_OP_ISPEED: 115200,
+                    TTY_OP_OSPEED: 115200
+                };
+                this.client.shell({ term: 'vt100', cols: 200, rows: 50, modes: ptyModes }, (err, stream) => {
                     if (err) {
                         clearTimeout(timeout);
                         reject(err);
@@ -239,17 +249,27 @@ class SSHSession {
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
             
-            // WORKAROUND: Some Huawei OLT VTY configurations strip spaces in line mode
-            // Send character-by-character with small delays to bypass line buffering
-            const sendCharByChar = async () => {
-                for (let i = 0; i < command.length; i++) {
-                    this.stream.write(command[i]);
-                    // Small delay between characters (2ms)
-                    await new Promise(r => setTimeout(r, 2));
+            // WORKAROUND: Huawei OLT VTY has aggressive space stripping
+            // Use a hybrid approach: group characters to reduce overhead, but pause at spaces
+            const sendCommand = async () => {
+                // Split command by spaces and send each word followed by space
+                const parts = command.split(' ');
+                for (let i = 0; i < parts.length; i++) {
+                    // Send the word as a single write
+                    if (parts[i].length > 0) {
+                        this.stream.write(parts[i]);
+                    }
+                    // After each word (except last), send space with delay
+                    if (i < parts.length - 1) {
+                        await new Promise(r => setTimeout(r, 15));
+                        this.stream.write(' ');
+                        await new Promise(r => setTimeout(r, 15));
+                    }
                 }
+                await new Promise(r => setTimeout(r, 30));
                 this.stream.write('\r');
             };
-            sendCharByChar().catch(e => console.error(`[OLT ${this.oltId}] SSH char send error:`, e.message));
+            sendCommand().catch(e => console.error(`[OLT ${this.oltId}] SSH send error:`, e.message));
         });
     }
 
