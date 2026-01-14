@@ -1420,25 +1420,18 @@ class GenieACS {
             $secureResult = $this->secureDevice($deviceId);
             $results['secure_device'] = $secureResult;
             
-            // Step 2: Create WAN structure and configure based on connection type
+            // Step 2: Configure WAN - SmartOLT approach: direct write to factory path
+            // NO addObject needed - Huawei firmware has WAN structure built-in
             if ($connectionType === 'pppoe') {
                 $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
                 $wanName = 'wan1.1.ppp1';
                 
-                // Only addObject if WAN doesn't exist (idempotency)
-                if (!$existingWAN['has_pppoe']) {
-                    $createTasks = [
-                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
-                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.']
-                    ];
-                    $createResult = $this->pushTasks($deviceId, $createTasks);
-                    $results['create_wan'] = $createResult;
-                } else {
-                    $results['create_wan'] = ['skipped' => true, 'reason' => 'PPPoE WAN already exists'];
-                }
+                // SmartOLT approach: Skip addObject, write directly to factory path
+                $results['create_wan'] = ['skipped' => true, 'reason' => 'SmartOLT method - direct write to factory path'];
                 
                 // Build all parameters in one setParameterValues call
                 $params = [];
+                $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
                 if (!empty($config['pppoe_username'])) {
                     $params[] = ["{$pppBase}.Username", $config['pppoe_username'], 'xsd:string'];
                 }
@@ -1449,10 +1442,14 @@ class GenieACS {
                 if ($serviceVlan > 0) {
                     $params[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
                 }
-                $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
+                
+                error_log("[GenieACS] PPPoE setParameterValues: " . json_encode($params));
                 
                 $configResult = $this->setParameterValues($deviceId, $params);
                 $results['pppoe_config'] = $configResult;
+                
+                error_log("[GenieACS] PPPoE result: " . json_encode($configResult));
+                
                 if (!$configResult['success']) {
                     $errors[] = 'PPPoE config failed: ' . ($configResult['error'] ?? 'Unknown');
                 }
@@ -1462,28 +1459,24 @@ class GenieACS {
                 $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
                 $wanName = 'wan1.1.ip1';
                 
-                // Only addObject if WAN doesn't exist (idempotency)
-                if (!$existingWAN['has_ip']) {
-                    $createTasks = [
-                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.'],
-                        ['name' => 'addObject', 'objectName' => 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.']
-                    ];
-                    $createResult = $this->pushTasks($deviceId, $createTasks);
-                    $results['create_wan'] = $createResult;
-                } else {
-                    $results['create_wan'] = ['skipped' => true, 'reason' => 'IP WAN already exists'];
-                }
+                // SmartOLT approach: Skip addObject, write directly to factory path
+                $results['create_wan'] = ['skipped' => true, 'reason' => 'SmartOLT method - direct write to factory path'];
                 
                 $params = [
+                    ["{$ipBase}.Enable", true, 'xsd:boolean'],
                     ["{$ipBase}.ConnectionType", 'IP_Bridged', 'xsd:string']
                 ];
                 if ($serviceVlan > 0) {
                     $params[] = ["{$ipBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
                 }
-                $params[] = ["{$ipBase}.Enable", true, 'xsd:boolean'];
+                
+                error_log("[GenieACS] Bridge setParameterValues: " . json_encode($params));
                 
                 $configResult = $this->setParameterValues($deviceId, $params);
                 $results['bridge_config'] = $configResult;
+                
+                error_log("[GenieACS] Bridge result: " . json_encode($configResult));
+                
                 if (!$configResult['success']) {
                     $errors[] = 'Bridge config failed: ' . ($configResult['error'] ?? 'Unknown');
                 }
