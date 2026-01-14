@@ -7538,24 +7538,18 @@ class HuaweiOLT {
                 $credParams[] = ["{$pppPath}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
             }
             
-            error_log("[WAN_CONFIG] Sending setParameterValues: " . json_encode($credParams));
+            // Add L3 Enable to the same task (all in one setParameterValues for immediate execution)
+            for ($i = 1; $i <= 4; $i++) {
+                $credParams[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+            }
             
+            error_log("[WAN_CONFIG] Sending setParameterValues with PPPoE + L3Enable: " . json_encode($credParams));
+            
+            // Send all parameters in one task with connection_request for immediate execution
             $result = $sendTask([
                 'name' => 'setParameterValues', 
                 'parameterValues' => $credParams
-            ], "PPPoE Credentials", false);  // Don't trigger connection yet
-            
-            // Enable L3 routing on all LAN Ethernet ports (required for PPPoE routing)
-            $l3Params = [];
-            for ($i = 1; $i <= 4; $i++) {
-                $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
-            }
-            
-            error_log("[WAN_CONFIG] Enabling X_HW_L3Enable on LAN ports");
-            $l3Result = $sendTask([
-                'name' => 'setParameterValues',
-                'parameterValues' => $l3Params
-            ], "L3 Enable LAN Ports", true);  // Trigger connection on final task
+            ], "PPPoE + L3Enable", true);  // Trigger immediate connection request
             
             error_log("[WAN_CONFIG] setParameterValues result: HTTP {$result['code']}, success: " . ($result['success'] ? 'true' : 'false'));
             error_log("[WAN_CONFIG] Response: " . substr($result['response'] ?? '', 0, 500));
