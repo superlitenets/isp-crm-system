@@ -7266,9 +7266,10 @@ class HuaweiOLT {
             
             $requestJson = json_encode($task);
             // Only trigger connection_request on final task for immediate execution
+            // Add timeout=30000 to wait for task execution (not just queue it)
             $url = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks";
             if ($triggerConnection) {
-                $url .= "?connection_request";
+                $url .= "?connection_request&timeout=30000";
             }
             $ch = curl_init($url);
             // Longer timeout for connection_request (device needs time to connect)
