@@ -7289,39 +7289,26 @@ class HuaweiOLT {
             // Step 2: If triggerConnection is true and task was created, trigger connection_request
             // This two-step approach ensures task is indexed before device connects
             if ($success && $triggerConnection) {
-                // Get task ID from response
-                $taskData = json_decode($response, true);
-                $taskId = $taskData['_id'] ?? null;
+                // Small delay to ensure task is indexed in MongoDB
+                usleep(200000); // 200ms
                 
-                // Small delay to ensure task is indexed
-                usleep(100000); // 100ms
+                // Trigger connection_request with timeout using a dummy getParameterValues task
+                // This forces the device to connect and execute ALL pending tasks
+                $crUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request&timeout=30000";
+                $dummyTask = json_encode([
+                    'name' => 'getParameterValues',
+                    'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']
+                ]);
                 
-                // Trigger connection_request with timeout to wait for execution
-                $crUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks";
-                if ($taskId) {
-                    // Retry the specific task
-                    $crUrl .= "/{$taskId}/retry?connection_request&timeout=30000";
-                    $ch2 = curl_init($crUrl);
-                    curl_setopt_array($ch2, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_POST => true,
-                        CURLOPT_POSTFIELDS => '',
-                        CURLOPT_TIMEOUT => 60,
-                        CURLOPT_CONNECTTIMEOUT => 10
-                    ]);
-                } else {
-                    // Fallback: just trigger connection_request
-                    $crUrl = "{$genieacsUrl}/devices/" . urlencode($genieacsId) . "/tasks?connection_request&timeout=30000";
-                    $ch2 = curl_init($crUrl);
-                    curl_setopt_array($ch2, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_POST => true,
-                        CURLOPT_POSTFIELDS => '{}',
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_TIMEOUT => 60,
-                        CURLOPT_CONNECTTIMEOUT => 10
-                    ]);
-                }
+                $ch2 = curl_init($crUrl);
+                curl_setopt_array($ch2, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $dummyTask,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_TIMEOUT => 60,
+                    CURLOPT_CONNECTTIMEOUT => 10
+                ]);
                 
                 $crResponse = curl_exec($ch2);
                 $crCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
@@ -7329,7 +7316,7 @@ class HuaweiOLT {
                 
                 error_log("[GENIEACS] Connection request result: HTTP {$crCode}");
                 
-                // Check if task was actually executed (not just queued)
+                // Check if tasks were executed
                 if ($crCode >= 200 && $crCode < 300) {
                     $response = $crResponse;
                     $httpCode = $crCode;
