@@ -5062,11 +5062,17 @@ if ($view === 'alerts' || $view === 'dashboard') {
     $alerts = $huaweiOLT->getAlerts(false, 100);
 }
 
-// Load location data for locations view and authorization modal
+// Load location data only when needed (lazy load for performance)
+$zones = [];
+$subzones = [];
+$apartments = [];
+$odbs = [];
+if (in_array($view, ["locations", "onus"])) {
 $zones = $huaweiOLT->getZones(false);
 $subzones = $huaweiOLT->getSubzones();
 $apartments = $huaweiOLT->getApartments();
 $odbs = $huaweiOLT->getODBs();
+}
 
 // Load ONU types for authorization modal
 $onuTypes = [];
