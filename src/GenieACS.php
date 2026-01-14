@@ -2593,14 +2593,19 @@ class GenieACS {
     }
     
     /**
-     * SmartOLT-style PPPoE WAN Provisioning
-     * Exact replication of SmartOLT's TR-069 workflow for Huawei HG8546M
+     * SmartOLT-style PPPoE WAN Provisioning - EXACT REPLICATION
+     * Based on chronological SmartOLT device logs analysis
      * 
-     * Based on SmartOLT device logs:
-     * 1. Add WANConnectionDevice
-     * 2. Add WANPPPConnection under WANConnectionDevice.2
-     * 3. Set PPPoE credentials with Huawei-specific params
-     * 4. Set default WAN and policy routes
+     * Flow:
+     * 1. Device initialization (ProvisioningCode:sOLTinit)
+     * 2. LAN router mode enable (X_HW_L3Enable on all ports)
+     * 3. Security baseline (HTTPWanEnable:0)
+     * 4. WAN structure creation (Add WANConnectionDevice, WANPPPConnection)
+     * 5. PPPoE credentials & VLAN
+     * 6. Default WAN selection
+     * 7. Policy routing
+     * 8. Enable WAN HTTP access
+     * 9. Optional: WiFi config
      */
     public function provisionPPPoESmartOLTStyle(string $deviceId, array $config): array {
         $results = [];
@@ -2610,99 +2615,146 @@ class GenieACS {
         $password = $config['pppoe_password'] ?? '';
         $vlan = (int)($config['wan_vlan'] ?? $config['service_vlan'] ?? 900);
         $wanName = 'wan1.2.ppp1'; // SmartOLT uses WANConnectionDevice.2.WANPPPConnection.1
+        $ssid = $config['ssid'] ?? '';
+        $wifiPassword = $config['wifi_password'] ?? '';
+        $webUsername = $config['web_username'] ?? 'superlite';
+        $webPassword = $config['web_password'] ?? '';
         
         if (empty($username) || empty($password)) {
             return ['success' => false, 'error' => 'PPPoE username and password required'];
         }
         
         try {
-            // Step 1: Add WANConnectionDevice (creates index dynamically, SmartOLT uses .2)
-            error_log("[GenieACS SmartOLT] Step 1: Add WANConnectionDevice");
-            $addWanCD = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.');
-            $results['add_wan_connection_device'] = $addWanCD;
-            sleep(1);
+            // =================================================================
+            // STEP 1: Device Initialization
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 1: Device initialization");
+            $results['step1_init'] = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLTinit', 'xsd:string']
+            ]);
             
-            // Step 2: Add WANPPPConnection under WANConnectionDevice.2
-            error_log("[GenieACS SmartOLT] Step 2: Add WANPPPConnection");
-            $addPPP = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.');
-            $results['add_wan_ppp_connection'] = $addPPP;
-            sleep(1);
+            // =================================================================
+            // STEP 2: LAN Router Mode Enable (X_HW_L3Enable on all 4 ports)
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 2: Enable LAN router mode");
+            $results['step2_lan_router'] = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable', true, 'xsd:boolean'],
+                ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable', true, 'xsd:boolean'],
+                ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable', true, 'xsd:boolean'],
+                ['InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable', true, 'xsd:boolean']
+            ]);
             
-            // Step 3: Set PPPoE credentials with Huawei-specific parameters
+            // =================================================================
+            // STEP 3: Security Baseline - Disable WAN HTTP Access
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 3: Security baseline (disable WAN HTTP)");
+            $results['step3_security'] = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable', false, 'xsd:boolean']
+            ]);
+            
+            // =================================================================
+            // STEP 4: WAN Structure Creation
+            // Add WANConnectionDevice, then WANPPPConnection
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 4a: Add WANConnectionDevice");
+            $results['step4a_add_wancd'] = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.');
+            
+            error_log("[GenieACS SmartOLT] Step 4b: Add WANPPPConnection under WANConnectionDevice.2");
+            $results['step4b_add_ppp'] = $this->addObject($deviceId, 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.');
+            
+            // =================================================================
+            // STEP 5: PPPoE Credentials & VLAN Assignment
+            // =================================================================
             $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.2.WANPPPConnection.1';
-            error_log("[GenieACS SmartOLT] Step 3: Set PPPoE credentials");
-            $pppoeParams = [
+            
+            error_log("[GenieACS SmartOLT] Step 5a: Set PPPoE credentials");
+            $results['step5a_credentials'] = $this->setParameterValues($deviceId, [
                 ["{$pppBase}.Username", $username, 'xsd:string'],
                 ["{$pppBase}.Password", $password, 'xsd:string'],
                 ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
                 ["{$pppBase}.X_HW_LcpEchoReqCheck", 1, 'xsd:unsignedInt'],
                 ["{$pppBase}.PPPLCPEcho", 10, 'xsd:unsignedInt']
-            ];
-            $credResult = $this->setParameterValues($deviceId, $pppoeParams);
-            $results['pppoe_credentials'] = $credResult;
-            sleep(1);
+            ]);
             
-            // Step 4: Set VLAN and Name
-            error_log("[GenieACS SmartOLT] Step 4: Set VLAN and Name");
-            $vlanParams = [
+            error_log("[GenieACS SmartOLT] Step 5b: Set VLAN and Name");
+            $results['step5b_vlan'] = $this->setParameterValues($deviceId, [
                 ["{$pppBase}.X_HW_VLAN", $vlan, 'xsd:unsignedInt'],
                 ["{$pppBase}.Name", 'Internet_PPPoE', 'xsd:string']
-            ];
-            $vlanResult = $this->setParameterValues($deviceId, $vlanParams);
-            $results['pppoe_vlan'] = $vlanResult;
-            sleep(1);
-            
-            // Step 5: Set ProvisioningCode
-            error_log("[GenieACS SmartOLT] Step 5: Set ProvisioningCode");
-            $provCode = $this->setParameterValues($deviceId, [
-                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string']
             ]);
-            $results['provisioning_code'] = $provCode;
             
-            // Step 6: Set DefaultConnectionService and X_HW_WanDefaultWanName
+            // =================================================================
+            // STEP 6: Default WAN Selection
+            // =================================================================
             error_log("[GenieACS SmartOLT] Step 6: Set default WAN");
-            $defaultWan = $this->setParameterValues($deviceId, [
-                ['InternetGatewayDevice.Layer3Forwarding.DefaultConnectionService', "{$pppBase}", 'xsd:string'],
+            $results['step6_default_wan'] = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.DeviceInfo.ProvisioningCode', 'sOLT.rPPP', 'xsd:string'],
+                ['InternetGatewayDevice.Layer3Forwarding.DefaultConnectionService', $pppBase, 'xsd:string'],
                 ['InternetGatewayDevice.Layer3Forwarding.X_HW_WanDefaultWanName', $wanName, 'xsd:string']
             ]);
-            $results['default_wan'] = $defaultWan;
-            sleep(1);
             
-            // Step 7: Add policy route
-            error_log("[GenieACS SmartOLT] Step 7: Add policy route");
-            $addRoute = $this->addObject($deviceId, 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.');
-            $results['add_policy_route'] = $addRoute;
-            sleep(1);
+            // =================================================================
+            // STEP 7: Security & Policy Routing
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 7a: Add WAN Access ACL");
+            $results['step7a_acl'] = $this->addObject($deviceId, 'InternetGatewayDevice.X_HW_Security.AclServices.WanAccess.');
             
-            // Step 8: Configure policy route to bind all LAN ports and SSID1 to WAN
-            error_log("[GenieACS SmartOLT] Step 8: Configure policy route");
-            $routeParams = [
+            error_log("[GenieACS SmartOLT] Step 7b: Add policy route");
+            $results['step7b_add_route'] = $this->addObject($deviceId, 'InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.');
+            
+            error_log("[GenieACS SmartOLT] Step 7c: Configure policy route");
+            $results['step7c_route_config'] = $this->setParameterValues($deviceId, [
                 ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PhyPortName', 'LAN1,LAN2,LAN3,LAN4,SSID1', 'xsd:string'],
                 ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.PolicyRouteType', 'SourcePhyPort', 'xsd:string'],
                 ['InternetGatewayDevice.Layer3Forwarding.X_HW_policy_route.1.WanName', $wanName, 'xsd:string']
-            ];
-            $routeResult = $this->setParameterValues($deviceId, $routeParams);
-            $results['policy_route'] = $routeResult;
-            
-            // Step 9: Enable the PPPoE connection
-            error_log("[GenieACS SmartOLT] Step 9: Enable PPPoE");
-            $enableResult = $this->setParameterValues($deviceId, [
-                ["{$pppBase}.Enable", true, 'xsd:boolean']
             ]);
-            $results['enable_pppoe'] = $enableResult;
+            
+            // =================================================================
+            // STEP 8: Enable WAN HTTP Access (Post-Config)
+            // =================================================================
+            error_log("[GenieACS SmartOLT] Step 8: Enable WAN HTTP access");
+            $results['step8_enable_http'] = $this->setParameterValues($deviceId, [
+                ['InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable', true, 'xsd:boolean']
+            ]);
+            
+            // =================================================================
+            // STEP 9: WiFi Configuration (Optional)
+            // =================================================================
+            if (!empty($ssid)) {
+                error_log("[GenieACS SmartOLT] Step 9: Configure WiFi");
+                $wifiParams = [
+                    ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid, 'xsd:string']
+                ];
+                if (!empty($wifiPassword)) {
+                    $wifiParams[] = ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $wifiPassword, 'xsd:string'];
+                }
+                $results['step9_wifi'] = $this->setParameterValues($deviceId, $wifiParams);
+            }
+            
+            // =================================================================
+            // STEP 10: UI & Access Credentials (Optional)
+            // =================================================================
+            if (!empty($webPassword)) {
+                error_log("[GenieACS SmartOLT] Step 10: Set web UI credentials");
+                $results['step10_web_ui'] = $this->setParameterValues($deviceId, [
+                    ['InternetGatewayDevice.UserInterface.X_HW_WebUserInfo.2.UserName', $webUsername, 'xsd:string'],
+                    ['InternetGatewayDevice.UserInterface.X_HW_WebUserInfo.2.Password', $webPassword, 'xsd:string']
+                ]);
+            }
             
             // Log the action
             $this->logTR069Action($deviceId, 'smartolt_pppoe_provision', [
                 'username' => $username,
                 'vlan' => $vlan,
                 'wan_name' => $wanName,
+                'ssid' => $ssid,
                 'success' => true
             ]);
             
             return [
                 'success' => true,
-                'message' => 'SmartOLT-style PPPoE provisioning completed',
+                'message' => 'SmartOLT-style PPPoE provisioning completed (10 steps)',
                 'wan_name' => $wanName,
+                'ppp_path' => $pppBase,
                 'results' => $results
             ];
             
