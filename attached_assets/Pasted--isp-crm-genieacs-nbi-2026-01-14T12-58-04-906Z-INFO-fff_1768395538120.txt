@@ -1,0 +1,60 @@
+
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:04.906Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:04.935Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:04.982Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86201, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Calling OMCI to create PPPoE WAN structure first...
+isp_crm_olt_service     | [OLT 1] SSH sending: "service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] OMCI result: {"success":true,"message":"PPPoE WAN configured via OMCI. Credentials queued for TR-069 push when device connects to ACS.","pppoe_vlan":902,"errors":[],"output":"[Step 1: Service Port for PPPoE VLAN]\nservice-port vlan 902 gpon 0\/1\/0 ont 1 gemport 2 multi-service u \u001b[1Dser-vlan 902\r\n{ <cr>\n[Step 3: TR-069 Config Queued]\nPPPoE credentials queued for TR-069 push\n"}
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:09.154Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.294Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="146" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.324Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80000" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.402Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Script: WAN/LAN discovery completed
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.408Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80200" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.464Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80201" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.502Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80202" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.521Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80203" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.576Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80204" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.619Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80205" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.677Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80206" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.738Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80207" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.798Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80208" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:09.859Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe80209" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:10.805Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95bfe8020a" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:10.855Z [WARN] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Missing or invalid XML node; element="Value" parameter="InternetGatewayDevice.ManagementServer.PeriodicInformTime"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:10.857Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Script: WAN/LAN discovery completed
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 200
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:15:58:12 +0300 "GET /index.php" 302
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:12:58:12 +0000] "GET /?page=huawei-olt&ajax=realtime_onus&unconfigured=1 HTTP/2.0" 302 0 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:15:58:12 +0300 "GET /index.php" 302
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:12:58:12 +0000] "GET /?page=huawei-olt&ajax=realtime_stats HTTP/2.0" 302 0 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:15:58:12 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:12:58:12 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:15:58:12 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:12:58:12 +0000] "GET /?page=login HTTP/2.0" 200 2865 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:15:58:12 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:12:58:12 +0000] "GET /?page=login HTTP/2.0" 200 2865 "https://crm.superlite.co.ke/?page=huawei-olt&view=onus&unconfigured=1" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:14.234Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Using SmartOLT default PPPoE path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE Path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1, Username: 2116, VLAN: 902
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Sending setParameterValues: [["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN",902,"xsd:unsignedInt"]]
+isp_crm_genieacs_nbi    | 2026-01-14T12:58:14.240Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.385Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="147" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.409Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Script: WAN/LAN discovery completed
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.424Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20100" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.479Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20101" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.511Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20102" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.529Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20103" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.584Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20104" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.624Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20105" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.682Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20106" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.739Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20107" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.807Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20108" acsRequestName="GetParameterNames"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:14.868Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c20109" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:15.835Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbc95d3c2010a" acsRequestName="GetParameterValues"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:15.905Z [WARN] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Missing or invalid XML node; element="Value" parameter="InternetGatewayDevice.ManagementServer.PeriodicInformTime"
+isp_crm_genieacs_cwmp   | 2026-01-14T12:58:15.907Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Script: WAN/LAN discovery completed
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] setParameterValues result: HTTP 200, success: true
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Response: {"name":"setParameterValues","parameterValues":[["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevic
+isp_crm_php      
