@@ -2381,6 +2381,19 @@ class GenieACS {
         ]);
         $results['step4_setParams'] = $setResult;
         
+        // Step 5: Enable L3 routing on LAN Ethernet ports (required for PPPoE routing)
+        error_log("[GenieACS] Step 5: Enable X_HW_L3Enable on LAN ports for {$deviceId}");
+        $l3Params = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+        }
+        
+        $l3Result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'setParameterValues',
+            'parameterValues' => $l3Params
+        ]);
+        $results['step5_l3Enable'] = $l3Result;
+        
         $success = $setResult['success'] ?? false;
         
         return [
@@ -2444,13 +2457,25 @@ class GenieACS {
             'parameterValues' => $setParams
         ]);
         
+        // Enable L3 routing on LAN Ethernet ports (required for PPPoE routing)
+        $l3Params = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
+        }
+        
+        $l3Result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'setParameterValues',
+            'parameterValues' => $l3Params
+        ]);
+        
         return [
             'success' => $setResult['success'] ?? false,
             'message' => ($setResult['success'] ?? false) 
                 ? "PPPoE credentials set on {$instancePath}"
                 : 'Failed to set PPPoE credentials',
             'instance_path' => $instancePath,
-            'set_result' => $setResult
+            'set_result' => $setResult,
+            'l3_result' => $l3Result
         ];
     }
     
