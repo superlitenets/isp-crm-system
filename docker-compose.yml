@@ -129,20 +129,20 @@ services:
       start_period: 60s
 
   genieacs-mongo:
-    image: mongo:7.0
+    image: mongo:4.4
     container_name: isp_crm_genieacs_mongo
     restart: unless-stopped
+    command: mongod --wiredTigerCacheSizeGB 0.5
     volumes:
       - genieacs_mongo_data:/data/db
-      - genieacs_mongo_configdb:/data/configdb
     networks:
       - crm_network
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      test: ["CMD", "mongo", "--quiet", "--eval", "db.runCommand('ping').ok"]
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 30s
 
   olt-service:
     build:
@@ -285,7 +285,6 @@ volumes:
   whatsapp_session:
   whatsapp_secret:
   genieacs_mongo_data:
-  genieacs_mongo_configdb:
   freepbx_certs:
   freepbx_data:
   freepbx_logs:
