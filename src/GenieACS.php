@@ -2288,6 +2288,173 @@ class GenieACS {
     }
     
     /**
+     * Configure PPPoE using the correct 4-step workflow for Huawei ONUs
+     * Step 1: Summon (getParameterNames) - Force discovery of WAN path
+     * Step 2: AddObject - Create WANPPPConnection instance
+     * Step 3: Refresh (getParameterValues) - Get all parameters
+     * Step 4: SetParameterValues - Set PPPoE credentials
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password
+     * @param bool $natEnabled Enable NAT (default true)
+     * @param int $wanDeviceIndex WANDevice index (default 1)
+     * @param int $wanConnDeviceIndex WANConnectionDevice index (default 1)
+     * @return array Result with success status and step details
+     */
+    public function configurePPPoE4Step(string $deviceId, string $username, string $password, 
+                                         bool $natEnabled = true, int $wanDeviceIndex = 1, int $wanConnDeviceIndex = 1): array {
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'Username and password are required'];
+        }
+        
+        $results = [];
+        $basePath = "InternetGatewayDevice.WANDevice.{$wanDeviceIndex}.WANConnectionDevice.{$wanConnDeviceIndex}";
+        $pppPath = "{$basePath}.WANPPPConnection";
+        $encodedId = urlencode($deviceId);
+        $timeout = 30000; // 30 seconds
+        
+        // Step 1: Summon - Force discovery of WAN path
+        error_log("[GenieACS] Step 1: Summon WAN path for {$deviceId}");
+        $summonResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'getParameterNames',
+            'parameterPath' => $pppPath,
+            'nextLevel' => false
+        ]);
+        $results['step1_summon'] = $summonResult;
+        
+        if (!$summonResult['success']) {
+            return [
+                'success' => false,
+                'error' => 'Step 1 (Summon) failed: ' . ($summonResult['error'] ?? 'Unknown error'),
+                'results' => $results
+            ];
+        }
+        
+        // Wait a moment for the device to process
+        usleep(500000); // 0.5 seconds
+        
+        // Step 2: AddObject - Create WANPPPConnection instance
+        error_log("[GenieACS] Step 2: AddObject WANPPPConnection for {$deviceId}");
+        $addObjectResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'addObject',
+            'objectName' => $pppPath
+        ]);
+        $results['step2_addObject'] = $addObjectResult;
+        
+        // AddObject might fail if instance already exists - that's OK
+        $instanceIndex = 1;
+        if ($addObjectResult['success'] && isset($addObjectResult['data']['instanceNumber'])) {
+            $instanceIndex = $addObjectResult['data']['instanceNumber'];
+        }
+        
+        $pppInstancePath = "{$pppPath}.{$instanceIndex}";
+        
+        // Wait a moment
+        usleep(500000);
+        
+        // Step 3: Refresh - Get all parameters from the new instance
+        error_log("[GenieACS] Step 3: Refresh parameters for {$pppInstancePath}");
+        $refreshResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'getParameterValues',
+            'parameterNames' => ["{$pppInstancePath}."]
+        ]);
+        $results['step3_refresh'] = $refreshResult;
+        
+        // Wait a moment
+        usleep(500000);
+        
+        // Step 4: SetParameterValues - Configure PPPoE credentials
+        error_log("[GenieACS] Step 4: Set PPPoE credentials for {$pppInstancePath}");
+        $setParams = [
+            ["{$pppInstancePath}.Enable", true, 'xsd:boolean'],
+            ["{$pppInstancePath}.Username", $username, 'xsd:string'],
+            ["{$pppInstancePath}.Password", $password, 'xsd:string'],
+            ["{$pppInstancePath}.NATEnabled", $natEnabled, 'xsd:boolean'],
+            ["{$pppInstancePath}.ConnectionType", 'IP_Routed', 'xsd:string'],
+            ["{$pppInstancePath}.ConnectionTrigger", 'AlwaysOn', 'xsd:string']
+        ];
+        
+        $setResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'setParameterValues',
+            'parameterValues' => $setParams
+        ]);
+        $results['step4_setParams'] = $setResult;
+        
+        $success = $setResult['success'] ?? false;
+        
+        return [
+            'success' => $success,
+            'message' => $success 
+                ? "PPPoE configured successfully on {$pppInstancePath}" 
+                : 'PPPoE configuration failed at Step 4',
+            'instance_path' => $pppInstancePath,
+            'results' => $results
+        ];
+    }
+    
+    /**
+     * Configure PPPoE on existing WANPPPConnection instance (skip create step)
+     * Use when WANPPPConnection.1 already exists
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password
+     * @param bool $natEnabled Enable NAT
+     * @param string $instancePath Full path to WANPPPConnection instance
+     * @return array Result with success status
+     */
+    public function configurePPPoEOnExisting(string $deviceId, string $username, string $password, 
+                                              bool $natEnabled = true, 
+                                              string $instancePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1'): array {
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'Username and password are required'];
+        }
+        
+        $encodedId = urlencode($deviceId);
+        $timeout = 30000;
+        
+        // First refresh to ensure parameters exist in GenieACS
+        $refreshResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'getParameterValues',
+            'parameterNames' => ["{$instancePath}."]
+        ]);
+        
+        if (!$refreshResult['success']) {
+            return [
+                'success' => false,
+                'error' => 'Failed to refresh parameters: ' . ($refreshResult['error'] ?? 'Unknown'),
+                'refresh_result' => $refreshResult
+            ];
+        }
+        
+        // Wait for device to process
+        usleep(500000);
+        
+        // Set PPPoE parameters
+        $setParams = [
+            ["{$instancePath}.Enable", true, 'xsd:boolean'],
+            ["{$instancePath}.Username", $username, 'xsd:string'],
+            ["{$instancePath}.Password", $password, 'xsd:string'],
+            ["{$instancePath}.NATEnabled", $natEnabled, 'xsd:boolean']
+        ];
+        
+        $setResult = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout={$timeout}", [
+            'name' => 'setParameterValues',
+            'parameterValues' => $setParams
+        ]);
+        
+        return [
+            'success' => $setResult['success'] ?? false,
+            'message' => ($setResult['success'] ?? false) 
+                ? "PPPoE credentials set on {$instancePath}"
+                : 'Failed to set PPPoE credentials',
+            'instance_path' => $instancePath,
+            'set_result' => $setResult
+        ];
+    }
+    
+    /**
      * Create WAN objects via provision
      * Uses wan-create provision to create WANDevice/WANConnectionDevice/WANPPPConnection structure
      * 
