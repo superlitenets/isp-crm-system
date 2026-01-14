@@ -249,27 +249,10 @@ class SSHSession {
             
             console.log(`[OLT ${this.oltId}] SSH sending: "${command}"`);
             
-            // WORKAROUND: Huawei OLT VTY has aggressive space stripping
-            // Use a hybrid approach: group characters to reduce overhead, but pause at spaces
-            const sendCommand = async () => {
-                // Split command by spaces and send each word followed by space
-                const parts = command.split(' ');
-                for (let i = 0; i < parts.length; i++) {
-                    // Send the word as a single write
-                    if (parts[i].length > 0) {
-                        this.stream.write(parts[i]);
-                    }
-                    // After each word (except last), send space with delay
-                    if (i < parts.length - 1) {
-                        await new Promise(r => setTimeout(r, 15));
-                        this.stream.write(' ');
-                        await new Promise(r => setTimeout(r, 15));
-                    }
-                }
-                await new Promise(r => setTimeout(r, 30));
-                this.stream.write('\r');
-            };
-            sendCommand().catch(e => console.error(`[OLT ${this.oltId}] SSH send error:`, e.message));
+            // Send command as single write - simpler approach
+            // Note: Some Huawei OLT VTY configurations strip spaces between numeric args
+            // This is a VTY limitation, not SSH - commands like "ont internet-config 0 1" may fail
+            this.stream.write(command + '\r');
         });
     }
 
