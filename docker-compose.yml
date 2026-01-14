@@ -94,7 +94,7 @@ services:
     networks:
       - crm_network
 
-  # GenieACS - All-in-one TR-069 ACS (drumsergio/genieacs)
+  # GenieACS - All-in-one TR-069 ACS (GeiserX/genieacs-docker)
   genieacs:
     depends_on:
       genieacs-mongo:
@@ -117,7 +117,7 @@ services:
       - "7567:7567"
       - "3000:3000"
     volumes:
-      - genieacs_ext:/opt/genieacs/ext
+      - genieacs_opt:/opt
       - genieacs_logs:/var/log/genieacs
     networks:
       - crm_network
@@ -129,20 +129,22 @@ services:
       start_period: 60s
 
   genieacs-mongo:
-    image: mongo:4.4
+    image: mongo:8.0
     container_name: isp_crm_genieacs_mongo
     restart: unless-stopped
-    command: mongod --wiredTigerCacheSizeGB 0.5
     volumes:
       - genieacs_mongo_data:/data/db
+      - genieacs_mongo_configdb:/data/configdb
+    expose:
+      - "27017"
     networks:
       - crm_network
     healthcheck:
-      test: ["CMD", "mongo", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
-      timeout: 10s
+      timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 40s
 
   olt-service:
     build:
@@ -285,12 +287,13 @@ volumes:
   whatsapp_session:
   whatsapp_secret:
   genieacs_mongo_data:
+  genieacs_mongo_configdb:
+  genieacs_opt:
+  genieacs_logs:
   freepbx_certs:
   freepbx_data:
   freepbx_logs:
   freepbx_www:
   freepbx_spool:
   freepbx_db_data:
-  genieacs_ext:
-  genieacs_logs:
   wireguard_config:
