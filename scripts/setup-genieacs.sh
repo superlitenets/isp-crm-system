@@ -387,60 +387,46 @@ log("Periodic WAN/WiFi status refresh completed");
 echo " Done"
 
 # =====================================================
-# PROVISION: huawei-wan-pppoe - Complete Huawei PPPoE setup
-# This is the main provision for configuring PPPoE on Huawei ONUs
+# PROVISION: huawei-wan-pppoe - Huawei PPPoE credential update
+# SmartOLT-style: NO discovery, NO addObject, just write credentials
+# Huawei firmware has the WAN structure built-in, we just update parameters
 # Args: username, password, vlan
-# Uses explicit paths to avoid "Invalid parameter path" errors
 # =====================================================
 echo "Creating provision: huawei-wan-pppoe..."
 curl -s -X PUT "$GENIEACS_NBI_URL/provisions/huawei-wan-pppoe" \
   -H "Content-Type: application/javascript" \
   -d '
-const now = Date.now();
-
 let username = args[0] || "";
 let password = args[1] || "";
 let vlan = parseInt(args[2]) || 0;
 
 if (!username || !password) {
-    log("Huawei WAN PPPoE: ERROR - Username and password are required");
+    log("Huawei PPPoE: ERROR - Username and password required");
     return;
 }
 
-log("Huawei WAN PPPoE: Starting for user " + username + " VLAN " + vlan);
+log("Huawei PPPoE: Setting credentials for " + username + " VLAN " + vlan);
 
-// Huawei HG8546M has factory default PPPoE at WANConnectionDevice.1.WANPPPConnection.1
-// This path exists even if not fully populated in the device tree
-const pppPath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1";
+// SmartOLT approach: Write directly to factory WAN path
+// No discovery, no addObject - Huawei firmware accepts these writes
+const params = {
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable": true,
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username": username,
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password": password,
+    "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled": true
+};
 
-// Refresh the PPPoE path to discover its parameters
-log("Huawei WAN PPPoE: Refreshing path " + pppPath);
-declare(pppPath + ".*", {path: now, value: now});
-
-// Configure PPPoE parameters on the explicit path
-log("Huawei WAN PPPoE: Setting credentials");
-declare(pppPath + ".Enable", {value: now}, {value: true});
-declare(pppPath + ".ConnectionType", {value: now}, {value: "IP_Routed"});
-declare(pppPath + ".NATEnabled", {value: now}, {value: true});
-declare(pppPath + ".Username", {value: now}, {value: username});
-declare(pppPath + ".Password", {value: now}, {value: password});
-declare(pppPath + ".Name", {value: now}, {value: "Internet_PPPoE"});
-
-// Huawei specific LCP settings for keep-alive
-declare(pppPath + ".X_HW_LcpEchoReqCheck", {value: now}, {value: true});
-declare(pppPath + ".PPPLCPEcho", {value: now}, {value: 10});
-
-// VLAN configuration (Huawei specific)
+// Add VLAN if specified
 if (vlan > 0) {
-    log("Huawei WAN PPPoE: Setting VLAN " + vlan);
-    declare(pppPath + ".X_HW_VLAN", {value: now}, {value: vlan});
+    params["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN"] = vlan;
 }
 
-// Refresh status
-declare(pppPath + ".ConnectionStatus", {value: now});
-declare(pppPath + ".ExternalIPAddress", {value: now});
+// Write all parameters
+for (const p in params) {
+    declare(p, {value: 1}, {value: params[p]});
+}
 
-log("Huawei WAN PPPoE: Configuration complete");
+log("Huawei PPPoE: Credentials written");
 '
 echo " Done"
 
