@@ -1,0 +1,52 @@
+3A8B
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:37.504Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_deviceId._SerialNumber\":\"48575443F2D53A8B\"}" limit="1"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:35:37 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:37 +0000] "GET /?page=api&action=check_tr069_reachability&serial=48575443F2D53A8B HTTP/2.0" 200 110 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86201" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:35:37 +0300 "GET /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:37 +0000] "GET /?page=api&action=get_wan_config&onu_id=86201 HTTP/2.0" 200 1680 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86201" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:40.037Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:40.062Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:40.095Z [INFO] ::ffff:10.200.0.1: GET /devices; query="{\"_id\":\"00259E-HG8546M-48575443F2D53A8B\"}"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PPPoE config for ONU 86201, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Calling OMCI to create PPPoE WAN structure first...
+isp_crm_olt_service     | [OLT 1] SSH sending: "service-port vlan 902 gpon 0/1/0 ont 1 gemport 2 multi-service user-vlan 902"
+isp_crm_nginx           | 2026/01/14 13:35:40 [error] 33#33: *1276 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 102.205.239.5, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "crm.superlite.co.ke"
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:40 +0000] "GET /favicon.ico HTTP/1.1" 404 153 "-" "Dalvik/2.1.0 (Linux; U; Android 14; 2404ARN45A Build/UP1A.231005.007)" "-"
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:35:40 +0300 "GET /ticket-status.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:41 +0000] "GET /ticket-status.php?t=8f3ac834edeb2c54f445fd44c5672ee3275b7dea9d577d1584b59f2216f1c783 HTTP/2.0" 200 5649 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36 Google-PageRenderer Google (+https://developers.google.com/+/web/snippet/)" "-"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] OMCI result: {"success":true,"message":"PPPoE WAN configured via OMCI. Credentials queued for TR-069 push when device connects to ACS.","pppoe_vlan":902,"errors":[],"output":"[Step 1: Service Port for PPPoE VLAN]\nservice-port vlan 902 gpon 0\/1\/0 ont 1 gemport 2 multi-service u \u001b[1Dser-vlan 902\r\n{ <cr>\n[Step 3: TR-069 Config Queued]\nPPPoE credentials queued for TR-069 push\n"}
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:41 +0000] "GET /favicon.ico HTTP/2.0" 404 555 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36 Google-PageRenderer Google (+https://developers.google.com/+/web/snippet/)" "-"
+isp_crm_nginx           | 2026/01/14 13:35:41 [error] 33#33: *1277 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 102.205.239.5, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/2.0", host: "crm.superlite.co.ke"
+isp_crm_nginx           | 2026/01/14 13:35:41 [error] 33#33: *1279 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 102.205.239.5, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "crm.superlite.co.ke"
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:41 +0000] "GET /favicon.ico HTTP/1.1" 404 153 "-" "Dalvik/2.1.0 (Linux; U; Android 14; 2404ARN45A Build/UP1A.231005.007)" "-"
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:44.218Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request=""
+isp_crm_genieacs_cwmp   | 2026-01-14T13:35:44.427Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="168" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_genieacs_cwmp   | 2026-01-14T13:35:44.455Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: ACS request; acsRequestId="19bbcb828df0000" acsRequestName="GetParameterValues"
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:46 +0000] "GET /favicon.ico HTTP/1.1" 404 153 "-" "Dalvik/2.1.0 (Linux; U; Android 14; 2404ARN45A Build/UP1A.231005.007)" "-"
+isp_crm_nginx           | 2026/01/14 13:35:46 [error] 33#33: *1280 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 102.205.239.5, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "crm.superlite.co.ke"
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:47 +0000] "GET /favicon.ico HTTP/1.1" 404 153 "-" "Dalvik/2.1.0 (Linux; U; Android 14; 2404ARN45A Build/UP1A.231005.007)" "-"
+isp_crm_nginx           | 2026/01/14 13:35:47 [error] 33#33: *1281 open() "/var/www/html/public/favicon.ico" failed (2: No such file or directory), client: 102.205.239.5, server: crm.superlite.co.ke, request: "GET /favicon.ico HTTP/1.1", host: "crm.superlite.co.ke"
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:47.771Z [INFO] ::ffff:10.200.0.1: GET /devices/00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Using SmartOLT default PPPoE path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE Path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1, Username: muturi@superlite.co.ke, VLAN: 902
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Sending setParameterValues: [["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","muturi@superlite.co.ke","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","Mgathoni.2016","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN",902,"xsd:unsignedInt"]]
+isp_crm_genieacs_nbi    | 2026-01-14T13:35:47.776Z [INFO] ::ffff:10.200.0.1: POST /devices/00259E-HG8546M-48575443F2D53A8B/tasks; connection_request="" timeout="30000"
+isp_crm_genieacs_cwmp   | 2026-01-14T13:35:47.955Z [INFO] ::ffff:10.200.0.3 00259E-HG8546M-48575443F2D53A8B: Inform; cpeRequestId="169" informEvent="6 CONNECTION REQUEST" informRetryCount=0
+isp_crm_php             | NOTICE: PHP message: [GENIEACS] Task with connection_request result: HTTP 200
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] setParameterValues result: HTTP 200, success: true
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Response: {"name":"setParameterValues","parameterValues":[["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","muturi@superlite.co.ke","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","Mgathoni.2016","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boole
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:35:39 +0300 "POST /index.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:48 +0000] "POST /?page=api&action=configure_wan_tr069 HTTP/2.0" 200 306 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86201" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [SNMP] Polling 2 active OLTs...
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 1: 0 ONUs
+isp_crm_olt_service     | [SNMP] ONU status walk completed for OLT 2: 0 ONUs
+isp_crm_olt_service     | [SNMP] Completed in 80ms - Success: 2, Failed: 0
+isp_crm_php             | 172.18.0.11 -  14/Jan/2026:16:35:58 +0300 "GET /api/olt-stats.php" 200
+isp_crm_nginx           | 102.205.239.5 - - [14/Jan/2026:13:35:58 +0000] "GET /api/olt-stats.php HTTP/2.0" 200 76 "https://crm.superlite.co.ke/?page=huawei-olt&view=onu_detail&onu_id=86201" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" "-"
+isp_crm_olt_service     | [Discovery] Starting discovery cycle...
+isp_crm_olt_service     | [Discovery] Found 2 active OLTs
+isp_crm_olt_service     | [Discovery] Checking OLT: G45_OLT (10.98.0.3)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_se
