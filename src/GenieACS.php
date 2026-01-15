@@ -2324,31 +2324,69 @@ class GenieACS {
         $summonResult = $this->request('POST', $endpoint, [
             'name' => 'getParameterNames',
             'parameterPath' => $pppPath,
-            'nextLevel' => false
+            'nextLevel' => true  // Get immediate children to find instances
         ]);
         $results['step1_summon'] = $summonResult;
         
-        // Step 2: AddObject - Create WANPPPConnection instance
-        error_log("[GenieACS] Step 2: AddObject WANPPPConnection for {$deviceId}");
-        $addObjectResult = $this->request('POST', $endpoint, [
-            'name' => 'addObject',
-            'objectName' => $pppPath
-        ]);
-        $results['step2_addObject'] = $addObjectResult;
+        // Step 2: Read device from GenieACS to check for existing WANPPPConnection
+        error_log("[GenieACS] Step 2: Read device to check existing PPP instances");
+        usleep(500000); // Wait 500ms for summon to complete
         
+        $device = $this->getDevice($deviceId);
+        $results['step2_device_read'] = ['success' => !empty($device)];
+        
+        // Check for existing WANPPPConnection instances
+        $existingInstance = null;
         $instanceIndex = 1;
-        $pppInstancePath = "{$pppPath}.{$instanceIndex}";
         
-        // Step 3: Refresh - Get all parameters from the new instance
-        error_log("[GenieACS] Step 3: Refresh parameters for {$pppInstancePath}");
+        if ($device) {
+            // Look for WANPPPConnection.1, .2, etc in device data
+            for ($i = 1; $i <= 5; $i++) {
+                $checkPath = "{$pppPath}.{$i}";
+                $exists = $this->getNestedValue($device, "{$checkPath}.Enable") !== null ||
+                          $this->getNestedValue($device, "{$checkPath}.Username") !== null ||
+                          $this->getNestedValue($device, "{$checkPath}.ConnectionStatus") !== null;
+                if ($exists) {
+                    $existingInstance = $i;
+                    error_log("[GenieACS] Found existing WANPPPConnection.{$i}");
+                    break;
+                }
+            }
+        }
+        
+        $pppInstancePath = null;
+        
+        if ($existingInstance) {
+            // Use existing instance
+            $pppInstancePath = "{$pppPath}.{$existingInstance}";
+            $results['step3_instance'] = ['action' => 'use_existing', 'path' => $pppInstancePath];
+            error_log("[GenieACS] Step 3: Using existing instance {$pppInstancePath}");
+        } else {
+            // Step 3: AddObject - Create WANPPPConnection instance
+            error_log("[GenieACS] Step 3: AddObject - Creating new WANPPPConnection");
+            $addObjectResult = $this->request('POST', $endpoint, [
+                'name' => 'addObject',
+                'objectName' => $pppPath
+            ]);
+            $results['step3_instance'] = ['action' => 'add_object', 'result' => $addObjectResult];
+            $pppInstancePath = "{$pppPath}.1";
+            
+            if (!($addObjectResult['success'] ?? false)) {
+                // AddObject failed, try using instance 1 anyway (might already exist)
+                error_log("[GenieACS] AddObject failed, trying existing path anyway");
+            }
+        }
+        
+        // Step 4: Refresh - Get all parameters from the instance
+        error_log("[GenieACS] Step 4: Refresh parameters for {$pppInstancePath}");
         $refreshResult = $this->request('POST', $endpoint, [
             'name' => 'getParameterValues',
             'parameterNames' => ["{$pppInstancePath}."]
         ]);
-        $results['step3_refresh'] = $refreshResult;
+        $results['step4_refresh'] = $refreshResult;
         
-        // Step 4: SetParameterValues - Configure PPPoE credentials
-        error_log("[GenieACS] Step 4: Set PPPoE credentials for {$pppInstancePath}");
+        // Step 5: SetParameterValues - Configure PPPoE credentials
+        error_log("[GenieACS] Step 5: Set PPPoE credentials for {$pppInstancePath}");
         $setParams = [
             ["{$pppInstancePath}.Enable", true, 'xsd:boolean'],
             ["{$pppInstancePath}.Username", $username, 'xsd:string'],
@@ -2362,10 +2400,10 @@ class GenieACS {
             'name' => 'setParameterValues',
             'parameterValues' => $setParams
         ]);
-        $results['step4_setParams'] = $setResult;
+        $results['step5_setParams'] = $setResult;
         
-        // Step 5: Enable L3 routing on LAN Ethernet ports (required for PPPoE routing)
-        error_log("[GenieACS] Step 5: Enable X_HW_L3Enable on LAN ports for {$deviceId}");
+        // Step 6: Enable L3 routing on LAN Ethernet ports (required for PPPoE routing)
+        error_log("[GenieACS] Step 6: Enable X_HW_L3Enable on LAN ports for {$deviceId}");
         $l3Params = [];
         for ($i = 1; $i <= 4; $i++) {
             $l3Params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
@@ -2375,21 +2413,19 @@ class GenieACS {
             'name' => 'setParameterValues',
             'parameterValues' => $l3Params
         ]);
-        $results['step5_l3Enable'] = $l3Result;
+        $results['step6_l3Enable'] = $l3Result;
         
-        $allTasksQueued = ($summonResult['success'] ?? false) && 
-                          ($addObjectResult['success'] ?? false) && 
-                          ($setResult['success'] ?? false) && 
-                          ($l3Result['success'] ?? false);
+        $success = ($setResult['success'] ?? false);
         
         return [
-            'success' => $allTasksQueued,
-            'message' => $allTasksQueued 
-                ? ($useConnectionRequest 
-                    ? "PPPoE configured successfully on {$pppInstancePath}" 
-                    : "PPPoE tasks queued for {$pppInstancePath} - will apply on next device inform")
+            'success' => $success,
+            'message' => $success 
+                ? ($existingInstance 
+                    ? "PPPoE configured on existing {$pppInstancePath}" 
+                    : "PPPoE configured on new {$pppInstancePath}")
                 : 'PPPoE configuration failed - check results for details',
             'instance_path' => $pppInstancePath,
+            'used_existing' => (bool)$existingInstance,
             'queued' => !$useConnectionRequest,
             'results' => $results
         ];
