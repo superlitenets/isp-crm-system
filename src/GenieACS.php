@@ -1496,6 +1496,112 @@ class GenieACS {
             ]
         ];
         
+        // WiFi 2.4GHz Site Survey
+        $survey24Params = [];
+        for ($i = 1; $i <= 20; $i++) {
+            $surveyBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_HW_NeighboringWiFiDiagnostic.Result.{$i}";
+            if ($hasPath("{$surveyBase}.SSID")) {
+                $survey24Params[] = ['path' => "{$surveyBase}.SSID", 'label' => "AP {$i} SSID", 'value' => $getValue("{$surveyBase}.SSID"), 'type' => 'readonly'];
+                $survey24Params[] = ['path' => "{$surveyBase}.BSSID", 'label' => "AP {$i} BSSID", 'value' => $getValue("{$surveyBase}.BSSID"), 'type' => 'readonly'];
+                $survey24Params[] = ['path' => "{$surveyBase}.Channel", 'label' => "AP {$i} Channel", 'value' => $getValue("{$surveyBase}.Channel"), 'type' => 'readonly'];
+                $survey24Params[] = ['path' => "{$surveyBase}.SignalStrength", 'label' => "AP {$i} Signal", 'value' => $getValue("{$surveyBase}.SignalStrength"), 'type' => 'readonly'];
+            }
+        }
+        if (!empty($survey24Params)) {
+            $categories['site_survey_24'] = [
+                'label' => 'WiFi 2.4GHz Site Survey',
+                'icon' => 'bi-broadcast',
+                'editable' => false,
+                'params' => $survey24Params
+            ];
+        }
+        
+        // WiFi 5GHz Site Survey
+        $survey5Params = [];
+        for ($i = 1; $i <= 20; $i++) {
+            $surveyBase = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.X_HW_NeighboringWiFiDiagnostic.Result.{$i}";
+            if ($hasPath("{$surveyBase}.SSID")) {
+                $survey5Params[] = ['path' => "{$surveyBase}.SSID", 'label' => "AP {$i} SSID", 'value' => $getValue("{$surveyBase}.SSID"), 'type' => 'readonly'];
+                $survey5Params[] = ['path' => "{$surveyBase}.BSSID", 'label' => "AP {$i} BSSID", 'value' => $getValue("{$surveyBase}.BSSID"), 'type' => 'readonly'];
+                $survey5Params[] = ['path' => "{$surveyBase}.Channel", 'label' => "AP {$i} Channel", 'value' => $getValue("{$surveyBase}.Channel"), 'type' => 'readonly'];
+                $survey5Params[] = ['path' => "{$surveyBase}.SignalStrength", 'label' => "AP {$i} Signal", 'value' => $getValue("{$surveyBase}.SignalStrength"), 'type' => 'readonly'];
+            }
+        }
+        if (!empty($survey5Params)) {
+            $categories['site_survey_5'] = [
+                'label' => 'WiFi 5GHz Site Survey',
+                'icon' => 'bi-broadcast',
+                'editable' => false,
+                'params' => $survey5Params
+            ];
+        }
+        
+        // Troubleshooting / Diagnostics
+        $diagBase = 'InternetGatewayDevice.IPPingDiagnostics';
+        $diagParams = [
+            ['path' => "{$diagBase}.DiagnosticsState", 'label' => 'Ping State', 'value' => $getValue("{$diagBase}.DiagnosticsState"), 'type' => 'readonly'],
+            ['path' => "{$diagBase}.Host", 'label' => 'Ping Host', 'value' => $getValue("{$diagBase}.Host"), 'type' => 'string'],
+            ['path' => "{$diagBase}.NumberOfRepetitions", 'label' => 'Repetitions', 'value' => $getValue("{$diagBase}.NumberOfRepetitions"), 'type' => 'number'],
+            ['path' => "{$diagBase}.Timeout", 'label' => 'Timeout (ms)', 'value' => $getValue("{$diagBase}.Timeout"), 'type' => 'number'],
+            ['path' => "{$diagBase}.SuccessCount", 'label' => 'Success Count', 'value' => $getValue("{$diagBase}.SuccessCount"), 'type' => 'readonly'],
+            ['path' => "{$diagBase}.FailureCount", 'label' => 'Failure Count', 'value' => $getValue("{$diagBase}.FailureCount"), 'type' => 'readonly'],
+            ['path' => "{$diagBase}.AverageResponseTime", 'label' => 'Avg Response (ms)', 'value' => $getValue("{$diagBase}.AverageResponseTime"), 'type' => 'readonly'],
+            ['path' => "{$diagBase}.MinimumResponseTime", 'label' => 'Min Response (ms)', 'value' => $getValue("{$diagBase}.MinimumResponseTime"), 'type' => 'readonly'],
+            ['path' => "{$diagBase}.MaximumResponseTime", 'label' => 'Max Response (ms)', 'value' => $getValue("{$diagBase}.MaximumResponseTime"), 'type' => 'readonly'],
+        ];
+        // Traceroute
+        $traceBase = 'InternetGatewayDevice.TraceRouteDiagnostics';
+        $diagParams[] = ['path' => "{$traceBase}.DiagnosticsState", 'label' => 'Traceroute State', 'value' => $getValue("{$traceBase}.DiagnosticsState"), 'type' => 'readonly'];
+        $diagParams[] = ['path' => "{$traceBase}.Host", 'label' => 'Traceroute Host', 'value' => $getValue("{$traceBase}.Host"), 'type' => 'string'];
+        $diagParams[] = ['path' => "{$traceBase}.NumberOfTries", 'label' => 'Tries', 'value' => $getValue("{$traceBase}.NumberOfTries"), 'type' => 'number'];
+        $diagParams[] = ['path' => "{$traceBase}.ResponseTime", 'label' => 'Response Time', 'value' => $getValue("{$traceBase}.ResponseTime"), 'type' => 'readonly'];
+        $categories['troubleshooting'] = [
+            'label' => 'Troubleshooting',
+            'icon' => 'bi-search',
+            'editable' => true,
+            'params' => $diagParams
+        ];
+        
+        // Device Logs
+        $logParams = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $logBase = "InternetGatewayDevice.DeviceInfo.VendorLogFile.{$i}";
+            if ($hasPath("{$logBase}.Name")) {
+                $logParams[] = ['path' => "{$logBase}.Name", 'label' => "Log {$i} Name", 'value' => $getValue("{$logBase}.Name"), 'type' => 'readonly'];
+            }
+        }
+        // Also check DeviceLog if available
+        if ($hasPath('InternetGatewayDevice.DeviceInfo.DeviceLog')) {
+            $logParams[] = ['path' => 'InternetGatewayDevice.DeviceInfo.DeviceLog', 'label' => 'Device Log', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.DeviceLog'), 'type' => 'readonly'];
+        }
+        if (!empty($logParams)) {
+            $categories['device_logs'] = [
+                'label' => 'Device Logs',
+                'icon' => 'bi-journal-text',
+                'editable' => false,
+                'params' => $logParams
+            ];
+        }
+        
+        // File & Firmware Management
+        $fwParams = [
+            ['path' => 'InternetGatewayDevice.DeviceInfo.SoftwareVersion', 'label' => 'Current Firmware', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.SoftwareVersion'), 'type' => 'readonly'],
+            ['path' => 'InternetGatewayDevice.DeviceInfo.SpecVersion', 'label' => 'Spec Version', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.SpecVersion'), 'type' => 'readonly'],
+            ['path' => 'InternetGatewayDevice.ManagementServer.UpgradesManaged', 'label' => 'Upgrades Managed', 'value' => $getValue('InternetGatewayDevice.ManagementServer.UpgradesManaged'), 'type' => 'boolean'],
+        ];
+        // Download Diagnostics
+        $dlBase = 'InternetGatewayDevice.DownloadDiagnostics';
+        if ($hasPath("{$dlBase}.DiagnosticsState")) {
+            $fwParams[] = ['path' => "{$dlBase}.DiagnosticsState", 'label' => 'Download State', 'value' => $getValue("{$dlBase}.DiagnosticsState"), 'type' => 'readonly'];
+            $fwParams[] = ['path' => "{$dlBase}.DownloadURL", 'label' => 'Download URL', 'value' => $getValue("{$dlBase}.DownloadURL"), 'type' => 'string'];
+        }
+        $categories['firmware'] = [
+            'label' => 'File & Firmware',
+            'icon' => 'bi-download',
+            'editable' => true,
+            'params' => $fwParams
+        ];
+        
         // Remove categories with no valid parameters
         foreach ($categories as $key => $category) {
             $hasValue = false;
