@@ -8119,7 +8119,7 @@ try {
                 loading.classList.remove('d-none');
                 refreshBtn.disabled = true;
                 
-                fetch('?page=huawei-olt', {
+                fetch('?page=huawei-olt&t=' + Date.now(), {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
@@ -8395,7 +8395,7 @@ try {
                     formData.append('action', 'refresh_onu_optical');
                     formData.append('onu_id', onuId);
                     
-                    const resp = await fetch('?page=huawei-olt', {
+                    const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                         method: 'POST',
                         body: formData
                     });
@@ -8436,7 +8436,7 @@ try {
                     formData.append('action', 'refresh_tr069_ip');
                     formData.append('onu_id', onuId);
                     
-                    const resp = await fetch('?page=huawei-olt', {
+                    const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                         method: 'POST',
                         body: formData
                     });
@@ -8494,7 +8494,7 @@ try {
                     formData.append('action', 'refresh_ont_ip');
                     formData.append('onu_id', onuId);
                     
-                    const resp = await fetch('?page=huawei-olt', {
+                    const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                         method: 'POST',
                         body: formData
                     });
@@ -15249,7 +15249,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('pppoeWanStatus').textContent = 'Starting provisioning...';
         
         try {
-            const response = await fetch('?page=huawei-olt', {
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: `action=start_pppoe_provisioning&onu_id=${onuId}&vlan=${vlan}&pppoe_username=${encodeURIComponent(username)}&pppoe_password=${encodeURIComponent(password)}`
@@ -15304,7 +15304,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         document.getElementById('pppoeWanStatus').textContent = 'Continuing...';
         
         try {
-            const response = await fetch('?page=huawei-olt', {
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: `action=continue_provisioning&onu_id=${onuId}`
@@ -15807,7 +15807,7 @@ function openDeviceStatus(serial, doRefresh = false) {
         document.getElementById('deviceStatusLoading').innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">Fetching data from device... This may take a few seconds.</p>';
     }
     
-    fetch('?page=huawei-olt', {
+    fetch('?page=huawei-olt&t=' + Date.now(), {
         method: 'POST',
         body: formData
     })
@@ -15952,7 +15952,7 @@ function saveDeviceStatus() {
     formData.append('serial', currentDeviceStatusSerial);
     formData.append('params', JSON.stringify(changedParams));
     
-    fetch('?page=huawei-olt', {
+    fetch('?page=huawei-olt&t=' + Date.now(), {
         method: 'POST',
         body: formData
     })
@@ -16410,7 +16410,7 @@ function saveDeviceStatus() {
         body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-3">Fetching ONU status from OLT...</p></div>';
         modal.show();
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_onu_full_status&onu_id=' + onuId
@@ -16686,7 +16686,7 @@ function saveDeviceStatus() {
         body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-3">Fetching configuration from OLT...</p></div>';
         modal.show();
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_onu_config&onu_id=' + onuId
@@ -16889,7 +16889,7 @@ function saveDeviceStatus() {
         
         container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Loading WiFi interfaces...</div>';
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(serialNumber)
@@ -16969,7 +16969,7 @@ function saveDeviceStatus() {
         body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Fetching software info...</p></div>';
         modal.show();
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_onu_sw_info&onu_id=' + onuId
@@ -17023,7 +17023,7 @@ function saveDeviceStatus() {
     
     async function syncTR069Device(onuId) {
         try {
-            const response = await fetch('?page=huawei-olt', {
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=tr069_sync_device&onu_id=' + onuId
@@ -17099,7 +17099,7 @@ function saveDeviceStatus() {
             steps[0].status = 'running';
             updateStatus();
             
-            const wanResp = await fetch('?page=huawei-olt', {
+            const wanResp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_wan&onu_id=' + onuId + '&wan_mode=pppoe' + 
@@ -17129,7 +17129,7 @@ function saveDeviceStatus() {
                 updateStatus();
                 
                 // Configure 2.4GHz
-                const wifiResp = await fetch('?page=huawei-olt', {
+                const wifiResp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wlan_index=1' +
@@ -17141,7 +17141,7 @@ function saveDeviceStatus() {
                 // Configure 5GHz if checkbox is checked and device has 5GHz
                 if (sync5GHz && tr069CurrentData.wifi && tr069CurrentData.wifi.length > 1) {
                     const wifi5Idx = tr069CurrentData.wifi.find(w => w.band && w.band.includes('5'))?.index || 2;
-                    await fetch('?page=huawei-olt', {
+                    await fetch('?page=huawei-olt&t=' + Date.now(), {
                         method: 'POST',
                         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                         body: 'action=save_tr069_wifi&onu_id=' + onuId + '&wlan_index=' + wifi5Idx +
@@ -17232,7 +17232,7 @@ function saveDeviceStatus() {
     function loadTR069Config(onuId) {
         const body = document.getElementById('onuFullStatusBody');
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=get_tr069_full_config&onu_id=' + onuId
@@ -17669,7 +17669,7 @@ function saveDeviceStatus() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=update_pppoe_credentials&onu_id=' + onuId + 
@@ -17707,7 +17707,7 @@ function saveDeviceStatus() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_wifi&onu_id=' + tr069CurrentOnuId + '&wlan_index=' + wlanIndex + 
@@ -17752,7 +17752,7 @@ function saveDeviceStatus() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 90000);
             
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_wan&onu_id=' + tr069CurrentOnuId + '&wan_mode=' + mode + 
@@ -17811,7 +17811,7 @@ function saveDeviceStatus() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_eth_ports&onu_id=' + tr069CurrentOnuId + '&ports=' + encodeURIComponent(JSON.stringify(ports))
@@ -17837,7 +17837,7 @@ function saveDeviceStatus() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=save_tr069_lan&onu_id=' + tr069CurrentOnuId + 
@@ -17860,7 +17860,7 @@ function saveDeviceStatus() {
         const protocol = prompt('Protocol (TCP/UDP/Both):', 'TCP');
         if (!extPort || !intIp || !intPort) return;
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=add_port_forward&onu_id=' + tr069CurrentOnuId + '&ext_port=' + extPort + 
@@ -17875,7 +17875,7 @@ function saveDeviceStatus() {
     
     function deletePortForward(index) {
         if (!confirm('Delete this port forward rule?')) return;
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=delete_port_forward&onu_id=' + tr069CurrentOnuId + '&index=' + index
@@ -17896,7 +17896,7 @@ function saveDeviceStatus() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=change_admin_password&onu_id=' + tr069CurrentOnuId + '&password=' + encodeURIComponent(newPass)
@@ -17913,7 +17913,7 @@ function saveDeviceStatus() {
         if (!confirm('Are you SURE? This cannot be undone!')) return;
         
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=factory_reset_onu&onu_id=' + onuId
@@ -17958,7 +17958,7 @@ function saveDeviceStatus() {
                 const config = JSON.parse(text);
                 if (!confirm('Restore configuration from backup dated ' + (config.backup_date || 'unknown') + '? This will overwrite current settings.')) return;
                 
-                const resp = await fetch('?page=huawei-olt', {
+                const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: 'action=restore_onu_config&onu_id=' + onuId + '&config=' + encodeURIComponent(JSON.stringify(config))
@@ -17974,7 +17974,7 @@ function saveDeviceStatus() {
     async function refreshClients(onuId) {
         document.getElementById('clientsList').innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>';
         try {
-            const resp = await fetch('?page=huawei-olt', {
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=get_tr069_clients&onu_id=' + onuId
@@ -18082,7 +18082,7 @@ function saveDeviceStatus() {
     function tr069Reboot(serialNumber) {
         if (!confirm('Reboot ONU ' + serialNumber + ' via TR-069?')) return;
         
-        fetch('?page=huawei-olt', {
+        fetch('?page=huawei-olt&t=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: 'action=tr069_reboot&serial=' + encodeURIComponent(serialNumber)
