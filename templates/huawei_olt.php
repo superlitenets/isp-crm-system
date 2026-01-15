@@ -4143,6 +4143,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $channel = (int)($_POST['channel'] ?? 0);
                     $security = $_POST['security'] ?? 'WPA2-PSK';
                     
+                    // Bridge/VLAN parameters
+                    $connMode = $_POST['conn_mode'] ?? 'route';
+                    $vlanMode = $_POST['vlan_mode'] ?? 'access';
+                    $accessVlan = (int)($_POST['access_vlan'] ?? 0);
+                    $nativeVlan = (int)($_POST['native_vlan'] ?? 0);
+                    $allowedVlans = $_POST['allowed_vlans'] ?? '';
+                    
                     if (!$onuId || !$ssid) {
                         echo json_encode(['success' => false, 'error' => 'ONU ID and SSID are required']);
                         exit;
@@ -4155,7 +4162,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         'ssid' => $ssid,
                         'password' => $password,
                         'channel' => $channel,
-                        'security' => $security
+                        'security' => $security,
+                        'conn_mode' => $connMode,
+                        'vlan_mode' => $vlanMode,
+                        'access_vlan' => $accessVlan,
+                        'native_vlan' => $nativeVlan,
+                        'allowed_vlans' => $allowedVlans
                     ]);
                     
                     echo json_encode($result);

@@ -7765,6 +7765,31 @@ class HuaweiOLT {
             $paramValues[] = ["{$basePath}.Channel", $channel, 'xsd:unsignedInt'];
         }
         
+        // Bridge/VLAN configuration (similar to PPPoE WAN)
+        $connMode = $config['conn_mode'] ?? 'route';
+        $vlanMode = $config['vlan_mode'] ?? 'access';
+        $accessVlan = (int)($config['access_vlan'] ?? 0);
+        $nativeVlan = (int)($config['native_vlan'] ?? 0);
+        
+        if ($connMode === 'bridge') {
+            // Set interface to bridge mode with VLAN
+            $paramValues[] = ["{$basePath}.X_HW_ServiceList", 'INTERNET', 'xsd:string'];
+            $paramValues[] = ["{$basePath}.X_HW_SwitchMode", 'Bridge', 'xsd:string'];
+            
+            if ($vlanMode === 'access' && $accessVlan > 0) {
+                // Access mode - single VLAN
+                $paramValues[] = ["{$basePath}.X_HW_VLAN", $accessVlan, 'xsd:unsignedInt'];
+                $paramValues[] = ["{$basePath}.X_HW_VLANMode", 'Access', 'xsd:string'];
+            } elseif ($vlanMode === 'trunk' && $nativeVlan > 0) {
+                // Trunk mode - tagged VLANs
+                $paramValues[] = ["{$basePath}.X_HW_VLAN", $nativeVlan, 'xsd:unsignedInt'];
+                $paramValues[] = ["{$basePath}.X_HW_VLANMode", 'Trunk', 'xsd:string'];
+            }
+        } else {
+            // Route mode - traffic NAT through ONU WAN
+            $paramValues[] = ["{$basePath}.X_HW_SwitchMode", 'Route', 'xsd:string'];
+        }
+        
         // Send setParameterValues task to GenieACS
         $task = [
             'name' => 'setParameterValues',
