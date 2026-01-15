@@ -7581,8 +7581,8 @@ try {
                     <!-- TR-069/GenieACS Operations -->
                     <div class="btn-group btn-group-sm" role="group">
                         <span class="btn btn-info disabled text-white" style="opacity:0.8"><i class="bi bi-cloud"></i> TR-069</span>
-                        <button type="button" class="btn btn-outline-info" onclick="openTR069Config(<?= $currentOnu['id'] ?>)" title="TR-069 Device Info & Status">
-                            <i class="bi bi-info-circle"></i><span class="d-none d-lg-inline ms-1">Status</span>
+                        <button type="button" class="btn btn-outline-info" onclick="openDeviceStatus('<?= $currentOnu['sn'] ?>')" title="View & Edit All Device Parameters">
+                            <i class="bi bi-sliders"></i><span class="d-none d-lg-inline ms-1">Status</span>
                         </button>
                         <button type="button" class="btn btn-outline-primary" onclick="openTR069WANConfig(<?= $currentOnu['id'] ?>, '<?= $currentOnu['sn'] ?>')" title="Configure PPPoE/IPoE WAN via TR-069">
                             <i class="bi bi-ethernet"></i><span class="d-none d-lg-inline ms-1">WAN</span>
