@@ -364,11 +364,29 @@ app.post('/send-group', async (req, res) => {
     
     try {
         const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
-        const result = await client.sendMessage(chatId, message);
+        
+        // Use Store.SendTextMsgToChat to bypass broken sendSeen
+        const result = await client.pupPage.evaluate(async (chatId, messageText) => {
+            const chatWid = window.Store.WidFactory.createWid(chatId);
+            const chat = await window.Store.Chat.find(chatWid);
+            
+            if (!chat) {
+                throw new Error('Group not found');
+            }
+            
+            // Use SendTextMsgToChat which doesn't call sendSeen
+            const msg = await window.Store.SendTextMsgToChat(chat, messageText);
+            
+            return {
+                id: msg.id._serialized || msg.id.id,
+                timestamp: msg.t || Math.floor(Date.now() / 1000)
+            };
+        }, chatId, message);
+        
         console.log(`Message sent to group ${groupId}`);
         res.json({ 
             success: true, 
-            messageId: result.id._serialized,
+            messageId: result.id,
             timestamp: result.timestamp
         });
     } catch (error) {
