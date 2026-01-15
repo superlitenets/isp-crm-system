@@ -15797,17 +15797,229 @@ let originalDeviceParams = {};
 
 // Tab definitions with icons
 const tabConfig = {
-    'device_info': { label: 'Device', icon: 'bi-info-circle', order: 1 },
-    'wan_pppoe': { label: 'WAN', icon: 'bi-globe', order: 2 },
-    'wan_ip': { label: 'WAN IP', icon: 'bi-diagram-3', order: 3 },
-    'wireless_1': { label: 'WiFi 2.4G', icon: 'bi-wifi', order: 4 },
-    'wireless_5': { label: 'WiFi 5G', icon: 'bi-wifi', order: 5 },
-    'lan_ports': { label: 'LAN', icon: 'bi-ethernet', order: 6 },
-    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 7 },
-    'dhcp': { label: 'DHCP', icon: 'bi-hdd-network', order: 8 },
-    'management': { label: 'MGMT', icon: 'bi-gear', order: 9 },
-    'time': { label: 'Time', icon: 'bi-clock', order: 10 },
-    'other': { label: 'Other', icon: 'bi-three-dots', order: 99 }
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wireless_lan_5': { label: 'Wireless LAN 5G', icon: 'bi-wifi', order: 8 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 9 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 10 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 11 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 12 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 13 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 14 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 15 }
+};
+
+// Dynamic tab label resolver for backend keys like ppp_interface_1_1
+function getTabConfig(key) {
+    // Check for PPP interface patterns like ppp_interface_1_1
+    if (key.startsWith('ppp_interface_')) {
+        const parts = key.replace('ppp_interface_', '').split('_');
+        return { label: 'PPP Interface ' + parts.join('.'), icon: 'bi-globe', order: 1 };
+    }
+    // Check for wireless patterns
+    if (key === 'wireless_lan_5') {
+        return { label: 'Wireless LAN (5GHz)', icon: 'bi-wifi', order: 8 };
+    }
+    // Check for troubleshooting wifi
+    if (key.startsWith('troubleshooting_wifi')) {
+        const band = key.includes('24') ? '2.4GHz' : '5GHz';
+        return { label: 'WiFi Scan (' + band + ')', icon: 'bi-broadcast', order: 14 };
+    }
+    // Check for miscellaneous variants
+    if (key.startsWith('miscellaneous')) {
+        return { label: 'Miscellaneous', icon: 'bi-three-dots', order: 13 };
+    }
+    // Check for auto-categorized
+    if (key.startsWith('auto_')) {
+        return { label: key.replace('auto_', '').replace(/_/g, ' '), icon: 'bi-folder', order: 50 };
+    }
+    return tabConfig[key] || { label: key.replace(/_/g, ' '), icon: 'bi-gear', order: 50 };
+}
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
+const tabConfig = {
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
+    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 8 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 9 },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 10 },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 11 },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 12 },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 13 },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
+};
 };
 
 function openDeviceStatus(serial, doRefresh = false) {
@@ -15882,7 +16094,7 @@ function renderDeviceStatusTabs(categories) {
         const category = categories[key];
         if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined).length === 0) return;
         
-        const config = tabConfig[key] || { label: category.label, icon: 'bi-gear', order: 50 };
+        const config = getTabConfig(key);
         const tabId = 'tab_' + key;
         const paneId = 'pane_' + key;
         const paramCount = category.params.filter(p => p.value !== null && p.value !== undefined).length;
@@ -15893,7 +16105,7 @@ function renderDeviceStatusTabs(categories) {
                 <button class="nav-link ${isFirst ? 'active' : ''}" id="${tabId}" data-bs-toggle="tab" 
                         data-bs-target="#${paneId}" type="button" role="tab">
                     <i class="bi ${config.icon} me-1"></i>${config.label}
-                    <span class="badge bg-secondary ms-1" style="font-size:0.65rem">${paramCount}</span>
+                    
                     ${category.editable ? '<i class="bi bi-pencil-fill text-success ms-1" style="font-size:0.6rem" title="Editable"></i>' : ''}
                 </button>
             </li>`;

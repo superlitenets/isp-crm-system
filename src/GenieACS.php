@@ -1250,7 +1250,7 @@ class GenieACS {
         };
         
         // Device Info
-        $categories['device_info'] = [
+        $categories['miscellaneous'] = [
             'label' => 'Device Info',
             'icon' => 'bi-info-circle',
             'editable' => false,
@@ -1346,7 +1346,7 @@ class GenieACS {
         
         // LAN DHCP Server
         $dhcpBase = 'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement';
-        $categories['dhcp_server'] = [
+        $categories['lan_dhcp'] = [
             'label' => 'LAN DHCP Server',
             'icon' => 'bi-hdd-network',
             'editable' => true,
@@ -1409,7 +1409,7 @@ class GenieACS {
         // Wireless LAN 2.4GHz (WLANConfiguration.1)
         $wlan24Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
         if ($hasPath("{$wlan24Base}.Enable") || $hasPath("{$wlan24Base}.SSID")) {
-            $categories['wireless_24'] = [
+            $categories['wireless_lan'] = [
                 'label' => 'Wireless LAN 1 (2.4GHz)',
                 'icon' => 'bi-wifi',
                 'editable' => true,
@@ -1433,7 +1433,7 @@ class GenieACS {
         // Wireless LAN 5GHz (WLANConfiguration.5)
         $wlan5Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5';
         if ($hasPath("{$wlan5Base}.Enable") || $hasPath("{$wlan5Base}.SSID")) {
-            $categories['wireless_5'] = [
+            $categories['wireless_lan_5'] = [
                 'label' => 'Wireless LAN 5 (5GHz)',
                 'icon' => 'bi-wifi',
                 'editable' => true,
@@ -1522,7 +1522,7 @@ class GenieACS {
             }
         }
         if (!empty($voiceParams)) {
-            $categories['voice'] = [
+            $categories['voice_lines'] = [
                 'label' => 'Voice Lines',
                 'icon' => 'bi-telephone',
                 'editable' => true,
@@ -1531,7 +1531,7 @@ class GenieACS {
         }
         
         // Miscellaneous
-        $categories['misc'] = [
+        $categories['miscellaneous_extra'] = [
             'label' => 'Miscellaneous',
             'icon' => 'bi-gear',
             'editable' => true,
@@ -1559,7 +1559,7 @@ class GenieACS {
             }
         }
         if (!empty($survey24Params)) {
-            $categories['site_survey_24'] = [
+            $categories['troubleshooting_wifi_24'] = [
                 'label' => 'WiFi 2.4GHz Site Survey',
                 'icon' => 'bi-broadcast',
                 'editable' => false,
@@ -1579,7 +1579,7 @@ class GenieACS {
             }
         }
         if (!empty($survey5Params)) {
-            $categories['site_survey_5'] = [
+            $categories['troubleshooting_wifi_5'] = [
                 'label' => 'WiFi 5GHz Site Survey',
                 'icon' => 'bi-broadcast',
                 'editable' => false,
@@ -1646,7 +1646,7 @@ class GenieACS {
             $fwParams[] = ['path' => "{$dlBase}.DiagnosticsState", 'label' => 'Download State', 'value' => $getValue("{$dlBase}.DiagnosticsState"), 'type' => 'readonly'];
             $fwParams[] = ['path' => "{$dlBase}.DownloadURL", 'label' => 'Download URL', 'value' => $getValue("{$dlBase}.DownloadURL"), 'type' => 'string'];
         }
-        $categories['firmware'] = [
+        $categories['miscellaneous_fw'] = [
             'label' => 'File & Firmware',
             'icon' => 'bi-download',
             'editable' => true,
@@ -1655,17 +1655,20 @@ class GenieACS {
         
         // AUTO-CATEGORIZE ALL REMAINING PARAMETERS by path prefix
         $autoCats = [
-            'wan_stats' => ['label' => 'WAN Statistics', 'icon' => 'bi-graph-up', 'prefix' => 'WANDevice', 'match' => ['Stats', 'Bytes', 'Packets', 'Errors', 'Ethernet'], 'editable' => false],
-            'wan_dhcp' => ['label' => 'WAN DHCP Options', 'icon' => 'bi-hdd-network', 'prefix' => 'WANDevice', 'match' => ['DHCPClient', 'SentDHCPOption', 'ReqDHCPOption'], 'editable' => true],
-            'wan_routing' => ['label' => 'WAN Routing', 'icon' => 'bi-signpost', 'prefix' => 'WANDevice', 'match' => ['X_HW_IPv6', 'X_HW_IPv4', 'PolicyRoute', 'Lan1Enable', 'Lan2Enable', 'SSID1Enable'], 'editable' => true],
-            'lan_hosts' => ['label' => 'Connected Hosts', 'icon' => 'bi-pc-display', 'prefix' => 'LANDevice.1.Hosts', 'match' => [], 'editable' => false],
-            'lan_eth' => ['label' => 'LAN Ethernet Ports', 'icon' => 'bi-ethernet', 'prefix' => 'LANEthernetInterfaceConfig', 'match' => [], 'editable' => true],
-            'wlan_config' => ['label' => 'WiFi Configuration', 'icon' => 'bi-wifi', 'prefix' => 'WLANConfiguration', 'match' => [], 'editable' => true],
-            'mgmt_server' => ['label' => 'Management Server (TR-069)', 'icon' => 'bi-cloud-arrow-up', 'prefix' => 'ManagementServer', 'match' => [], 'editable' => true],
-            'time_config' => ['label' => 'Time & NTP', 'icon' => 'bi-clock', 'prefix' => 'Time', 'match' => [], 'editable' => true],
-            'voice_svc' => ['label' => 'Voice Service (VoIP)', 'icon' => 'bi-telephone', 'prefix' => 'VoiceService', 'match' => [], 'editable' => true],
-            'user_iface' => ['label' => 'User Interface', 'icon' => 'bi-display', 'prefix' => 'UserInterface', 'match' => [], 'editable' => true],
-            'device_info' => ['label' => 'Device Info (All)', 'icon' => 'bi-info-circle', 'prefix' => 'DeviceInfo', 'match' => [], 'editable' => false],
+            'ppp_interface' => ['label' => 'PPP Interface (WAN)', 'icon' => 'bi-globe', 'prefix' => 'WANDevice', 'match' => ['PPPConnection', 'WANPPPConnection'], 'editable' => true],
+            'port_forward' => ['label' => 'Port Forward', 'icon' => 'bi-arrow-left-right', 'prefix' => 'WANDevice', 'match' => ['PortMapping', 'NAT'], 'editable' => true],
+            'ip_interface' => ['label' => 'IP Interface', 'icon' => 'bi-diagram-3', 'prefix' => 'WANDevice', 'match' => ['IPConnection', 'WANIPConnection', 'ExternalIP', 'DefaultGateway'], 'editable' => true],
+            'lan_dhcp' => ['label' => 'LAN DHCP Server', 'icon' => 'bi-hdd-network', 'prefix' => 'LANDevice', 'match' => ['DHCPServer', 'DHCP'], 'editable' => true],
+            'lan_ports' => ['label' => 'LAN Ports', 'icon' => 'bi-ethernet', 'prefix' => 'LANEthernetInterfaceConfig', 'match' => [], 'editable' => true],
+            'lan_counters' => ['label' => 'LAN Counters', 'icon' => 'bi-speedometer2', 'prefix' => 'LANDevice', 'match' => ['Stats', 'Bytes', 'Packets', 'Errors'], 'editable' => false],
+            'wireless_lan' => ['label' => 'Wireless LAN', 'icon' => 'bi-wifi', 'prefix' => 'WLANConfiguration', 'match' => ['SSID', 'KeyPassphrase', 'BeaconType', 'Channel', 'Enable'], 'editable' => true],
+            'wlan_counters' => ['label' => 'WLAN Counters', 'icon' => 'bi-bar-chart', 'prefix' => 'WLANConfiguration', 'match' => ['Stats', 'TotalBytes', 'TotalPackets'], 'editable' => false],
+            'hosts' => ['label' => 'Hosts', 'icon' => 'bi-pc-display', 'prefix' => 'LANDevice.1.Hosts', 'match' => [], 'editable' => false],
+            'security' => ['label' => 'Security', 'icon' => 'bi-shield-lock', 'prefix' => 'UserInterface', 'match' => ['RemoteAccess', 'Password', 'Firewall'], 'editable' => true],
+            'voice_lines' => ['label' => 'Voice Lines', 'icon' => 'bi-telephone', 'prefix' => 'VoiceService', 'match' => [], 'editable' => true],
+            'miscellaneous' => ['label' => 'Miscellaneous', 'icon' => 'bi-three-dots', 'prefix' => '', 'match' => ['ManagementServer', 'Time', 'DeviceInfo'], 'editable' => true],
+            'troubleshooting' => ['label' => 'Troubleshooting', 'icon' => 'bi-tools', 'prefix' => '', 'match' => ['Diagnostics', 'IPPing', 'TraceRoute', 'Download', 'Upload'], 'editable' => true],
+            'device_logs' => ['label' => 'Device Logs', 'icon' => 'bi-journal-text', 'prefix' => 'DeviceInfo', 'match' => ['Log', 'DeviceLog', 'VendorLog'], 'editable' => false],
         ];
         
         $autoCatParams = [];
@@ -1755,7 +1758,7 @@ class GenieACS {
         
         // Add uncategorized as "Other Parameters"
         if (!empty($uncategorized)) {
-            $categories['other_params'] = [
+            $categories['miscellaneous_other'] = [
                 'label' => 'Other Parameters (' . count($uncategorized) . ')',
                 'icon' => 'bi-list-ul',
                 'editable' => true,
