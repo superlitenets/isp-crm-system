@@ -15524,6 +15524,7 @@ echo "# ================================================\n";
         </div>
     </div>
     
+<?php if ($view === 'locations'): ?>
     <!-- Zone Modal -->
     <div class="modal fade" id="zoneModal" tabindex="-1">
         <div class="modal-dialog">
@@ -15661,7 +15662,6 @@ echo "# ================================================\n";
         </div>
     </div>
     
-<?php if ($view === 'locations'): ?>
     <!-- ODB Modal -->
     <div class="modal fade" id="odbModal" tabindex="-1">
         <div class="modal-dialog">
