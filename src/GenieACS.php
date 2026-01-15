@@ -906,19 +906,6 @@ class GenieACS {
         $device = $result['data'];
         $wifiData = [];
         
-        $extractValue = function($device, $path) {
-            $parts = explode('.', $path);
-            $current = $device;
-            foreach ($parts as $part) {
-                if (isset($current[$part])) {
-                    $current = $current[$part];
-                } else {
-                    return null;
-                }
-            }
-            return $current['_value'] ?? $current;
-        };
-        
         // Check if LANDevice exists
         $lanDevice = $device['InternetGatewayDevice']['LANDevice']['1'] ?? null;
         if (!$lanDevice || !isset($lanDevice['WLANConfiguration'])) {
@@ -927,20 +914,33 @@ class GenieACS {
         
         // Dynamically iterate over all available WLANConfiguration entries
         $wlanConfig = $lanDevice['WLANConfiguration'] ?? [];
-        foreach ($wlanConfig as $idx => $config) {
+        
+        // For HG8546M and similar: Interfaces are typically 1,2,5,6 (2.4G, 2.4G Guest, 5G, 5G Guest)
+        // Check all potential indices from 1 to 8
+        $potentialIndices = array_merge(array_keys($wlanConfig), [1, 2, 3, 4, 5, 6, 7, 8]);
+        $potentialIndices = array_unique($potentialIndices);
+        sort($potentialIndices);
+        
+        foreach ($potentialIndices as $idx) {
             if (!is_numeric($idx)) continue;
+            
+            $config = $wlanConfig[$idx] ?? null;
+            if (!$config) continue;
             
             $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}";
             $ssid = isset($config['SSID']['_value']) ? $config['SSID']['_value'] : ($config['SSID'] ?? null);
             $enable = isset($config['Enable']['_value']) ? $config['Enable']['_value'] : ($config['Enable'] ?? null);
             $channel = isset($config['Channel']['_value']) ? $config['Channel']['_value'] : ($config['Channel'] ?? null);
+            $standard = isset($config['Standard']['_value']) ? $config['Standard']['_value'] : ($config['Standard'] ?? null);
             $password = isset($config['PreSharedKey']['1']['KeyPassphrase']['_value']) 
                 ? $config['PreSharedKey']['1']['KeyPassphrase']['_value'] 
                 : null;
             
+            // Include interface even if some values are null
             $wifiData[] = ["{$basePath}.SSID", $ssid];
             $wifiData[] = ["{$basePath}.Enable", $enable];
             $wifiData[] = ["{$basePath}.Channel", $channel];
+            $wifiData[] = ["{$basePath}.Standard", $standard];
             if ($password !== null) {
                 $wifiData[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password];
             }
@@ -952,7 +952,6 @@ class GenieACS {
         
         return ['success' => true, 'data' => $wifiData];
     }
-    
     public function setPPPoECredentials(string $deviceId, string $username, string $password): array {
         $params = [
             ['InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username', $username, 'xsd:string'],
