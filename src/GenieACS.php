@@ -1197,6 +1197,10 @@ class GenieACS {
         $device = $result['data'];
         $categories = [];
         
+        // DEBUG: Log first 20 keys to understand structure
+        $debugKeys = array_slice(array_keys($device), 0, 30);
+        error_log("DEBUG getDeviceStatus - Device keys: " . json_encode($debugKeys));
+        
         // Check if device has actual values (not just parameter structure)
         $hasValues = false;
         foreach ($device as $key => $val) {
