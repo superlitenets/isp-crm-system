@@ -3065,7 +3065,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $messageType = 'danger';
                     }
                 } else {
-                    // TR-069 method - configure via GenieACS
+                    // TR-069 method - configure via GenieACS using 4-step approach
+                    // Step 1: Summon (getParameterNames) - Force discovery
+                    // Step 2: AddObject - Create WANPPPConnection
+                    // Step 3: Refresh (getParameterValues) - Read parameters
+                    // Step 4: SetParameterValues - Set PPPoE credentials
                     $genieacs = new \App\GenieACS($pdo);
                     
                     $deviceResult = $genieacs->getDeviceBySerial($serial);
@@ -3077,30 +3081,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     
                     $deviceId = $deviceResult['device']['_id'];
                     
-                    $config = [
-                        'connection_type' => $connType,
-                        'service_vlan' => $vlanId,
-                        'wan_index' => 1,
-                        'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
-                    ];
-                    
                     if ($connType === 'pppoe') {
-                        $config['pppoe_username'] = $_POST['pppoe_username'] ?? '';
-                        $config['pppoe_password'] = $_POST['pppoe_password'] ?? '';
-                    } elseif ($connType === 'static') {
-                        $config['static_ip'] = $_POST['static_ip'] ?? '';
-                        $config['static_mask'] = $_POST['subnet_mask'] ?? '255.255.255.0';
-                        $config['static_gateway'] = $_POST['gateway'] ?? '';
-                    }
-                    
-                    $result = $genieacs->configureInternetWAN($deviceId, $config);
-                    
-                    if ($result['success']) {
-                        $message = 'Internet WAN configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
-                        $messageType = 'success';
+                        $pppoeUsername = $_POST['pppoe_username'] ?? '';
+                        $pppoePassword = $_POST['pppoe_password'] ?? '';
+                        
+                        if (empty($pppoeUsername) || empty($pppoePassword)) {
+                            $message = 'PPPoE username and password are required';
+                            $messageType = 'danger';
+                            break;
+                        }
+                        
+                        // Use 4-step method with connection_request for immediate execution
+                        $result = $genieacs->configurePPPoE4Step(
+                            $deviceId,
+                            $pppoeUsername,
+                            $pppoePassword,
+                            true,  // NAT enabled
+                            1,     // WANDevice index
+                            1,     // WANConnectionDevice index
+                            true   // Use connection_request for immediate push
+                        );
+                        
+                        if ($result['success']) {
+                            $message = 'PPPoE configured via TR-069 (4-step). Steps: Summon, AddObject, Refresh, SetParams';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'TR-069 PPPoE failed: ' . ($result['error'] ?? 'Unknown error');
+                            $messageType = 'danger';
+                        }
                     } else {
-                        $message = 'Failed to configure WAN via TR-069: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
-                        $messageType = 'danger';
+                        // DHCP/Static - use simpler approach
+                        $config = [
+                            'connection_type' => $connType,
+                            'service_vlan' => $vlanId,
+                            'skip_safety_checks' => true
+                        ];
+                        if ($connType === 'static') {
+                            $config['static_ip'] = $_POST['static_ip'] ?? '';
+                            $config['static_mask'] = $_POST['subnet_mask'] ?? '255.255.255.0';
+                            $config['static_gateway'] = $_POST['gateway'] ?? '';
+                        }
+                        $result = $genieacs->configureInternetWAN($deviceId, $config);
+                        
+                        if ($result['success']) {
+                            $message = strtoupper($connType) . ' configured via TR-069';
+                            $messageType = 'success';
+                        } else {
+                            $message = 'TR-069 ' . strtoupper($connType) . ' failed: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                            $messageType = 'danger';
+                        }
                     }
                 }
                 break;
