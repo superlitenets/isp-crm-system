@@ -23,7 +23,7 @@ class GenieACS {
         $this->baseUrl = rtrim($settings['genieacs_url'] ?? 'http://localhost:7557', '/');
         $this->username = $settings['genieacs_username'] ?? '';
         $this->password = $settings['genieacs_password'] ?? '';
-        $this->timeout = (int)($settings['genieacs_timeout'] ?? 30);
+        $this->timeout = (int)($settings['genieacs_timeout'] ?? 60);
     }
     
     public function isConfigured(): bool {
@@ -397,7 +397,7 @@ class GenieACS {
         
         // Use connection_request with timeout to execute immediately and wait for completion
         // timeout=30000 (30s) ensures task executes during session, not just queued
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=60000", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
         ]);
@@ -2316,7 +2316,7 @@ class GenieACS {
         
         // Use connection_request for immediate push, or queue for next inform
         $endpoint = $useConnectionRequest 
-            ? "/devices/{$encodedId}/tasks?connection_request&timeout=30000"
+            ? "/devices/{$encodedId}/tasks?connection_request&timeout=60000"
             : "/devices/{$encodedId}/tasks";
         
         // Step 1: Summon - Force discovery of WAN path
@@ -2453,7 +2453,7 @@ class GenieACS {
         
         $encodedId = urlencode($deviceId);
         $endpoint = $useConnectionRequest 
-            ? "/devices/{$encodedId}/tasks?connection_request&timeout=30000"
+            ? "/devices/{$encodedId}/tasks?connection_request&timeout=60000"
             : "/devices/{$encodedId}/tasks";
         
         // First refresh to ensure parameters exist in GenieACS
