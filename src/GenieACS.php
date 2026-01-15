@@ -1650,8 +1650,45 @@ class GenieACS {
             'params' => $fwParams
         ];
         
-        // Remove categories with no valid parameters
+        // ALL PARAMETERS - Show everything the device has (like SmartOLT raw view)
+        $allParams = [];
+        $sortedKeys = array_keys($device);
+        sort($sortedKeys);
+        foreach ($sortedKeys as $key) {
+            // Skip metadata keys
+            if (str_starts_with($key, '_')) continue;
+            
+            $val = $device[$key];
+            if (is_array($val) && isset($val['_value'])) {
+                $paramValue = $val['_value'];
+                $writable = $val['_writable'] ?? false;
+                
+                // Create readable label from path
+                $pathParts = explode('.', $key);
+                $shortLabel = end($pathParts);
+                
+                $allParams[] = [
+                    'path' => $key,
+                    'label' => $shortLabel,
+                    'full_path' => $key,
+                    'value' => $paramValue,
+                    'type' => $writable ? 'string' : 'readonly'
+                ];
+            }
+        }
+        if (!empty($allParams)) {
+            $categories['all_parameters'] = [
+                'label' => 'All Parameters (' . count($allParams) . ')',
+                'icon' => 'bi-list-ul',
+                'editable' => true,
+                'collapsed' => true,
+                'params' => $allParams
+            ];
+        }
+        
+        // Remove categories with no valid parameters (except all_parameters)
         foreach ($categories as $key => $category) {
+            if ($key === 'all_parameters') continue;
             $hasValue = false;
             foreach ($category['params'] as $param) {
                 if ($param['value'] !== null) {
@@ -1668,7 +1705,8 @@ class GenieACS {
             'success' => true,
             'device_id' => $deviceId,
             'last_inform' => $device['_lastInform'] ?? null,
-            'categories' => $categories
+            'categories' => $categories,
+            'total_params' => count($allParams)
         ];
     }
     
