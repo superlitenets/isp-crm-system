@@ -15850,37 +15850,94 @@ function renderDeviceStatus(categories) {
     for (const [key, category] of Object.entries(categories)) {
         const collapseId = 'collapse_' + key;
         const headerId = 'header_' + key;
-        const isExpanded = index === 0; // First one expanded
+        const isExpanded = index === 0;
         
         let paramsHtml = '';
-        if (category.params) {
+        
+        // Special rendering for LAN Ports - table format
+        if (key === 'lan_ports' && category.params && category.params.length > 0) {
+            const ports = {};
+            category.params.forEach(param => {
+                const match = param.path.match(/LANEthernetInterfaceConfig\.(\d+)\./);
+                if (match) {
+                    const portNum = match[1];
+                    if (!ports[portNum]) ports[portNum] = { params: {} };
+                    const paramName = param.path.split('.').pop();
+                    ports[portNum].params[paramName] = param;
+                    originalDeviceParams[param.path] = param.value;
+                }
+            });
+            
+            paramsHtml = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Port</th>
+                                <th class="text-center">Enable</th>
+                                <th>Status</th>
+                                <th>Speed</th>
+                                <th>Duplex</th>
+                                <th class="text-center">L3 Enable</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+            Object.keys(ports).sort((a,b) => a-b).forEach(portNum => {
+                const p = ports[portNum].params;
+                const statusClass = p.Status?.value === 'Up' ? 'text-success' : 'text-muted';
+                const statusIcon = p.Status?.value === 'Up' ? 'bi-check-circle-fill' : 'bi-x-circle';
+                
+                paramsHtml += `
+                    <tr>
+                        <td><strong>LAN ${portNum}</strong></td>
+                        <td class="text-center">
+                            <div class="form-check form-switch d-inline-block mb-0">
+                                <input class="form-check-input device-param" type="checkbox" 
+                                       data-path="${p.Enable?.path || ''}" 
+                                       ${p.Enable?.value ? 'checked' : ''} 
+                                       ${!category.editable ? 'disabled' : ''}>
+                            </div>
+                        </td>
+                        <td class="${statusClass}"><i class="bi ${statusIcon} me-1"></i>${p.Status?.value || 'Unknown'}</td>
+                        <td>${p.MaxBitRate?.value || '-'}</td>
+                        <td>${p.DuplexMode?.value || '-'}</td>
+                        <td class="text-center">
+                            <div class="form-check form-switch d-inline-block mb-0">
+                                <input class="form-check-input device-param" type="checkbox" 
+                                       data-path="${p.X_HW_L3Enable?.path || ''}" 
+                                       ${p.X_HW_L3Enable?.value ? 'checked' : ''} 
+                                       ${!category.editable ? 'disabled' : ''}>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+            
+            paramsHtml += `</tbody></table></div>`;
+            
+        } else if (key === 'wan_pppoe' && category.params) {
+            paramsHtml = `<div class="row g-3">`;
+            let leftCol = '', rightCol = '';
+            category.params.forEach((param, idx) => {
+                if (param.value !== null && param.value !== undefined) {
+                    originalDeviceParams[param.path] = param.value;
+                    let inputHtml = renderParamInput(param, category.editable);
+                    const fieldHtml = `
+                        <div class="mb-2">
+                            <label class="form-label small text-muted mb-1">${param.label}</label>
+                            ${inputHtml}
+                        </div>`;
+                    if (idx % 2 === 0) leftCol += fieldHtml;
+                    else rightCol += fieldHtml;
+                }
+            });
+            paramsHtml += `<div class="col-md-6">${leftCol}</div><div class="col-md-6">${rightCol}</div></div>`;
+            
+        } else if (category.params) {
             category.params.forEach(param => {
                 if (param.value !== null && param.value !== undefined) {
                     originalDeviceParams[param.path] = param.value;
-                    
-                    let inputHtml = '';
-                    const isReadonly = param.type === 'readonly' || !category.editable;
-                    
-                    if (param.type === 'boolean') {
-                        const checked = param.value === true || param.value === 'true' || param.value === 1;
-                        inputHtml = `<div class="form-check form-switch">
-                            <input class="form-check-input device-param" type="checkbox" data-path="${param.path}" 
-                                   ${checked ? 'checked' : ''} ${isReadonly ? 'disabled' : ''}>
-                        </div>`;
-                    } else if (param.type === 'password') {
-                        inputHtml = `<input type="password" class="form-control form-control-sm device-param" 
-                                           data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
-                                           ${isReadonly ? 'readonly' : ''}>`;
-                    } else if (param.type === 'number') {
-                        inputHtml = `<input type="number" class="form-control form-control-sm device-param" 
-                                           data-path="${param.path}" value="${param.value || 0}"
-                                           ${isReadonly ? 'readonly' : ''}>`;
-                    } else {
-                        inputHtml = `<input type="text" class="form-control form-control-sm device-param" 
-                                           data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
-                                           ${isReadonly ? 'readonly' : ''}>`;
-                    }
-                    
+                    let inputHtml = renderParamInput(param, category.editable);
                     paramsHtml += `
                         <div class="row mb-2 align-items-center">
                             <div class="col-5"><small class="text-muted">${param.label}</small></div>
@@ -15890,8 +15947,9 @@ function renderDeviceStatus(categories) {
             });
         }
         
-        // Skip empty categories
         if (!paramsHtml) continue;
+        
+        const paramCount = category.params ? category.params.filter(p => p.value !== null && p.value !== undefined).length : 0;
         
         const html = `
             <div class="accordion-item">
@@ -15900,12 +15958,13 @@ function renderDeviceStatus(categories) {
                             data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <i class="${category.icon || 'bi-gear'} me-2"></i>
                         ${category.label}
-                        ${category.editable ? '<span class="badge bg-success ms-2">Editable</span>' : ''}
+                        <span class="badge bg-secondary ms-2">${paramCount}</span>
+                        ${category.editable ? '<span class="badge bg-success ms-1">Editable</span>' : ''}
                     </button>
                 </h2>
                 <div id="${collapseId}" class="accordion-collapse collapse ${isExpanded ? 'show' : ''}" 
                      data-bs-parent="#deviceStatusAccordion">
-                    <div class="accordion-body">
+                    <div class="accordion-body p-2">
                         ${paramsHtml}
                     </div>
                 </div>
@@ -15913,6 +15972,30 @@ function renderDeviceStatus(categories) {
         
         accordion.innerHTML += html;
         index++;
+    }
+}
+
+function renderParamInput(param, editable) {
+    const isReadonly = param.type === 'readonly' || !editable;
+    
+    if (param.type === 'boolean') {
+        const checked = param.value === true || param.value === 'true' || param.value === 1;
+        return `<div class="form-check form-switch">
+            <input class="form-check-input device-param" type="checkbox" data-path="${param.path}" 
+                   ${checked ? 'checked' : ''} ${isReadonly ? 'disabled' : ''}>
+        </div>`;
+    } else if (param.type === 'password') {
+        return `<input type="password" class="form-control form-control-sm device-param" 
+                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
+                       ${isReadonly ? 'readonly' : ''}>`;
+    } else if (param.type === 'number') {
+        return `<input type="number" class="form-control form-control-sm device-param" 
+                       data-path="${param.path}" value="${param.value || 0}"
+                       ${isReadonly ? 'readonly' : ''}>`;
+    } else {
+        return `<input type="text" class="form-control form-control-sm device-param" 
+                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
+                       ${isReadonly ? 'readonly' : ''}>`;
     }
 }
 
