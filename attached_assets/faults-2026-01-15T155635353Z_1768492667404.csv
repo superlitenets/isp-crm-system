@@ -1,0 +1,13 @@
+"Device","Channel","Code","Message","Detail","Retries","Timestamp"
+"00259E-HG8546M-48575443F2D53A8B","task_69690dd908b7b6920fad2baa","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at refresh
+",0,"2026-01-15T15:55:12.176Z"
+"00259E-HG8546M-48575443F2D53A8B","task_69690ddf593b9387a64942df","script.Error","Invalid parameter path","name: Error
+message: Invalid parameter path
+stack: |-
+  Error: Invalid parameter path
+      at refresh
+",0,"2026-01-15T15:55:12.176Z"

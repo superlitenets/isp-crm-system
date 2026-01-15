@@ -2586,10 +2586,7 @@ class GenieACS {
     public function checkWANConnectionExists(string $deviceId, int $wanIndex = 1): array {
         $wanBase = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{$wanIndex}";
         
-        // Refresh the WAN data first
-        $this->refreshObject($deviceId, $wanBase);
-        
-        // Get device data
+        // Get device data (skip refresh to avoid invalid path errors)
         $result = $this->getDevice($deviceId);
         if (!$result['success'] || empty($result['data'])) {
             return ['exists' => false, 'error' => 'Device not found'];
