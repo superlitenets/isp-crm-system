@@ -1,0 +1,453 @@
+root@superlitecrm:~/isp# # Check for virtual parameters
+docker exec isp_crm_genieacs_mongo mongosh genieacs --eval '
+print("Virtual Parameters: " + db.virtualParameters.countDocuments({}));
+db.virtualParameters.find().forEach(function(doc) { printjson(doc); });
+'
+
+# Drop virtual parameters too
+docker exec isp_crm_genieacs_mongo mongosh genieacs --eval '
+db.virtualParameters.drop();
+print("Virtual parameters dropped");
+'
+
+# Also check/clear config collection
+docker exec isp_crm_genieacs_mongo mongosh genieacs --eval '
+print("Config entries:");
+db.config.find().forEach(function(doc) { printjson(doc); });
+'
+Virtual Parameters: 0
+Virtual parameters dropped
+Config entries:
+{
+  _id: 'ui.filters.1.parameter',
+  value: 'DeviceID.ProductClass'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.5',
+  value: 'InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.KeyPassphrase'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.6',
+  value: 'InternetGatewayDevice.LANDevice.*.Hosts.Host.*.HostName'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.7',
+  value: 'InternetGatewayDevice.LANDevice.*.Hosts.Host.*.IPAddress'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.8',
+  value: 'InternetGatewayDevice.LANDevice.*.Hosts.Host.*.MACAddress'
+}
+{
+  _id: 'ui.device.2.parameters.0.parameter',
+  value: 'DATE_STRING(Events.Inform)'
+}
+{
+  _id: 'ui.device.2.parameters.1.label',
+  value: "'Serial number'"
+}
+{
+  _id: 'ui.device.2.parameters.1.parameter',
+  value: 'DeviceID.SerialNumber'
+}
+{
+  _id: 'ui.device.2.parameters.2.label',
+  value: "'Product class'"
+}
+{
+  _id: 'ui.device.2.parameters.2.parameter',
+  value: 'DeviceID.ProductClass'
+}
+{
+  _id: 'ui.device.2.parameters.3.label',
+  value: "'OUI'"
+}
+{
+  _id: 'ui.device.2.parameters.3.parameter',
+  value: 'DeviceID.OUI'
+}
+{
+  _id: 'ui.device.2.parameters.4.label',
+  value: "'Manufacturer'"
+}
+{
+  _id: 'ui.device.6.type',
+  value: "'device-actions'"
+}
+{
+  _id: 'ui.device.2.parameters.5.label',
+  value: "'Hardware version'"
+}
+{
+  _id: 'ui.index.3.label',
+  value: "'IP'"
+}
+{
+  _id: 'ui.index.3.parameter',
+  value: 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress'
+}
+{
+  _id: 'ui.device.2.parameters.7.label',
+  value: "'MAC'"
+}
+{
+  _id: 'ui.device.2.parameters.4.parameter',
+  value: 'DeviceID.Manufacturer'
+}
+{
+  _id: 'ui.device.2.parameters.7.parameter',
+  value: 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.MACAddress'
+}
+{
+  _id: 'ui.filters.0.type',
+  value: "'string'"
+}
+{
+  _id: 'ui.filters.0.parameter',
+  value: 'DeviceID.SerialNumber'
+}
+{
+  _id: 'ui.device.2.parameters.9.label',
+  value: "'WLAN SSID'"
+}
+{
+  _id: 'ui.device.2.parameters.10.parameter',
+  value: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase'
+}
+{
+  _id: 'ui.device.2.parameters.9.parameter',
+  value: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID'
+}
+{
+  _id: 'ui.device.2.parameters.10.label',
+  value: "'WLAN passphrase'"
+}
+{
+  _id: 'ui.index.5.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.filters.1.label',
+  value: "'Product class'"
+}
+{
+  _id: 'ui.filters.1.type',
+  value: "'string'"
+}
+{
+  _id: 'ui.filters.2.label',
+  value: "'Tag'"
+}
+{
+  _id: 'ui.index.5.element',
+  value: "'span.inform'"
+}
+{
+  _id: 'ui.device.3.label',
+  value: "'LAN hosts'"
+}
+{
+  _id: 'ui.index.5.parameter',
+  value: 'DATE_STRING(Events.Inform)'
+}
+{
+  _id: 'ui.device.3.childParameters.0.parameter',
+  value: 'HostName'
+}
+{
+  _id: 'ui.device.3.childParameters.1.label',
+  value: "'IP address'"
+}
+{
+  _id: 'ui.device.3.childParameters.1.parameter',
+  value: 'IPAddress'
+}
+{
+  _id: 'ui.device.3.childParameters.2.label',
+  value: "'MAC address'"
+}
+{
+  _id: 'ui.device.3.childParameters.2.parameter',
+  value: 'MACAddress'
+}
+{
+  _id: 'ui.device.4.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.device.4.element',
+  value: "'div'"
+}
+{
+  _id: 'ui.device.4.components.0.components.0',
+  value: "'Faults'"
+}
+{
+  _id: 'ui.filters.2.type',
+  value: "'tag'"
+}
+{
+  _id: 'ui.index.6.label',
+  value: "'Tags'"
+}
+{
+  _id: 'ui.device.1.type',
+  value: "'ping'"
+}
+{
+  _id: 'ui.device.2.type',
+  value: "'parameter-list'"
+}
+{
+  _id: 'ui.index.6.unsortable',
+  value: 'true'
+}
+{
+  _id: 'ui.device.2.parameters.0.label',
+  value: "'Last inform'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.0.type',
+  value: "'parameter'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.1.chart',
+  value: "'online'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.type',
+  value: "'summon-button'"
+}
+{
+  _id: 'ui.device.4.components.1.type',
+  value: "'device-faults'"
+}
+{
+  _id: 'ui.device.4.components.0.element',
+  value: "'h3'"
+}
+{
+  _id: 'ui.device.5.element',
+  value: "'div.container-full-width'"
+}
+{
+  _id: 'ui.device.5.components.0.components.0',
+  value: "'All parameters'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.0',
+  value: 'InternetGatewayDevice.DeviceInfo.HardwareVersion'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.3',
+  value: 'InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.ExternalIPAddress'
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.1',
+  value: 'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
+}
+{
+  _id: 'ui.device.4.components.0.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.device.5.components.0.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.device.5.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.device.5.components.0.element',
+  value: "'h3'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.4',
+  value: 'InternetGatewayDevice.LANDevice.*.WLANConfiguration.*.SSID'
+}
+{
+  _id: 'ui.device.5.components.1.type',
+  value: "'all-parameters'"
+}
+{
+  _id: 'ui.index.0.label',
+  value: "'Serial number'"
+}
+{
+  _id: 'ui.index.0.parameter',
+  value: 'DeviceID.SerialNumber'
+}
+{
+  _id: 'ui.index.0.components.0.type',
+  value: "'parameter'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.3_others.filter',
+  value: 'Events.Inform < (NOW() - 5 * 60 * 1000) - (24 * 60 * 60 * 1000)'
+}
+{
+  _id: 'ui.index.2.label',
+  value: "'Software version'"
+}
+{
+  _id: 'ui.index.2.parameter',
+  value: 'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
+}
+{
+  _id: 'ui.device.2.parameters.5.parameter',
+  value: 'InternetGatewayDevice.DeviceInfo.HardwareVersion'
+}
+{
+  _id: 'ui.device.2.parameters.6.label',
+  value: "'Software version'"
+}
+{
+  _id: 'ui.device.2.parameters.6.parameter',
+  value: 'InternetGatewayDevice.DeviceInfo.SoftwareVersion'
+}
+{
+  _id: 'ui.device.2.parameters.8.label',
+  value: "'IP'"
+}
+{
+  _id: 'ui.device.2.parameters.8.parameter',
+  value: 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress'
+}
+{
+  _id: 'ui.index.4.label',
+  value: "'SSID'"
+}
+{
+  _id: 'ui.index.4.parameter',
+  value: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID'
+}
+{
+  _id: 'ui.device.3.type',
+  value: "'parameter-table'"
+}
+{
+  _id: 'ui.device.3.childParameters.0.label',
+  value: "'Host name'"
+}
+{
+  _id: 'ui.device.3.parameter',
+  value: 'InternetGatewayDevice.LANDevice.1.Hosts.Host'
+}
+{
+  _id: 'ui.index.5.components.0.type',
+  value: "'parameter'"
+}
+{
+  _id: 'ui.index.5.components.1.chart',
+  value: "'online'"
+}
+{
+  _id: 'ui.index.5.components.1.type',
+  value: "'overview-dot'"
+}
+{
+  _id: 'ui.index.6.type',
+  value: "'tags'"
+}
+{
+  _id: 'ui.index.6.parameter',
+  value: 'Tags'
+}
+{
+  _id: 'ui.device.2.parameters.0.type',
+  value: "'container'"
+}
+{
+  _id: 'ui.index.6.writable',
+  value: 'false'
+}
+{
+  _id: 'ui.overview.charts.online.label',
+  value: "'Online status'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.1_onlineNow.color',
+  value: "'#31a354'"
+}
+{
+  _id: 'ui.index.0.type',
+  value: "'device-link'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.1_onlineNow.label',
+  value: "'Online now'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.2_past24.color',
+  value: "'#a1d99b'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.2_past24.filter',
+  value: 'Events.Inform > (NOW() - 5 * 60 * 1000) - (24 * 60 * 60 * 1000) AND Events.Inform < (NOW() - 5 * 60 * 1000)'
+}
+{
+  _id: 'ui.overview.charts.online.slices.2_past24.label',
+  value: "'Past 24 hours'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.3_others.color',
+  value: "'#e5f5e0'"
+}
+{
+  _id: 'ui.index.1.parameter',
+  value: 'DeviceID.ProductClass'
+}
+{
+  _id: 'ui.overview.groups.online.label',
+  value: "''"
+}
+{
+  _id: 'ui.overview.groups.online.charts.0',
+  value: "'online'"
+}
+{
+  _id: 'ui.index.1.label',
+  value: "'Product class'"
+}
+{
+  _id: 'ui.index.5.label',
+  value: "'Last inform'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.3_others.label',
+  value: "'Others'"
+}
+{
+  _id: 'ui.overview.charts.online.slices.1_onlineNow.filter',
+  value: 'Events.Inform > NOW() - 5 * 60 * 1000'
+}
+{
+  _id: 'ui.filters.0.label',
+  value: "'Serial number'"
+}
+{
+  _id: 'ui.device.0.type',
+  value: "'tags'"
+}
+{
+  _id: 'ui.device.2.parameters.0.element',
+  value: "'span.inform'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.1.type',
+  value: "'overview-dot'"
+}
+{
+  _id: 'ui.device.2.parameters.0.components.2.parameters.2',
+  value: 'InternetGatewayDevice.WANDevice.*.WANConnectionDevice.*.WANIPConnection.*.MACAddress'
+}
+{
+  _id: 'cwmp.datetimeMilliseconds',
+  value: 'false'
+}
+root@superlitecrm:~/isp# docker exec isp_crm_genieacs ls -la /opt/genieacs/ext/ 2>/dev/null || echo "No ext dir"
+total 8
+drwxr-xr-x  2 genieacs genieacs 4096 Dec  5 16:30 .
+drwxr-xr-x 13 genieacs genieacs 4096 Jan 15 21:25 ..
+root@superlitecrm:~/isp#
