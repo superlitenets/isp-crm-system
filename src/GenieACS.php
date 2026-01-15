@@ -2945,4 +2945,54 @@ PROVISION;
         ];
     }
 
+    /**
+     * Configure PPPoE using direct setParameterValues (instant execution like WiFi)
+     * This uses the same approach as editing WiFi parameters - direct and immediate
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password
+     * @param int $vlan Service VLAN (for X_HW_VLAN parameter)
+     * @param bool $enable Enable the connection (default true)
+     * @return array Result with success status
+     */
+    public function configurePPPoEDirect(string $deviceId, string $username, string $password, 
+                                          int $vlan = 0, bool $enable = true): array {
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'Username and password are required'];
+        }
+        
+        $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+        
+        // Build parameter list (same format as WiFi config)
+        $params = [
+            ["{$pppBase}.Enable", $enable, 'xsd:boolean'],
+            ["{$pppBase}.Username", $username, 'xsd:string'],
+            ["{$pppBase}.Password", $password, 'xsd:string'],
+            ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
+            ["{$pppBase}.ConnectionType", 'IP_Routed', 'xsd:string'],
+            ["{$pppBase}.ConnectionTrigger", 'AlwaysOn', 'xsd:string'],
+        ];
+        
+        // Add VLAN if specified
+        if ($vlan > 0) {
+            $params[] = ["{$pppBase}.X_HW_VLAN", $vlan, 'xsd:unsignedInt'];
+        }
+        
+        error_log("[GenieACS] configurePPPoEDirect to {$deviceId}: username={$username}, vlan={$vlan}");
+        
+        // Use setParameterValues which already uses connection_request for instant push
+        $result = $this->setParameterValues($deviceId, $params);
+        
+        return [
+            'success' => $result['success'] ?? false,
+            'message' => ($result['success'] ?? false)
+                ? "PPPoE configured instantly (username: {$username}, vlan: {$vlan})"
+                : 'Failed to set PPPoE parameters',
+            'http_code' => $result['http_code'] ?? 0,
+            'error' => $result['error'] ?? null,
+            'details' => $result
+        ];
+    }
+
 }
