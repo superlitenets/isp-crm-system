@@ -15694,16 +15694,35 @@ echo "# ================================================\n";
                                 </select>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">ODB Code <span class="text-danger">*</span></label>
+                                <input type="text" name="code" id="odbCode" class="form-control" required placeholder="e.g., ODB-001">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Capacity <span class="text-danger">*</span></label>
+                                <input type="number" name="capacity" id="odbCapacity" class="form-control" required min="1" value="8">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Location Description</label>
+                            <input type="text" name="location_description" id="odbLocation" class="form-control" placeholder="e.g., Floor 2, Near Elevator">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" name="is_active" id="odbActive" class="form-check-input" value="1" checked>
+                            <label class="form-check-label">Active</label>
+                        </div>
                     </div>
-                </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save ODB</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
-</div>
 
 <?php endif; ?>
-
-<!-- Device Status Modal (SmartOLT-style) -->
 <div class="modal fade" id="deviceStatusModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -15916,38 +15935,6 @@ function saveDeviceStatus() {
 }
 </script>
 
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <label class="form-label">ODB Code <span class="text-danger">*</span></label>
-                                <input type="text" name="code" id="odbCode" class="form-control" required placeholder="e.g., ODB-001">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Capacity <span class="text-danger">*</span></label>
-                                <input type="number" name="capacity" id="odbCapacity" class="form-control" required min="1" value="8">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Location Description</label>
-                            <input type="text" name="location_description" id="odbLocation" class="form-control" placeholder="e.g., Floor 2, Near Elevator">
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" name="is_active" id="odbActive" class="form-check-input" value="1" checked>
-                            <label class="form-check-label">Active</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save ODB</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script>
     // Loading overlay for OLT sync operations
     const loadingMessages = {
         'sync_onus_snmp': 'Syncing ONUs from OLT...',
