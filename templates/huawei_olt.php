@@ -3015,6 +3015,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     $messageType = 'danger';
                 }
                 break;
+            case 'get_device_status':
+                // Get all device parameters organized by category (like SmartOLT)
+                require_once __DIR__ . '/../src/GenieACS.php';
+                header('Content-Type: application/json');
+                
+                $serial = $_POST['serial'] ?? '';
+                if (empty($serial)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                    exit;
+                }
+                
+                $genieacs = new \App\GenieACS($db);
+                
+                // Find device by serial
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if (!($deviceResult['success'] ?? false) || empty($deviceResult['data'])) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
+                    exit;
+                }
+                
+                $deviceId = $deviceResult['data']['_id'] ?? '';
+                $result = $genieacs->getDeviceStatus($deviceId);
+                echo json_encode($result);
+                exit;
+                
+            case 'save_device_params':
+                // Save device parameters (batch update)
+                require_once __DIR__ . '/../src/GenieACS.php';
+                header('Content-Type: application/json');
+                
+                $serial = $_POST['serial'] ?? '';
+                $params = json_decode($_POST['params'] ?? '{}', true);
+                
+                if (empty($serial)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                    exit;
+                }
+                
+                if (empty($params)) {
+                    echo json_encode(['success' => false, 'error' => 'No parameters to save']);
+                    exit;
+                }
+                
+                $genieacs = new \App\GenieACS($db);
+                
+                // Find device by serial
+                $deviceResult = $genieacs->getDeviceBySerial($serial);
+                if (!($deviceResult['success'] ?? false) || empty($deviceResult['data'])) {
+                    echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
+                    exit;
+                }
+                
+                $deviceId = $deviceResult['data']['_id'] ?? '';
+                $result = $genieacs->saveDeviceParams($deviceId, $params);
+                echo json_encode($result);
+                exit;
+                
             case 'configure_pppoe':
                 // Internet WAN configuration - supports both TR-069 and OMCI methods
                 require_once __DIR__ . '/../src/GenieACS.php';
@@ -15612,7 +15669,222 @@ echo "# ================================================\n";
                                     <option value="">-- None --</option>
                                     <?php foreach ($apartments as $apt): ?>
                                     <option value="<?= $apt['id'] ?>" data-zone="<?= $apt['zone_id'] ?>"><?= htmlspecialchars($apt['name']) ?></option>
-                                    <?php endforeach; ?>
+                                    <?php endforeach; 
+
+<!-- Device Status Modal (SmartOLT-style) -->
+<div class="modal fade" id="deviceStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-cpu me-2"></i>
+                    Device Status - <span id="deviceStatusSerial"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="deviceStatusLoading" class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Loading device parameters...</p>
+                </div>
+                <div id="deviceStatusContent" style="display:none;">
+                    <div class="accordion" id="deviceStatusAccordion">
+                        <!-- Categories will be populated dynamically -->
+                    </div>
+                </div>
+                <div id="deviceStatusError" class="alert alert-danger m-3" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
+                    <i class="bi bi-check-circle me-1"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Device Status Modal Functions
+let currentDeviceStatusSerial = '';
+let originalDeviceParams = {};
+
+function openDeviceStatus(serial) {
+    currentDeviceStatusSerial = serial;
+    document.getElementById('deviceStatusSerial').textContent = serial;
+    document.getElementById('deviceStatusLoading').style.display = 'block';
+    document.getElementById('deviceStatusContent').style.display = 'none';
+    document.getElementById('deviceStatusError').style.display = 'none';
+    document.getElementById('deviceStatusSaveBtn').disabled = true;
+    originalDeviceParams = {};
+    
+    const modal = new bootstrap.Modal(document.getElementById('deviceStatusModal'));
+    modal.show();
+    
+    // Fetch device status
+    const formData = new FormData();
+    formData.append('action', 'get_device_status');
+    formData.append('serial', serial);
+    
+    fetch('?page=huawei-olt', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('deviceStatusLoading').style.display = 'none';
+        if (data.success) {
+            renderDeviceStatus(data.categories);
+            document.getElementById('deviceStatusContent').style.display = 'block';
+            document.getElementById('deviceStatusSaveBtn').disabled = false;
+        } else {
+            document.getElementById('deviceStatusError').textContent = data.error || 'Failed to load device status';
+            document.getElementById('deviceStatusError').style.display = 'block';
+        }
+    })
+    .catch(err => {
+        document.getElementById('deviceStatusLoading').style.display = 'none';
+        document.getElementById('deviceStatusError').textContent = 'Error: ' + err.message;
+        document.getElementById('deviceStatusError').style.display = 'block';
+    });
+}
+
+function renderDeviceStatus(categories) {
+    const accordion = document.getElementById('deviceStatusAccordion');
+    accordion.innerHTML = '';
+    
+    let index = 0;
+    for (const [key, category] of Object.entries(categories)) {
+        const collapseId = 'collapse_' + key;
+        const headerId = 'header_' + key;
+        const isExpanded = index === 0; // First one expanded
+        
+        let paramsHtml = '';
+        if (category.params) {
+            category.params.forEach(param => {
+                if (param.value !== null && param.value !== undefined) {
+                    originalDeviceParams[param.path] = param.value;
+                    
+                    let inputHtml = '';
+                    const isReadonly = param.type === 'readonly' || !category.editable;
+                    
+                    if (param.type === 'boolean') {
+                        const checked = param.value === true || param.value === 'true' || param.value === 1;
+                        inputHtml = `<div class="form-check form-switch">
+                            <input class="form-check-input device-param" type="checkbox" data-path="${param.path}" 
+                                   ${checked ? 'checked' : ''} ${isReadonly ? 'disabled' : ''}>
+                        </div>`;
+                    } else if (param.type === 'password') {
+                        inputHtml = `<input type="password" class="form-control form-control-sm device-param" 
+                                           data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
+                                           ${isReadonly ? 'readonly' : ''}>`;
+                    } else if (param.type === 'number') {
+                        inputHtml = `<input type="number" class="form-control form-control-sm device-param" 
+                                           data-path="${param.path}" value="${param.value || 0}"
+                                           ${isReadonly ? 'readonly' : ''}>`;
+                    } else {
+                        inputHtml = `<input type="text" class="form-control form-control-sm device-param" 
+                                           data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
+                                           ${isReadonly ? 'readonly' : ''}>`;
+                    }
+                    
+                    paramsHtml += `
+                        <div class="row mb-2 align-items-center">
+                            <div class="col-5"><small class="text-muted">${param.label}</small></div>
+                            <div class="col-7">${inputHtml}</div>
+                        </div>`;
+                }
+            });
+        }
+        
+        // Skip empty categories
+        if (!paramsHtml) continue;
+        
+        const html = `
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="${headerId}">
+                    <button class="accordion-button ${isExpanded ? '' : 'collapsed'}" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                        <i class="${category.icon || 'bi-gear'} me-2"></i>
+                        ${category.label}
+                        ${category.editable ? '<span class="badge bg-success ms-2">Editable</span>' : ''}
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${isExpanded ? 'show' : ''}" 
+                     data-bs-parent="#deviceStatusAccordion">
+                    <div class="accordion-body">
+                        ${paramsHtml}
+                    </div>
+                </div>
+            </div>`;
+        
+        accordion.innerHTML += html;
+        index++;
+    }
+}
+
+function saveDeviceStatus() {
+    const changedParams = {};
+    const inputs = document.querySelectorAll('.device-param:not([readonly]):not([disabled])');
+    
+    inputs.forEach(input => {
+        const path = input.dataset.path;
+        let value;
+        
+        if (input.type === 'checkbox') {
+            value = input.checked;
+        } else if (input.type === 'number') {
+            value = parseInt(input.value) || 0;
+        } else {
+            value = input.value;
+        }
+        
+        // Only include if changed
+        const original = originalDeviceParams[path];
+        if (value !== original && String(value) !== String(original)) {
+            changedParams[path] = value;
+        }
+    });
+    
+    if (Object.keys(changedParams).length === 0) {
+        showToast('No changes to save', 'info');
+        return;
+    }
+    
+    document.getElementById('deviceStatusSaveBtn').disabled = true;
+    document.getElementById('deviceStatusSaveBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+    
+    const formData = new FormData();
+    formData.append('action', 'save_device_params');
+    formData.append('serial', currentDeviceStatusSerial);
+    formData.append('params', JSON.stringify(changedParams));
+    
+    fetch('?page=huawei-olt', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('deviceStatusSaveBtn').disabled = false;
+        document.getElementById('deviceStatusSaveBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i> Save Changes';
+        
+        if (data.success) {
+            showToast('Device parameters saved successfully!', 'success');
+            // Update original values
+            Object.assign(originalDeviceParams, changedParams);
+        } else {
+            showToast('Failed to save: ' + (data.error || 'Unknown error'), 'danger');
+        }
+    })
+    .catch(err => {
+        document.getElementById('deviceStatusSaveBtn').disabled = false;
+        document.getElementById('deviceStatusSaveBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i> Save Changes';
+        showToast('Error: ' + err.message, 'danger');
+    });
+}
+</script>
+
+?>
                                 </select>
                             </div>
                         </div>

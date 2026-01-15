@@ -1124,6 +1124,195 @@ class GenieACS {
         return $this->request('GET', '/devices', null, ['query' => $query]);
     }
     
+    /**
+     * Get all device parameters organized by category (like SmartOLT Status view)
+     * Returns editable parameter groups: PPP, LAN, WiFi, DHCP, etc.
+     */
+    public function getDeviceStatus(string $deviceId): array {
+        $result = $this->getDevice($deviceId);
+        if (!($result['success'] ?? false) || empty($result['data'])) {
+            return ['success' => false, 'error' => 'Device not found'];
+        }
+        
+        $device = $result['data'];
+        $categories = [];
+        
+        // Helper to extract parameter value
+        $getValue = function($path) use ($device) {
+            return $device[$path]['_value'] ?? null;
+        };
+        
+        // Device Info
+        $categories['device_info'] = [
+            'label' => 'Device Info',
+            'icon' => 'bi-info-circle',
+            'editable' => false,
+            'params' => [
+                ['path' => 'InternetGatewayDevice.DeviceInfo.Manufacturer', 'label' => 'Manufacturer', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.Manufacturer')],
+                ['path' => 'InternetGatewayDevice.DeviceInfo.ModelName', 'label' => 'Model', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.ModelName')],
+                ['path' => 'InternetGatewayDevice.DeviceInfo.SerialNumber', 'label' => 'Serial Number', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.SerialNumber')],
+                ['path' => 'InternetGatewayDevice.DeviceInfo.SoftwareVersion', 'label' => 'Firmware', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.SoftwareVersion')],
+                ['path' => 'InternetGatewayDevice.DeviceInfo.UpTime', 'label' => 'Uptime (sec)', 'value' => $getValue('InternetGatewayDevice.DeviceInfo.UpTime')],
+            ]
+        ];
+        
+        // PPP Interface (WAN PPPoE)
+        $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+        $categories['ppp_interface'] = [
+            'label' => 'PPP Interface',
+            'icon' => 'bi-globe',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$pppBase}.Enable", 'label' => 'Enable', 'value' => $getValue("{$pppBase}.Enable"), 'type' => 'boolean'],
+                ['path' => "{$pppBase}.Username", 'label' => 'Username', 'value' => $getValue("{$pppBase}.Username"), 'type' => 'string'],
+                ['path' => "{$pppBase}.Password", 'label' => 'Password', 'value' => $getValue("{$pppBase}.Password"), 'type' => 'password'],
+                ['path' => "{$pppBase}.NATEnabled", 'label' => 'NAT Enabled', 'value' => $getValue("{$pppBase}.NATEnabled"), 'type' => 'boolean'],
+                ['path' => "{$pppBase}.ConnectionType", 'label' => 'Connection Type', 'value' => $getValue("{$pppBase}.ConnectionType"), 'type' => 'string'],
+                ['path' => "{$pppBase}.ConnectionTrigger", 'label' => 'Connection Trigger', 'value' => $getValue("{$pppBase}.ConnectionTrigger"), 'type' => 'string'],
+                ['path' => "{$pppBase}.X_HW_VLAN", 'label' => 'VLAN', 'value' => $getValue("{$pppBase}.X_HW_VLAN"), 'type' => 'number'],
+                ['path' => "{$pppBase}.ConnectionStatus", 'label' => 'Status', 'value' => $getValue("{$pppBase}.ConnectionStatus"), 'type' => 'readonly'],
+                ['path' => "{$pppBase}.ExternalIPAddress", 'label' => 'External IP', 'value' => $getValue("{$pppBase}.ExternalIPAddress"), 'type' => 'readonly'],
+            ]
+        ];
+        
+        // IP Interface (if exists)
+        $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
+        $categories['ip_interface'] = [
+            'label' => 'IP Interface',
+            'icon' => 'bi-ethernet',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$ipBase}.Enable", 'label' => 'Enable', 'value' => $getValue("{$ipBase}.Enable"), 'type' => 'boolean'],
+                ['path' => "{$ipBase}.ConnectionType", 'label' => 'Connection Type', 'value' => $getValue("{$ipBase}.ConnectionType"), 'type' => 'string'],
+                ['path' => "{$ipBase}.AddressingType", 'label' => 'Addressing', 'value' => $getValue("{$ipBase}.AddressingType"), 'type' => 'string'],
+                ['path' => "{$ipBase}.ExternalIPAddress", 'label' => 'External IP', 'value' => $getValue("{$ipBase}.ExternalIPAddress"), 'type' => 'readonly'],
+            ]
+        ];
+        
+        // LAN DHCP Server
+        $dhcpBase = 'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement';
+        $categories['dhcp_server'] = [
+            'label' => 'LAN DHCP Server',
+            'icon' => 'bi-hdd-network',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$dhcpBase}.DHCPServerEnable", 'label' => 'DHCP Enabled', 'value' => $getValue("{$dhcpBase}.DHCPServerEnable"), 'type' => 'boolean'],
+                ['path' => "{$dhcpBase}.MinAddress", 'label' => 'Min Address', 'value' => $getValue("{$dhcpBase}.MinAddress"), 'type' => 'string'],
+                ['path' => "{$dhcpBase}.MaxAddress", 'label' => 'Max Address', 'value' => $getValue("{$dhcpBase}.MaxAddress"), 'type' => 'string'],
+                ['path' => "{$dhcpBase}.SubnetMask", 'label' => 'Subnet Mask', 'value' => $getValue("{$dhcpBase}.SubnetMask"), 'type' => 'string'],
+                ['path' => "{$dhcpBase}.IPRouters", 'label' => 'Gateway', 'value' => $getValue("{$dhcpBase}.IPRouters"), 'type' => 'string'],
+                ['path' => "{$dhcpBase}.DNSServers", 'label' => 'DNS Servers', 'value' => $getValue("{$dhcpBase}.DNSServers"), 'type' => 'string'],
+                ['path' => "{$dhcpBase}.DHCPLeaseTime", 'label' => 'Lease Time', 'value' => $getValue("{$dhcpBase}.DHCPLeaseTime"), 'type' => 'number'],
+            ]
+        ];
+        
+        // LAN Ports (Ethernet interfaces with L3 settings)
+        $lanParams = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $lanBase = "InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}";
+            $lanParams[] = ['path' => "{$lanBase}.Enable", 'label' => "Port {$i} Enable", 'value' => $getValue("{$lanBase}.Enable"), 'type' => 'boolean'];
+            $lanParams[] = ['path' => "{$lanBase}.X_HW_L3Enable", 'label' => "Port {$i} L3 Enable", 'value' => $getValue("{$lanBase}.X_HW_L3Enable"), 'type' => 'boolean'];
+            $lanParams[] = ['path' => "{$lanBase}.Status", 'label' => "Port {$i} Status", 'value' => $getValue("{$lanBase}.Status"), 'type' => 'readonly'];
+        }
+        $categories['lan_ports'] = [
+            'label' => 'LAN Ports',
+            'icon' => 'bi-plug',
+            'editable' => true,
+            'params' => $lanParams
+        ];
+        
+        // Wireless LAN 2.4GHz
+        $wlan24Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
+        $categories['wireless_24'] = [
+            'label' => 'Wireless LAN 2.4GHz',
+            'icon' => 'bi-wifi',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$wlan24Base}.Enable", 'label' => 'Enable', 'value' => $getValue("{$wlan24Base}.Enable"), 'type' => 'boolean'],
+                ['path' => "{$wlan24Base}.SSID", 'label' => 'SSID', 'value' => $getValue("{$wlan24Base}.SSID"), 'type' => 'string'],
+                ['path' => "{$wlan24Base}.PreSharedKey.1.KeyPassphrase", 'label' => 'Password', 'value' => $getValue("{$wlan24Base}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
+                ['path' => "{$wlan24Base}.Channel", 'label' => 'Channel', 'value' => $getValue("{$wlan24Base}.Channel"), 'type' => 'number'],
+                ['path' => "{$wlan24Base}.SSIDAdvertisementEnabled", 'label' => 'Broadcast SSID', 'value' => $getValue("{$wlan24Base}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
+                ['path' => "{$wlan24Base}.X_HW_ChannelWidth", 'label' => 'Channel Width', 'value' => $getValue("{$wlan24Base}.X_HW_ChannelWidth"), 'type' => 'number'],
+                ['path' => "{$wlan24Base}.BeaconType", 'label' => 'Security Mode', 'value' => $getValue("{$wlan24Base}.BeaconType"), 'type' => 'string'],
+                ['path' => "{$wlan24Base}.TotalAssociations", 'label' => 'Connected Clients', 'value' => $getValue("{$wlan24Base}.TotalAssociations"), 'type' => 'readonly'],
+            ]
+        ];
+        
+        // Wireless LAN 5GHz
+        $wlan5Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5';
+        $categories['wireless_5'] = [
+            'label' => 'Wireless LAN 5GHz',
+            'icon' => 'bi-wifi',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$wlan5Base}.Enable", 'label' => 'Enable', 'value' => $getValue("{$wlan5Base}.Enable"), 'type' => 'boolean'],
+                ['path' => "{$wlan5Base}.SSID", 'label' => 'SSID', 'value' => $getValue("{$wlan5Base}.SSID"), 'type' => 'string'],
+                ['path' => "{$wlan5Base}.PreSharedKey.1.KeyPassphrase", 'label' => 'Password', 'value' => $getValue("{$wlan5Base}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
+                ['path' => "{$wlan5Base}.Channel", 'label' => 'Channel', 'value' => $getValue("{$wlan5Base}.Channel"), 'type' => 'number'],
+                ['path' => "{$wlan5Base}.SSIDAdvertisementEnabled", 'label' => 'Broadcast SSID', 'value' => $getValue("{$wlan5Base}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
+                ['path' => "{$wlan5Base}.X_HW_ChannelWidth", 'label' => 'Channel Width', 'value' => $getValue("{$wlan5Base}.X_HW_ChannelWidth"), 'type' => 'number'],
+                ['path' => "{$wlan5Base}.BeaconType", 'label' => 'Security Mode', 'value' => $getValue("{$wlan5Base}.BeaconType"), 'type' => 'string'],
+                ['path' => "{$wlan5Base}.TotalAssociations", 'label' => 'Connected Clients', 'value' => $getValue("{$wlan5Base}.TotalAssociations"), 'type' => 'readonly'],
+            ]
+        ];
+        
+        // Security/Firewall
+        $fwBase = 'InternetGatewayDevice.X_HW_Security.Firewall';
+        $categories['security'] = [
+            'label' => 'Security',
+            'icon' => 'bi-shield-check',
+            'editable' => true,
+            'params' => [
+                ['path' => "{$fwBase}.Enable", 'label' => 'Firewall Enable', 'value' => $getValue("{$fwBase}.Enable"), 'type' => 'boolean'],
+                ['path' => "{$fwBase}.Level", 'label' => 'Firewall Level', 'value' => $getValue("{$fwBase}.Level"), 'type' => 'string'],
+            ]
+        ];
+        
+        // Miscellaneous
+        $categories['misc'] = [
+            'label' => 'Miscellaneous',
+            'icon' => 'bi-gear',
+            'editable' => true,
+            'params' => [
+                ['path' => 'InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 'label' => 'Inform Interval', 'value' => $getValue('InternetGatewayDevice.ManagementServer.PeriodicInformInterval'), 'type' => 'number'],
+                ['path' => 'InternetGatewayDevice.ManagementServer.PeriodicInformEnable', 'label' => 'Periodic Inform', 'value' => $getValue('InternetGatewayDevice.ManagementServer.PeriodicInformEnable'), 'type' => 'boolean'],
+                ['path' => 'InternetGatewayDevice.Time.NTPServer1', 'label' => 'NTP Server 1', 'value' => $getValue('InternetGatewayDevice.Time.NTPServer1'), 'type' => 'string'],
+            ]
+        ];
+        
+        return [
+            'success' => true,
+            'device_id' => $deviceId,
+            'last_inform' => $device['_lastInform'] ?? null,
+            'categories' => $categories
+        ];
+    }
+    
+    /**
+     * Save device parameters (batch update)
+     */
+    public function saveDeviceParams(string $deviceId, array $params): array {
+        if (empty($params)) {
+            return ['success' => false, 'error' => 'No parameters to save'];
+        }
+        
+        // Build parameter values array
+        $paramValues = [];
+        foreach ($params as $path => $value) {
+            // Determine type based on value
+            if (is_bool($value) || $value === 'true' || $value === 'false') {
+                $paramValues[] = [$path, $value === 'true' || $value === true, 'xsd:boolean'];
+            } elseif (is_numeric($value) && strpos($path, 'Address') === false && strpos($path, 'SSID') === false) {
+                $paramValues[] = [$path, (int)$value, 'xsd:unsignedInt'];
+            } else {
+                $paramValues[] = [$path, (string)$value, 'xsd:string'];
+            }
+        }
+        
+        return $this->setParameterValues($deviceId, $paramValues);
+    }
+    
     public function setWirelessConfig(string $deviceId, array $config): array {
         $params = [];
         $base24 = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
