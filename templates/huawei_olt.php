@@ -16253,6 +16253,33 @@ function renderTabContent(key, category) {
 function renderParamInput(param, editable) {
     const isReadonly = param.type === 'readonly' || !editable;
     
+    // Security-related dropdowns
+    const dropdownOptions = {
+        'BeaconType': ['None', 'Basic', 'WPA', 'WPA2', '11i', 'WPAand11i', 'WPA3'],
+        'WPAEncryptionModes': ['TKIPEncryption', 'AESEncryption', 'TKIPandAESEncryption'],
+        'WPAAuthenticationMode': ['PSKAuthentication', 'EAPAuthentication'],
+        'IEEE11iEncryptionModes': ['TKIPEncryption', 'AESEncryption', 'TKIPandAESEncryption'],
+        'IEEE11iAuthenticationMode': ['PSKAuthentication', 'EAPAuthentication'],
+        'BasicEncryptionModes': ['None', 'WEPEncryption'],
+        'BasicAuthenticationMode': ['None', 'SharedAuthentication'],
+        'Standard': ['a', 'b', 'g', 'n', 'ac', 'ax'],
+        'ConnectionType': ['IP_Routed', 'IP_Bridged', 'PPPoE_Routed', 'PPPoE_Bridged'],
+        'ConnectionTrigger': ['OnDemand', 'AlwaysOn', 'Manual']
+    };
+    
+    // Check if this param should be a dropdown
+    const paramName = param.path.split('.').pop();
+    if (dropdownOptions[paramName] && !isReadonly) {
+        const options = dropdownOptions[paramName];
+        let html = `<select class="form-select form-select-sm device-param" data-path="${param.path}">`;
+        options.forEach(opt => {
+            const selected = (param.value === opt || String(param.value) === opt) ? 'selected' : '';
+            html += `<option value="${opt}" ${selected}>${opt}</option>`;
+        });
+        html += '</select>';
+        return html;
+    }
+    
     if (param.type === 'boolean') {
         const checked = param.value === true || param.value === 'true' || param.value === 1;
         return `<div class="form-check form-switch">
@@ -16270,7 +16297,6 @@ function renderParamInput(param, editable) {
                        data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}" ${isReadonly ? 'readonly' : ''}>`;
     }
 }
-
 function saveDeviceStatus() {
     const changedParams = {};
     const inputs = document.querySelectorAll('.device-param:not([readonly]):not([disabled])');
