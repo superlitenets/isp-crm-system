@@ -8751,8 +8751,18 @@ try {
                                         <option value="<?= $vid ?>" <?= ($currentOnu['vlan_id'] ?? '') == $vid ? 'selected' : '' ?>>
                                             <?= $vid ?>
                                         </option>
-                                        <?php endforeach; 
-                                        endif; ?>
+                                        <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+                                        <?php endif; ?>
                                     </select>
                                     <?php if (empty($attachedVlans)): ?>
                                     <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Attach VLANs to this ONU first before configuring WAN.</div>
@@ -8850,7 +8860,17 @@ try {
                                         <?= $vid ?>
                                         <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeAttachedVlan(<?= $vid ?>)" title="Remove"></button>
                                     </span>
-                                    <?php endforeach; 
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
                                     else: ?>
                                     <span class="text-muted" id="noVlansMsg">No VLANs attached</span>
                                     <?php endif; ?>
@@ -15669,7 +15689,17 @@ echo "# ================================================\n";
                                     <option value="">-- None --</option>
                                     <?php foreach ($apartments as $apt): ?>
                                     <option value="<?= $apt['id'] ?>" data-zone="<?= $apt['zone_id'] ?>"><?= htmlspecialchars($apt['name']) ?></option>
-                                    <?php endforeach; 
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- Device Status Modal (SmartOLT-style) -->
 <div class="modal fade" id="deviceStatusModal" tabindex="-1">
