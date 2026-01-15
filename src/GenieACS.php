@@ -46,6 +46,49 @@ class GenieACS {
         return $this->baseUrl;
     }
     
+    /**
+     * Flatten nested GenieACS device structure to dot-notation
+     * Converts {InternetGatewayDevice: {DeviceInfo: {Manufacturer: {_value: 'X'}}}}
+     * to {'InternetGatewayDevice.DeviceInfo.Manufacturer': {_value: 'X'}}
+     */
+    private function flattenDevice(array $data, string $prefix = ''): array {
+        $result = [];
+        foreach ($data as $key => $value) {
+            // Skip special keys at root level
+            if ($prefix === '' && in_array($key, ['_id', '_deviceId', '_lastInform', '_lastBoot', '_registered', '_lastBootstrap', '_timestamp'])) {
+                $result[$key] = $value;
+                continue;
+            }
+            
+            $newKey = $prefix === '' ? $key : $prefix . '.' . $key;
+            
+            // If this is a TR-069 parameter (has _value, _type, _timestamp, _writable, or _object)
+            if (is_array($value) && (isset($value['_value']) || isset($value['_type']) || isset($value['_writable']))) {
+                $result[$newKey] = $value;
+            } elseif (is_array($value) && !empty($value)) {
+                // Check if this is a nested object container (has _object flag or nested arrays)
+                $hasNestedParams = false;
+                foreach ($value as $subKey => $subVal) {
+                    if (is_array($subVal) && !str_starts_with($subKey, '_')) {
+                        $hasNestedParams = true;
+                        break;
+                    }
+                }
+                
+                if ($hasNestedParams || isset($value['_object'])) {
+                    // Recursively flatten
+                    $flattened = $this->flattenDevice($value, $newKey);
+                    $result = array_merge($result, $flattened);
+                } else {
+                    $result[$newKey] = $value;
+                }
+            } else {
+                $result[$newKey] = $value;
+            }
+        }
+        return $result;
+    }
+    
     private function request(string $method, string $endpoint, ?array $data = null, array $query = []): array {
         $url = $this->baseUrl . $endpoint;
         if (!empty($query)) {
@@ -118,19 +161,27 @@ class GenieACS {
         return $this->request('GET', '/devices', null, $query);
     }
     
-    public function getDevice(string $deviceId): array {
+    public function getDevice(string $deviceId, bool $flatten = true): array {
         // Use query parameter approach to avoid URL encoding issues with device IDs containing special chars
         $query = json_encode(['_id' => $deviceId]);
         $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
         
         if ($result['success'] && !empty($result['data']) && is_array($result['data'])) {
-            return ['success' => true, 'data' => $result['data'][0]];
+            $device = $result['data'][0];
+            // Flatten nested GenieACS structure to dot-notation for easier access
+            if ($flatten) {
+                $device = $this->flattenDevice($device);
+            }
+            return ['success' => true, 'data' => $device];
         }
         
         // Fallback to direct path approach
         $encodedId = urlencode($deviceId);
         $directResult = $this->request('GET', "/devices/{$encodedId}");
-        if ($directResult['success']) {
+        if ($directResult['success'] && isset($directResult['data'])) {
+            if ($flatten) {
+                $directResult['data'] = $this->flattenDevice($directResult['data']);
+            }
             return $directResult;
         }
         
