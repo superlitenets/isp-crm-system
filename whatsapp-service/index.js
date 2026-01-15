@@ -364,7 +364,15 @@ app.post('/send-group', async (req, res) => {
     
     try {
         const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
-        const result = await client.sendMessage(chatId, message);
+        
+        // Get the chat first to avoid sendSeen issues with groups
+        const chat = await client.getChatById(chatId);
+        if (!chat) {
+            return res.status(404).json({ error: 'Group not found', success: false });
+        }
+        
+        // Use chat.sendMessage which is more reliable for groups
+        const result = await chat.sendMessage(message);
         console.log(`Message sent to group ${groupId}`);
         res.json({ 
             success: true, 

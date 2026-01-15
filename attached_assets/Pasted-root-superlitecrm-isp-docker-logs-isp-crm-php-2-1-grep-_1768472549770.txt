@@ -1,0 +1,106 @@
+root@superlitecrm:~/isp# docker logs isp_crm_php 2>&1 | grep -i "whatsapp\|group\|branch" | tail -50
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0731306267
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+NOTICE: PHP message: WhatsApp::send called - enabled: yes, provider: session, phone: 0731306267
+NOTICE: PHP message: WhatsApp::send - using session provider, calling sendViaSession
+NOTICE: PHP message: notifyBranchWhatsAppGroup called - ticketId: 196, branchId: 2
+NOTICE: PHP message: notifyBranchWhatsAppGroup - Sending to group: 120363151338798184@g.us for branch: GITHURAI REGION
+NOTICE: PHP message: WhatsApp sendToGroup called - Group: 120363151338798184@g.us, Provider: session, URL: http://127.0.0.1:3001
+NOTICE: PHP message: WhatsApp sendToGroup - Calling URL: http://127.0.0.1:3001/send-group
+NOTICE: PHP message: WhatsApp sendToGroup response - HTTP: 500, Error: , Response: {"error":"Evaluation failed: TypeError: Cannot read properties of undefined (reading 'markedUnread')\n    at I (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:4171)\n    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1751)\n    at Generator.next (<anonymous>)\n    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)\n    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:
+NOTICE: PHP message: WhatsApp sendToGroup FAILED - HTTP: 500, Error: Evaluation failed: TypeError: Cannot read properties of undefined (reading 'markedUnread')
+    at I (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:4171)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1751)
+    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)
+    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:349)
+    at https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:408
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:277)
+    at Object.v [as sendSeen] (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1312)
+NOTICE: PHP message: WhatsApp branch group notification failed: Evaluation failed: TypeError: Cannot read properties of undefined (reading 'markedUnread')
+    at I (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:4171)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1751)
+    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)
+    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:349)
+    at https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:408
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:277)
+    at Object.v [as sendSeen] (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1312)
+172.18.0.8 -  15/Jan/2026:13:11:23 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:27 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:38 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:40 +0300 "GET /api/whatsapp-chat.php" 400
+172.18.0.8 -  15/Jan/2026:13:11:41 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:47 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:52 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:54 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:11:57 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:02 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:07 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:12 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:17 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:22 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:24 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:27 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:32 +0300 "GET /api/whatsapp-chat.php" 200
+172.18.0.8 -  15/Jan/2026:13:12:37 +0300 "GET /api/whatsapp-chat.php" 200
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp# docker logs isp_crm_whatsapp 2>&1 | tail -50
+    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)
+    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:349)
+    at https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:408
+    at new Promise (<anonymous>)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:277)
+    at Object.S (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:2045)
+    at Object.v [as sendSeen] (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1312)
+    at ExecutionContext._ExecutionContext_evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:229:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async ExecutionContext.evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:107:16)
+    at async Client.sendMessage (/app/node_modules/whatsapp-web.js/src/Client.js:1038:25)
+    at async /app/index.js:341:24
+Send error: Error: Evaluation failed: TypeError: Cannot read properties of undefined (reading 'markedUnread')
+    at I (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:4171)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1751)
+    at Generator.next (<anonymous>)
+    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)
+    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:349)
+    at https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:408
+    at new Promise (<anonymous>)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:277)
+    at Object.v [as sendSeen] (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1312)
+    at window.WWebJS.sendSeen (pptr://__puppeteer_evaluation_script__:14:41)
+    at ExecutionContext._ExecutionContext_evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:229:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async ExecutionContext.evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:107:16)
+    at async Client.sendMessage (/app/node_modules/whatsapp-web.js/src/Client.js:1038:25)
+    at async /app/index.js:341:24
+Send group error: Error: Evaluation failed: TypeError: Cannot read properties of undefined (reading 'markedUnread')
+    at I (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:4171)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1751)
+    at Generator.next (<anonymous>)
+    at l (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:125)
+    at i (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:349)
+    at https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:408
+    at new Promise (<anonymous>)
+    at Object.<anonymous> (https://static.whatsapp.net/rsrc.php/v4/yE/r/8_Dgf5nZjzc.js:107:277)
+    at Object.v [as sendSeen] (https://static.whatsapp.net/rsrc.php/v4i4Xq4/y1/l/en_GB-j/yr84XDFBp3X.js:1540:1312)
+    at window.WWebJS.sendSeen (pptr://__puppeteer_evaluation_script__:14:41)
+    at ExecutionContext._ExecutionContext_evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:229:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async ExecutionContext.evaluate (/app/node_modules/puppeteer-core/lib/cjs/puppeteer/common/ExecutionContext.js:107:16)
+    at async Client.sendMessage (/app/node_modules/whatsapp-web.js/src/Client.js:1038:25)
+    at async /app/index.js:367:24
+Message ack: true_254794931136@c.us_AC1CB09D60C0DF9E5F94588DB647A235 delivered
+Message ack: true_254794931136@c.us_AC1CB09D60C0DF9E5F94588DB647A235 read
+Incoming message from: 254794931136@c.us Body: Saizi iko sawa
+Message ack: true_120363395097732236@g.us_3EB07AC58970D9855ABD54_210445378052171@lid read
+Incoming message from: status@broadcast Body: Not to excuse them lakini weeh!!!
+Media downloaded: image/jpeg no filename
+root@superlitecrm:~/isp#
+root@superlitecrm:~/isp# ^C
+root@superlitecrm:~/isp# docker exec -i isp_crm_db psql -U crm -d isp_crm -c "SELECT id, name, whatsapp_group FROM branches;"
+ id |      name       |     whatsapp_group
+----+-----------------+-------------------------
+  1 | S-HURUMA        | 120363395097732236@g.us
+  2 | GITHURAI REGION | 120363151338798184@g.us
+(2 rows)
+
+root@superlitecrm:~/isp#
