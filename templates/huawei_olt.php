@@ -15914,7 +15914,6 @@ function saveDeviceStatus() {
 }
 </script>
 
-?>
                                 </select>
                             </div>
                         </div>
