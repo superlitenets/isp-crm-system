@@ -15912,7 +15912,7 @@ function renderDeviceStatusTabs(categories) {
     let isFirst = true;
     sortedKeys.forEach(key => {
         const category = categories[key];
-        if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined).length === 0) return;
+        if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined || p.value === '').length === 0) return;
         
         const config = getTabConfig(key);
         const tabId = 'tab_' + key;
@@ -16040,7 +16040,7 @@ function renderTabContent(key, category) {
         let col1 = '', col2 = '';
         let idx = 0;
         category.params.forEach(param => {
-            if (param.value !== null && param.value !== undefined) {
+            if (param.value !== null && param.value !== undefined || param.value === '') {
                 originalDeviceParams[param.path] = param.value;
                 const inputHtml = renderParamInput(param, category.editable);
                 const field = `<div class="mb-2">
