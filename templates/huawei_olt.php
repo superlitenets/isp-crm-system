@@ -15935,6 +15935,7 @@ function saveDeviceStatus() {
 }
 </script>
 
+<script>
     // Loading overlay for OLT sync operations
     const loadingMessages = {
         'sync_onus_snmp': 'Syncing ONUs from OLT...',
