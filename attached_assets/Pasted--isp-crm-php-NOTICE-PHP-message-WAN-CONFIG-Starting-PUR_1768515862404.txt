@@ -1,0 +1,33 @@
+
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Starting PURE TR-069 PPPoE config for ONU 86201, GenieACS ID: 00259E-HG8546M-48575443F2D53A8B
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refreshing WAN tree: HTTP 202
+isp_crm_olt_service     | [OLT 1] SSH command timeout, got 899 bytes
+isp_crm_olt_service     | [OLT 1] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [OLT 1] SSH sending: "quit"
+isp_crm_olt_service     | [Discovery] Parsing autofind output (155 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on G45_OLT
+isp_crm_olt_service     | [Discovery] Marked 4857544306D6348A as authorized (no longer in autofind)
+isp_crm_olt_service     | [Discovery] Marked 485754437E1772E3 as authorized (no longer in autofind)
+isp_crm_olt_service     | [Discovery] Checking OLT: HRM_OLT (10.98.0.2)
+isp_crm_olt_service     | [Discovery] Skipping PHP SNMP (using CLI + background SNMP polling)
+isp_crm_olt_service     | [OLT 2] SSH sending: "display ont autofind all"
+isp_crm_olt_service     | [RefreshONU] Updated ONU 48575443F2D53A8B: status=online, rx=-11.98
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Discovered PPPoE connections: []
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Using SmartOLT default PPPoE path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] PPPoE Path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1, Username: 2116, VLAN: 902
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] No PPPoE instance found, creating with AddObject: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection
+isp_crm_php             | NOTICE: PHP message: [GENIEACS] Task with connection_request result: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] AddObject result: HTTP 202, success: true
+isp_crm_olt_service     | [Discovery] Parsing autofind output (98 chars)
+isp_crm_olt_service     | [Discovery] Parsed 0 ONUs from autofind output
+isp_crm_olt_service     | [Discovery] CLI found 0 unconfigured ONUs on HRM_OLT
+isp_crm_olt_service     | [Discovery] Discovery cycle complete
+isp_crm_php             | NOTICE: PHP message: [GENIEACS] Task with connection_request result: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Refresh result: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Sending setParameterValues with PPPoE + L3Enable: [["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.X_HW_VLAN",902,"xsd:unsignedInt"],["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1.X_HW_L3Enable",true,"xsd:boolean"],["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2.X_HW_L3Enable",true,"xsd:boolean"],["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3.X_HW_L3Enable",true,"xsd:boolean"],["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4.X_HW_L3Enable",true,"xsd:boolean"]]
+isp_crm_php             | NOTICE: PHP message: [GENIEACS] Task with connection_request result: HTTP 202
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] setParameterValues result: HTTP 202, success: true
+isp_crm_php             | NOTICE: PHP message: [WAN_CONFIG] Response: {"name":"setParameterValues","parameterValues":[["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Enable",true,"xsd:boolean"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password","2116","xsd:string"],["InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.NATEnabled",true,"xsd:boolean"],["InternetGatewayDevic
+isp_crm_php             | 172.18.0.8 -  16/Jan/2026:01:23:30 +0300 "POST /index.php" 200
+isp_crm_ngi
