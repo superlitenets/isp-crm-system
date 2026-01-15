@@ -15855,8 +15855,18 @@ echo "# ================================================\n";
     padding: 1rem;
     background: #fff;
 }
+.device-status-main .tab-content {
+    width: 100%;
+    min-height: 400px;
+}
 .device-status-main .tab-pane {
     animation: fadeIn 0.2s ease;
+}
+.device-status-main .tab-pane:not(.show) {
+    display: none !important;
+}
+.device-status-main .tab-pane.show {
+    display: block !important;
 }
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
