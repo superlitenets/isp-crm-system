@@ -4164,24 +4164,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             
             case 'start_pppoe_provisioning':
+                // Direct parameter setting - NO provisions/scripts (same as WiFi config)
                 header('Content-Type: application/json');
                 try {
-                    require_once __DIR__ . '/../src/TR069Provisioner.php';
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    require_once __DIR__ . '/../src/HuaweiOLT.php';
+                    
                     $onuId = (int)($_POST['onu_id'] ?? 0);
                     if (!$onuId) {
                         echo json_encode(['success' => false, 'error' => 'ONU ID required']);
                         exit;
                     }
                     
+                    $huaweiOLT = new \App\HuaweiOLT($db);
+                    $onu = $huaweiOLT->getONU($onuId);
+                    if (!$onu) {
+                        echo json_encode(['success' => false, 'error' => 'ONU not found']);
+                        exit;
+                    }
+                    
+                    $genieacs = new \App\GenieACS($db);
+                    $deviceResult = $genieacs->getDeviceBySerial($onu['sn']);
+                    if (!$deviceResult['success']) {
+                        echo json_encode(['success' => false, 'error' => 'ONU not found in GenieACS']);
+                        exit;
+                    }
+                    
+                    $deviceId = $deviceResult['device']['_id'];
+                    
+                    // Use direct parameter setting - same approach as WiFi config
                     $config = [
+                        'connection_type' => 'pppoe',
+                        'service_vlan' => (int)($_POST['vlan'] ?? $_POST['service_vlan'] ?? 0),
                         'pppoe_username' => $_POST['pppoe_username'] ?? '',
                         'pppoe_password' => $_POST['pppoe_password'] ?? '',
-                        'service_vlan' => (int)($_POST['vlan'] ?? $_POST['service_vlan'] ?? 0),
-                        'wan_mode' => 'pppoe'
+                        'skip_safety_checks' => true
                     ];
                     
-                    $provisioner = new \App\TR069Provisioner($db);
-                    $result = $provisioner->startProvisioning($onuId, $config);
+                    $result = $genieacs->configureInternetWAN($deviceId, $config);
+                    
+                    if ($result['success']) {
+                        $updateStmt = $db->prepare("UPDATE huawei_onus SET pppoe_username = ?, wan_mode = 'pppoe' WHERE id = ?");
+                        $updateStmt->execute([$config['pppoe_username'], $onuId]);
+                    }
                     
                     echo json_encode($result);
                 } catch (Exception $e) {
