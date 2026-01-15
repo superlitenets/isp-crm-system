@@ -3030,12 +3030,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Find device by serial
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
-                if (!($deviceResult['success'] ?? false) || empty($deviceResult['data'])) {
+                if (!($deviceResult['success'] ?? false) || empty($deviceResult['device'])) {
                     echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
                     exit;
                 }
                 
-                $deviceId = $deviceResult['data']['_id'] ?? '';
+                $deviceId = $deviceResult['device']['_id'] ?? '';
                 $result = $genieacs->getDeviceStatus($deviceId);
                 echo json_encode($result);
                 exit;
@@ -3062,12 +3062,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Find device by serial
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
-                if (!($deviceResult['success'] ?? false) || empty($deviceResult['data'])) {
+                if (!($deviceResult['success'] ?? false) || empty($deviceResult['device'])) {
                     echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
                     exit;
                 }
                 
-                $deviceId = $deviceResult['data']['_id'] ?? '';
+                $deviceId = $deviceResult['device']['_id'] ?? '';
                 $result = $genieacs->saveDeviceParams($deviceId, $params);
                 echo json_encode($result);
                 exit;
