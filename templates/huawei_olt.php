@@ -15750,9 +15750,9 @@ echo "# ================================================\n";
 
 <?php endif; ?>
 <div class="modal fade" id="deviceStatusModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header bg-primary text-white py-2">
                 <h5 class="modal-title">
                     <i class="bi bi-cpu me-2"></i>
                     Device Status - <span id="deviceStatusSerial"></span>
@@ -15765,15 +15765,24 @@ echo "# ================================================\n";
                     <p class="mt-2">Loading device parameters...</p>
                 </div>
                 <div id="deviceStatusContent" style="display:none;">
-                    <div class="accordion" id="deviceStatusAccordion">
-                        <!-- Categories will be populated dynamically -->
+                    <!-- Horizontal Tabs -->
+                    <ul class="nav nav-tabs nav-fill" id="deviceStatusTabs" role="tablist" style="font-size: 0.85rem;">
+                        <!-- Tabs will be populated dynamically -->
+                    </ul>
+                    <div class="tab-content p-3" id="deviceStatusTabContent">
+                        <!-- Tab content will be populated dynamically -->
                     </div>
                 </div>
                 <div id="deviceStatusError" class="alert alert-danger m-3" style="display:none;"></div>
             </div>
-            <div class="modal-footer justify-content-between">
-                <div><button type="button" class="btn btn-primary me-2" onclick="openDeviceStatus(currentDeviceStatusSerial, true)"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
-                <button type="button" class="btn btn-success" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
+            <div class="modal-footer justify-content-between py-2">
+                <div>
+                    <button type="button" class="btn btn-primary btn-sm me-2" onclick="openDeviceStatus(currentDeviceStatusSerial, true)">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+                <button type="button" class="btn btn-success btn-sm" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
                     <i class="bi bi-check-circle me-1"></i> Save Changes
                 </button>
             </div>
@@ -15785,6 +15794,21 @@ echo "# ================================================\n";
 // Device Status Modal Functions
 let currentDeviceStatusSerial = '';
 let originalDeviceParams = {};
+
+// Tab definitions with icons
+const tabConfig = {
+    'device_info': { label: 'Device', icon: 'bi-info-circle', order: 1 },
+    'wan_pppoe': { label: 'WAN', icon: 'bi-globe', order: 2 },
+    'wan_ip': { label: 'WAN IP', icon: 'bi-diagram-3', order: 3 },
+    'wireless_1': { label: 'WiFi 2.4G', icon: 'bi-wifi', order: 4 },
+    'wireless_5': { label: 'WiFi 5G', icon: 'bi-wifi', order: 5 },
+    'lan_ports': { label: 'LAN', icon: 'bi-ethernet', order: 6 },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 7 },
+    'dhcp': { label: 'DHCP', icon: 'bi-hdd-network', order: 8 },
+    'management': { label: 'MGMT', icon: 'bi-gear', order: 9 },
+    'time': { label: 'Time', icon: 'bi-clock', order: 10 },
+    'other': { label: 'Other', icon: 'bi-three-dots', order: 99 }
+};
 
 function openDeviceStatus(serial, doRefresh = false) {
     currentDeviceStatusSerial = serial;
@@ -15798,7 +15822,6 @@ function openDeviceStatus(serial, doRefresh = false) {
     const modal = new bootstrap.Modal(document.getElementById('deviceStatusModal'));
     modal.show();
     
-    // Fetch device status
     const formData = new FormData();
     formData.append('action', 'get_device_status');
     formData.append('serial', serial);
@@ -15817,21 +15840,20 @@ function openDeviceStatus(serial, doRefresh = false) {
         document.getElementById('deviceStatusLoading').innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">Loading device status...</p>';
         
         if (data.success) {
-            renderDeviceStatus(data.categories);
+            renderDeviceStatusTabs(data.categories);
             document.getElementById('deviceStatusContent').style.display = 'block';
             document.getElementById('deviceStatusSaveBtn').disabled = false;
         } else if (data.needs_refresh) {
-            // Device has no cached values - need to refresh from device
             document.getElementById('deviceStatusError').innerHTML = `
                 <div class="text-center">
                     <p>${data.error}</p>
                     <button class="btn btn-primary" onclick="openDeviceStatus('${serial}', true)">
-                        <i class="bi bi-arrow-clockwise me-1"></i> Fetch Data from Device
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh from Device
                     </button>
                 </div>`;
             document.getElementById('deviceStatusError').style.display = 'block';
         } else {
-            document.getElementById('deviceStatusError').textContent = data.error || 'Failed to load device status';
+            document.getElementById('deviceStatusError').textContent = data.error || 'Unknown error';
             document.getElementById('deviceStatusError').style.display = 'block';
         }
     })
@@ -15842,137 +15864,166 @@ function openDeviceStatus(serial, doRefresh = false) {
     });
 }
 
-function renderDeviceStatus(categories) {
-    const accordion = document.getElementById('deviceStatusAccordion');
-    accordion.innerHTML = '';
+function renderDeviceStatusTabs(categories) {
+    const tabList = document.getElementById('deviceStatusTabs');
+    const tabContent = document.getElementById('deviceStatusTabContent');
+    tabList.innerHTML = '';
+    tabContent.innerHTML = '';
     
-    let index = 0;
-    for (const [key, category] of Object.entries(categories)) {
-        const collapseId = 'collapse_' + key;
-        const headerId = 'header_' + key;
-        const isExpanded = index === 0;
+    // Sort categories by tab order
+    const sortedKeys = Object.keys(categories).sort((a, b) => {
+        const orderA = tabConfig[a]?.order || 50;
+        const orderB = tabConfig[b]?.order || 50;
+        return orderA - orderB;
+    });
+    
+    let isFirst = true;
+    sortedKeys.forEach(key => {
+        const category = categories[key];
+        if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined).length === 0) return;
         
-        let paramsHtml = '';
+        const config = tabConfig[key] || { label: category.label, icon: 'bi-gear', order: 50 };
+        const tabId = 'tab_' + key;
+        const paneId = 'pane_' + key;
+        const paramCount = category.params.filter(p => p.value !== null && p.value !== undefined).length;
         
-        // Special rendering for LAN Ports - table format
-        if (key === 'lan_ports' && category.params && category.params.length > 0) {
-            const ports = {};
-            category.params.forEach(param => {
-                const match = param.path.match(/LANEthernetInterfaceConfig\.(\d+)\./);
-                if (match) {
-                    const portNum = match[1];
-                    if (!ports[portNum]) ports[portNum] = { params: {} };
-                    const paramName = param.path.split('.').pop();
-                    ports[portNum].params[paramName] = param;
-                    originalDeviceParams[param.path] = param.value;
-                }
-            });
-            
-            paramsHtml = `
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Port</th>
-                                <th class="text-center">Enable</th>
-                                <th>Status</th>
-                                <th>Speed</th>
-                                <th>Duplex</th>
-                                <th class="text-center">L3 Enable</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-            
-            Object.keys(ports).sort((a,b) => a-b).forEach(portNum => {
-                const p = ports[portNum].params;
-                const statusClass = p.Status?.value === 'Up' ? 'text-success' : 'text-muted';
-                const statusIcon = p.Status?.value === 'Up' ? 'bi-check-circle-fill' : 'bi-x-circle';
-                
-                paramsHtml += `
-                    <tr>
-                        <td><strong>LAN ${portNum}</strong></td>
-                        <td class="text-center">
-                            <div class="form-check form-switch d-inline-block mb-0">
-                                <input class="form-check-input device-param" type="checkbox" 
-                                       data-path="${p.Enable?.path || ''}" 
-                                       ${p.Enable?.value ? 'checked' : ''} 
-                                       ${!category.editable ? 'disabled' : ''}>
-                            </div>
-                        </td>
-                        <td class="${statusClass}"><i class="bi ${statusIcon} me-1"></i>${p.Status?.value || 'Unknown'}</td>
-                        <td>${p.MaxBitRate?.value || '-'}</td>
-                        <td>${p.DuplexMode?.value || '-'}</td>
-                        <td class="text-center">
-                            <div class="form-check form-switch d-inline-block mb-0">
-                                <input class="form-check-input device-param" type="checkbox" 
-                                       data-path="${p.X_HW_L3Enable?.path || ''}" 
-                                       ${p.X_HW_L3Enable?.value ? 'checked' : ''} 
-                                       ${!category.editable ? 'disabled' : ''}>
-                            </div>
-                        </td>
-                    </tr>`;
-            });
-            
-            paramsHtml += `</tbody></table></div>`;
-            
-        } else if (key === 'wan_pppoe' && category.params) {
-            paramsHtml = `<div class="row g-3">`;
-            let leftCol = '', rightCol = '';
-            category.params.forEach((param, idx) => {
-                if (param.value !== null && param.value !== undefined) {
-                    originalDeviceParams[param.path] = param.value;
-                    let inputHtml = renderParamInput(param, category.editable);
-                    const fieldHtml = `
-                        <div class="mb-2">
-                            <label class="form-label small text-muted mb-1">${param.label}</label>
-                            ${inputHtml}
-                        </div>`;
-                    if (idx % 2 === 0) leftCol += fieldHtml;
-                    else rightCol += fieldHtml;
-                }
-            });
-            paramsHtml += `<div class="col-md-6">${leftCol}</div><div class="col-md-6">${rightCol}</div></div>`;
-            
-        } else if (category.params) {
-            category.params.forEach(param => {
-                if (param.value !== null && param.value !== undefined) {
-                    originalDeviceParams[param.path] = param.value;
-                    let inputHtml = renderParamInput(param, category.editable);
-                    paramsHtml += `
-                        <div class="row mb-2 align-items-center">
-                            <div class="col-5"><small class="text-muted">${param.label}</small></div>
-                            <div class="col-7">${inputHtml}</div>
-                        </div>`;
-                }
-            });
-        }
+        // Tab button
+        tabList.innerHTML += `
+            <li class="nav-item" role="presentation">
+                <button class="nav-link ${isFirst ? 'active' : ''}" id="${tabId}" data-bs-toggle="tab" 
+                        data-bs-target="#${paneId}" type="button" role="tab">
+                    <i class="bi ${config.icon} me-1"></i>${config.label}
+                    <span class="badge bg-secondary ms-1" style="font-size:0.65rem">${paramCount}</span>
+                    ${category.editable ? '<i class="bi bi-pencil-fill text-success ms-1" style="font-size:0.6rem" title="Editable"></i>' : ''}
+                </button>
+            </li>`;
         
-        if (!paramsHtml) continue;
+        // Tab content
+        let paramsHtml = renderTabContent(key, category);
         
-        const paramCount = category.params ? category.params.filter(p => p.value !== null && p.value !== undefined).length : 0;
-        
-        const html = `
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="${headerId}">
-                    <button class="accordion-button ${isExpanded ? '' : 'collapsed'}" type="button" 
-                            data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                        <i class="${category.icon || 'bi-gear'} me-2"></i>
-                        ${category.label}
-                        <span class="badge bg-secondary ms-2">${paramCount}</span>
-                        ${category.editable ? '<span class="badge bg-success ms-1">Editable</span>' : ''}
-                    </button>
-                </h2>
-                <div id="${collapseId}" class="accordion-collapse collapse ${isExpanded ? 'show' : ''}" 
-                     data-bs-parent="#deviceStatusAccordion">
-                    <div class="accordion-body p-2">
-                        ${paramsHtml}
-                    </div>
-                </div>
+        tabContent.innerHTML += `
+            <div class="tab-pane fade ${isFirst ? 'show active' : ''}" id="${paneId}" role="tabpanel">
+                ${paramsHtml}
             </div>`;
         
-        accordion.innerHTML += html;
-        index++;
+        isFirst = false;
+    });
+}
+
+function renderTabContent(key, category) {
+    let html = '';
+    
+    // LAN Ports - Table format
+    if (key === 'lan_ports') {
+        const ports = {};
+        category.params.forEach(param => {
+            const match = param.path.match(/LANEthernetInterfaceConfig\.(\d+)\./);
+            if (match) {
+                const portNum = match[1];
+                if (!ports[portNum]) ports[portNum] = {};
+                const paramName = param.path.split('.').pop();
+                ports[portNum][paramName] = param;
+                originalDeviceParams[param.path] = param.value;
+            }
+        });
+        
+        html = `<table class="table table-sm table-bordered table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:80px">Port</th>
+                    <th class="text-center" style="width:70px">Enable</th>
+                    <th style="width:100px">Status</th>
+                    <th>Speed</th>
+                    <th>Duplex</th>
+                    <th class="text-center" style="width:80px">L3 Enable</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        Object.keys(ports).sort((a,b) => a-b).forEach(portNum => {
+            const p = ports[portNum];
+            const isUp = p.Status?.value === 'Up';
+            html += `<tr>
+                <td><strong>LAN ${portNum}</strong></td>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block mb-0">
+                        <input class="form-check-input device-param" type="checkbox" 
+                               data-path="${p.Enable?.path || ''}" ${p.Enable?.value ? 'checked' : ''} ${!category.editable ? 'disabled' : ''}>
+                    </div>
+                </td>
+                <td class="${isUp ? 'text-success' : 'text-muted'}">
+                    <i class="bi ${isUp ? 'bi-check-circle-fill' : 'bi-x-circle'} me-1"></i>${p.Status?.value || '-'}
+                </td>
+                <td>${p.MaxBitRate?.value || '-'}</td>
+                <td>${p.DuplexMode?.value || '-'}</td>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block mb-0">
+                        <input class="form-check-input device-param" type="checkbox" 
+                               data-path="${p.X_HW_L3Enable?.path || ''}" ${p.X_HW_L3Enable?.value ? 'checked' : ''} ${!category.editable ? 'disabled' : ''}>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        
+    } else if (key === 'hosts') {
+        // Hosts - Table format
+        const hosts = {};
+        category.params.forEach(param => {
+            const match = param.path.match(/Hosts\.Host\.(\d+)\./);
+            if (match) {
+                const hostNum = match[1];
+                if (!hosts[hostNum]) hosts[hostNum] = {};
+                const paramName = param.path.split('.').pop();
+                hosts[hostNum][paramName] = param;
+                originalDeviceParams[param.path] = param.value;
+            }
+        });
+        
+        if (Object.keys(hosts).length > 0) {
+            html = `<table class="table table-sm table-bordered table-hover mb-0">
+                <thead class="table-light">
+                    <tr><th>Hostname</th><th>IP Address</th><th>MAC Address</th><th>Interface</th><th>Active</th></tr>
+                </thead>
+                <tbody>`;
+            Object.keys(hosts).forEach(hostNum => {
+                const h = hosts[hostNum];
+                const isActive = h.Active?.value === true || h.Active?.value === 'true' || h.Active?.value === 1;
+                html += `<tr class="${isActive ? '' : 'text-muted'}">
+                    <td>${h.HostName?.value || '-'}</td>
+                    <td>${h.IPAddress?.value || '-'}</td>
+                    <td><code>${h.MACAddress?.value || '-'}</code></td>
+                    <td>${h.Layer2Interface?.value || h.InterfaceType?.value || '-'}</td>
+                    <td><i class="bi ${isActive ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-muted'}"></i></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+        } else {
+            html = '<p class="text-muted text-center py-3">No connected hosts</p>';
+        }
+        
+    } else {
+        // Default - Two column grid
+        html = '<div class="row g-2">';
+        let col1 = '', col2 = '';
+        let idx = 0;
+        category.params.forEach(param => {
+            if (param.value !== null && param.value !== undefined) {
+                originalDeviceParams[param.path] = param.value;
+                const inputHtml = renderParamInput(param, category.editable);
+                const field = `<div class="mb-2">
+                    <label class="form-label small text-muted mb-0">${param.label}</label>
+                    ${inputHtml}
+                </div>`;
+                if (idx % 2 === 0) col1 += field;
+                else col2 += field;
+                idx++;
+            }
+        });
+        html += `<div class="col-md-6">${col1}</div><div class="col-md-6">${col2}</div></div>`;
     }
+    
+    return html;
 }
 
 function renderParamInput(param, editable) {
@@ -15986,16 +16037,13 @@ function renderParamInput(param, editable) {
         </div>`;
     } else if (param.type === 'password') {
         return `<input type="password" class="form-control form-control-sm device-param" 
-                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
-                       ${isReadonly ? 'readonly' : ''}>`;
+                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}" ${isReadonly ? 'readonly' : ''}>`;
     } else if (param.type === 'number') {
         return `<input type="number" class="form-control form-control-sm device-param" 
-                       data-path="${param.path}" value="${param.value || 0}"
-                       ${isReadonly ? 'readonly' : ''}>`;
+                       data-path="${param.path}" value="${param.value || 0}" ${isReadonly ? 'readonly' : ''}>`;
     } else {
         return `<input type="text" class="form-control form-control-sm device-param" 
-                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}"
-                       ${isReadonly ? 'readonly' : ''}>`;
+                       data-path="${param.path}" value="${escapeHtml(String(param.value || ''))}" ${isReadonly ? 'readonly' : ''}>`;
     }
 }
 
