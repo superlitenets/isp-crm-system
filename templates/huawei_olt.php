@@ -15797,6 +15797,7 @@ let originalDeviceParams = {};
 
 // Tab definitions with icons
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15845,6 +15846,7 @@ function getTabConfig(key) {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15861,6 +15863,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15877,6 +15880,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15893,6 +15897,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15909,6 +15914,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15925,6 +15931,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15941,6 +15948,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15957,6 +15965,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15973,6 +15982,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -15989,6 +15999,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
@@ -16005,6 +16016,7 @@ const tabConfig = {
     'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 14 }
 };
 const tabConfig = {
+    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
     'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
     'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
     'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },

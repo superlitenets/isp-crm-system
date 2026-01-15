@@ -1250,7 +1250,7 @@ class GenieACS {
         };
         
         // Device Info
-        $categories['miscellaneous'] = [
+        $categories['device_info'] = [
             'label' => 'Device Info',
             'icon' => 'bi-info-circle',
             'editable' => false,
