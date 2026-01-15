@@ -410,9 +410,10 @@ class GenieACS {
     
     public function refreshDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        // Use connection_request with timeout to force immediate execution
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", [
             'name' => 'refreshObject',
-            'objectName' => ''
+            'objectName' => 'InternetGatewayDevice'
         ]);
     }
     
@@ -1185,8 +1186,8 @@ class GenieACS {
         if ($refresh) {
             $refreshResult = $this->refreshDevice($deviceId);
             if ($refreshResult['success'] ?? false) {
-                // Wait briefly for values to populate, then re-fetch
-                usleep(1000000); // 1 second for device to respond
+                // Wait for values to populate (refresh has 10s timeout, device may take a moment)
+                sleep(2);
             }
         }
         
