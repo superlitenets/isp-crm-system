@@ -3093,16 +3093,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         
                         // Use provision-based method (recommended approach)
                         // This uses GenieACS declare() statements for reliable config
+                        $queueOnly = isset($_POST['queue_only']) && $_POST['queue_only'] === '1';
+                        $useConnectionRequest = !$queueOnly;  // If queue_only, don't wait for connection request
+                        
                         $result = $genieacs->configurePPPoEViaProvision(
                             $deviceId,
                             $pppoeUsername,
                             $pppoePassword,
                             $vlanId,    // Service VLAN
-                            true        // NAT enabled
+                            true,       // NAT enabled
+                            $useConnectionRequest  // Whether to use connection_request
                         );
                         
                         if ($result['success']) {
-                            $message = 'PPPoE configured via TR-069 provision. ' . ($result['message'] ?? '');
+                            if ($queueOnly) {
+                                $message = 'PPPoE task queued. Summon the device to apply config. ' . ($result['message'] ?? '');
+                            } else {
+                                $message = 'PPPoE configured via TR-069 provision. ' . ($result['message'] ?? '');
+                            }
                             $messageType = 'success';
                         } else {
                             $message = 'TR-069 PPPoE failed: ' . ($result['error'] ?? 'Unknown error');
@@ -14970,11 +14978,17 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         
                         <div class="mb-3" id="provisionMethodDiv">
                             <label class="form-label">Provisioning Method</label>
-                            <select name="provision_method" class="form-select" id="provisionMethod">
+                            <select name="provision_method" class="form-select" id="provisionMethod" onchange="document.getElementById('queueOnlyDiv').style.display = this.value === 'tr069' ? 'block' : 'none'">
                                 <option value="tr069" selected>TR-069 (GenieACS)</option>
                                 <option value="omci">OMCI (OLT CLI)</option>
                             </select>
                             <small class="text-muted">TR-069 uses remote ACS; OMCI configures via OLT directly</small>
+                        </div>
+                        
+                        <div class="mb-3 form-check" id="queueOnlyDiv">
+                            <input type="checkbox" class="form-check-input" name="queue_only" id="queueOnly" value="1">
+                            <label class="form-check-label" for="queueOnly">Queue only (summon device manually)</label>
+                            <small class="d-block text-muted">If device is behind NAT, queue task and trigger inform manually</small>
                         </div>
                         
                         <div id="pppoeCredentials">

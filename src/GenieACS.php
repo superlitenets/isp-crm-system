@@ -2868,10 +2868,12 @@ class GenieACS {
      * @param string $password PPPoE password  
      * @param int $vlan Service VLAN (0 = untagged)
      * @param bool $natEnabled Enable NAT routing
+     * @param bool $useConnectionRequest If false, just queue task (user can summon device)
      * @return array Result with success status
      */
     public function configurePPPoEViaProvision(string $deviceId, string $username, string $password, 
-                                                int $vlan = 0, bool $natEnabled = true): array {
+                                                int $vlan = 0, bool $natEnabled = true, 
+                                                bool $useConnectionRequest = true): array {
         if (empty($username) || empty($password)) {
             return ['success' => false, 'error' => 'Username and password are required'];
         }
@@ -2930,7 +2932,7 @@ PROVISION;
         
         // Step 2: Run the provision with arguments
         $args = [$username, $password, (string)$vlan, $natEnabled ? 'true' : 'false'];
-        $result = $this->runProvision($deviceId, $provisionName, $args, true);
+        $result = $this->runProvision($deviceId, $provisionName, $args, $useConnectionRequest);
         
         return [
             'success' => $result['success'] ?? false,
