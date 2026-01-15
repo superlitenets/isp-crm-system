@@ -1188,14 +1188,34 @@ class GenieACS {
         $device = $result['data'];
         $categories = [];
         
-        // Helper to extract parameter value
+        // Helper to extract parameter value - checks for _value in array or direct value
         $getValue = function($path) use ($device) {
-            return $device[$path]['_value'] ?? null;
+            if (!isset($device[$path])) return null;
+            $param = $device[$path];
+            if (is_array($param)) {
+                return $param['_value'] ?? null;
+            }
+            return $param;
         };
         
-        // Helper to check if path exists
+        // Helper to check if path exists with a value
         $hasPath = function($path) use ($device) {
-            return isset($device[$path]);
+            if (!isset($device[$path])) return false;
+            $param = $device[$path];
+            if (is_array($param)) {
+                return isset($param['_value']) || isset($param['_type']);
+            }
+            return true;
+        };
+        
+        // Helper to check if any path with prefix exists
+        $hasPrefix = function($prefix) use ($device) {
+            foreach ($device as $key => $val) {
+                if (str_starts_with($key, $prefix)) {
+                    if (is_array($val) && isset($val['_value'])) return true;
+                }
+            }
+            return false;
         };
         
         // Device Info
@@ -1271,7 +1291,7 @@ class GenieACS {
         for ($wanDev = 1; $wanDev <= 2; $wanDev++) {
             for ($connDev = 1; $connDev <= 4; $connDev++) {
                 $ipBase = "InternetGatewayDevice.WANDevice.{$wanDev}.WANConnectionDevice.{$connDev}.WANIPConnection.1";
-                if ($hasPath("{$ipBase}.Enable") || $hasPath("{$ipBase}.ConnectionType")) {
+                if ($hasPrefix($ipBase) || $hasPath("{$ipBase}.Enable") || $hasPath("{$ipBase}.ConnectionType")) {
                     $categories["ip_interface_{$wanDev}_{$connDev}"] = [
                         'label' => "IP Interface {$wanDev}.{$connDev}",
                         'icon' => 'bi-ethernet',
