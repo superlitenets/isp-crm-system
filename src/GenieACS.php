@@ -1776,12 +1776,18 @@ class GenieACS {
             }
         }
         
+        // Calculate total params from all categories
+        $totalParams = 0;
+        foreach ($categories as $cat) {
+            $totalParams += count($cat['params'] ?? []);
+        }
+        
         return [
             'success' => true,
             'device_id' => $deviceId,
             'last_inform' => $device['_lastInform'] ?? null,
             'categories' => $categories,
-            'total_params' => count($allParams)
+            'total_params' => $totalParams
         ];
     }
     
