@@ -308,6 +308,8 @@ class GenieACS {
         
         // Quick socket connect test (2 second timeout)
         $port = $parsed['port'] ?? ($parsed['scheme'] === 'https' ? 443 : 80);
+        $errno = 0;
+        $errstr = '';
         $socket = @fsockopen($host, $port, $errno, $errstr, 2);
         if ($socket) {
             fclose($socket);
@@ -2112,16 +2114,48 @@ class GenieACS {
             $secureResult = $this->secureDevice($deviceId);
             $results['secure_device'] = $secureResult;
             
-            // Step 2: Configure WAN - SmartOLT approach: direct write to factory path
-            // NO addObject needed - Huawei firmware has WAN structure built-in
+            // Step 2: Configure WAN - Proper TR-069 workflow:
+            // 1. AddObject to create WANPPPConnection instance
+            // 2. Wait for device to process
+            // 3. SetParameterValues on the new instance
             if ($connectionType === 'pppoe') {
-                $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+                $pppBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection';
                 $wanName = 'wan1.1.ppp1';
                 
-                // SmartOLT approach: Skip addObject, write directly to factory path
-                $results['create_wan'] = ['skipped' => true, 'reason' => 'SmartOLT method - direct write to factory path'];
+                // Step 2a: Check if WANPPPConnection.1 already exists
+                $instanceExists = false;
+                if (isset($existingWAN['ppp_connections']) && count($existingWAN['ppp_connections']) > 0) {
+                    $instanceExists = true;
+                    $pppBase = $existingWAN['ppp_connections'][0] ?? "{$pppBasePath}.1";
+                    $results['create_wan'] = ['skipped' => true, 'reason' => 'WANPPPConnection instance already exists: ' . $pppBase];
+                    error_log("[GenieACS] PPPoE instance exists: {$pppBase}");
+                }
                 
-                // Build all parameters in one setParameterValues call
+                if (!$instanceExists) {
+                    // Step 2b: AddObject to create WANPPPConnection instance
+                    error_log("[GenieACS] Creating WANPPPConnection via AddObject: {$pppBasePath}");
+                    $addResult = $this->addObject($deviceId, $pppBasePath);
+                    $results['add_ppp_object'] = $addResult;
+                    
+                    if (!$addResult['success']) {
+                        $errors[] = 'AddObject failed: ' . ($addResult['error'] ?? 'Unknown');
+                        error_log("[GenieACS] AddObject failed: " . json_encode($addResult));
+                    } else {
+                        // Wait for device to create the object (2 seconds)
+                        sleep(2);
+                        
+                        // Step 2c: Refresh to get the new instance path
+                        $refreshResult = $this->refreshObject($deviceId, $pppBasePath);
+                        $results['refresh_ppp'] = $refreshResult;
+                        error_log("[GenieACS] Refresh result: " . json_encode($refreshResult));
+                        
+                        // Wait for refresh to complete
+                        sleep(2);
+                    }
+                    $pppBase = "{$pppBasePath}.1";
+                }
+                
+                // Step 2d: Build all parameters in one setParameterValues call
                 $params = [];
                 $params[] = ["{$pppBase}.Enable", true, 'xsd:boolean'];
                 if (!empty($config['pppoe_username'])) {
@@ -2133,6 +2167,11 @@ class GenieACS {
                 $params[] = ["{$pppBase}.NATEnabled", true, 'xsd:boolean'];
                 if ($serviceVlan > 0) {
                     $params[] = ["{$pppBase}.X_HW_VLAN", $serviceVlan, 'xsd:unsignedInt'];
+                }
+                
+                // Enable LAN port routing (L3Enable) as you did manually
+                for ($i = 1; $i <= 4; $i++) {
+                    $params[] = ["InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.{$i}.X_HW_L3Enable", true, 'xsd:boolean'];
                 }
                 
                 error_log("[GenieACS] PPPoE setParameterValues: " . json_encode($params));
@@ -2148,11 +2187,33 @@ class GenieACS {
                 
             } else {
                 // Bridge Mode (DHCP/Static) - WANIPConnection with IP_Bridged
-                $ipBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1';
+                $ipBasePath = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection';
                 $wanName = 'wan1.1.ip1';
                 
-                // SmartOLT approach: Skip addObject, write directly to factory path
-                $results['create_wan'] = ['skipped' => true, 'reason' => 'SmartOLT method - direct write to factory path'];
+                // Step 2a: Check if WANIPConnection.1 already exists
+                $instanceExists = false;
+                if (isset($existingWAN['ip_connections']) && count($existingWAN['ip_connections']) > 0) {
+                    $instanceExists = true;
+                    $ipBase = $existingWAN['ip_connections'][0] ?? "{$ipBasePath}.1";
+                    $results['create_wan'] = ['skipped' => true, 'reason' => 'WANIPConnection instance already exists: ' . $ipBase];
+                }
+                
+                if (!$instanceExists) {
+                    // Step 2b: AddObject to create WANIPConnection instance
+                    error_log("[GenieACS] Creating WANIPConnection via AddObject: {$ipBasePath}");
+                    $addResult = $this->addObject($deviceId, $ipBasePath);
+                    $results['add_ip_object'] = $addResult;
+                    
+                    if (!$addResult['success']) {
+                        $errors[] = 'AddObject failed: ' . ($addResult['error'] ?? 'Unknown');
+                    } else {
+                        sleep(2);
+                        $refreshResult = $this->refreshObject($deviceId, $ipBasePath);
+                        $results['refresh_ip'] = $refreshResult;
+                        sleep(2);
+                    }
+                    $ipBase = "{$ipBasePath}.1";
+                }
                 
                 $params = [
                     ["{$ipBase}.Enable", true, 'xsd:boolean'],
@@ -2811,6 +2872,24 @@ class GenieACS {
         error_log("[GenieACS] addObject: {$objectPath} on {$deviceId}");
         $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
         error_log("[GenieACS] addObject result: " . json_encode($result));
+        
+        return $result;
+    }
+    
+    /**
+     * Refresh/discover an object path via TR-069 getParameterNames
+     */
+    public function refreshObject(string $deviceId, string $objectPath): array {
+        $encodedId = rawurlencode($deviceId);
+        
+        $task = [
+            'name' => 'getParameterValues',
+            'parameterNames' => [$objectPath]
+        ];
+        
+        error_log("[GenieACS] refreshObject: {$objectPath} on {$deviceId}");
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
+        error_log("[GenieACS] refreshObject result: " . json_encode($result));
         
         return $result;
     }
