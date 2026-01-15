@@ -8718,7 +8718,7 @@ try {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-success" id="btnPushTr069">
                                     <i class="bi bi-broadcast me-1"></i> Push Configuration
@@ -8850,7 +8850,7 @@ try {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary" id="btnConfigWan" <?= (empty($currentOnu['tr069_ip']) || empty($attachedVlans)) ? 'disabled' : '' ?>>
                                     <i class="bi bi-check-circle me-1"></i> Apply Configuration
@@ -8938,7 +8938,7 @@ try {
                                 <pre class="bg-dark text-light p-2 small" style="max-height: 150px; overflow-y: auto;" id="vlanLogContent"></pre>
                             </div>
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer justify-content-between">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
@@ -9265,7 +9265,7 @@ try {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary">Save ONU Type</button>
                             </div>
@@ -10504,7 +10504,7 @@ try {
                                     <input type="text" class="form-control" name="dns_servers" placeholder="1.1.1.1, 8.8.8.8">
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-success">
                                     <i class="bi bi-plus-lg me-2"></i>Create Server
@@ -10585,7 +10585,7 @@ try {
                                     <div class="form-text">Networks accessible through this peer (OLT management, TR-069 client ranges, etc.)</div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-success">
                                     <i class="bi bi-plus-lg me-2"></i>Add Peer
@@ -10650,7 +10650,7 @@ try {
                                     <div class="form-text">Networks accessible through this peer. Changes will restart WireGuard to apply new routes.</div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-warning">
                                     <i class="bi bi-check-lg me-2"></i>Save Changes
@@ -10671,7 +10671,7 @@ try {
                         <div class="modal-body">
                             <pre id="configContent" class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer justify-content-between">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                             <button type="button" class="btn btn-primary" onclick="copyConfig()">
                                 <i class="bi bi-clipboard me-2"></i>Copy
@@ -10693,7 +10693,7 @@ try {
                         </div>
                         <div class="modal-body" id="connectivityResults">
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer justify-content-between">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
@@ -11257,7 +11257,7 @@ try {
                                     <strong>Warning:</strong> This will briefly disconnect the ONU during migration.
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-right-circle me-1"></i> Move ONU</button>
                             </div>
@@ -11972,7 +11972,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                     <textarea name="description" id="onuTypeDescription" class="form-control" rows="2"></textarea>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save</button>
                             </div>
@@ -13068,7 +13068,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div class="modal-footer">
+                                                        <div class="modal-footer justify-content-between">
                                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                             <button type="submit" class="btn btn-primary">Save</button>
                                                         </div>
@@ -13349,7 +13349,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="modal-footer">
+                                        <div class="modal-footer justify-content-between">
                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                             <button type="button" class="btn btn-primary" 
                                                     onclick="savePortSettings(<?= $oltId ?>, '<?= htmlspecialchars($port['port_name']) ?>', '<?= $portId ?>')">
@@ -13515,7 +13515,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                                        placeholder="Port description">
                                                             </div>
                                                         </div>
-                                                        <div class="modal-footer">
+                                                        <div class="modal-footer justify-content-between">
                                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                             <button type="submit" class="btn btn-primary">Apply Configuration</button>
                                                         </div>
@@ -13770,7 +13770,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <label class="form-check-label">Active</label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save OLT</button>
                     </div>
@@ -13875,7 +13875,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Profile</button>
                     </div>
@@ -13950,7 +13950,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </select>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save ONU</button>
                     </div>
@@ -13985,7 +13985,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </select>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Authorize</button>
                     </div>
@@ -14148,7 +14148,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success" id="authSubmitBtn">
                             <i class="bi bi-check-circle me-1"></i> Authorize & Configure
@@ -14617,7 +14617,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Apply Settings</button>
                     </div>
@@ -14877,7 +14877,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <input type="password" name="confirm_password" id="confirmAdminPass" class="form-control" placeholder="Confirm new password" required minlength="6">
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-warning" onclick="return validatePasswordMatch()">
                             <i class="bi bi-key me-1"></i> Change Password
@@ -14901,7 +14901,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <p class="mt-3">Fetching ONU status from OLT...</p>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -14942,7 +14942,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <div class="form-text">DBA = Dynamic Bandwidth Allocation (controls download/upload speeds)</div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-info">
                             <i class="bi bi-check-lg me-1"></i> Apply DBA Profile
@@ -15007,7 +15007,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             </select>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i> Apply via OMCI
@@ -15038,7 +15038,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <p class="mt-3">Fetching configuration from OLT...</p>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-outline-primary" onclick="copyOnuConfig()">
                         <i class="bi bi-clipboard me-1"></i> Copy to Clipboard
                     </button>
@@ -15114,7 +15114,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <input type="number" name="vlan_id" class="form-control" placeholder="Leave empty for default">
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-success">
                             <i class="bi bi-check me-1"></i> Apply Configuration
@@ -15198,7 +15198,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="pppoeWanCancelBtn">Cancel</button>
                     <button type="button" class="btn btn-primary" id="pppoeWanStartBtn" onclick="startPPPoEProvisioning()">
                         <i class="bi bi-play me-1"></i> Start Provisioning
@@ -15540,7 +15540,7 @@ echo "# ================================================\n";
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-primary" onclick="copyConfigScript()">
                         <i class="bi bi-clipboard me-1"></i> Copy Full Script
@@ -15576,7 +15576,7 @@ echo "# ================================================\n";
                             <label class="form-check-label">Active</label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Zone</button>
                     </div>
@@ -15619,7 +15619,7 @@ echo "# ================================================\n";
                             <label class="form-check-label">Active</label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Subzone</button>
                     </div>
@@ -15679,7 +15679,7 @@ echo "# ================================================\n";
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Apartment</button>
                     </div>
@@ -15739,7 +15739,7 @@ echo "# ================================================\n";
                             <label class="form-check-label">Active</label>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save ODB</button>
                     </div>
@@ -15771,8 +15771,8 @@ echo "# ================================================\n";
                 </div>
                 <div id="deviceStatusError" class="alert alert-danger m-3" style="display:none;"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer justify-content-between">
+                <div><button type="button" class="btn btn-primary me-2" onclick="openDeviceStatus(currentDeviceStatusSerial, true)"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
                 <button type="button" class="btn btn-success" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
                     <i class="bi bi-check-circle me-1"></i> Save Changes
                 </button>
@@ -16662,7 +16662,7 @@ function saveDeviceStatus() {
                                 <pre class="bg-light p-2 rounded" style="max-height:200px;overflow:auto;font-size:11px">${respData}</pre>
                             </div>
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer justify-content-between">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
@@ -18438,7 +18438,7 @@ function saveDeviceStatus() {
                                 </div>
                             </div>
                         </div>
-                        <div class="modal-footer">
+                        <div class="modal-footer justify-content-between">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                             <button type="button" class="btn btn-warning" onclick="retryTR069Connection(${onuId})">
                                 <i class="bi bi-arrow-clockwise me-1"></i>Retry Connection
@@ -18561,7 +18561,7 @@ function saveDeviceStatus() {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer justify-content-between">
                                 <button type="button" class="btn btn-outline-primary" onclick="sendTR069ConnectionRequest(${onuId})">
                                     <i class="bi bi-broadcast me-1"></i>Ping Device
                                 </button>
