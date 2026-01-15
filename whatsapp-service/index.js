@@ -151,12 +151,25 @@ function initializeClient() {
         qrCodeData = await qrcode.toDataURL(qr);
     });
 
-    client.on('ready', () => {
+    client.on('ready', async () => {
         console.log('WhatsApp client is ready!');
         connectionStatus = 'connected';
         qrCodeData = null;
         qrCodeString = null;
         clientInfo = client.info;
+        
+        // Monkey-patch sendSeen to fix markedUnread error (WhatsApp Web API change)
+        try {
+            await client.pupPage.evaluate(() => {
+                if (window.WWebJS && window.WWebJS.sendSeen) {
+                    window.WWebJS.sendSeen = async () => true;
+                    console.log('Patched WWebJS.sendSeen');
+                }
+            });
+            console.log('Applied sendSeen patch for group messages');
+        } catch (e) {
+            console.warn('Could not patch sendSeen:', e.message);
+        }
     });
 
     client.on('authenticated', () => {
@@ -365,28 +378,12 @@ app.post('/send-group', async (req, res) => {
     try {
         const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
         
-        // Use Store.SendTextMsgToChat to bypass broken sendSeen
-        const result = await client.pupPage.evaluate(async (chatId, messageText) => {
-            const chatWid = window.Store.WidFactory.createWid(chatId);
-            const chat = await window.Store.Chat.find(chatWid);
-            
-            if (!chat) {
-                throw new Error('Group not found');
-            }
-            
-            // Use SendTextMsgToChat which doesn't call sendSeen
-            const msg = await window.Store.SendTextMsgToChat(chat, messageText);
-            
-            return {
-                id: msg.id._serialized || msg.id.id,
-                timestamp: msg.t || Math.floor(Date.now() / 1000)
-            };
-        }, chatId, message);
-        
+        // Use standard sendMessage (sendSeen is patched on ready)
+        const result = await client.sendMessage(chatId, message);
         console.log(`Message sent to group ${groupId}`);
         res.json({ 
             success: true, 
-            messageId: result.id,
+            messageId: result.id._serialized,
             timestamp: result.timestamp
         });
     } catch (error) {

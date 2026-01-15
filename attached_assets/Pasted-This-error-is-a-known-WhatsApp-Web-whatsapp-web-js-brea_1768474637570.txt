@@ -1,0 +1,136 @@
+This error is a known WhatsApp Web / whatsapp-web.js breakage, not a bug in your business logic.
+
+What the error actually means
+TypeError: Cannot read properties of undefined (reading 'markedUnread')
+at window.WWebJS.sendSeen
+
+
+whatsapp-web.js internally calls sendSeen() before sending a message.
+WhatsApp recently changed their internal chat object structure, so:
+
+chat.markedUnread no longer exists (or is undefined)
+
+whatsapp-web.js is still trying to access it
+
+Result: sending to GROUPS fails, especially when the chat was never opened in the session
+
+This is very common right now, especially on:
+
+Groups
+
+Fresh sessions
+
+Headless / Docker environments
+
+Why it happens more on GROUPS
+
+Groups behave differently internally:
+
+Seen/unread state is handled differently
+
+Some metadata is lazy-loaded
+
+If the group was never opened, the chat object is incomplete
+
+So sendSeen() crashes.
+
+Immediate Fixes (do these first)
+✅ 1. Update whatsapp-web.js
+
+This is critical.
+
+npm uninstall whatsapp-web.js
+npm install whatsapp-web.js@latest
+
+
+Then restart your container / app.
+
+Many users are fixed just by updating.
+
+✅ 2. Disable auto “seen” behavior (WORKAROUND)
+
+If update doesn’t fix it yet, force-disable sendSeen().
+
+Patch in your code (recommended)
+
+Before sending messages:
+
+client.sendMessage(chatId, message, {
+    sendSeen: false
+});
+
+
+If your version doesn’t support that option, apply the monkey patch below.
+
+✅ 3. Monkey-patch sendSeen (very reliable)
+
+Add this ONCE after client is ready:
+
+client.on('ready', async () => {
+    await client.pupPage.evaluate(() => {
+        if (window.WWebJS?.sendSeen) {
+            window.WWebJS.sendSeen = async () => true;
+        }
+    });
+});
+
+
+This prevents WhatsApp Web from touching markedUnread at all.
+
+Group-safe send method (BEST PRACTICE)
+
+Before sending to a group, force-load the chat:
+
+const chat = await client.getChatById(groupId);
+
+// Ensure chat is fully initialized
+await chat.fetchMessages({ limit: 1 });
+
+await client.sendMessage(groupId, message);
+
+
+This reduces undefined chat objects.
+
+Docker / Headless-specific fix (important)
+
+If you are running in Docker (you are):
+
+Use non-headless mode OR new Chrome flags
+puppeteer: {
+    headless: 'new',
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+    ]
+}
+
+
+Old headless mode breaks WhatsApp state handling.
+
+If you want a guaranteed stable solution
+⚠️ Reality check
+
+whatsapp-web.js is reverse-engineered and will keep breaking.
+
+For production / ISP / CRM use (like your Superlite setup):
+
+Recommended alternatives
+
+WhatsApp Cloud API (Meta official) – most stable
+
+Baileys (MD) – faster updates than wwebjs
+
+Venom-bot – less breaking changes for groups
+
+If this is feeding into your Perfex / ticketing WhatsApp integration, Cloud API is the only long-term safe option.
+
+Summary (TL;DR)
+
+✔ This is not your code’s fault
+✔ WhatsApp changed internals → markedUnread removed
+✔ Update whatsapp-web.js
+✔ Disable or patch sendSeen()
+✔ Force-load group chats before sending
+✔ Consider moving off whatsapp-web.js for production
