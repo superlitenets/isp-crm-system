@@ -1179,7 +1179,16 @@ class GenieACS {
      * Get all device parameters organized by category (like SmartOLT Status view)
      * Returns editable parameter groups: PPP, LAN, WiFi, DHCP, etc.
      */
-    public function getDeviceStatus(string $deviceId): array {
+    public function getDeviceStatus(string $deviceId, bool $refresh = false): array {
+        // If refresh requested, trigger a refresh task first
+        if ($refresh) {
+            $refreshResult = $this->refreshDevice($deviceId);
+            if ($refreshResult['success'] ?? false) {
+                // Wait briefly for values to populate, then re-fetch
+                usleep(1000000); // 1 second for device to respond
+            }
+        }
+        
         $result = $this->getDevice($deviceId);
         if (!($result['success'] ?? false) || empty($result['data'])) {
             return ['success' => false, 'error' => 'Device not found'];
@@ -1187,6 +1196,24 @@ class GenieACS {
         
         $device = $result['data'];
         $categories = [];
+        
+        // Check if device has actual values (not just parameter structure)
+        $hasValues = false;
+        foreach ($device as $key => $val) {
+            if (is_array($val) && isset($val['_value'])) {
+                $hasValues = true;
+                break;
+            }
+        }
+        
+        // If no values and not already refreshing, suggest refresh
+        if (!$hasValues && !$refresh) {
+            return [
+                'success' => false,
+                'error' => 'Device parameters not yet fetched. Click Refresh to load data from device.',
+                'needs_refresh' => true
+            ];
+        }
         
         // Helper to extract parameter value - checks for _value in array or direct value
         $getValue = function($path) use ($device) {

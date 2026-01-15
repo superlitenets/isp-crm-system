@@ -3036,7 +3036,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 $deviceId = $deviceResult['device']['_id'] ?? '';
-                $result = $genieacs->getDeviceStatus($deviceId);
+                $refresh = filter_var($_POST["refresh"] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $result = $genieacs->getDeviceStatus($deviceId, $refresh);
                 echo json_encode($result);
                 exit;
                 
@@ -15785,7 +15786,7 @@ echo "# ================================================\n";
 let currentDeviceStatusSerial = '';
 let originalDeviceParams = {};
 
-function openDeviceStatus(serial) {
+function openDeviceStatus(serial, doRefresh = false) {
     currentDeviceStatusSerial = serial;
     document.getElementById('deviceStatusSerial').textContent = serial;
     document.getElementById('deviceStatusLoading').style.display = 'block';
@@ -15801,6 +15802,10 @@ function openDeviceStatus(serial) {
     const formData = new FormData();
     formData.append('action', 'get_device_status');
     formData.append('serial', serial);
+    if (doRefresh) {
+        formData.append('refresh', '1');
+        document.getElementById('deviceStatusLoading').innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">Fetching data from device... This may take a few seconds.</p>';
+    }
     
     fetch('?page=huawei-olt', {
         method: 'POST',
@@ -15809,10 +15814,22 @@ function openDeviceStatus(serial) {
     .then(r => r.json())
     .then(data => {
         document.getElementById('deviceStatusLoading').style.display = 'none';
+        document.getElementById('deviceStatusLoading').innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">Loading device status...</p>';
+        
         if (data.success) {
             renderDeviceStatus(data.categories);
             document.getElementById('deviceStatusContent').style.display = 'block';
             document.getElementById('deviceStatusSaveBtn').disabled = false;
+        } else if (data.needs_refresh) {
+            // Device has no cached values - need to refresh from device
+            document.getElementById('deviceStatusError').innerHTML = `
+                <div class="text-center">
+                    <p>${data.error}</p>
+                    <button class="btn btn-primary" onclick="openDeviceStatus('${serial}', true)">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Fetch Data from Device
+                    </button>
+                </div>`;
+            document.getElementById('deviceStatusError').style.display = 'block';
         } else {
             document.getElementById('deviceStatusError').textContent = data.error || 'Failed to load device status';
             document.getElementById('deviceStatusError').style.display = 'block';
