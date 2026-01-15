@@ -62,11 +62,8 @@ class GenieACS {
             
             $newKey = $prefix === '' ? $key : $prefix . '.' . $key;
             
-            // If this is a TR-069 parameter (has _value, _type, _timestamp, _writable, or _object)
-            if (is_array($value) && (isset($value['_value']) || isset($value['_type']) || isset($value['_writable']))) {
-                $result[$newKey] = $value;
-            } elseif (is_array($value) && !empty($value)) {
-                // Check if this is a nested object container (has _object flag or nested arrays)
+            if (is_array($value) && !empty($value)) {
+                // Check if this has nested parameters (non-underscore keys with array values)
                 $hasNestedParams = false;
                 foreach ($value as $subKey => $subVal) {
                     if (is_array($subVal) && !str_starts_with($subKey, '_')) {
@@ -75,11 +72,15 @@ class GenieACS {
                     }
                 }
                 
-                if ($hasNestedParams || isset($value['_object'])) {
-                    // Recursively flatten
+                if ($hasNestedParams) {
+                    // Container object - recursively flatten
                     $flattened = $this->flattenDevice($value, $newKey);
                     $result = array_merge($result, $flattened);
+                } elseif (isset($value['_value']) || isset($value['_type'])) {
+                    // Leaf parameter - add directly
+                    $result[$newKey] = $value;
                 } else {
+                    // Other array value
                     $result[$newKey] = $value;
                 }
             } else {
@@ -1196,10 +1197,6 @@ class GenieACS {
         
         $device = $result['data'];
         $categories = [];
-        
-        // DEBUG: Log first 20 keys to understand structure
-        $debugKeys = array_slice(array_keys($device), 0, 30);
-        error_log("DEBUG getDeviceStatus - Device keys: " . json_encode($debugKeys));
         
         // Check if device has actual values (not just parameter structure)
         $hasValues = false;
