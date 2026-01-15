@@ -1651,39 +1651,113 @@ class GenieACS {
             'params' => $fwParams
         ];
         
-        // ALL PARAMETERS - Show everything the device has (like SmartOLT raw view)
-        $allParams = [];
+        // AUTO-CATEGORIZE ALL REMAINING PARAMETERS by path prefix
+        $autoCats = [
+            'wan_stats' => ['label' => 'WAN Statistics', 'icon' => 'bi-graph-up', 'prefix' => 'WANDevice', 'match' => ['Stats', 'Bytes', 'Packets', 'Errors', 'Ethernet'], 'editable' => false],
+            'wan_dhcp' => ['label' => 'WAN DHCP Options', 'icon' => 'bi-hdd-network', 'prefix' => 'WANDevice', 'match' => ['DHCPClient', 'SentDHCPOption', 'ReqDHCPOption'], 'editable' => true],
+            'wan_routing' => ['label' => 'WAN Routing', 'icon' => 'bi-signpost', 'prefix' => 'WANDevice', 'match' => ['X_HW_IPv6', 'X_HW_IPv4', 'PolicyRoute', 'Lan1Enable', 'Lan2Enable', 'SSID1Enable'], 'editable' => true],
+            'lan_hosts' => ['label' => 'Connected Hosts', 'icon' => 'bi-pc-display', 'prefix' => 'LANDevice.1.Hosts', 'match' => [], 'editable' => false],
+            'lan_eth' => ['label' => 'LAN Ethernet Ports', 'icon' => 'bi-ethernet', 'prefix' => 'LANEthernetInterfaceConfig', 'match' => [], 'editable' => true],
+            'wlan_config' => ['label' => 'WiFi Configuration', 'icon' => 'bi-wifi', 'prefix' => 'WLANConfiguration', 'match' => [], 'editable' => true],
+            'mgmt_server' => ['label' => 'Management Server (TR-069)', 'icon' => 'bi-cloud-arrow-up', 'prefix' => 'ManagementServer', 'match' => [], 'editable' => true],
+            'time_config' => ['label' => 'Time & NTP', 'icon' => 'bi-clock', 'prefix' => 'Time', 'match' => [], 'editable' => true],
+            'voice_svc' => ['label' => 'Voice Service (VoIP)', 'icon' => 'bi-telephone', 'prefix' => 'VoiceService', 'match' => [], 'editable' => true],
+            'user_iface' => ['label' => 'User Interface', 'icon' => 'bi-display', 'prefix' => 'UserInterface', 'match' => [], 'editable' => true],
+            'device_info' => ['label' => 'Device Info (All)', 'icon' => 'bi-info-circle', 'prefix' => 'DeviceInfo', 'match' => [], 'editable' => false],
+        ];
+        
+        $autoCatParams = [];
+        foreach ($autoCats as $catKey => $catDef) {
+            $autoCatParams[$catKey] = [];
+        }
+        $uncategorized = [];
+        
+        // Process all device parameters
         $sortedKeys = array_keys($device);
         sort($sortedKeys);
         foreach ($sortedKeys as $key) {
-            // Skip metadata keys
             if (str_starts_with($key, '_')) continue;
             
             $val = $device[$key];
-            if (is_array($val) && isset($val['_value'])) {
-                $paramValue = $val['_value'];
-                $writable = $val['_writable'] ?? false;
-                
-                // Create readable label from path
-                $pathParts = explode('.', $key);
-                $shortLabel = end($pathParts);
-                
-                $allParams[] = [
-                    'path' => $key,
-                    'label' => $shortLabel,
-                    'full_path' => $key,
-                    'value' => $paramValue,
-                    'type' => $writable ? 'string' : 'readonly'
+            if (!is_array($val) || !isset($val['_value'])) continue;
+            
+            $paramValue = $val['_value'];
+            $writable = $val['_writable'] ?? false;
+            $pathParts = explode('.', $key);
+            $shortLabel = end($pathParts);
+            
+            // Make labels more readable
+            $friendlyLabel = preg_replace('/([a-z])([A-Z])/', '$1 $2', $shortLabel);
+            $friendlyLabel = str_replace('X_HW_', '', $friendlyLabel);
+            $friendlyLabel = str_replace('_', ' ', $friendlyLabel);
+            
+            // Determine type based on value and path
+            $paramType = 'readonly';
+            if ($writable) {
+                if (is_bool($paramValue) || $paramValue === 'true' || $paramValue === 'false') {
+                    $paramType = 'boolean';
+                } elseif (stripos($shortLabel, 'Password') !== false || stripos($shortLabel, 'Passphrase') !== false) {
+                    $paramType = 'password';
+                } elseif (is_numeric($paramValue) && !preg_match('/Address|IP|MAC|URL/', $shortLabel)) {
+                    $paramType = 'number';
+                } else {
+                    $paramType = 'string';
+                }
+            }
+            
+            $param = [
+                'path' => $key,
+                'label' => $friendlyLabel,
+                'full_path' => $key,
+                'value' => $paramValue,
+                'type' => $paramType
+            ];
+            
+            // Categorize by path
+            $categorized = false;
+            foreach ($autoCats as $catKey => $catDef) {
+                if (strpos($key, $catDef['prefix']) !== false) {
+                    // Check if matches specific sub-patterns
+                    if (!empty($catDef['match'])) {
+                        foreach ($catDef['match'] as $match) {
+                            if (strpos($key, $match) !== false) {
+                                $autoCatParams[$catKey][] = $param;
+                                $categorized = true;
+                                break 2;
+                            }
+                        }
+                    } else {
+                        $autoCatParams[$catKey][] = $param;
+                        $categorized = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$categorized) {
+                $uncategorized[] = $param;
+            }
+        }
+        
+        // Add auto-categorized sections
+        foreach ($autoCats as $catKey => $catDef) {
+            if (!empty($autoCatParams[$catKey])) {
+                $categories['auto_' . $catKey] = [
+                    'label' => $catDef['label'] . ' (' . count($autoCatParams[$catKey]) . ')',
+                    'icon' => $catDef['icon'],
+                    'editable' => $catDef['editable'],
+                    'params' => $autoCatParams[$catKey]
                 ];
             }
         }
-        if (!empty($allParams)) {
-            $categories['all_parameters'] = [
-                'label' => 'All Parameters (' . count($allParams) . ')',
+        
+        // Add uncategorized as "Other Parameters"
+        if (!empty($uncategorized)) {
+            $categories['other_params'] = [
+                'label' => 'Other Parameters (' . count($uncategorized) . ')',
                 'icon' => 'bi-list-ul',
                 'editable' => true,
-                'collapsed' => true,
-                'params' => $allParams
+                'params' => $uncategorized
             ];
         }
         
