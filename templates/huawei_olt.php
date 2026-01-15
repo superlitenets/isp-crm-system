@@ -6257,7 +6257,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>OLT Name</th>
                                             <th>IP Address</th>
@@ -6967,7 +6967,7 @@ try {
                     <?php elseif (empty($onus) && !empty($discoveredOnus)): ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
@@ -7021,7 +7021,7 @@ try {
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0" id="onuTable">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Serial Number</th>
                                     <th>ONU Type</th>
@@ -7997,7 +7997,7 @@ try {
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Service-port ID</th>
                                 <th>User-VLAN</th>
@@ -8046,7 +8046,7 @@ try {
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Port</th>
                                 <th>Admin state</th>
@@ -8093,7 +8093,7 @@ try {
                         <span class="text-muted">Device not connected to TR-069. WiFi data will be available when the device connects to the ACS.</span>
                     </div>
                     <table class="table table-sm table-hover mb-0 <?= empty($currentOnu['tr069_ip']) ? 'd-none' : '' ?>" id="wifiTable">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Port</th>
                                 <th>Admin state</th>
@@ -9174,7 +9174,7 @@ try {
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Name / Model</th>
                                     <th>ETH Ports</th>
@@ -9368,7 +9368,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Zone Name</th>
                                             <th>Description</th>
@@ -9434,7 +9434,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Subzone Name</th>
                                             <th>Zone</th>
@@ -9498,7 +9498,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Name</th>
                                             <th>Zone</th>
@@ -9558,7 +9558,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>ODB Code</th>
                                             <th>Zone</th>
@@ -9645,7 +9645,7 @@ try {
                     <?php else: ?>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 small">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Time</th>
                                     <th>OLT</th>
@@ -9983,7 +9983,7 @@ try {
                 if (node.type === 'olt') {
                     html = `
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <p><strong>Type:</strong> OLT Device</p>
                                 <p><strong>Name:</strong> ${node.label}</p>
                                 <p><strong>IP Address:</strong> ${node.ip || 'N/A'}</p>
@@ -9997,11 +9997,11 @@ try {
                 } else if (node.type === 'port') {
                     html = `
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <p><strong>Type:</strong> PON Port</p>
                                 <p><strong>Port:</strong> ${node.label}</p>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <p><strong>Total ONUs:</strong> ${node.onu_count || 0}</p>
                                 <p><span class="text-success">${node.online || 0} Online</span> / <span class="text-danger">${node.los || 0} LOS</span> / <span class="text-secondary">${node.offline || 0} Offline</span></p>
                             </div>
@@ -10010,13 +10010,13 @@ try {
                     const statusClass = node.status === 'online' ? 'success' : (node.status === 'los' ? 'danger' : 'secondary');
                     html = `
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <p><strong>Type:</strong> ONU</p>
                                 <p><strong>Name:</strong> ${node.label}</p>
                                 <p><strong>Serial:</strong> <code>${node.serial || 'N/A'}</code></p>
                                 <p><strong>Status:</strong> <span class="badge bg-${statusClass}">${node.status}</span></p>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <p><strong>Rx Power:</strong> ${node.rx_power ? node.rx_power + ' dBm' : 'N/A'}</p>
                                 <p><strong>Customer:</strong> ${node.customer || 'Not assigned'}</p>
                                 ${node.db_id ? `<a href="?page=huawei-olt&view=onus&onu_id=${node.db_id}" class="btn btn-primary btn-sm"><i class="bi bi-eye me-1"></i> View Details</a>` : ''}
@@ -10116,7 +10116,7 @@ try {
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Serial Number</th>
                                     <th>Linked ONU</th>
@@ -10376,7 +10376,7 @@ try {
                             <?php else: ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Name</th>
                                             <th>Allowed IPs</th>
@@ -10804,7 +10804,7 @@ try {
                             if (results.networks && results.networks.length > 0) {
                                 html += `<h6 class="mt-4"><i class="bi bi-diagram-3 me-2"></i>Routed Networks</h6>`;
                                 html += `<table class="table table-sm table-bordered">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr><th>Network</th><th>Test IP</th><th>Status</th><th>Latency</th></tr>
                                     </thead>
                                     <tbody>`;
@@ -11059,7 +11059,7 @@ try {
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>SN</th>
                                             <th>Name</th>
@@ -11118,7 +11118,7 @@ try {
                                 <input type="hidden" name="olt_id" value="<?= $migOltId ?>">
                                 
                                 <div class="row g-3 mb-4">
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="card border">
                                             <div class="card-header bg-light">
                                                 <strong>Source Port</strong>
@@ -11149,7 +11149,7 @@ try {
                                         </div>
                                     </div>
                                     
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="card border">
                                             <div class="card-header bg-light">
                                                 <strong>Destination Port</strong>
@@ -11182,7 +11182,7 @@ try {
                                     <h6>ONUs to Migrate:</h6>
                                     <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
                                         <table class="table table-sm table-bordered">
-                                            <thead class="table-light">
+                                            <thead>
                                                 <tr>
                                                     <th><input type="checkbox" id="selectAllBulk" checked onchange="toggleAllBulk()"></th>
                                                     <th>SN</th>
@@ -11648,7 +11648,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 
                                 <div class="table-responsive mb-3">
                                     <table class="table table-sm table-bordered">
-                                        <thead class="table-light">
+                                        <thead>
                                             <tr>
                                                 <th>SmartOLT Device</th>
                                                 <th>ONUs</th>
@@ -11751,7 +11751,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                 </div>
                 
                 <!-- Bulk TR-069 Configuration -->
-                <div class="col-md-6">
+                <div>
                     <div class="card h-100">
                         <div class="card-header bg-info text-white">
                             <i class="bi bi-broadcast me-2"></i>Bulk TR-069 Configuration
@@ -11836,7 +11836,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Name</th>
                                             <th>Model</th>
@@ -12290,7 +12290,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6">
+                                <div>
                                     <h6>Before Running Script:</h6>
                                     <ul class="small">
                                         <li>Backup current config: <code>save</code></li>
@@ -12298,7 +12298,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         <li>Check VLANs: <code>display vlan all</code></li>
                                     </ul>
                                 </div>
-                                <div class="col-md-6">
+                                <div>
                                     <h6>After Running Script:</h6>
                                     <ul class="small">
                                         <li>Save configuration: <code>save</code></li>
@@ -12482,7 +12482,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <div class="collapse" id="templateHelp">
                             <div class="card-body bg-light border-bottom">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div>
                                         <h6 class="text-primary">Discovery Template Placeholders:</h6>
                                         <ul class="small mb-0">
                                             <li><code>{olt_name}</code> - OLT name</li>
@@ -12495,7 +12495,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <li><code>{discovery_time}</code> - Discovery timestamp</li>
                                         </ul>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <h6 class="text-danger">Fault Template Placeholders:</h6>
                                         <ul class="small mb-0">
                                             <li><code>{olt_name}</code> - OLT name</li>
@@ -12517,7 +12517,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <input type="hidden" name="action" value="save_oms_templates">
                                 
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-broadcast text-primary me-1"></i>
@@ -12529,7 +12529,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
                                         </button>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-exclamation-triangle text-danger me-1"></i>
@@ -12724,7 +12724,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             };
                             ?>
                             <div class="row">
-                                <div class="col-md-6">
+                                <div>
                                     <table class="table table-sm mb-0">
                                         <tr>
                                             <td class="text-muted" width="35%">SNMP Status</td>
@@ -12745,7 +12745,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         </tr>
                                     </table>
                                 </div>
-                                <div class="col-md-6">
+                                <div>
                                     <table class="table table-sm mb-0">
                                         <tr>
                                             <td class="text-muted" width="35%">System Uptime</td>
@@ -12883,7 +12883,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     ?>
                     <div class="table-responsive">
                         <table class="table table-hover">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>Slot</th>
                                     <th>Board Name</th>
@@ -12971,7 +12971,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <?php if (!empty($cachedVLANs)): ?>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>VLAN ID</th>
                                             <th>Type</th>
@@ -13223,7 +13223,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         <div class="accordion-body p-0">
                                             <div class="table-responsive">
                                                 <table class="table table-sm table-hover mb-0">
-                                                    <thead class="table-light">
+                                                    <thead>
                                                         <tr>
                                                             <th style="width: 80px;">Port</th>
                                                             <th style="width: 70px;">Status</th>
@@ -13305,7 +13305,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                         </div>
                                         <div class="modal-body">
                                             <div class="row g-3">
-                                                <div class="col-md-6">
+                                                <div>
                                                     <label class="form-label">Default VLAN for Authorization</label>
                                                     <select class="form-select" id="defaultVlan<?= $portId ?>">
                                                         <option value="">-- None --</option>
@@ -13317,7 +13317,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                     </select>
                                                     <small class="text-muted">Pre-selected when authorizing ONUs on this port</small>
                                                 </div>
-                                                <div class="col-md-6">
+                                                <div>
                                                     <label class="form-label">Port Status</label>
                                                     <div class="d-flex align-items-center gap-2">
                                                         <span class="badge bg-<?= $adminEnabled ? 'success' : 'secondary' ?>">
@@ -13444,7 +13444,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <?php if (!empty($cachedUplinks)): ?>
                             <div class="table-responsive">
                                 <table class="table table-hover">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>Port</th>
                                             <th>Type</th>
@@ -13498,7 +13498,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                             <input type="hidden" name="port_name" value="<?= htmlspecialchars($uplink['port_name']) ?>">
                                                             
                                                             <div class="row g-3">
-                                                                <div class="col-md-6">
+                                                                <div>
                                                                     <label class="form-label">VLAN Mode</label>
                                                                     <select name="vlan_mode" class="form-select" id="vlanMode<?= str_replace('/', '_', $uplink['port_name']) ?>">
                                                                         <option value="trunk" <?= ($uplink['vlan_mode'] ?? '') === 'trunk' ? 'selected' : '' ?>>Trunk</option>
@@ -13506,7 +13506,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                                         <option value="hybrid" <?= ($uplink['vlan_mode'] ?? '') === 'hybrid' ? 'selected' : '' ?>>Hybrid</option>
                                                                     </select>
                                                                 </div>
-                                                                <div class="col-md-6">
+                                                                <div>
                                                                     <label class="form-label">Native/Default VLAN</label>
                                                                     <input type="number" name="pvid" class="form-control" value="<?= $uplink['pvid'] ?? 1 ?>" min="1" max="4094">
                                                                 </div>
@@ -13621,7 +13621,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             
             <?php elseif ($detailTab === 'advanced'): ?>
             <div class="row g-4">
-                <div class="col-md-6">
+                <div>
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-white">
                             <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>CLI Terminal</h5>
@@ -13634,7 +13634,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div>
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-white">
                             <h5 class="mb-0"><i class="bi bi-gear me-2"></i>OLT Actions</h5>
@@ -14040,13 +14040,13 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label">Name <span class="text-danger">*</span></label>
                                     <input type="text" name="name" id="authName" class="form-control" placeholder="e.g., John Doe" required>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label"><i class="bi bi-telephone text-primary me-1"></i>Phone</label>
                                     <input type="text" name="phone" id="authPhone" class="form-control" placeholder="e.g., 0712345678">
@@ -14063,7 +14063,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label">Zone <span class="text-danger">*</span></label>
                                     <select name="zone_id" id="authZoneId" class="form-select" required onchange="updateZoneName(this)">
@@ -14079,7 +14079,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                     <input type="hidden" name="zone" id="authZoneName">
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label">Service VLAN <span class="text-danger">*</span></label>
                                     <select name="vlan_id" id="authVlanId" class="form-select" required>
@@ -14095,13 +14095,13 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Latitude</label>
                                     <input type="text" name="latitude" id="authLatitude" class="form-control" placeholder="e.g., -1.2921">
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label"><i class="bi bi-geo-alt text-danger me-1"></i>GPS Longitude</label>
                                     <div class="input-group">
@@ -14132,13 +14132,13 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <hr>
                         <h6 class="text-primary mb-3"><i class="bi bi-wifi me-2"></i>PPPoE Internet Configuration (Optional)</h6>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label">PPPoE Username</label>
                                     <input type="text" name="pppoe_username" id="authPppoeUser" class="form-control" placeholder="e.g., user@isp.com">
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div>
                                 <div class="mb-3">
                                     <label class="form-label">PPPoE Password</label>
                                     <div class="input-group">
@@ -14455,7 +14455,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <!-- 2.4 GHz Tab -->
                             <div class="tab-pane fade show active" id="wifi24Tab">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="form-check form-switch mb-3">
                                             <input type="checkbox" class="form-check-input" name="wifi24_enabled" id="wifi24Enabled" checked>
                                             <label class="form-check-label" for="wifi24Enabled"><strong>Enable 2.4 GHz WiFi</strong></label>
@@ -14481,7 +14481,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
@@ -14527,7 +14527,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <!-- 5 GHz Tab -->
                             <div class="tab-pane fade" id="wifi5Tab">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="form-check form-switch mb-3">
                                             <input type="checkbox" class="form-check-input" name="wifi5_enabled" id="wifi5Enabled" checked>
                                             <label class="form-check-label" for="wifi5Enabled"><strong>Enable 5 GHz WiFi</strong></label>
@@ -14558,7 +14558,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <h6 class="text-muted mb-3"><i class="bi bi-diagram-3 me-1"></i> Connection Mode & VLAN</h6>
                                         
                                         <div class="mb-3">
@@ -14737,7 +14737,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             .then(data => {
                 if (data.vlans && data.vlans.length > 0) {
                     let html = '<table class="table table-sm table-bordered mb-0">';
-                    html += '<thead class="table-light"><tr><th>VLAN</th><th>Name</th><th>Type</th><th>Mode</th><th></th></tr></thead><tbody>';
+                    html += '<thead><tr><th>VLAN</th><th>Name</th><th>Type</th><th>Mode</th><th></th></tr></thead><tbody>';
                     data.vlans.forEach(v => {
                         const nativeBadge = v.is_native ? '<span class="badge bg-warning text-dark ms-1">Native</span>' : '';
                         html += `<tr>
@@ -15761,47 +15761,316 @@ echo "# ================================================\n";
     </div>
 
 <?php endif; ?>
-<div class="modal fade" id="deviceStatusModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+<style>
+.device-status-modal .modal-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+}
+.device-status-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%);
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.device-status-header .device-title {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.device-status-header .device-serial {
+    background: rgba(255,255,255,0.15);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    letter-spacing: 0.5px;
+}
+.device-status-header .btn-close-custom {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.device-status-header .btn-close-custom:hover {
+    background: rgba(255,255,255,0.2);
+}
+.device-status-body {
+    display: flex;
+    min-height: 500px;
+    max-height: 70vh;
+}
+.device-status-sidebar {
+    width: 200px;
+    min-width: 200px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-right: 1px solid #e2e8f0;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+.device-status-sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    color: #475569;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.device-status-sidebar .nav-link:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+.device-status-sidebar .nav-link.active {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
+.device-status-sidebar .nav-link i {
+    font-size: 0.9rem;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.device-status-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    background: #fff;
+}
+.device-status-main .tab-pane {
+    animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.param-group {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 0.875rem;
+    overflow: hidden;
+}
+.param-group-header {
+    background: linear-gradient(90deg, #f8fafc 0%, #fff 100%);
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.param-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    padding: 0.875rem;
+}
+.param-item {
+    margin-bottom: 0;
+}
+.param-item label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.param-item .form-control,
+.param-item .form-select {
+    font-size: 0.8125rem;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    padding: 0.4rem 0.625rem;
+    transition: all 0.15s;
+}
+.param-item .form-control:focus,
+.param-item .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+.param-item .form-control[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+}
+.param-item .form-check-input {
+    width: 2.25rem;
+    height: 1.125rem;
+    border-radius: 1rem;
+}
+.param-item .form-check-input:checked {
+    background-color: #22c55e;
+    border-color: #22c55e;
+}
+.device-status-footer {
+    background: linear-gradient(90deg, #f8fafc 0%, #fff 100%);
+    border-top: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.device-status-footer .btn {
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.4rem 0.875rem;
+}
+.device-status-footer .btn-refresh {
+    background: #e2e8f0;
+    border: none;
+    color: #475569;
+}
+.device-status-footer .btn-refresh:hover {
+    background: #cbd5e1;
+}
+.device-status-footer .btn-save {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    border: none;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(34,197,94,0.25);
+}
+.device-status-footer .btn-save:hover {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+.status-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: #64748b;
+}
+.status-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.hosts-table {
+    width: 100%;
+    font-size: 0.75rem;
+}
+.hosts-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    padding: 0.5rem 0.625rem;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+    text-transform: uppercase;
+    font-size: 0.625rem;
+    letter-spacing: 0.05em;
+}
+.hosts-table td {
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+.hosts-table tr:hover td {
+    background: #f8fafc;
+}
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+.status-badge.online {
+    background: #dcfce7;
+    color: #166534;
+}
+.status-badge.offline {
+    background: #fef2f2;
+    color: #991b1b;
+}
+.status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 0.375rem;
+}
+.status-badge.online::before {
+    background: #22c55e;
+}
+.status-badge.offline::before {
+    background: #ef4444;
+}
+</style>
+
+<div class="modal fade device-status-modal" id="deviceStatusModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white py-2">
-                <h5 class="modal-title">
-                    <i class="bi bi-cpu me-2"></i>
-                    Device Status - <span id="deviceStatusSerial"></span>
+            <div class="device-status-header d-flex justify-content-between align-items-center">
+                <h5 class="device-title">
+                    <i class="bi bi-router-fill"></i>
+                    <span>Device Status</span>
+                    <span class="device-serial" id="deviceStatusSerial"></span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close-custom" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
             <div class="modal-body p-0">
-                <div id="deviceStatusLoading" class="text-center p-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2">Loading device parameters...</p>
+                <div id="deviceStatusLoading" class="status-loading">
+                    <div class="spinner mb-3"></div>
+                    <span>Loading device parameters...</span>
                 </div>
-                <div id="deviceStatusContent" style="display:none;">
-                    <!-- Horizontal Tabs -->
-                    <ul class="nav nav-tabs nav-fill" id="deviceStatusTabs" role="tablist" style="font-size: 0.85rem;">
-                        <!-- Tabs will be populated dynamically -->
-                    </ul>
-                    <div class="tab-content p-3" id="deviceStatusTabContent">
-                        <!-- Tab content will be populated dynamically -->
+                <div id="deviceStatusContent" class="device-status-body" style="display:none;">
+                    <nav class="device-status-sidebar">
+                        <ul class="nav flex-column" id="deviceStatusTabs" role="tablist">
+                        </ul>
+                    </nav>
+                    <div class="device-status-main">
+                        <div class="tab-content" id="deviceStatusTabContent">
+                        </div>
                     </div>
                 </div>
                 <div id="deviceStatusError" class="alert alert-danger m-3" style="display:none;"></div>
             </div>
-            <div class="modal-footer justify-content-between py-2">
-                <div>
-                    <button type="button" class="btn btn-primary btn-sm me-2" onclick="openDeviceStatus(currentDeviceStatusSerial, true)">
+            <div class="device-status-footer">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-refresh" onclick="openDeviceStatus(currentDeviceStatusSerial, true)">
                         <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
-                <button type="button" class="btn btn-success btn-sm" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
+                <button type="button" class="btn btn-save" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
                     <i class="bi bi-check-circle me-1"></i> Save Changes
                 </button>
             </div>
         </div>
     </div>
 </div>
-
 <script>
 // Device Status Modal Functions
 let currentDeviceStatusSerial = '';
@@ -15933,12 +16202,11 @@ function renderDeviceStatusTabs(categories) {
         
         // Tab button
         tabList.innerHTML += `
-            <li class="nav-item" role="presentation">
+            <li role="presentation">
                 <button class="nav-link ${isFirst ? 'active' : ''}" id="${tabId}" data-bs-toggle="tab" 
                         data-bs-target="#${paneId}" type="button" role="tab">
-                    <i class="bi ${config.icon} me-1"></i>${config.label}
+                    <i class="bi ${config.icon}"></i><span>${config.label}</span>
                     
-                    ${category.editable ? '<i class="bi bi-pencil-fill text-success ms-1" style="font-size:0.6rem" title="Editable"></i>' : ''}
                 </button>
             </li>`;
         
@@ -15971,8 +16239,8 @@ function renderTabContent(key, category) {
             }
         });
         
-        html = `<table class="table table-sm table-bordered table-hover mb-0">
-            <thead class="table-light">
+        html = `<table class="hosts-table">
+            <thead>
                 <tr>
                     <th style="width:80px">Port</th>
                     <th class="text-center" style="width:70px">Enable</th>
@@ -16025,8 +16293,8 @@ function renderTabContent(key, category) {
         });
         
         if (Object.keys(hosts).length > 0) {
-            html = `<table class="table table-sm table-bordered table-hover mb-0">
-                <thead class="table-light">
+            html = `<table class="hosts-table">
+                <thead>
                     <tr><th>Hostname</th><th>IP Address</th><th>MAC Address</th><th>Interface</th><th>Active</th></tr>
                 </thead>
                 <tbody>`;
@@ -16048,15 +16316,15 @@ function renderTabContent(key, category) {
         
     } else {
         // Default - Two column grid
-        html = '<div class="row g-2">';
+        html = '<div class="param-row">';
         let col1 = '', col2 = '';
         let idx = 0;
         category.params.forEach(param => {
             if (param.value !== null && param.value !== undefined || param.value === '') {
                 originalDeviceParams[param.path] = param.value;
                 const inputHtml = renderParamInput(param, category.editable);
-                const field = `<div class="mb-2">
-                    <label class="form-label small text-muted mb-0">${param.label}</label>
+                const field = `<div class="param-item">
+                    <label>${param.label}</label>
                     ${inputHtml}
                 </div>`;
                 if (idx % 2 === 0) col1 += field;
@@ -16064,7 +16332,7 @@ function renderTabContent(key, category) {
                 idx++;
             }
         });
-        html += `<div class="col-md-6">${col1}</div><div class="col-md-6">${col2}</div></div>`;
+        html += `<div>${col1}</div><div>${col2}</div></div>`;
     }
     
     return html;
@@ -16848,8 +17116,8 @@ function saveDeviceStatus() {
                                 <div class="col-md-4"><strong>Result:</strong><br><span class="badge bg-${resultClass}">${log.result || '-'}</span> ${log.error_message ? '<small class="text-danger">'+log.error_message+'</small>' : ''}</div>
                             </div>
                             <div class="row mb-3">
-                                <div class="col-md-6"><strong>Terminal:</strong> ${log.terminal || 'ACS'}</div>
-                                <div class="col-md-6"><strong>HTTP Code:</strong> ${log.http_code || '-'}</div>
+                                <div><strong>Terminal:</strong> ${log.terminal || 'ACS'}</div>
+                                <div><strong>HTTP Code:</strong> ${log.http_code || '-'}</div>
                             </div>
                             <div class="mb-3">
                                 <strong>Task Name:</strong><br><code>${log.task_name || '-'}</code>
@@ -16936,7 +17204,7 @@ function saveDeviceStatus() {
             html += '<div class="card-body p-0">';
             if (c.service_ports && c.service_ports.length > 0) {
                 html += '<div class="table-responsive"><table class="table table-sm table-hover mb-0">';
-                html += '<thead class="table-light"><tr><th>Index</th><th>VLAN</th><th>GEM Port</th><th>Attr</th></tr></thead>';
+                html += '<thead><tr><th>Index</th><th>VLAN</th><th>GEM Port</th><th>Attr</th></tr></thead>';
                 html += '<tbody>';
                 c.service_ports.forEach(sp => {
                     html += '<tr>';
@@ -17118,7 +17386,7 @@ function saveDeviceStatus() {
                 const statusBadge = iface.enabled ? '<span class="badge bg-success">ON</span>' : '<span class="badge bg-secondary">OFF</span>';
                 const bandIcon = iface.band.includes('5') ? 'bi-broadcast' : 'bi-wifi';
                 
-                html += '<div class="col-md-6">';
+                html += '<div>';
                 html += '<div class="card ' + statusClass + '" style="border-width:2px">';
                 html += '<div class="card-body py-2 px-3">';
                 html += '<div class="d-flex justify-content-between align-items-center mb-1">';
@@ -18728,7 +18996,7 @@ function saveDeviceStatus() {
                             </div>
                             <div class="modal-body">
                                 <div class="row g-3">
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="card h-100">
                                             <div class="card-header bg-light"><i class="bi bi-info-circle me-2"></i>Device Info</div>
                                             <div class="card-body small">
@@ -18743,7 +19011,7 @@ function saveDeviceStatus() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <div class="card h-100">
                                             <div class="card-header bg-light"><i class="bi bi-activity me-2"></i>Connection Status</div>
                                             <div class="card-body small">
