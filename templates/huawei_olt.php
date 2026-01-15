@@ -3091,19 +3091,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             break;
                         }
                         
-                        // Use 4-step method with connection_request for immediate execution
-                        $result = $genieacs->configurePPPoE4Step(
+                        // Use provision-based method (recommended approach)
+                        // This uses GenieACS declare() statements for reliable config
+                        $result = $genieacs->configurePPPoEViaProvision(
                             $deviceId,
                             $pppoeUsername,
                             $pppoePassword,
-                            true,  // NAT enabled
-                            1,     // WANDevice index
-                            1,     // WANConnectionDevice index
-                            true   // Use connection_request for immediate push
+                            $vlanId,    // Service VLAN
+                            true        // NAT enabled
                         );
                         
                         if ($result['success']) {
-                            $message = 'PPPoE configured via TR-069 (4-step). Steps: Summon, AddObject, Refresh, SetParams';
+                            $message = 'PPPoE configured via TR-069 provision. ' . ($result['message'] ?? '');
                             $messageType = 'success';
                         } else {
                             $message = 'TR-069 PPPoE failed: ' . ($result['error'] ?? 'Unknown error');

@@ -2825,4 +2825,122 @@ class GenieACS {
         
         return $this->setParameterValues($deviceId, $params);
     }
+
+    /**
+     * Ensure a provision script exists in GenieACS
+     * Creates or updates the provision with the given script content
+     */
+    public function ensureProvision(string $name, string $script): array {
+        $encodedName = rawurlencode($name);
+        
+        // GenieACS expects provision script as raw text body with Content-Type: text/plain
+        $url = $this->baseUrl . "/provisions/{$encodedName}";
+        
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST => 'PUT',
+            CURLOPT_POSTFIELDS => $script,
+            CURLOPT_HTTPHEADER => ['Content-Type: text/plain'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $success = $httpCode >= 200 && $httpCode < 300;
+        error_log("[GenieACS] ensureProvision {$name}: HTTP {$httpCode}");
+        
+        return ['success' => $success, 'http_code' => $httpCode];
+    }
+    
+    /**
+     * Configure PPPoE using GenieACS Provision (recommended approach)
+     * Uses declare() statements for reliable object creation and configuration
+     * 
+     * This is the best practice method per GenieACS documentation:
+     * 1. declare() with {path: 1} ensures the WANPPPConnection instance exists
+     * 2. declare() with {value: x} sets the parameters
+     * 
+     * @param string $deviceId GenieACS device ID
+     * @param string $username PPPoE username
+     * @param string $password PPPoE password  
+     * @param int $vlan Service VLAN (0 = untagged)
+     * @param bool $natEnabled Enable NAT routing
+     * @return array Result with success status
+     */
+    public function configurePPPoEViaProvision(string $deviceId, string $username, string $password, 
+                                                int $vlan = 0, bool $natEnabled = true): array {
+        if (empty($username) || empty($password)) {
+            return ['success' => false, 'error' => 'Username and password are required'];
+        }
+        
+        $provisionName = 'pppoe-config';
+        
+        // Create the provision script using GenieACS declare() syntax
+        // args[0] = username, args[1] = password, args[2] = vlan, args[3] = natEnabled
+        $script = <<<'PROVISION'
+const username = args[0];
+const password = args[1];
+const vlan = parseInt(args[2]) || 0;
+const natEnabled = args[3] === "true" || args[3] === "1";
+
+const pppBase = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection";
+
+// Step 1: Ensure WANPPPConnection instance exists (creates if needed)
+// The {path: 1} tells GenieACS to ensure exactly 1 instance exists
+declare(pppBase + ".*", null, {path: Date.now()});
+
+// Step 2: Refresh to discover what instances exist
+declare(pppBase + ".*", {value: Date.now()});
+
+// Step 3: Configure WANPPPConnection.1
+const pppPath = pppBase + ".1";
+
+declare(pppPath + ".Enable", null, {value: true});
+declare(pppPath + ".Username", null, {value: username});
+declare(pppPath + ".Password", null, {value: password});
+declare(pppPath + ".NATEnabled", null, {value: natEnabled});
+declare(pppPath + ".ConnectionType", null, {value: "IP_Routed"});
+declare(pppPath + ".ConnectionTrigger", null, {value: "AlwaysOn"});
+
+// Set VLAN if specified
+if (vlan > 0) {
+    declare(pppPath + ".X_HW_VLAN", null, {value: vlan});
+}
+
+// Step 4: Enable L3 routing on LAN ports (required for PPPoE to work)
+for (let i = 1; i <= 4; i++) {
+    declare("InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig." + i + ".X_HW_L3Enable", null, {value: true});
+}
+
+log("PPPoE configured: " + username + " VLAN:" + vlan);
+PROVISION;
+
+        // Step 1: Ensure provision exists in GenieACS
+        $ensureResult = $this->ensureProvision($provisionName, $script);
+        if (!($ensureResult['success'] ?? false)) {
+            return [
+                'success' => false,
+                'error' => 'Failed to create provision script',
+                'details' => $ensureResult
+            ];
+        }
+        
+        // Step 2: Run the provision with arguments
+        $args = [$username, $password, (string)$vlan, $natEnabled ? 'true' : 'false'];
+        $result = $this->runProvision($deviceId, $provisionName, $args, true);
+        
+        return [
+            'success' => $result['success'] ?? false,
+            'message' => ($result['success'] ?? false) 
+                ? "PPPoE configured via provision (username: {$username}, vlan: {$vlan})"
+                : 'Provision execution failed',
+            'provision_name' => $provisionName,
+            'http_code' => $result['http_code'] ?? 0,
+            'details' => $result
+        ];
+    }
+
 }
