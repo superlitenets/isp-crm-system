@@ -7517,7 +7517,9 @@ try {
             .onu-info-card .info-value { font-size: 0.95rem; font-weight: 500; color: #1e293b; word-break: break-word; }
             .action-toolbar { background: #f8fafc; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
             .action-toolbar .btn { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
-            .signal-meter { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
+            .signal-meter { height: 6px; border-radius: 3px; background: #fff;
+    border: 1px solid #3b82f6 !important;
+    color: #3b82f6; overflow: hidden; }
             .signal-meter-fill { height: 100%; border-radius: 3px; }
             .data-table { font-size: 0.85rem; }
             .data-table th { font-weight: 600; color: #64748b; font-size: 0.75rem; text-transform: uppercase; }
@@ -15835,7 +15837,9 @@ echo "# ================================================\n";
     text-overflow: ellipsis;
 }
 .device-status-sidebar .nav-link:hover {
-    background: #e2e8f0;
+    background: #fff;
+    border: 1px solid #3b82f6 !important;
+    color: #3b82f6;
     color: #1e293b;
 }
 .device-status-sidebar .nav-link.active {
@@ -15949,12 +15953,14 @@ echo "# ================================================\n";
     padding: 0.4rem 0.875rem;
 }
 .device-status-footer .btn-refresh {
-    background: #e2e8f0;
-    border: none;
-    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #3b82f6 !important;
+    color: #3b82f6;
 }
 .device-status-footer .btn-refresh:hover {
-    background: #cbd5e1;
+    background: #eff6ff;
 }
 .device-status-footer .btn-save {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
@@ -16164,7 +16170,7 @@ function openDeviceStatus(serial, doRefresh = false) {
         
         if (data.success) {
             renderDeviceStatusTabs(data.categories);
-            document.getElementById('deviceStatusContent').style.display = 'block';
+            document.getElementById('deviceStatusContent').style.display = 'flex';
             document.getElementById('deviceStatusSaveBtn').disabled = false;
         } else if (data.needs_refresh) {
             document.getElementById('deviceStatusError').innerHTML = `
