@@ -365,18 +365,25 @@ app.post('/send-group', async (req, res) => {
     try {
         const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
         
-        // Get the chat first to avoid sendSeen issues with groups
-        const chat = await client.getChatById(chatId);
-        if (!chat) {
-            return res.status(404).json({ error: 'Group not found', success: false });
-        }
+        // Use direct puppeteer evaluation to bypass sendSeen issues
+        const result = await client.pupPage.evaluate(async (chatId, message) => {
+            const chat = await window.WWebJS.getChat(chatId);
+            if (!chat) {
+                throw new Error('Group not found');
+            }
+            
+            // Send message directly without sendSeen
+            const msgResult = await window.WWebJS.sendMessage(chat, message, {});
+            return {
+                id: msgResult.id._serialized,
+                timestamp: msgResult.t
+            };
+        }, chatId, message);
         
-        // Use chat.sendMessage which is more reliable for groups
-        const result = await chat.sendMessage(message);
         console.log(`Message sent to group ${groupId}`);
         res.json({ 
             success: true, 
-            messageId: result.id._serialized,
+            messageId: result.id,
             timestamp: result.timestamp
         });
     } catch (error) {
