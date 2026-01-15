@@ -7467,9 +7467,46 @@ class HuaweiOLT {
             
             error_log("[WAN_CONFIG] PPPoE Path: {$pppPath}, Username: {$pppoeUsername}, VLAN: {$serviceVlan}");
             
-            // SmartOLT approach: Direct setParameterValues to factory WAN path
-            // NO provision, NO addObject, NO discovery - Huawei firmware accepts direct writes
-            // The WAN structure exists in firmware even if not visible in GenieACS UI
+            // Proper TR-069 workflow: 
+            // 1. AddObject to create WANPPPConnection instance (if not exists)
+            // 2. Refresh to discover new path
+            // 3. SetParameterValues to configure
+            
+            // Step 1: If no PPPoE connections discovered, create one with AddObject
+            if (count($pppConnections) === 0) {
+                $pppBasePath = "InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection";
+                error_log("[WAN_CONFIG] No PPPoE instance found, creating with AddObject: {$pppBasePath}");
+                
+                $addResult = $sendTask([
+                    'name' => 'addObject',
+                    'objectName' => $pppBasePath
+                ], "Add WANPPPConnection", true);
+                
+                error_log("[WAN_CONFIG] AddObject result: HTTP {$addResult['code']}, success: " . ($addResult['success'] ? 'true' : 'false'));
+                
+                if ($addResult['success']) {
+                    $tasksSent[] = 'Created WANPPPConnection instance';
+                    
+                    // Wait for device to create the object
+                    sleep(2);
+                    
+                    // Step 2: Refresh to discover the new path
+                    $refreshResult = $sendTask([
+                        'name' => 'getParameterValues',
+                        'parameterNames' => ["{$pppBasePath}."]
+                    ], "Refresh WANPPPConnection", true);
+                    
+                    error_log("[WAN_CONFIG] Refresh result: HTTP {$refreshResult['code']}");
+                    
+                    // Wait for refresh to complete
+                    sleep(2);
+                } else {
+                    $errors[] = "AddObject failed (HTTP {$addResult['code']})";
+                    error_log("[WAN_CONFIG] AddObject failed, cannot proceed with PPPoE config");
+                }
+            }
+            
+            // Step 3: SetParameterValues to configure PPPoE
             $credParams = [
                 ["{$pppPath}.Enable", true, 'xsd:boolean'],
                 ["{$pppPath}.Username", $pppoeUsername, 'xsd:string'],
