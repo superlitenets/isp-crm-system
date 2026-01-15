@@ -15661,6 +15661,7 @@ echo "# ================================================\n";
         </div>
     </div>
     
+<?php if ($view === 'locations'): ?>
     <!-- ODB Modal -->
     <div class="modal fade" id="odbModal" tabindex="-1">
         <div class="modal-dialog">
@@ -15700,6 +15701,7 @@ echo "# ================================================\n";
     </div>
 </div>
 
+<?php endif; ?>
 
 <!-- Device Status Modal (SmartOLT-style) -->
 <div class="modal fade" id="deviceStatusModal" tabindex="-1">
