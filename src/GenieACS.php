@@ -2963,15 +2963,22 @@ PROVISION;
         }
         
         $pppBase = 'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1';
+        $lanBase = 'InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig';
         
         // Build parameter list (same format as WiFi config)
         $params = [
+            // PPPoE connection settings
             ["{$pppBase}.Enable", $enable, 'xsd:boolean'],
             ["{$pppBase}.Username", $username, 'xsd:string'],
             ["{$pppBase}.Password", $password, 'xsd:string'],
             ["{$pppBase}.NATEnabled", true, 'xsd:boolean'],
             ["{$pppBase}.ConnectionType", 'IP_Routed', 'xsd:string'],
             ["{$pppBase}.ConnectionTrigger", 'AlwaysOn', 'xsd:string'],
+            // L3 routing on LAN ports (required for PPPoE to work)
+            ["{$lanBase}.1.X_HW_L3Enable", true, 'xsd:boolean'],
+            ["{$lanBase}.2.X_HW_L3Enable", true, 'xsd:boolean'],
+            ["{$lanBase}.3.X_HW_L3Enable", true, 'xsd:boolean'],
+            ["{$lanBase}.4.X_HW_L3Enable", true, 'xsd:boolean'],
         ];
         
         // Add VLAN if specified
