@@ -3016,48 +3016,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 break;
             case 'configure_pppoe':
-                // SmartOLT-style Internet WAN configuration via TR-069
+                // Internet WAN configuration - supports both TR-069 and OMCI methods
                 require_once __DIR__ . '/../src/GenieACS.php';
-                $genieacs = new \App\GenieACS($db);
+                require_once __DIR__ . '/../src/HuaweiOLT.php';
+                
                 $serial = $_POST['serial'] ?? '';
                 $connType = $_POST['connection_type'] ?? 'pppoe';
+                $provisionMethod = $_POST['provision_method'] ?? 'tr069';
+                $vlanId = (int)($_POST['vlan_id'] ?? 900);
                 
-                $deviceResult = $genieacs->getDeviceBySerial($serial);
-                if (!$deviceResult['success']) {
-                    $message = 'Device not found in GenieACS: ' . $serial;
-                    $messageType = 'danger';
-                    break;
-                }
-                
-                $deviceId = $deviceResult['device']['_id'];
-                
-                // Use SmartOLT-style configureInternetWAN function
-                // NOTE: Huawei ONUs do NOT allow creating WAN objects via TR-069
-                // The WANPPPConnection.1 must already exist from OLT OMCI config
-                $config = [
-                    'connection_type' => $connType,
-                    'service_vlan' => (int)($_POST['vlan_id'] ?? 0),
-                    'wan_index' => 1, // WANConnectionDevice.1 (created by OMCI)
-                    'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
-                ];
-                
-                if ($connType === 'pppoe') {
-                    $config['pppoe_username'] = $_POST['pppoe_username'] ?? '';
-                    $config['pppoe_password'] = $_POST['pppoe_password'] ?? '';
-                } elseif ($connType === 'static') {
-                    $config['static_ip'] = $_POST['static_ip'] ?? '';
-                    $config['static_mask'] = $_POST['subnet_mask'] ?? '255.255.255.0';
-                    $config['static_gateway'] = $_POST['gateway'] ?? '';
-                }
-                
-                $result = $genieacs->configureInternetWAN($deviceId, $config);
-                
-                if ($result['success']) {
-                    $message = 'Internet WAN configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
-                    $messageType = 'success';
+                if ($provisionMethod === 'omci') {
+                    // OMCI method - configure via OLT CLI
+                    $huaweiOLT = new \ISP\HuaweiOLT($pdo);
+                    
+                    // Find ONU by serial
+                    $stmt = $pdo->prepare("SELECT id, olt_id, slot, port, onu_id FROM huawei_onus WHERE sn = ?");
+                    $stmt->execute([$serial]);
+                    $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$onu) {
+                        $message = 'ONU not found in database: ' . $serial;
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    if ($connType === 'pppoe') {
+                        $config = [
+                            'pppoe_vlan' => $vlanId ?: 900,
+                            'pppoe_username' => $_POST['pppoe_username'] ?? '',
+                            'pppoe_password' => $_POST['pppoe_password'] ?? '',
+                            'ip_index' => 1,
+                            'wan_profile_id' => 1
+                        ];
+                        $result = $huaweiOLT->configureWANPPPoE($onu['id'], $config);
+                    } else {
+                        $config = [
+                            'dhcp_vlan' => $vlanId ?: 900,
+                            'ip_index' => 1
+                        ];
+                        $result = $huaweiOLT->configureWANDHCP($onu['id'], $config);
+                    }
+                    
+                    if ($result['success']) {
+                        $message = 'WAN configured via OMCI (OLT CLI). VLAN: ' . ($result['pppoe_vlan'] ?? $result['dhcp_vlan'] ?? $vlanId);
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to configure WAN via OMCI: ' . ($result['message'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
                 } else {
-                    $message = 'Failed to configure WAN: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
-                    $messageType = 'danger';
+                    // TR-069 method - configure via GenieACS
+                    $genieacs = new \App\GenieACS($pdo);
+                    
+                    $deviceResult = $genieacs->getDeviceBySerial($serial);
+                    if (!$deviceResult['success']) {
+                        $message = 'Device not found in GenieACS: ' . $serial;
+                        $messageType = 'danger';
+                        break;
+                    }
+                    
+                    $deviceId = $deviceResult['device']['_id'];
+                    
+                    $config = [
+                        'connection_type' => $connType,
+                        'service_vlan' => $vlanId,
+                        'wan_index' => 1,
+                        'connection_name' => $connType === 'pppoe' ? 'Internet_PPPoE' : 'Internet_' . strtoupper($connType),
+                    ];
+                    
+                    if ($connType === 'pppoe') {
+                        $config['pppoe_username'] = $_POST['pppoe_username'] ?? '';
+                        $config['pppoe_password'] = $_POST['pppoe_password'] ?? '';
+                    } elseif ($connType === 'static') {
+                        $config['static_ip'] = $_POST['static_ip'] ?? '';
+                        $config['static_mask'] = $_POST['subnet_mask'] ?? '255.255.255.0';
+                        $config['static_gateway'] = $_POST['gateway'] ?? '';
+                    }
+                    
+                    $result = $genieacs->configureInternetWAN($deviceId, $config);
+                    
+                    if ($result['success']) {
+                        $message = 'Internet WAN configured via TR-069. WAN: ' . ($result['wan_name'] ?? 'wan2.1.ppp1');
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to configure WAN via TR-069: ' . implode(', ', $result['errors'] ?? ['Unknown error']);
+                        $messageType = 'danger';
+                    }
                 }
                 break;
             case 'configure_pppoe_wan':
@@ -14894,6 +14938,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <option value="dhcp">DHCP (Bridge Mode)</option>
                                 <option value="static">Static IP</option>
                             </select>
+                        </div>
+                        
+                        <div class="mb-3" id="provisionMethodDiv">
+                            <label class="form-label">Provisioning Method</label>
+                            <select name="provision_method" class="form-select" id="provisionMethod">
+                                <option value="tr069" selected>TR-069 (GenieACS)</option>
+                                <option value="omci">OMCI (OLT CLI)</option>
+                            </select>
+                            <small class="text-muted">TR-069 uses remote ACS; OMCI configures via OLT directly</small>
                         </div>
                         
                         <div id="pppoeCredentials">
