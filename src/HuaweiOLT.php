@@ -6734,14 +6734,11 @@ class HuaweiOLT {
     /**
      * Configure PPPoE WAN via OMCI commands
      * 
-     * Complete OMCI sequence for Huawei HG8546M and similar ONUs:
-     * 1. ont ipconfig - Set PPPoE credentials (username/password/vlan)
-     * 2. ont internet-config - Mark as Internet WAN
-     * 3. ont wan-config - Apply WAN profile (NAT/route mode)
-     * 4. ont port route - Enable Ethernet ports for routing
-     * 5. service-port - Create service port for traffic flow
+     * Simplified OMCI sequence using ont ipconfig only:
+     * 1. ont ipconfig - Set PPPoE credentials (username/password/vlan) with ip-index
      * 
-     * This creates the WANPPPConnection in the ONU which TR-069 can then see
+     * Service-port should already be created during ONU authorization.
+     * This creates the WANPPPConnection in the ONU which TR-069 can then see.
      */
     public function configureWANPPPoE(int $onuDbId, array $config): array {
         $onu = $this->getONU($onuDbId);
@@ -6759,14 +6756,11 @@ class HuaweiOLT {
         $port = $onu['port'];
         $onuId = $onu['onu_id'];
         
-        $pppoeVlan = (int)($config['pppoe_vlan'] ?? 902);
+        $pppoeVlan = (int)($config['pppoe_vlan'] ?? 900);
         $pppoeUsername = $config['pppoe_username'] ?? '';
         $pppoePassword = $config['pppoe_password'] ?? '';
-        $gemPort = (int)($config['gemport'] ?? 2);
-        $natEnabled = $config['nat_enabled'] ?? true;
         $priority = (int)($config['priority'] ?? 0);
         $ipIndex = (int)($config['ip_index'] ?? 1);  // ip-index 0 is usually management, use 1 for Internet
-        $wanProfileId = (int)($config['wan_profile_id'] ?? 1);
         
         if (empty($pppoeUsername) || empty($pppoePassword)) {
             return ['success' => false, 'message' => 'PPPoE username and password are required'];
@@ -6792,6 +6786,7 @@ class HuaweiOLT {
         
         // Step 2: Configure PPPoE WAN via ont ipconfig
         // Syntax: ont ipconfig {port} {onu_id} ip-index {index} pppoe user-account username {user} password {pass} vlan {vlan} priority {pri}
+        // This command uses long string arguments that work with the VTY space-stripping issue
         $output .= "[Step 2: PPPoE IP Config (OMCI)]\n";
         $cmd2 = "ont ipconfig {$port} {$onuId} ip-index {$ipIndex} pppoe user-account username {$pppoeUsername} password {$pppoePassword} vlan {$pppoeVlan} priority {$priority}";
         $result2 = $this->executeCommand($oltId, $cmd2);
@@ -6799,47 +6794,16 @@ class HuaweiOLT {
         usleep(300000);
         
         if ($hasRealError($result2['output'] ?? '')) {
-            $errors[] = "PPPoE IP config failed";
+            $errors[] = "PPPoE IP config failed: " . ($result2['output'] ?? '');
         }
         
-        // Step 3: Set Internet service type
-        // Syntax: ont internet-config {port} {onu_id} ip-index {index}
-        $output .= "[Step 3: Internet Config]\n";
-        $cmd3 = "ont internet-config {$port} {$onuId} ip-index {$ipIndex}";
-        $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= ($result3['output'] ?? '') . "\n";
-        usleep(300000);
-        
-        // Step 4: Apply WAN profile (NAT/route mode)
-        // Syntax: ont wan-config {port} {onu_id} ip-index {index} profile-id {id}
-        $output .= "[Step 4: WAN Config (Profile)]\n";
-        $cmd4 = "ont wan-config {$port} {$onuId} ip-index {$ipIndex} profile-id {$wanProfileId}";
-        $result4 = $this->executeCommand($oltId, $cmd4);
-        $output .= ($result4['output'] ?? '') . "\n";
-        usleep(300000);
-        
-        // Step 5: Enable routing on Ethernet ports
-        $output .= "[Step 5: Enable ETH Port Routing]\n";
-        for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
-            $cmd5 = "ont port route {$port} {$onuId} eth {$ethPort} enable";
-            $result5 = $this->executeCommand($oltId, $cmd5);
-            $output .= "  ETH{$ethPort}: " . trim($result5['output'] ?? 'OK') . "\n";
-            usleep(100000);
-        }
-        
-        // Step 6: Exit interface mode
+        // Step 3: Exit interface mode
         $this->executeCommand($oltId, "quit");
-        
-        // Step 7: Create service-port for PPPoE VLAN traffic flow
-        $output .= "[Step 6: Service Port for PPPoE VLAN]\n";
-        $cmd7 = "service-port vlan {$pppoeVlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$pppoeVlan}";
-        $result7 = $this->executeCommand($oltId, $cmd7);
-        $output .= ($result7['output'] ?? '') . "\n";
         
         $success = empty($errors);
         $message = $success 
-            ? "PPPoE WAN configured via OMCI. ONU will create WANPPPConnection visible to TR-069."
-            : "PPPoE configuration had errors: " . implode(', ', $errors);
+            ? "PPPoE WAN configured via OMCI (ip-index {$ipIndex}, VLAN {$pppoeVlan}). ONU will dial PPPoE."
+            : "PPPoE configuration failed: " . implode(', ', $errors);
         
         $this->addLog([
             'olt_id' => $oltId,
