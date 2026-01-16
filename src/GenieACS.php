@@ -3687,12 +3687,10 @@ declare(pppPath + ".ConnectionTrigger", null, {value: "AlwaysOn"});
 // Set VLAN if specified
 if (vlan > 0) {
     declare(pppPath + ".X_HW_VLAN", null, {value: vlan});
-}
 
 // Step 4: Enable L3 routing on LAN ports (required for PPPoE to work)
 for (let i = 1; i <= 4; i++) {
     declare("InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig." + i + ".X_HW_L3Enable", null, {value: true});
-}
 
 log("PPPoE configured: " + username + " VLAN:" + vlan);
 PROVISION;
@@ -3835,4 +3833,29 @@ PROVISION;
         ];
     }
 
+
+    /**
+     * Queue auth clear WITHOUT connection_request
+     * This queues the task to execute on next device inform (avoids 401)
+     */
+    public function queueClearAuth(string $deviceId): array {
+        $encodedId = rawurlencode($deviceId);
+        
+        // Queue WITHOUT connection_request - executes on next inform
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", [
+            'name' => 'setParameterValues',
+            'parameterValues' => [
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
+                ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
+            ]
+        ]);
+        
+        error_log("[GenieACS] Queued auth clear for {$deviceId} (will execute on next inform)");
+        
+        return [
+            'success' => $result['success'] ?? false,
+            'message' => 'Auth clear queued - will execute on next device inform (usually within 60 seconds)',
+            'result' => $result
+        ];
+    }
 }

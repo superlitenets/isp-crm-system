@@ -4151,6 +4151,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 exit;
             
 
+            case 'queue_clear_auth':
+                header('Content-Type: application/json');
+                try {
+                    $serial = $_POST['serial'] ?? '';
+                    if (empty($serial)) {
+                        echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                        exit;
+                    }
+                    
+                    $genieACS = new GenieACS($db);
+                    $result = $genieACS->queueClearAuth($serial);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+
             case 'save_tr069_wifi':
                 header('Content-Type: application/json');
                 try {
