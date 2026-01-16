@@ -16168,7 +16168,7 @@ const tabConfig = {
     'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6, editable: false },
     'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7, editable: true },
     'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 8, editable: false },
-    'security': { label: 'Security', icon: 'bi-shield-lock', order: 9, editable: true },
+    'security': { label: 'Security & Users', icon: 'bi-shield-lock', order: 9, editable: true },
     'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 10, editable: true },
     'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 11, editable: true },
     'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 12, editable: true },
@@ -16213,9 +16213,9 @@ function getTabConfig(key) {
     if (key.startsWith('host')) {
         return { label: 'Hosts', icon: 'bi-pc-display', order: 8, editable: false };
     }
-    // Check for security
+    // Check for security & user management
     if (key.startsWith('security')) {
-        return { label: 'Security', icon: 'bi-shield-lock', order: 9, editable: true };
+        return { label: 'Security & Users', icon: 'bi-shield-lock', order: 9, editable: true };
     }
     // Check for voice lines
     if (key.startsWith('voice')) {

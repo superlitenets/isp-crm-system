@@ -1504,16 +1504,36 @@ class GenieACS {
             ];
         }
         
-        // Security/Firewall
+        // Security/Firewall & User Management
         $fwBase = 'InternetGatewayDevice.X_HW_Security.Firewall';
+        $userBase = 'InternetGatewayDevice.UserInterface';
         $secParams = [
+            // Firewall Settings
             ['path' => "{$fwBase}.Enable", 'label' => 'Firewall Enable', 'value' => $getValue("{$fwBase}.Enable"), 'type' => 'boolean'],
             ['path' => "{$fwBase}.Level", 'label' => 'Firewall Level', 'value' => $getValue("{$fwBase}.Level"), 'type' => 'string'],
             ['path' => 'InternetGatewayDevice.X_HW_Security.AntiDDoS.Enable', 'label' => 'AntiDDoS Enable', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.AntiDDoS.Enable'), 'type' => 'boolean'],
             ['path' => 'InternetGatewayDevice.X_HW_Security.ARP.Enable', 'label' => 'ARP Protection', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.ARP.Enable'), 'type' => 'boolean'],
+            // Remote Access
+            ['path' => 'InternetGatewayDevice.X_HW_Security.AclServices.HTTPLanEnable', 'label' => 'HTTP LAN Access', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.AclServices.HTTPLanEnable'), 'type' => 'boolean'],
+            ['path' => 'InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable', 'label' => 'HTTP WAN Access', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.AclServices.HTTPWanEnable'), 'type' => 'boolean'],
+            ['path' => 'InternetGatewayDevice.X_HW_Security.AclServices.TelnetLanEnable', 'label' => 'Telnet LAN Access', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.AclServices.TelnetLanEnable'), 'type' => 'boolean'],
+            ['path' => 'InternetGatewayDevice.X_HW_Security.AclServices.SSHLanEnable', 'label' => 'SSH LAN Access', 'value' => $getValue('InternetGatewayDevice.X_HW_Security.AclServices.SSHLanEnable'), 'type' => 'boolean'],
         ];
+        
+        // User Management - Web Users (Admin, User, etc.)
+        for ($u = 1; $u <= 4; $u++) {
+            $userPath = "{$userBase}.X_HW_WebUserInfo.{$u}";
+            if ($hasPath("{$userPath}.UserName") || $getValue("{$userPath}.UserName") !== null) {
+                $userName = $getValue("{$userPath}.UserName");
+                $userLabel = $userName ? ucfirst($userName) : "User {$u}";
+                $secParams[] = ['path' => "{$userPath}.UserName", 'label' => "{$userLabel} Username", 'value' => $userName, 'type' => 'string'];
+                $secParams[] = ['path' => "{$userPath}.Password", 'label' => "{$userLabel} Password", 'value' => $getValue("{$userPath}.Password"), 'type' => 'password'];
+                $secParams[] = ['path' => "{$userPath}.UserLevel", 'label' => "{$userLabel} Level", 'value' => $getValue("{$userPath}.UserLevel"), 'type' => 'string'];
+            }
+        }
+        
         $categories['security'] = [
-            'label' => 'Security',
+            'label' => 'Security & Users',
             'icon' => 'bi-shield-check',
             'editable' => true,
             'params' => $secParams
