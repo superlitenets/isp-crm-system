@@ -1433,10 +1433,19 @@ class GenieACS {
                 ? "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
                 : "InternetGatewayDevice.WLANConfiguration.{$idx}";
             
-            // Check if this WLAN has valid data
+            // Check if this WLAN has valid data - only show enabled SSIDs or ones with configured names
             $ssid = $getValue("{$wlanBase}.SSID");
             $enable = $getValue("{$wlanBase}.Enable");
+            
+            // Skip if no data at all
             if ($ssid === null && $enable === null) continue;
+            
+            // Skip disabled SSIDs with empty/default names (indexes 2-4, 6-8 are usually disabled by default)
+            $isEnabled = $enable === true || $enable === 'true' || $enable === 1 || $enable === '1';
+            $hasValidSsid = !empty($ssid) && $ssid !== '' && $ssid !== 'SSID' . $idx;
+            
+            // Only show if enabled OR has a custom SSID name configured
+            if (!$isEnabled && !$hasValidSsid) continue;
             
             // Determine band based on index or standard
             $standard = $getValue("{$wlanBase}.Standard") ?? '';
