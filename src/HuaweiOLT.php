@@ -11956,25 +11956,20 @@ class HuaweiOLT {
             if (preg_match('/Profile-name\s*:\s*(.+)/i', $line, $m)) {
                 $profile['profile_name'] = trim($m[1]);
             }
-            elseif (preg_match('/ACS-URL\s*:\s*(.+)/i', $line, $m)) {
+            elseif (preg_match('/^URL\s*:\s*(.+)/i', $line, $m)) {
                 $profile['acs_url'] = trim($m[1]);
             }
-            elseif (preg_match('/ACS-username\s*:\s*(.*)/i', $line, $m)) {
+            elseif (preg_match('/^User Name\s*:\s*(.*)/i', $line, $m)) {
                 $profile['acs_username'] = trim($m[1]) ?: '';
             }
-            elseif (preg_match('/Connection-request-username\s*:\s*(.*)/i', $line, $m)) {
-                $profile['conn_req_username'] = trim($m[1]) ?: '';
-            }
-            elseif (preg_match('/Connection-request-password\s*:\s*(.*)/i', $line, $m)) {
-                $profile['conn_req_password'] = trim($m[1]) ? '(set)' : '';
-            }
-            elseif (preg_match('/Periodic-inform-enable\s*:\s*(.+)/i', $line, $m)) {
-                $profile['periodic_inform'] = strtolower(trim($m[1])) === 'enable';
-            }
-            elseif (preg_match('/Periodic-inform-interval\s*:\s*(\d+)/i', $line, $m)) {
-                $profile['periodic_interval'] = (int)$m[1];
+            elseif (preg_match('/Binding times\s*:\s*(\d+)/i', $line, $m)) {
+                $profile['binding_times'] = (int)$m[1];
             }
         }
+        
+        // Note: ConnectionRequest credentials are typically per-ONU, not per-profile on MA5683T
+        $profile['conn_req_username'] = '(per-ONU)';
+        $profile['conn_req_password'] = '(per-ONU)';
         
         return [
             'success' => true,

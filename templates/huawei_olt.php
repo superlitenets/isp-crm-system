@@ -17333,6 +17333,7 @@ function saveDeviceStatus() {
                     html += '</tr>';
                 });
                 html += '</tbody></table></div>';
+                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest credentials are cleared per-ONU during authorization (automatic).</div>';
             } else {
                 html += '<div class="text-center text-muted py-3">No service ports configured</div>';
             }
@@ -19493,22 +19494,18 @@ function saveDeviceStatus() {
         .then(data => {
             if (data.success && data.profiles && data.profiles.length > 0) {
                 let html = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0">';
-                html += '<thead><tr><th>Profile ID</th><th>Name</th><th>ACS URL</th><th>Conn Req Auth</th><th>Actions</th></tr></thead><tbody>';
+                html += '<thead><tr><th>Profile ID</th><th>Name</th><th>ACS URL</th><th>Bindings</th><th>Conn Req</th></tr></thead><tbody>';
                 data.profiles.forEach(p => {
-                    const hasAuth = p.conn_req_username !== '(empty)' || p.conn_req_password !== '(empty)';
                     html += `<tr>
                         <td><strong>${p.profile_id}</strong></td>
                         <td>${p.profile_name || '-'}</td>
                         <td><small>${p.acs_url || '-'}</small></td>
-                        <td>${hasAuth ? '<span class="badge bg-warning">Set</span>' : '<span class="badge bg-success">None</span>'}</td>
-                        <td>
-                            ${hasAuth ? `<button class="btn btn-sm btn-outline-danger" onclick="clearTR069Credentials(${oltId}, ${p.profile_id})">
-                                <i class="bi bi-unlock me-1"></i>Clear Auth
-                            </button>` : '<span class="text-success small"><i class="bi bi-check-circle"></i> OK</span>'}
-                        </td>
+                        <td>${p.binding_times || 0}</td>
+                        <td><span class="badge bg-info">Per-ONU</span></td>
                     </tr>`;
                 });
                 html += '</tbody></table></div>';
+                html += '<div class="mt-2 small text-muted"><i class="bi bi-info-circle me-1"></i>ConnectionRequest credentials are cleared per-ONU during authorization (automatic).</div>';
                 container.innerHTML = html;
             } else if (data.success && (!data.profiles || data.profiles.length === 0)) {
                 container.innerHTML = '<div class="alert alert-info mb-0"><i class="bi bi-info-circle me-2"></i>No TR-069 profiles found on this OLT.</div>';
