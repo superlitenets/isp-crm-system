@@ -4132,6 +4132,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
             
+            case 'enable_instant_provisioning':
+                header('Content-Type: application/json');
+                try {
+                    $serial = $_POST['serial'] ?? '';
+                    if (empty($serial)) {
+                        echo json_encode(['success' => false, 'error' => 'Serial number required']);
+                        exit;
+                    }
+                    
+                    $genieACS = new GenieACS($db);
+                    $result = $genieACS->enableInstantProvisioning($serial);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            
+
             case 'save_tr069_wifi':
                 header('Content-Type: application/json');
                 try {
@@ -16078,6 +16097,9 @@ echo "# ================================================\n";
                     <button type="button" class="btn btn-refresh" onclick="openDeviceStatus(currentDeviceStatusSerial, true)">
                         <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                     </button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="enableInstantProvisioning(currentDeviceStatusSerial)" title="Clear Connection Request auth for instant push">
+                        <i class="bi bi-lightning-charge me-1"></i> Enable Instant
+                    </button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
                 <button type="button" class="btn btn-save" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
@@ -16138,6 +16160,33 @@ function getTabConfig(key) {
     }
     return tabConfig[key] || { label: key.replace(/_/g, ' '), icon: 'bi-gear', order: 50 };
 }
+
+// Enable instant provisioning (clear connection request auth)
+async function enableInstantProvisioning(serial) {
+    if (!confirm('Enable instant provisioning for ' + serial + '?\n\nThis will clear Connection Request authentication, allowing GenieACS to push commands instantly without 401 errors.')) {
+        return;
+    }
+    
+    showToast('Enabling instant provisioning...', 'info');
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'enable_instant_provisioning');
+        formData.append('serial', serial);
+        
+        const resp = await fetch('?page=huawei-olt', { method: 'POST', body: formData });
+        const data = await resp.json();
+        
+        if (data.success) {
+            showToast(data.message || 'Instant provisioning enabled!', 'success');
+        } else {
+            showToast('Failed: ' + (data.error || 'Unknown error'), 'danger');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'danger');
+    }
+}
+
 
 function openDeviceStatus(serial, doRefresh = false) {
     currentDeviceStatusSerial = serial;
@@ -18112,7 +18161,10 @@ function saveDeviceStatus() {
                     </div>
                 </div>
             </div>
-            <div class="modal-footer py-1"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
+            <div class="modal-footer py-1"><button type="button" class="btn btn-warning btn-sm" onclick="enableInstantProvisioning(currentDeviceStatusSerial)" title="Clear Connection Request auth for instant push">
+                        <i class="bi bi-lightning-charge me-1"></i> Enable Instant
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
         </div></div></div>`;
         
         document.getElementById('logDetailModal')?.remove();

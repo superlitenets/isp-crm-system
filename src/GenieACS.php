@@ -3771,4 +3771,60 @@ PROVISION;
         ];
     }
 
+
+    /**
+     * Clear Connection Request authentication credentials on the device
+     * This allows GenieACS to make instant connection requests without 401 errors
+     */
+    public function clearConnectionRequestAuth(string $deviceId): array {
+        $params = [
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
+        ];
+        
+        error_log("[GenieACS] Clearing Connection Request auth for {$deviceId}");
+        
+        $result = $this->setParameterValues($deviceId, $params);
+        
+        return [
+            'success' => $result['success'] ?? false,
+            'message' => ($result['success'] ?? false)
+                ? 'Connection Request authentication cleared - instant push now enabled'
+                : 'Failed to clear Connection Request auth',
+            'error' => $result['error'] ?? null
+        ];
+    }
+
+    /**
+     * Enable instant provisioning by clearing auth and configuring proper ACS URL
+     * Call this after first TR-069 contact to enable instant push capability
+     */
+    public function enableInstantProvisioning(string $deviceId, string $acsUrl = ''): array {
+        $params = [
+            // Clear connection request auth
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestUsername', '', 'xsd:string'],
+            ['InternetGatewayDevice.ManagementServer.ConnectionRequestPassword', '', 'xsd:string'],
+            // Enable periodic inform
+            ['InternetGatewayDevice.ManagementServer.PeriodicInformEnable', true, 'xsd:boolean'],
+            ['InternetGatewayDevice.ManagementServer.PeriodicInformInterval', 60, 'xsd:unsignedInt'],
+        ];
+        
+        // Set ACS URL if provided
+        if (!empty($acsUrl)) {
+            $params[] = ['InternetGatewayDevice.ManagementServer.URL', $acsUrl, 'xsd:string'];
+        }
+        
+        error_log("[GenieACS] Enabling instant provisioning for {$deviceId}");
+        
+        $result = $this->setParameterValues($deviceId, $params);
+        
+        return [
+            'success' => $result['success'] ?? false,
+            'message' => ($result['success'] ?? false)
+                ? 'Instant provisioning enabled - device will respond to immediate push commands'
+                : 'Failed to enable instant provisioning',
+            'error' => $result['error'] ?? null
+        ];
+    }
+
 }
