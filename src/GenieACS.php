@@ -242,7 +242,7 @@ class GenieACS {
         
         // Create a simple getParameterValues task with connection_request to trigger immediate inform
         $encodedId = urlencode($deviceId);
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'getParameterValues',
             'parameterNames' => ['InternetGatewayDevice.DeviceInfo.UpTime']
         ]);
@@ -398,14 +398,14 @@ class GenieACS {
     public function rebootDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
         // Use connection_request to execute immediately instead of waiting for periodic inform
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        return $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'reboot'
         ]);
     }
     
     public function factoryReset(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", [
+        return $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'factoryReset'
         ]);
     }
@@ -413,7 +413,7 @@ class GenieACS {
     public function refreshDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
         // Use connection_request with timeout to force immediate execution
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", [
+        return $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'refreshObject',
             'objectName' => 'InternetGatewayDevice'
         ]);
@@ -460,7 +460,7 @@ class GenieACS {
         
         // Use connection_request with timeout to execute immediately and wait for completion
         // timeout=30000 (30s) ensures task executes during session, not just queued
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=60000", [
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
         ]);
@@ -485,7 +485,7 @@ class GenieACS {
         
         $results = [];
         foreach ($tasks as $task) {
-            $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task);
+            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
             $results[] = $result;
             
             // Log the task
@@ -2880,7 +2880,7 @@ class GenieACS {
         ];
         
         error_log("[GenieACS] addObject: {$objectPath} on {$deviceId}");
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
         error_log("[GenieACS] addObject result: " . json_encode($result));
         
         return $result;
@@ -2898,7 +2898,7 @@ class GenieACS {
         ];
         
         error_log("[GenieACS] refreshObject: {$objectPath} on {$deviceId}");
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
         error_log("[GenieACS] refreshObject result: " . json_encode($result));
         
         return $result;
@@ -2915,7 +2915,7 @@ class GenieACS {
             'objectName' => $objectPath
         ];
         
-        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request", $task, ['timeout' => $this->timeout * 1000]);
+        return $this->request('POST', "/devices/{$encodedId}/tasks", $task, ['timeout' => $this->timeout * 1000]);
     }
     
     /**
@@ -3025,9 +3025,9 @@ class GenieACS {
      * @param bool $connectionRequest Whether to send connection request for immediate execution
      * @return array Result with success status
      */
-    public function runProvision(string $deviceId, string $provisionName, array $args = [], bool $connectionRequest = true): array {
+    public function runProvision(string $deviceId, string $provisionName, array $args = [], bool $connectionRequest = false): array {
         $encodedId = rawurlencode($deviceId);
-        $endpoint = "/devices/{$encodedId}/tasks" . ($connectionRequest ? '?connection_request' : '');
+        $endpoint = "/devices/{$encodedId}/tasks";
         
         $task = [
             'name' => 'provision',
@@ -3093,7 +3093,7 @@ class GenieACS {
         
         // Use connection_request for immediate push, or queue for next inform
         $endpoint = $useConnectionRequest 
-            ? "/devices/{$encodedId}/tasks?connection_request&timeout=60000"
+            ? "/devices/{$encodedId}/tasks"
             : "/devices/{$encodedId}/tasks";
         
         // Step 1: Summon - Force discovery of WAN path
@@ -3230,7 +3230,7 @@ class GenieACS {
         
         $encodedId = urlencode($deviceId);
         $endpoint = $useConnectionRequest 
-            ? "/devices/{$encodedId}/tasks?connection_request&timeout=60000"
+            ? "/devices/{$encodedId}/tasks"
             : "/devices/{$encodedId}/tasks";
         
         // First refresh to ensure parameters exist in GenieACS
