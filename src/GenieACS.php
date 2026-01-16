@@ -428,23 +428,11 @@ class GenieACS {
     
     public function refreshDevice(string $deviceId): array {
         $encodedId = urlencode($deviceId);
-        $task = [
+        // Use connection_request with timeout for instant execution
+        return $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", [
             'name' => 'refreshObject',
             'objectName' => 'InternetGatewayDevice'
-        ];
-        
-        // Try with connection_request first for instant execution
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=10000", $task);
-        
-        // If 401, fallback to queue mode
-        $httpCode = $result['http_code'] ?? 0;
-        if ($httpCode == 401 || (isset($result['error']) && strpos($result['error'], '401') !== false)) {
-            error_log("[GenieACS] Got 401 on refreshDevice, falling back to queue mode for {$deviceId}");
-            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-            $result['queued'] = true;
-        }
-        
-        return $result;
+        ]);
     }
     
     public function getParameterValues(string $deviceId, array $parameterNames): array {
@@ -460,7 +448,6 @@ class GenieACS {
         $encodedId = rawurlencode($deviceId);
         
         // Auto-clear Connection Request auth on every call for instant provisioning
-        // This ensures subsequent calls work without 401 errors
         $autoParams = [
             ["InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", "", "xsd:string"],
             ["InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", "", "xsd:string"],
@@ -468,14 +455,11 @@ class GenieACS {
         $parameterValues = array_merge($autoParams, $parameterValues);
 
         // GenieACS expects parameterValues as array of [name, value, type] arrays
-        // Check if already in correct format or needs conversion
         $formattedParams = [];
         foreach ($parameterValues as $key => $value) {
             if (is_array($value) && isset($value[0], $value[1])) {
-                // Already in [name, value, type] format
                 $formattedParams[] = $value;
             } else {
-                // Convert key-value to [name, value, type] format
                 if (is_bool($value)) {
                     $formattedParams[] = [$key, $value, 'xsd:boolean'];
                 } elseif (is_int($value)) {
@@ -486,32 +470,16 @@ class GenieACS {
             }
         }
         
-        $task = [
+        // Use connection_request with timeout for instant push
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
-        ];
+        ]);
         
-        // Try with connection_request first for instant push
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", $task);
-        
-        // If 401 error (connection request auth failed), fallback to queue mode
-        $httpCode = $result['http_code'] ?? 0;
-        if ($httpCode == 401 || (isset($result['error']) && strpos($result['error'], '401') !== false)) {
-            error_log("[GenieACS] Got 401 on connection_request, falling back to queue mode for {$deviceId}");
-            
-            // Queue without connection_request - will execute on next device inform
-            $result = $this->request('POST', "/devices/{$encodedId}/tasks", $task);
-            $result['queued'] = true;
-            $result['message'] = 'Queued for next device inform (auth will be cleared automatically)';
-        }
-        
-        // Log for debugging
         error_log("[GenieACS] setParameterValues to {$deviceId}: " . json_encode([
             'params_count' => count($formattedParams), 
-            'result' => $result['success'] ?? false, 
-            'http_code' => $result['http_code'] ?? 0,
-            'queued' => $result['queued'] ?? false,
-            'error' => $result['error'] ?? null
+            'success' => $result['success'] ?? false, 
+            'http_code' => $result['http_code'] ?? 0
         ]));
         
         return $result;
