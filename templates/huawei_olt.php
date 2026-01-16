@@ -19476,7 +19476,9 @@ function saveDeviceStatus() {
                     alert('Error: ' + (data.error || 'Failed to send reboot command'));
                 }
             })
-            .catch(err => alert('Error: ' + err.message));
+                    .catch(err => alert('Error: ' + err.message));
+    }
+    
     // TR-069 Profile Management
     function loadTR069Profiles(oltId) {
         const container = document.getElementById('tr069ProfilesContainer');
@@ -19536,7 +19538,9 @@ function saveDeviceStatus() {
                 alert('Error: ' + (data.error || 'Failed to clear credentials'));
             }
         })
-        .catch(err => alert('Error: ' + err.message));
+                .catch(err => alert('Error: ' + err.message));
+    }
+    
     }
     }
     </script>
