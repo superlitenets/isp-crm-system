@@ -431,6 +431,14 @@ class GenieACS {
         // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
         
+        // Auto-clear Connection Request auth on every call for instant provisioning
+        // This ensures subsequent calls work without 401 errors
+        $autoParams = [
+            ["InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", "", "xsd:string"],
+            ["InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", "", "xsd:string"],
+        ];
+        $parameterValues = array_merge($autoParams, $parameterValues);
+
         // GenieACS expects parameterValues as array of [name, value, type] arrays
         // Check if already in correct format or needs conversion
         $formattedParams = [];

@@ -16097,9 +16097,6 @@ echo "# ================================================\n";
                     <button type="button" class="btn btn-refresh" onclick="openDeviceStatus(currentDeviceStatusSerial, true)">
                         <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                     </button>
-                    <button type="button" class="btn btn-warning btn-sm" onclick="enableInstantProvisioning(currentDeviceStatusSerial)" title="Clear Connection Request auth for instant push">
-                        <i class="bi bi-lightning-charge me-1"></i> Enable Instant
-                    </button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
                 <button type="button" class="btn btn-save" id="deviceStatusSaveBtn" onclick="saveDeviceStatus()">
@@ -18161,9 +18158,6 @@ function saveDeviceStatus() {
                     </div>
                 </div>
             </div>
-            <div class="modal-footer py-1"><button type="button" class="btn btn-warning btn-sm" onclick="enableInstantProvisioning(currentDeviceStatusSerial)" title="Clear Connection Request auth for instant push">
-                        <i class="bi bi-lightning-charge me-1"></i> Enable Instant
-                    </button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
         </div></div></div>`;
         
