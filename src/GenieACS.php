@@ -1415,52 +1415,80 @@ class GenieACS {
             ];
         }
         
-        // Wireless LAN 2.4GHz (WLANConfiguration.1)
-        $wlan24Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1';
-        if ($hasPath("{$wlan24Base}.Enable") || $hasPath("{$wlan24Base}.SSID")) {
-            $categories['wireless_lan'] = [
-                'label' => 'Wireless LAN 1 (2.4GHz)',
-                'icon' => 'bi-wifi',
-                'editable' => true,
+        // Wireless LAN - Dynamically detect all WLANConfiguration entries
+        $wlanParams = [];
+        $lanDevice = $device['InternetGatewayDevice']['LANDevice']['1'] ?? [];
+        $wlanConfigs = $lanDevice['WLANConfiguration'] ?? [];
+        
+        // Also check direct path (some devices use InternetGatewayDevice.WLANConfiguration)
+        if (empty($wlanConfigs)) {
+            $wlanConfigs = $device['InternetGatewayDevice']['WLANConfiguration'] ?? [];
+        }
+        
+        foreach ($wlanConfigs as $idx => $wlanData) {
+            if (!is_numeric($idx)) continue;
+            
+            // Determine base path
+            $wlanBase = isset($lanDevice['WLANConfiguration'][$idx]) 
+                ? "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
+                : "InternetGatewayDevice.WLANConfiguration.{$idx}";
+            
+            // Check if this WLAN has valid data
+            $ssid = $getValue("{$wlanBase}.SSID");
+            $enable = $getValue("{$wlanBase}.Enable");
+            if ($ssid === null && $enable === null) continue;
+            
+            // Determine band based on index or standard
+            $standard = $getValue("{$wlanBase}.Standard") ?? '';
+            $band = '';
+            if (strpos($standard, 'ac') !== false || strpos($standard, 'ax') !== false || $idx >= 5) {
+                $band = '5GHz';
+            } else {
+                $band = '2.4GHz';
+            }
+            
+            $wlanParams[] = [
+                'idx' => $idx,
+                'band' => $band,
+                'ssid' => $ssid,
                 'params' => [
-                    ['path' => "{$wlan24Base}.Enable", 'label' => 'Enable', 'value' => $getValue("{$wlan24Base}.Enable"), 'type' => 'boolean'],
-                    ['path' => "{$wlan24Base}.SSID", 'label' => 'SSID', 'value' => $getValue("{$wlan24Base}.SSID"), 'type' => 'string'],
-                    ['path' => "{$wlan24Base}.PreSharedKey.1.KeyPassphrase", 'label' => 'Password', 'value' => $getValue("{$wlan24Base}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
-                    ['path' => "{$wlan24Base}.Channel", 'label' => 'Channel', 'value' => $getValue("{$wlan24Base}.Channel"), 'type' => 'number'],
-                    ['path' => "{$wlan24Base}.X_HW_ChannelWidth", 'label' => 'Channel Width', 'value' => $getValue("{$wlan24Base}.X_HW_ChannelWidth"), 'type' => 'number'],
-                    ['path' => "{$wlan24Base}.SSIDAdvertisementEnabled", 'label' => 'Broadcast SSID', 'value' => $getValue("{$wlan24Base}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
-                    ['path' => "{$wlan24Base}.BeaconType", 'label' => 'Security Mode', 'value' => $getValue("{$wlan24Base}.BeaconType"), 'type' => 'string'],
-                    ['path' => "{$wlan24Base}.WPAEncryptionModes", 'label' => 'Encryption Mode', 'value' => $getValue("{$wlan24Base}.WPAEncryptionModes"), 'type' => 'string'],
-                    ['path' => "{$wlan24Base}.Standard", 'label' => 'WiFi Standard', 'value' => $getValue("{$wlan24Base}.Standard"), 'type' => 'readonly'],
-                    ['path' => "{$wlan24Base}.TransmitPower", 'label' => 'Transmit Power', 'value' => $getValue("{$wlan24Base}.TransmitPower"), 'type' => 'number'],
-                    ['path' => "{$wlan24Base}.TotalAssociations", 'label' => 'Connected Clients', 'value' => $getValue("{$wlan24Base}.TotalAssociations"), 'type' => 'readonly'],
-                    ['path' => "{$wlan24Base}.BSSID", 'label' => 'BSSID', 'value' => $getValue("{$wlan24Base}.BSSID"), 'type' => 'readonly'],
+                    ['path' => "{$wlanBase}.Enable", 'label' => "SSID {$idx} Enable", 'value' => $enable, 'type' => 'boolean'],
+                    ['path' => "{$wlanBase}.SSID", 'label' => "SSID {$idx} Name", 'value' => $ssid, 'type' => 'string'],
+                    ['path' => "{$wlanBase}.PreSharedKey.1.KeyPassphrase", 'label' => "SSID {$idx} Password", 'value' => $getValue("{$wlanBase}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
+                    ['path' => "{$wlanBase}.Channel", 'label' => "SSID {$idx} Channel", 'value' => $getValue("{$wlanBase}.Channel"), 'type' => 'number'],
+                    ['path' => "{$wlanBase}.X_HW_ChannelWidth", 'label' => "SSID {$idx} Channel Width", 'value' => $getValue("{$wlanBase}.X_HW_ChannelWidth"), 'type' => 'number'],
+                    ['path' => "{$wlanBase}.SSIDAdvertisementEnabled", 'label' => "SSID {$idx} Broadcast", 'value' => $getValue("{$wlanBase}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
+                    ['path' => "{$wlanBase}.BeaconType", 'label' => "SSID {$idx} Security", 'value' => $getValue("{$wlanBase}.BeaconType"), 'type' => 'string'],
+                    ['path' => "{$wlanBase}.WPAEncryptionModes", 'label' => "SSID {$idx} Encryption", 'value' => $getValue("{$wlanBase}.WPAEncryptionModes"), 'type' => 'string'],
+                    ['path' => "{$wlanBase}.Standard", 'label' => "SSID {$idx} Standard", 'value' => $standard, 'type' => 'readonly'],
+                    ['path' => "{$wlanBase}.TransmitPower", 'label' => "SSID {$idx} TX Power", 'value' => $getValue("{$wlanBase}.TransmitPower"), 'type' => 'number'],
+                    ['path' => "{$wlanBase}.TotalAssociations", 'label' => "SSID {$idx} Clients", 'value' => $getValue("{$wlanBase}.TotalAssociations"), 'type' => 'readonly'],
+                    ['path' => "{$wlanBase}.BSSID", 'label' => "SSID {$idx} BSSID", 'value' => $getValue("{$wlanBase}.BSSID"), 'type' => 'readonly'],
                 ]
             ];
         }
         
-        // Wireless LAN 5GHz (WLANConfiguration.5)
-        $wlan5Base = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5';
-        if ($hasPath("{$wlan5Base}.Enable") || $hasPath("{$wlan5Base}.SSID")) {
-            $categories['wireless_lan_5'] = [
-                'label' => 'Wireless LAN 5 (5GHz)',
-                'icon' => 'bi-wifi',
-                'editable' => true,
-                'params' => [
-                    ['path' => "{$wlan5Base}.Enable", 'label' => 'Enable', 'value' => $getValue("{$wlan5Base}.Enable"), 'type' => 'boolean'],
-                    ['path' => "{$wlan5Base}.SSID", 'label' => 'SSID', 'value' => $getValue("{$wlan5Base}.SSID"), 'type' => 'string'],
-                    ['path' => "{$wlan5Base}.PreSharedKey.1.KeyPassphrase", 'label' => 'Password', 'value' => $getValue("{$wlan5Base}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
-                    ['path' => "{$wlan5Base}.Channel", 'label' => 'Channel', 'value' => $getValue("{$wlan5Base}.Channel"), 'type' => 'number'],
-                    ['path' => "{$wlan5Base}.X_HW_ChannelWidth", 'label' => 'Channel Width', 'value' => $getValue("{$wlan5Base}.X_HW_ChannelWidth"), 'type' => 'number'],
-                    ['path' => "{$wlan5Base}.SSIDAdvertisementEnabled", 'label' => 'Broadcast SSID', 'value' => $getValue("{$wlan5Base}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
-                    ['path' => "{$wlan5Base}.BeaconType", 'label' => 'Security Mode', 'value' => $getValue("{$wlan5Base}.BeaconType"), 'type' => 'string'],
-                    ['path' => "{$wlan5Base}.WPAEncryptionModes", 'label' => 'Encryption Mode', 'value' => $getValue("{$wlan5Base}.WPAEncryptionModes"), 'type' => 'string'],
-                    ['path' => "{$wlan5Base}.Standard", 'label' => 'WiFi Standard', 'value' => $getValue("{$wlan5Base}.Standard"), 'type' => 'readonly'],
-                    ['path' => "{$wlan5Base}.TransmitPower", 'label' => 'Transmit Power', 'value' => $getValue("{$wlan5Base}.TransmitPower"), 'type' => 'number'],
-                    ['path' => "{$wlan5Base}.TotalAssociations", 'label' => 'Connected Clients', 'value' => $getValue("{$wlan5Base}.TotalAssociations"), 'type' => 'readonly'],
-                    ['path' => "{$wlan5Base}.BSSID", 'label' => 'BSSID', 'value' => $getValue("{$wlan5Base}.BSSID"), 'type' => 'readonly'],
-                ]
-            ];
+        // Group by band and create categories
+        if (!empty($wlanParams)) {
+            // Combine all wireless params into single category
+            $allWlanParams = [];
+            foreach ($wlanParams as $wlan) {
+                // Add a separator/header for each SSID
+                foreach ($wlan['params'] as $param) {
+                    if ($param['value'] !== null) {
+                        $allWlanParams[] = $param;
+                    }
+                }
+            }
+            
+            if (!empty($allWlanParams)) {
+                $categories['wireless_lan'] = [
+                    'label' => 'Wireless LAN',
+                    'icon' => 'bi-wifi',
+                    'editable' => true,
+                    'params' => $allWlanParams
+                ];
+            }
         }
         
         // WLAN Counters
