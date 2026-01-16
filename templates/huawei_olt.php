@@ -19382,7 +19382,7 @@ function saveDeviceStatus() {
                     
                     html += '<div class="mb-3">';
                     html += '<label class="form-label">Internet VLAN</label>';
-                    html += '<input type="number" name="service_vlan" class="form-control" value="' + (onu.service_vlan || 902) + '" min="1" max="4094">';
+                    html += '<input type="number" name="service_vlan" class="form-control" value="' + ((onu.vlan_id && onu.vlan_id > 1) ? onu.vlan_id : 902) + '" min="1" max="4094">';
                     html += '<div class="form-text">Service VLAN for internet traffic</div>';
                     html += '</div>';
                     
