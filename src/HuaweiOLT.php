@@ -6153,6 +6153,9 @@ class HuaweiOLT {
                 $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url {$acsUrl}\r\n";
                 $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
             }
+            // Clear ConnectionRequest credentials so GenieACS can summon without 401 errors
+            $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} connection-request-username \"\"\r\n";
+            $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} connection-request-password \"\"\r\n";
             $batchScript .= "quit\r\n";
             
             // Service-port for TR-069 VLAN
@@ -6509,6 +6512,9 @@ class HuaweiOLT {
             $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}\r\n";
             $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval 300\r\n";
         }
+        // Clear ConnectionRequest credentials so GenieACS can summon without 401 errors
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\"\r\n";
+        $cmd2 .= "ont tr069-server-config {$port} {$onuId} connection-request-password \"\"\r\n";
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
         $output .= "[TR-069 Server Config]\n" . ($result2['output'] ?? '') . "\n";
