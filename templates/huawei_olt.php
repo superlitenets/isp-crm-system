@@ -8255,8 +8255,6 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                         tbody.innerHTML = '<tr><td colspan="6" class="text-warning text-center">' + (data.error || 'Failed to load WiFi data') + '</td></tr>';
                         return;
                     }
