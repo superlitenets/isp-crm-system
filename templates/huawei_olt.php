@@ -7320,7 +7320,7 @@ try {
                                 showToast('Discovery failed: ' + (data.error || 'Unknown error'), 'danger');
                             }
                         })
-                        .catch(err => {
+                .catch(err => {
                             isDiscovering = false;
                             btn.disabled = false;
                             btn.innerHTML = origHtml;
@@ -10889,7 +10889,7 @@ try {
                             `;
                         }
                     })
-                    .catch(err => {
+            .catch(err => {
                         document.getElementById('connectivityResults').innerHTML = `
                             <div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Error: ${err.message}</div>
                         `;
@@ -10942,7 +10942,7 @@ try {
                             `;
                         }
                     })
-                    .catch(err => {
+            .catch(err => {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Ping';
                         document.getElementById('pingTestResult').innerHTML = `
@@ -19476,7 +19476,7 @@ function saveDeviceStatus() {
                     alert('Error: ' + (data.error || 'Failed to send reboot command'));
                 }
             })
-                    .catch(err => alert('Error: ' + err.message));
+            .catch(err => alert('Error: ' + err.message));
     }
     
     // TR-069 Profile Management
