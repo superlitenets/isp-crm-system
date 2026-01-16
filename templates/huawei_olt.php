@@ -8851,23 +8851,12 @@ try {
                                             <?= $vid ?>
                                         </option>
                                         <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
                                         <?php endif; ?>
                                     </select>
                                     <?php if (empty($attachedVlans)): ?>
                                     <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Attach VLANs to this ONU first before configuring WAN.</div>
                                     <?php endif; ?>
                                 </div>
-                                
                                 
                                 <div class="mb-3">
                                     <label class="form-label">WAN Profile ID <small class="text-muted">(OLT WAN profile for PPPoE/DHCP mode)</small></label>
