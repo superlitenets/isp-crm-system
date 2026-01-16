@@ -5219,6 +5219,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $message = $result['success'] ? 'ODB deleted successfully' : ($result['message'] ?? 'Failed to delete ODB');
                 $messageType = $result['success'] ? 'success' : 'danger';
                 break;
+            case 'get_tr069_profiles':
+                $oltId = (int)$_POST['olt_id'];
+                $result = $huaweiOLT->getTR069Profiles($oltId);
+                header('Content-Type: application/json');
+                echo json_encode($result);
+                exit;
+            case 'get_tr069_profile':
+                $oltId = (int)$_POST['olt_id'];
+                $profileId = (int)$_POST['profile_id'];
+                $result = $huaweiOLT->getTR069Profile($oltId, $profileId);
+                header('Content-Type: application/json');
+                echo json_encode($result);
+                exit;
+            case 'clear_tr069_profile_credentials':
+                $oltId = (int)$_POST['olt_id'];
+                $profileId = (int)$_POST['profile_id'];
+                $result = $huaweiOLT->clearTR069ProfileCredentials($oltId, $profileId);
+                header('Content-Type: application/json');
+                echo json_encode($result);
+                exit;
             default:
                 break;
         }

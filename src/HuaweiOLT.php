@@ -11890,4 +11890,191 @@ class HuaweiOLT {
         
         return ['success' => false, 'error' => 'Failed to send reboot command. HTTP: ' . $httpCode];
     }
+    
+    /**
+     * Get TR-069 server profiles from OLT
+     */
+    public function getTR069Profiles(int $oltId): array {
+        $cmd = "display ont tr069-serv-profile all";
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'Failed to get TR-069 profiles'];
+        }
+        
+        $profiles = [];
+        $lines = explode("\n", $result['output'] ?? '');
+        $currentProfile = null;
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            // Match profile header: "Profile-id  : 1"
+            if (preg_match('/Profile-id\s*:\s*(\d+)/i', $line, $m)) {
+                if ($currentProfile) {
+                    $profiles[] = $currentProfile;
+                }
+                $currentProfile = ['profile_id' => (int)$m[1]];
+            }
+            // Match profile name
+            elseif ($currentProfile && preg_match('/Profile-name\s*:\s*(.+)/i', $line, $m)) {
+                $currentProfile['profile_name'] = trim($m[1]);
+            }
+            // Match ACS URL
+            elseif ($currentProfile && preg_match('/ACS-URL\s*:\s*(.+)/i', $line, $m)) {
+                $currentProfile['acs_url'] = trim($m[1]);
+            }
+            // Match username
+            elseif ($currentProfile && preg_match('/Connection-request-username\s*:\s*(.*)/i', $line, $m)) {
+                $currentProfile['conn_req_username'] = trim($m[1]) ?: '(empty)';
+            }
+            // Match password
+            elseif ($currentProfile && preg_match('/Connection-request-password\s*:\s*(.*)/i', $line, $m)) {
+                $currentProfile['conn_req_password'] = trim($m[1]) ? '***' : '(empty)';
+            }
+            // Match periodic inform
+            elseif ($currentProfile && preg_match('/Periodic-inform-enable\s*:\s*(.+)/i', $line, $m)) {
+                $currentProfile['periodic_inform'] = trim($m[1]);
+            }
+            elseif ($currentProfile && preg_match('/Periodic-inform-interval\s*:\s*(\d+)/i', $line, $m)) {
+                $currentProfile['periodic_interval'] = (int)$m[1];
+            }
+        }
+        
+        if ($currentProfile) {
+            $profiles[] = $currentProfile;
+        }
+        
+        return [
+            'success' => true,
+            'profiles' => $profiles,
+            'raw_output' => $result['output']
+        ];
+    }
+    
+    /**
+     * Get single TR-069 profile details
+     */
+    public function getTR069Profile(int $oltId, int $profileId): array {
+        $cmd = "display ont tr069-serv-profile profile-id {$profileId}";
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'Failed to get TR-069 profile'];
+        }
+        
+        $profile = ['profile_id' => $profileId];
+        $lines = explode("\n", $result['output'] ?? '');
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            if (preg_match('/Profile-name\s*:\s*(.+)/i', $line, $m)) {
+                $profile['profile_name'] = trim($m[1]);
+            }
+            elseif (preg_match('/ACS-URL\s*:\s*(.+)/i', $line, $m)) {
+                $profile['acs_url'] = trim($m[1]);
+            }
+            elseif (preg_match('/ACS-username\s*:\s*(.*)/i', $line, $m)) {
+                $profile['acs_username'] = trim($m[1]) ?: '';
+            }
+            elseif (preg_match('/Connection-request-username\s*:\s*(.*)/i', $line, $m)) {
+                $profile['conn_req_username'] = trim($m[1]) ?: '';
+            }
+            elseif (preg_match('/Connection-request-password\s*:\s*(.*)/i', $line, $m)) {
+                $profile['conn_req_password'] = trim($m[1]) ? '(set)' : '';
+            }
+            elseif (preg_match('/Periodic-inform-enable\s*:\s*(.+)/i', $line, $m)) {
+                $profile['periodic_inform'] = strtolower(trim($m[1])) === 'enable';
+            }
+            elseif (preg_match('/Periodic-inform-interval\s*:\s*(\d+)/i', $line, $m)) {
+                $profile['periodic_interval'] = (int)$m[1];
+            }
+        }
+        
+        return [
+            'success' => true,
+            'profile' => $profile,
+            'raw_output' => $result['output']
+        ];
+    }
+    
+    /**
+     * Modify TR-069 profile to clear connection request credentials
+     * This allows GenieACS to summon devices without 401 errors
+     */
+    public function clearTR069ProfileCredentials(int $oltId, int $profileId): array {
+        // Clear connection request username and password
+        $cmd = "ont tr069-serv-profile modify profile-id {$profileId} connection-request-username \"\" connection-request-password \"\"";
+        $result = $this->executeCommand($oltId, $cmd);
+        
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error'] ?? 'Failed to modify TR-069 profile'];
+        }
+        
+        // Check if command succeeded
+        $output = $result['output'] ?? '';
+        if (preg_match('/(?:Failure|Error:|Invalid|Unknown command)/i', $output)) {
+            return ['success' => false, 'error' => 'OLT rejected command: ' . $output];
+        }
+        
+        $this->addLog([
+            'olt_id' => $oltId,
+            'action' => 'clear_tr069_profile_credentials',
+            'status' => 'success',
+            'message' => "Cleared ConnectionRequest credentials on TR-069 profile {$profileId}",
+            'command_sent' => $cmd,
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => true,
+            'message' => "TR-069 profile {$profileId} credentials cleared. New ONUs will have no auth.",
+            'output' => $output
+        ];
+    }
+    
+    /**
+     * Update TR-069 profile settings
+     */
+    public function updateTR069Profile(int $oltId, int $profileId, array $settings): array {
+        $commands = [];
+        
+        if (isset($settings['acs_url'])) {
+            $commands[] = "ont tr069-serv-profile modify profile-id {$profileId} acs-url {$settings['acs_url']}";
+        }
+        
+        if (isset($settings['periodic_inform'])) {
+            $enable = $settings['periodic_inform'] ? 'enable' : 'disable';
+            $interval = $settings['periodic_interval'] ?? 300;
+            $commands[] = "ont tr069-serv-profile modify profile-id {$profileId} periodic-inform {$enable} periodic-inform-interval {$interval}";
+        }
+        
+        if (isset($settings['clear_credentials']) && $settings['clear_credentials']) {
+            $commands[] = "ont tr069-serv-profile modify profile-id {$profileId} connection-request-username \"\" connection-request-password \"\"";
+        }
+        
+        if (empty($commands)) {
+            return ['success' => false, 'error' => 'No settings to update'];
+        }
+        
+        $allOutput = '';
+        $errors = [];
+        
+        foreach ($commands as $cmd) {
+            $result = $this->executeCommand($oltId, $cmd);
+            $allOutput .= $result['output'] ?? '';
+            
+            if (!$result['success'] || preg_match('/(?:Failure|Error:|Invalid)/i', $result['output'] ?? '')) {
+                $errors[] = "Command failed: {$cmd}";
+            }
+        }
+        
+        return [
+            'success' => empty($errors),
+            'message' => empty($errors) ? 'TR-069 profile updated successfully' : implode(', ', $errors),
+            'output' => $allOutput
+        ];
+    }
 }
