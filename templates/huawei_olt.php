@@ -4854,6 +4854,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                             'enabled' => ($data['Enable'] ?? false) === true || ($data['Enable'] ?? '') === 'true' || ($data['Enable'] ?? '') === '1' || $data['Enable'] === 1,
                             'channel' => $channel,
                             'standard' => $standard,
+                            'vlan_id' => $data['X_HW_VLANID'] ?? $data['VLANID'] ?? '',
+                            'vlan_mode' => $data['X_HW_VLANMode'] ?? '',
+                            'broadcast' => ($data['SSIDAdvertisementEnabled'] ?? true) === true || ($data['SSIDAdvertisementEnabled'] ?? '') === 'true',
+                            'security' => $data['BeaconType'] ?? '',
                             'path' => "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
                         ];
                     }
@@ -4869,6 +4873,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
                 }
                 exit;
+            case 'set_tr069_param':
+                header('Content-Type: application/json');
+                $serial = $_POST['serial'] ?? '';
+                $path = $_POST['path'] ?? '';
+                $value = $_POST['value'] ?? '';
+                $type = $_POST['type'] ?? 'xsd:string';
+                
+                if (empty($serial) || empty($path)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial and path required']);
+                    exit;
+                }
+                
+                try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new \App\GenieACS($db);
+                    $deviceResult = $genieacs->getDeviceBySerial($serial);
+                    if (!$deviceResult['success']) {
+                        echo json_encode(['success' => false, 'error' => 'Device not found']);
+                        exit;
+                    }
+                    $deviceId = $deviceResult['device']['_id'];
+                    
+                    // Convert value to correct type
+                    if ($type === 'xsd:boolean') {
+                        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                    } elseif ($type === 'xsd:unsignedInt' || $type === 'xsd:int') {
+                        $value = (int)$value;
+                    }
+                    
+                    $result = $genieacs->setParameterValues($deviceId, [
+                        [$path, $value, $type]
+                    ]);
+                    
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+                
             case 'refresh_tr069_ip':
                 header('Content-Type: application/json');
                 $onuId = (int)$_POST['onu_id'];
@@ -8155,10 +8198,10 @@ try {
                         <thead>
                             <tr>
                                 <th>Port</th>
-                                <th>Admin state</th>
-                                <th>Mode</th>
+                                <th>Enable</th>
                                 <th>SSID</th>
-                                <th>DHCP</th>
+                                <th>VLAN</th>
+                                <th>Security</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -8225,29 +8268,79 @@ try {
                     
                     let html = '';
                     data.interfaces.forEach((iface, idx) => {
+                        const wlanIdx = iface.index || (idx + 1);
                         const band = iface.band || (idx === 0 ? '2.4GHz' : '5GHz');
-                        const enabled = iface.enabled ? '<span class="text-success">Enabled</span>' : '<span class="text-danger">Disabled</span>';
-                        const ssid = iface.ssid || '<span class="text-muted">-</span>';
-                        const mode = iface.mode || 'LAN';
+                        const ssid = iface.ssid || '<span class="text-muted">Not configured</span>';
+                        const vlan = iface.vlan_id || '';
+                        const security = iface.security || '-';
+                        const enableChecked = iface.enabled ? 'checked' : '';
+                        const rowClass = iface.enabled ? '' : 'table-secondary';
                         
-                        html += '<tr>';
-                        html += '<td>wifi_0/' + (idx + 1) + ' <small class="text-muted">(' + band + ')</small></td>';
-                        html += '<td>' + enabled + '</td>';
-                        html += '<td>' + mode + '</td>';
+                        html += '<tr class="' + rowClass + '">';
+                        html += '<td>wifi_0/' + wlanIdx + ' <small class="text-muted">(' + band + ')</small></td>';
+                        html += '<td><div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input wifi-enable-toggle" data-index="' + wlanIdx + '" ' + enableChecked + '></div></td>';
                         html += '<td><strong>' + ssid + '</strong></td>';
-                        html += '<td>No control</td>';
-                        html += '<td><a href="#" class="text-primary" onclick="openTR069WiFiConfig(\'' + onuSerial + '\')">Configure</a></td>';
+                        html += '<td><input type="number" class="form-control form-control-sm wifi-vlan-input" style="width:70px" data-index="' + wlanIdx + '" value="' + vlan + '" placeholder="-"></td>';
+                        html += '<td><small>' + security + '</small></td>';
+                        html += '<td><a href="#" class="text-primary" onclick="openTR069WiFiConfig(\'' + onuSerial + '\', ' + wlanIdx + ')">Configure</a></td>';
                         html += '</tr>';
                     });
                     
                     tbody.innerHTML = html;
                     table.classList.remove('d-none');
                     notConnected.classList.add('d-none');
+                    
+                    // Add event handlers for enable toggles
+                    document.querySelectorAll('.wifi-enable-toggle').forEach(toggle => {
+                        toggle.addEventListener('change', function() {
+                            const wlanIdx = this.dataset.index;
+                            const enabled = this.checked;
+                            saveWiFiSetting(wlanIdx, 'Enable', enabled);
+                        });
+                    });
+                    
+                    // Add event handlers for VLAN inputs
+                    document.querySelectorAll('.wifi-vlan-input').forEach(input => {
+                        input.addEventListener('change', function() {
+                            const wlanIdx = this.dataset.index;
+                            const vlanId = this.value;
+                            if (vlanId && vlanId > 0) {
+                                saveWiFiSetting(wlanIdx, 'X_HW_VLANID', parseInt(vlanId));
+                            }
+                        });
+                    });
                 })
         .catch(err => {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
                     tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center">Error: ' + err.message + '</td></tr>';
+                });
+            }
+            
+            // Save individual WiFi setting via TR-069
+            function saveWiFiSetting(wlanIndex, param, value) {
+                const path = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + wlanIndex + '.' + param;
+                const paramType = (typeof value === 'boolean') ? 'xsd:boolean' : (typeof value === 'number' ? 'xsd:unsignedInt' : 'xsd:string');
+                
+                fetch('?page=huawei-olt&t=' + Date.now(), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=set_tr069_param&serial=' + encodeURIComponent(onuSerial) + 
+                          '&path=' + encodeURIComponent(path) + 
+                          '&value=' + encodeURIComponent(value) +
+                          '&type=' + encodeURIComponent(paramType)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('WiFi setting saved', 'success');
+                    } else {
+                        showToast('Failed: ' + (data.error || 'Unknown error'), 'danger');
+                        loadWiFiFromTR069(); // Reload to show actual values
+                    }
+                })
+                .catch(err => {
+                    showToast('Error: ' + err.message, 'danger');
                 });
             }
             
