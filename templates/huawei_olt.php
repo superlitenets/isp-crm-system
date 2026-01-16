@@ -7320,7 +7320,7 @@ try {
                                 showToast('Discovery failed: ' + (data.error || 'Unknown error'), 'danger');
                             }
                         })
-                .catch(err => {
+        .catch(err => {
                             isDiscovering = false;
                             btn.disabled = false;
                             btn.innerHTML = origHtml;
@@ -8242,7 +8242,7 @@ try {
                     table.classList.remove('d-none');
                     notConnected.classList.add('d-none');
                 })
-                .catch(err => {
+        .catch(err => {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
                     tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center">Error: ' + err.message + '</td></tr>';
@@ -14299,7 +14299,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         });
                     }
                 })
-                .catch(e => console.log('Customer load failed:', e));
+        .catch(e => console.log('Customer load failed:', e));
             
             // Auto-fill name and phone when customer selected
             customerSelect.addEventListener('change', function() {
@@ -16860,7 +16860,7 @@ function saveDeviceStatus() {
                         });
                     }
                 })
-                .catch(e => {
+        .catch(e => {
                     vlanSelect.innerHTML = '<option value="">Error loading VLANs</option>';
                 });
         } else {
@@ -19538,11 +19538,9 @@ function saveDeviceStatus() {
                 alert('Error: ' + (data.error || 'Failed to clear credentials'));
             }
         })
-                .catch(err => alert('Error: ' + err.message));
+        .catch(err => alert('Error: ' + err.message));
     }
     
-    }
-    }
     </script>
     
     <!-- WAN Configuration Modal -->
