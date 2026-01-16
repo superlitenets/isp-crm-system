@@ -916,41 +916,79 @@ class GenieACS {
         $device = $result['data'];
         $wifiData = [];
         
-        // Check if LANDevice exists
+        // Helper to extract value from TR-069 format
+        $getValue = function($obj, $key) {
+            if (!isset($obj[$key])) return null;
+            $val = $obj[$key];
+            if (is_array($val) && isset($val['_value'])) return $val['_value'];
+            return $val;
+        };
+        
+        // Try multiple paths for WiFi data
+        $wlanConfig = null;
+        $basePaths = [
+            'InternetGatewayDevice.LANDevice.1.WLANConfiguration',
+            'Device.WiFi.SSID',
+            'InternetGatewayDevice.X_HW_WLANConfiguration',
+        ];
+        
+        // Check InternetGatewayDevice.LANDevice.1.WLANConfiguration
         $lanDevice = $device['InternetGatewayDevice']['LANDevice']['1'] ?? null;
-        if (!$lanDevice || !isset($lanDevice['WLANConfiguration'])) {
-            return ['success' => false, 'error' => 'No WiFi configuration found. Device may not support WiFi or data not yet fetched from device.'];
+        if ($lanDevice && isset($lanDevice['WLANConfiguration'])) {
+            $wlanConfig = $lanDevice['WLANConfiguration'];
         }
         
-        // Dynamically iterate over all available WLANConfiguration entries
-        $wlanConfig = $lanDevice['WLANConfiguration'] ?? [];
+        // Try Device.WiFi.SSID (Device:2 data model)
+        if (!$wlanConfig) {
+            $wlanConfig = $device['Device']['WiFi']['SSID'] ?? null;
+        }
+        
+        // If still not found, return helpful debug info
+        if (!$wlanConfig) {
+            $availableKeys = [];
+            if (isset($device['InternetGatewayDevice'])) {
+                $availableKeys = array_keys($device['InternetGatewayDevice']);
+            }
+            return [
+                'success' => false, 
+                'error' => 'WiFi configuration not found. Device may need a refresh from GenieACS.',
+                'debug' => ['available_keys' => $availableKeys]
+            ];
+        }
         
         // For HG8546M and similar: Interfaces are typically 1,2,5,6 (2.4G, 2.4G Guest, 5G, 5G Guest)
-        // Check all potential indices from 1 to 8
-        $potentialIndices = array_merge(array_keys($wlanConfig), [1, 2, 3, 4, 5, 6, 7, 8]);
-        $potentialIndices = array_unique($potentialIndices);
+        $potentialIndices = array_merge(array_keys($wlanConfig), range(1, 8));
+        $potentialIndices = array_unique(array_filter($potentialIndices, 'is_numeric'));
         sort($potentialIndices);
         
         foreach ($potentialIndices as $idx) {
-            if (!is_numeric($idx)) continue;
-            
             $config = $wlanConfig[$idx] ?? null;
             if (!$config) continue;
             
             $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}";
-            $ssid = isset($config['SSID']['_value']) ? $config['SSID']['_value'] : ($config['SSID'] ?? null);
-            $enable = isset($config['Enable']['_value']) ? $config['Enable']['_value'] : ($config['Enable'] ?? null);
-            $channel = isset($config['Channel']['_value']) ? $config['Channel']['_value'] : ($config['Channel'] ?? null);
-            $standard = isset($config['Standard']['_value']) ? $config['Standard']['_value'] : ($config['Standard'] ?? null);
-            $password = isset($config['PreSharedKey']['1']['KeyPassphrase']['_value']) 
-                ? $config['PreSharedKey']['1']['KeyPassphrase']['_value'] 
-                : null;
+            
+            $ssid = $getValue($config, 'SSID');
+            $enable = $getValue($config, 'Enable');
+            $channel = $getValue($config, 'Channel');
+            $standard = $getValue($config, 'Standard');
+            $beaconType = $getValue($config, 'BeaconType');
+            $vlanId = $getValue($config, 'X_HW_VLANID') ?? $getValue($config, 'VLANID');
+            $broadcast = $getValue($config, 'SSIDAdvertisementEnabled');
+            
+            // Get password from nested PreSharedKey structure
+            $password = null;
+            if (isset($config['PreSharedKey']['1'])) {
+                $password = $getValue($config['PreSharedKey']['1'], 'KeyPassphrase');
+            }
             
             // Include interface even if some values are null
             $wifiData[] = ["{$basePath}.SSID", $ssid];
             $wifiData[] = ["{$basePath}.Enable", $enable];
             $wifiData[] = ["{$basePath}.Channel", $channel];
             $wifiData[] = ["{$basePath}.Standard", $standard];
+            $wifiData[] = ["{$basePath}.BeaconType", $beaconType];
+            $wifiData[] = ["{$basePath}.X_HW_VLANID", $vlanId];
+            $wifiData[] = ["{$basePath}.SSIDAdvertisementEnabled", $broadcast];
             if ($password !== null) {
                 $wifiData[] = ["{$basePath}.PreSharedKey.1.KeyPassphrase", $password];
             }
