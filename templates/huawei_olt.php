@@ -13729,6 +13729,24 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 </a>
                             </div>
                         </div>
+            <div class="mt-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-router me-2"></i>TR-069 Profiles</h5>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadTR069Profiles(<?= $oltId ?>)">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Load Profiles
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Manage TR-069 server profiles on the OLT. Clear credentials to allow GenieACS to summon devices without 401 errors.</p>
+                        <div id="tr069ProfilesContainer">
+                            <div class="text-center text-muted py-3">
+                                <i class="bi bi-info-circle me-1"></i>Click "Load Profiles" to view TR-069 profiles from this OLT
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
                     </div>
                 </div>
             </div>
@@ -19459,6 +19477,67 @@ function saveDeviceStatus() {
                 }
             })
             .catch(err => alert('Error: ' + err.message));
+    // TR-069 Profile Management
+    function loadTR069Profiles(oltId) {
+        const container = document.getElementById('tr069ProfilesContainer');
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div> Loading profiles...</div>';
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=get_tr069_profiles&olt_id=' + oltId
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.profiles && data.profiles.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0">';
+                html += '<thead><tr><th>Profile ID</th><th>Name</th><th>ACS URL</th><th>Conn Req Auth</th><th>Actions</th></tr></thead><tbody>';
+                data.profiles.forEach(p => {
+                    const hasAuth = p.conn_req_username !== '(empty)' || p.conn_req_password !== '(empty)';
+                    html += `<tr>
+                        <td><strong>${p.profile_id}</strong></td>
+                        <td>${p.profile_name || '-'}</td>
+                        <td><small>${p.acs_url || '-'}</small></td>
+                        <td>${hasAuth ? '<span class="badge bg-warning">Set</span>' : '<span class="badge bg-success">None</span>'}</td>
+                        <td>
+                            ${hasAuth ? `<button class="btn btn-sm btn-outline-danger" onclick="clearTR069Credentials(${oltId}, ${p.profile_id})">
+                                <i class="bi bi-unlock me-1"></i>Clear Auth
+                            </button>` : '<span class="text-success small"><i class="bi bi-check-circle"></i> OK</span>'}
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+            } else if (data.success && (!data.profiles || data.profiles.length === 0)) {
+                container.innerHTML = '<div class="alert alert-info mb-0"><i class="bi bi-info-circle me-2"></i>No TR-069 profiles found on this OLT.</div>';
+            } else {
+                container.innerHTML = '<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load profiles') + '</div>';
+            }
+        })
+        .catch(err => {
+            container.innerHTML = '<div class="alert alert-danger mb-0">Error: ' + err.message + '</div>';
+        });
+    }
+    
+    function clearTR069Credentials(oltId, profileId) {
+        if (!confirm('Clear ConnectionRequest credentials on Profile ' + profileId + '? This allows GenieACS to summon devices without 401 errors.')) return;
+        
+        fetch('?page=huawei-olt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=clear_tr069_profile_credentials&olt_id=' + oltId + '&profile_id=' + profileId
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Success: ' + data.message);
+                loadTR069Profiles(oltId);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to clear credentials'));
+            }
+        })
+        .catch(err => alert('Error: ' + err.message));
+    }
     }
     </script>
     
