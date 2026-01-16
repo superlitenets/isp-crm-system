@@ -16158,51 +16158,83 @@ echo "# ================================================\n";
 let currentDeviceStatusSerial = '';
 let originalDeviceParams = {};
 
-// Tab definitions with icons
+// Tab definitions - Only show these specific sections
 const tabConfig = {
-    'device_info': { label: 'Device Info', icon: 'bi-info-circle', order: 0 },
-    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1 },
-    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2 },
-    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3 },
-    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4 },
-    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5 },
-    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6 },
-    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7 },
-    'wireless_lan_5': { label: 'Wireless LAN 5G', icon: 'bi-wifi', order: 8 },
-    'wlan_counters': { label: 'WLAN Counters', icon: 'bi-bar-chart', order: 9 },
-    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 10 },
-    'security': { label: 'Security', icon: 'bi-shield-lock', order: 11 },
-    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 12 },
-    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 13 },
-    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 14 },
-    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 15 }
+    'ppp_interface': { label: 'PPP Interface (WAN)', icon: 'bi-globe', order: 1, editable: true },
+    'port_forward': { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2, editable: true },
+    'ip_interface': { label: 'IP Interface', icon: 'bi-diagram-3', order: 3, editable: true },
+    'lan_dhcp': { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4, editable: true },
+    'lan_ports': { label: 'LAN Ports', icon: 'bi-ethernet', order: 5, editable: true },
+    'lan_counters': { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6, editable: false },
+    'wireless_lan': { label: 'Wireless LAN', icon: 'bi-wifi', order: 7, editable: true },
+    'hosts': { label: 'Hosts', icon: 'bi-pc-display', order: 8, editable: false },
+    'security': { label: 'Security', icon: 'bi-shield-lock', order: 9, editable: true },
+    'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 10, editable: true },
+    'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 11, editable: true },
+    'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 12, editable: true },
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 13, editable: false }
 };
+
 
 // Dynamic tab label resolver for backend keys like ppp_interface_1_1
 function getTabConfig(key) {
     // Check for PPP interface patterns like ppp_interface_1_1
-    if (key.startsWith('ppp_interface_')) {
-        const parts = key.replace('ppp_interface_', '').split('_');
-        return { label: 'PPP Interface ' + parts.join('.'), icon: 'bi-globe', order: 1 };
+    if (key.startsWith('ppp_interface')) {
+        const parts = key.replace('ppp_interface_', '').split('_').filter(p => p);
+        const suffix = parts.length > 0 ? ' ' + parts.join('.') : '';
+        return { label: 'PPP Interface (WAN)' + suffix, icon: 'bi-globe', order: 1, editable: true };
+    }
+    // Check for port forward patterns
+    if (key.startsWith('port_forward')) {
+        return { label: 'Port Forward', icon: 'bi-arrow-left-right', order: 2, editable: true };
+    }
+    // Check for IP interface patterns
+    if (key.startsWith('ip_interface')) {
+        return { label: 'IP Interface', icon: 'bi-diagram-3', order: 3, editable: true };
+    }
+    // Check for LAN DHCP patterns
+    if (key.startsWith('lan_dhcp')) {
+        return { label: 'LAN DHCP Server', icon: 'bi-hdd-network', order: 4, editable: true };
+    }
+    // Check for LAN ports patterns
+    if (key.startsWith('lan_ports') || key === 'lan_ports') {
+        return { label: 'LAN Ports', icon: 'bi-ethernet', order: 5, editable: true };
+    }
+    // Check for LAN counters patterns
+    if (key.startsWith('lan_counters') || key === 'lan_counters') {
+        return { label: 'LAN Counters', icon: 'bi-speedometer2', order: 6, editable: false };
     }
     // Check for wireless patterns
-    if (key === 'wireless_lan_5') {
-        return { label: 'Wireless LAN (5GHz)', icon: 'bi-wifi', order: 8 };
+    if (key.startsWith('wireless_lan')) {
+        const is5g = key.includes('5');
+        return { label: 'Wireless LAN' + (is5g ? ' (5GHz)' : ''), icon: 'bi-wifi', order: 7, editable: true };
     }
-    // Check for troubleshooting wifi
-    if (key.startsWith('troubleshooting_wifi')) {
-        const band = key.includes('24') ? '2.4GHz' : '5GHz';
-        return { label: 'WiFi Scan (' + band + ')', icon: 'bi-broadcast', order: 14 };
+    // Check for hosts
+    if (key.startsWith('host')) {
+        return { label: 'Hosts', icon: 'bi-pc-display', order: 8, editable: false };
+    }
+    // Check for security
+    if (key.startsWith('security')) {
+        return { label: 'Security', icon: 'bi-shield-lock', order: 9, editable: true };
+    }
+    // Check for voice lines
+    if (key.startsWith('voice')) {
+        return { label: 'Voice Lines', icon: 'bi-telephone', order: 10, editable: true };
     }
     // Check for miscellaneous variants
     if (key.startsWith('miscellaneous')) {
-        return { label: 'Miscellaneous', icon: 'bi-three-dots', order: 13 };
+        return { label: 'Miscellaneous', icon: 'bi-three-dots', order: 11, editable: true };
     }
-    // Check for auto-categorized
-    if (key.startsWith('auto_')) {
-        return { label: key.replace('auto_', '').replace(/_/g, ' '), icon: 'bi-folder', order: 50 };
+    // Check for troubleshooting
+    if (key.startsWith('troubleshooting')) {
+        return { label: 'Troubleshooting', icon: 'bi-tools', order: 12, editable: true };
     }
-    return tabConfig[key] || { label: key.replace(/_/g, ' '), icon: 'bi-gear', order: 50 };
+    // Check for device logs
+    if (key.startsWith('device_log')) {
+        return { label: 'Device Logs', icon: 'bi-journal-text', order: 13, editable: false };
+    }
+    // Fallback - but hide unknown tabs
+    return tabConfig[key] || null;
 }
 
 // Enable instant provisioning (clear connection request auth)
@@ -16292,19 +16324,38 @@ function renderDeviceStatusTabs(categories) {
     tabList.innerHTML = '';
     tabContent.innerHTML = '';
     
-    // Sort categories by tab order
-    const sortedKeys = Object.keys(categories).sort((a, b) => {
-        const orderA = tabConfig[a]?.order || 50;
-        const orderB = tabConfig[b]?.order || 50;
+    // Filter and sort categories - only show allowed tabs
+    const sortedKeys = Object.keys(categories).filter(key => {
+        // Check if tab is allowed (directly in tabConfig or matches a pattern)
+        const baseKey = key.replace(/_\d+(_\d+)?$/g, ''); // Remove numeric suffixes like _1 or _1_1
+        return tabConfig[key] || tabConfig[baseKey] || 
+               key.startsWith('ppp_interface') || 
+               key.startsWith('wireless_lan') || 
+               key.startsWith('voice') ||
+               key.startsWith('port_forward') ||
+               key.startsWith('ip_interface') ||
+               key.startsWith('lan_') ||
+               key.startsWith('host') ||
+               key.startsWith('security') ||
+               key.startsWith('miscellaneous') ||
+               key.startsWith('troubleshooting') ||
+               key.startsWith('device_log');
+    }).sort((a, b) => {
+        const orderA = tabConfig[a]?.order || getTabConfig(a)?.order || 50;
+        const orderB = tabConfig[b]?.order || getTabConfig(b)?.order || 50;
         return orderA - orderB;
     });
     
     let isFirst = true;
     sortedKeys.forEach(key => {
         const category = categories[key];
-        if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined || p.value === '').length === 0) return;
-        
         const config = getTabConfig(key);
+        
+        // Skip if tab config not found (not an allowed tab)
+        if (!config) return;
+        
+        // Skip if no valid params
+        if (!category.params || category.params.filter(p => p.value !== null && p.value !== undefined || p.value === '').length === 0) return;
         const tabId = 'tab_' + key;
         const paneId = 'pane_' + key;
         const paramCount = category.params.filter(p => p.value !== null && p.value !== undefined).length;
