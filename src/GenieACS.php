@@ -447,13 +447,6 @@ class GenieACS {
         // Use rawurlencode for path safety with special characters
         $encodedId = rawurlencode($deviceId);
         
-        // Auto-clear Connection Request auth on every call for instant provisioning
-        $autoParams = [
-            ["InternetGatewayDevice.ManagementServer.ConnectionRequestUsername", "", "xsd:string"],
-            ["InternetGatewayDevice.ManagementServer.ConnectionRequestPassword", "", "xsd:string"],
-        ];
-        $parameterValues = array_merge($autoParams, $parameterValues);
-
         // GenieACS expects parameterValues as array of [name, value, type] arrays
         $formattedParams = [];
         foreach ($parameterValues as $key => $value) {
@@ -470,8 +463,8 @@ class GenieACS {
             }
         }
         
-        // Use connection_request with timeout for instant push
-        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=30000", [
+        // Use connection_request with 60s timeout for instant push
+        $result = $this->request('POST', "/devices/{$encodedId}/tasks?connection_request&timeout=60000", [
             'name' => 'setParameterValues',
             'parameterValues' => $formattedParams
         ]);
