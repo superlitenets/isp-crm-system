@@ -1433,19 +1433,12 @@ class GenieACS {
                 ? "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$idx}"
                 : "InternetGatewayDevice.WLANConfiguration.{$idx}";
             
-            // Check if this WLAN has valid data - only show enabled SSIDs or ones with configured names
+            // Check if this WLAN exists - show all SSIDs including disabled ones
             $ssid = $getValue("{$wlanBase}.SSID");
             $enable = $getValue("{$wlanBase}.Enable");
             
-            // Skip if no data at all
+            // Skip only if no data exists at all for this index
             if ($ssid === null && $enable === null) continue;
-            
-            // Skip disabled SSIDs with empty/default names (indexes 2-4, 6-8 are usually disabled by default)
-            $isEnabled = $enable === true || $enable === 'true' || $enable === 1 || $enable === '1';
-            $hasValidSsid = !empty($ssid) && $ssid !== '' && $ssid !== 'SSID' . $idx;
-            
-            // Only show if enabled OR has a custom SSID name configured
-            if (!$isEnabled && !$hasValidSsid) continue;
             
             // Determine band based on index or standard
             $standard = $getValue("{$wlanBase}.Standard") ?? '';
@@ -1456,23 +1449,32 @@ class GenieACS {
                 $band = '2.4GHz';
             }
             
+            // Get status for display
+            $isEnabled = $enable === true || $enable === 'true' || $enable === 1 || $enable === '1';
+            $statusLabel = $isEnabled ? '' : ' (Disabled)';
+            
             $wlanParams[] = [
                 'idx' => $idx,
                 'band' => $band,
                 'ssid' => $ssid,
+                'enabled' => $isEnabled,
                 'params' => [
-                    ['path' => "{$wlanBase}.Enable", 'label' => "SSID {$idx} Enable", 'value' => $enable, 'type' => 'boolean'],
+                    ['path' => "{$wlanBase}.Enable", 'label' => "SSID {$idx} Enable{$statusLabel}", 'value' => $enable, 'type' => 'boolean'],
                     ['path' => "{$wlanBase}.SSID", 'label' => "SSID {$idx} Name", 'value' => $ssid, 'type' => 'string'],
                     ['path' => "{$wlanBase}.PreSharedKey.1.KeyPassphrase", 'label' => "SSID {$idx} Password", 'value' => $getValue("{$wlanBase}.PreSharedKey.1.KeyPassphrase"), 'type' => 'password'],
+                    ['path' => "{$wlanBase}.X_HW_VLANID", 'label' => "SSID {$idx} VLAN ID", 'value' => $getValue("{$wlanBase}.X_HW_VLANID"), 'type' => 'number'],
+                    ['path' => "{$wlanBase}.X_HW_VLANMode", 'label' => "SSID {$idx} VLAN Mode", 'value' => $getValue("{$wlanBase}.X_HW_VLANMode"), 'type' => 'string'],
                     ['path' => "{$wlanBase}.Channel", 'label' => "SSID {$idx} Channel", 'value' => $getValue("{$wlanBase}.Channel"), 'type' => 'number'],
                     ['path' => "{$wlanBase}.X_HW_ChannelWidth", 'label' => "SSID {$idx} Channel Width", 'value' => $getValue("{$wlanBase}.X_HW_ChannelWidth"), 'type' => 'number'],
                     ['path' => "{$wlanBase}.SSIDAdvertisementEnabled", 'label' => "SSID {$idx} Broadcast", 'value' => $getValue("{$wlanBase}.SSIDAdvertisementEnabled"), 'type' => 'boolean'],
                     ['path' => "{$wlanBase}.BeaconType", 'label' => "SSID {$idx} Security", 'value' => $getValue("{$wlanBase}.BeaconType"), 'type' => 'string'],
                     ['path' => "{$wlanBase}.WPAEncryptionModes", 'label' => "SSID {$idx} Encryption", 'value' => $getValue("{$wlanBase}.WPAEncryptionModes"), 'type' => 'string'],
-                    ['path' => "{$wlanBase}.Standard", 'label' => "SSID {$idx} Standard", 'value' => $standard, 'type' => 'readonly'],
+                    ['path' => "{$wlanBase}.Standard", 'label' => "SSID {$idx} Standard ({$band})", 'value' => $standard, 'type' => 'readonly'],
                     ['path' => "{$wlanBase}.TransmitPower", 'label' => "SSID {$idx} TX Power", 'value' => $getValue("{$wlanBase}.TransmitPower"), 'type' => 'number'],
                     ['path' => "{$wlanBase}.TotalAssociations", 'label' => "SSID {$idx} Clients", 'value' => $getValue("{$wlanBase}.TotalAssociations"), 'type' => 'readonly'],
                     ['path' => "{$wlanBase}.BSSID", 'label' => "SSID {$idx} BSSID", 'value' => $getValue("{$wlanBase}.BSSID"), 'type' => 'readonly'],
+                    ['path' => "{$wlanBase}.X_HW_WMMEnable", 'label' => "SSID {$idx} WMM", 'value' => $getValue("{$wlanBase}.X_HW_WMMEnable"), 'type' => 'boolean'],
+                    ['path' => "{$wlanBase}.X_HW_APModuleEnable", 'label' => "SSID {$idx} AP Isolation", 'value' => $getValue("{$wlanBase}.X_HW_APModuleEnable"), 'type' => 'boolean'],
                 ]
             ];
         }
