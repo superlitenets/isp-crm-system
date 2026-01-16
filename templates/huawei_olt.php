@@ -8212,6 +8212,8 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                         tbody.innerHTML = '<tr><td colspan="6" class="text-warning text-center">' + (data.error || 'Failed to load WiFi data') + '</td></tr>';
                         return;
                     }
@@ -16914,6 +16916,8 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 alert('Failed to update description: ' + (data.error || 'Unknown error'));
             }
         })
@@ -17016,7 +17020,8 @@ function saveDeviceStatus() {
         })
         .then(data => {
             if (!data.success) {
-                body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch status') + '</div>';
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 return;
             }
             
@@ -17164,6 +17169,8 @@ function saveDeviceStatus() {
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                     container.innerHTML = '<div class="alert alert-warning m-2">' + (data.error || 'Failed to load logs') + '</div>';
                     return;
                 }
@@ -17292,6 +17299,8 @@ function saveDeviceStatus() {
         })
         .then(data => {
             if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch config') + '</div>';
                 return;
             }
@@ -17485,6 +17494,8 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 container.innerHTML = '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load WiFi settings') + (data.model ? ' (Model: ' + data.model + ')' : '') + '</div>';
                 return;
             }
@@ -17565,6 +17576,8 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No SW info available') + '</div>';
                 return;
             }
@@ -17829,6 +17842,8 @@ function saveDeviceStatus() {
         .then(data => {
             tr069CurrentData = data;
             if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No data available') + '</div>';
                 return;
             }
@@ -18112,6 +18127,8 @@ function saveDeviceStatus() {
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
+                modal.hide();
+                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
                     container.innerHTML = '<div class="alert alert-warning m-2 small">' + (data.error || 'Failed') + '</div>';
                     return;
                 }
