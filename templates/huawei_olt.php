@@ -4912,6 +4912,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 exit;
                 
+            case 'summon_onu':
+                header('Content-Type: application/json');
+                $serial = $_POST['serial'] ?? '';
+                if (empty($serial)) {
+                    echo json_encode(['success' => false, 'error' => 'Serial required']);
+                    exit;
+                }
+                try {
+                    require_once __DIR__ . '/../src/GenieACS.php';
+                    $genieacs = new \App\GenieACS($db);
+                    $result = $genieacs->sendConnectionRequest($serial);
+                    echo json_encode($result);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+                
             case 'refresh_tr069_ip':
                 header('Content-Type: application/json');
                 $onuId = (int)$_POST['onu_id'];
@@ -8316,7 +8333,31 @@ try {
                 });
             }
             
-            // Auto-load if TR-069 is connected
+            // Auto-summon ONU in GenieACS when page opens (triggers connection request)
+            function summonOnu() {
+                if (!onuSerial) return;
+                fetch('?page=huawei-olt&t=' + Date.now(), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=summon_onu&serial=' + encodeURIComponent(onuSerial)
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('ONU summoned successfully');
+                        // Refresh WiFi data after a short delay to allow device to respond
+                        setTimeout(loadWiFiFromTR069, 2000);
+                    } else {
+                        console.log('Summon queued or device offline:', data.error || 'unknown');
+                    }
+                })
+                .catch(err => console.log('Summon error:', err.message));
+            }
+            
+            // Auto-summon and load WiFi when page opens
+            if (onuSerial) {
+                summonOnu();
+            }
             if (hasTR069) {
                 loadWiFiFromTR069();
             }
