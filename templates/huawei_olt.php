@@ -9040,17 +9040,7 @@ try {
                                         <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6rem;" onclick="removeAttachedVlan(<?= $vid ?>)" title="Remove"></button>
                                     </span>
                                     <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-                                    else: ?>
+                                    <?php else: ?>
                                     <span class="text-muted" id="noVlansMsg">No VLANs attached</span>
                                     <?php endif; ?>
                                 </div>
