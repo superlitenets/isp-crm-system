@@ -6066,11 +6066,9 @@ class HuaweiOLT {
             $description = $this->generateNextSNSCode($oltId);
         }
         
-        // Find the next available ONU ID for this port
-        $assignedOnuId = $onu['onu_id'];
-        if (empty($assignedOnuId)) {
-            $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
-        }
+        // ALWAYS query OLT for the next available ONU ID to avoid conflicts
+        // Database onu_id may be stale if another ONU was authorized with that ID
+        $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
         
         // Build CLI script with newlines for multi-command execution
         // Huawei MA5680T/MA5683T requires interface context for ont add
@@ -6319,11 +6317,8 @@ class HuaweiOLT {
             $description = $this->generateNextSNSCode($oltId);
         }
         
-        // Find next available ONU ID
-        $assignedOnuId = $onu['onu_id'];
-        if (empty($assignedOnuId)) {
-            $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
-        }
+        // ALWAYS query OLT for the next available ONU ID to avoid conflicts
+        $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
         
         // ==== STAGE 1A: AUTHORIZE ONU ====
         $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
