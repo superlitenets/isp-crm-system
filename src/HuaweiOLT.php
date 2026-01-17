@@ -5905,49 +5905,80 @@ class HuaweiOLT {
         
         // Get used IDs from OLT via CLI (most reliable source)
         $result = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} all\r\nquit");
-        if ($result['success'] && !empty($result['output'])) {
-            // Parse ONU IDs from various output formats:
-            // Format 1: "0/1/0  1  HWTC..." (F/S/P  ONU_ID  SN)
-            preg_match_all('/^\s*\d+\/\d+\/\d+\s+(\d+)\s+/m', $result['output'], $matches);
+        $output = $result['output'] ?? '';
+        error_log("[findNextAvailableOnuId] CLI output length: " . strlen($output));
+        
+        if ($result['success'] && !empty($output)) {
+            // Format 1: "0/1/0  1  HWTC..." (F/S/P  ONU_ID  SN) - table format
+            preg_match_all('/^\s*\d+\/\d+\/\d+\s+(\d+)\s+/m', $output, $matches);
             if (!empty($matches[1])) {
                 foreach ($matches[1] as $id) {
                     $usedIds[] = (int)$id;
                 }
             }
-            // Format 2: "ONT-ID  :  1" or "ONT ID: 1"
-            preg_match_all('/ONT[- ]?ID\s*:\s*(\d+)/i', $result['output'], $matches2);
+            
+            // Format 2: "ONT-ID  :  1" or "ONT ID: 1" - detail format
+            preg_match_all('/ONT[- ]?ID\s*:\s*(\d+)/i', $output, $matches2);
             if (!empty($matches2[1])) {
                 foreach ($matches2[1] as $id) {
                     $usedIds[] = (int)$id;
                 }
             }
-            // Format 3: Table row " 1 | online | ..."
-            preg_match_all('/^\s*(\d+)\s+\|\s*(?:online|offline)/mi', $result['output'], $matches3);
+            
+            // Format 3: Table row " 1 | online | ..." - pipe-separated
+            preg_match_all('/^\s*(\d+)\s+\|\s*(?:online|offline)/mi', $output, $matches3);
             if (!empty($matches3[1])) {
                 foreach ($matches3[1] as $id) {
                     $usedIds[] = (int)$id;
                 }
             }
+            
+            // Format 4: MA5683T table format "  0      1   HWTC..." (spaces, then F/S/P index, then ONT-ID)
+            // Look for lines with ONT data: numbers followed by HEX serial
+            preg_match_all('/^\s*(\d+)\s+(\d+)\s+[A-F0-9]{8,16}/mi', $output, $matches4);
+            if (!empty($matches4[2])) {
+                foreach ($matches4[2] as $id) {
+                    $usedIds[] = (int)$id;
+                }
+            }
+            
+            // Format 5: Simple "ont add PORT ONT_ID" in config output
+            preg_match_all('/ont\s+add\s+\d+\s+(\d+)\s+/i', $output, $matches5);
+            if (!empty($matches5[1])) {
+                foreach ($matches5[1] as $id) {
+                    $usedIds[] = (int)$id;
+                }
+            }
+            
+            // Format 6: Look for any "ONT : X" patterns
+            preg_match_all('/\bONT\s*:\s*(\d+)/i', $output, $matches6);
+            if (!empty($matches6[1])) {
+                foreach ($matches6[1] as $id) {
+                    $usedIds[] = (int)$id;
+                }
+            }
         }
         
-        // Also check database as backup (but OLT is authoritative)
+        // Also check database - include ALL ONUs on this port (authorized or pending)
         $stmt = $this->db->prepare("
             SELECT onu_id FROM huawei_onus 
-            WHERE olt_id = ? AND frame = ? AND slot = ? AND port = ? AND onu_id IS NOT NULL AND is_authorized = TRUE
+            WHERE olt_id = ? AND frame = ? AND slot = ? AND port = ? AND onu_id IS NOT NULL
             ORDER BY onu_id
         ");
         $stmt->execute([$oltId, $frame, $slot, $port]);
         $dbIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
         foreach ($dbIds as $id) {
-            $usedIds[] = (int)$id;
+            if ($id !== null) {
+                $usedIds[] = (int)$id;
+            }
         }
         
         // Remove duplicates and sort
         $usedIds = array_unique($usedIds);
         sort($usedIds);
         
-        // Find the next available ID (starting from 1)
-        $nextId = 1;
+        // Find the next available ID (starting from 0 for Huawei OLTs)
+        $nextId = 0;
         foreach ($usedIds as $id) {
             if ($id == $nextId) {
                 $nextId++;
