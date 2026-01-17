@@ -5903,10 +5903,18 @@ class HuaweiOLT {
     public function findNextAvailableOnuId(int $oltId, int $frame, int $slot, int $port): int {
         $usedIds = [];
         
-        // Get used IDs from OLT via CLI (most reliable source)
+        // Try multiple CLI commands to get used IDs
+        // Command 1: display ont info (shows authorized ONTs)
         $result = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} all\r\nquit");
         $output = $result['output'] ?? '';
-        error_log("[findNextAvailableOnuId] CLI output length: " . strlen($output));
+        
+        // Command 2: display current-configuration (shows ont add commands)
+        $configResult = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration\r\nquit");
+        if (!empty($configResult['output'])) {
+            $output .= "\n" . $configResult['output'];
+        }
+        
+        error_log("[findNextAvailableOnuId] Combined CLI output length: " . strlen($output));
         
         if ($result['success'] && !empty($output)) {
             // Format 1: "0/1/0  1  HWTC..." (F/S/P  ONU_ID  SN) - table format
@@ -5942,10 +5950,19 @@ class HuaweiOLT {
                 }
             }
             
-            // Format 5: Simple "ont add PORT ONT_ID" in config output
-            preg_match_all('/ont\s+add\s+\d+\s+(\d+)\s+/i', $output, $matches5);
+            // Format 5: Simple "ont add PORT ONT_ID" in config output (for this specific port)
+            preg_match_all('/ont\s+add\s+' . $port . '\s+(\d+)\s+/i', $output, $matches5);
             if (!empty($matches5[1])) {
                 foreach ($matches5[1] as $id) {
+                    $usedIds[] = (int)$id;
+                }
+            }
+            
+            // Format 5b: Any "ont add" commands to capture all ports as backup
+            preg_match_all('/ont\s+add\s+\d+\s+(\d+)\s+/i', $output, $matches5b);
+            if (!empty($matches5b[1])) {
+                // Only add if we're looking at the right port context
+                foreach ($matches5b[1] as $id) {
                     $usedIds[] = (int)$id;
                 }
             }
