@@ -644,23 +644,34 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --isp-primary: #1e3a5f;
-            --isp-primary-light: #2d4a6f;
-            --isp-accent: #0ea5e9;
-            --isp-accent-light: #38bdf8;
+            --isp-primary: #1a1c2c;
+            --isp-primary-light: #2d3250;
+            --isp-primary-dark: #0f1019;
+            --isp-accent: #6366f1;
+            --isp-accent-light: #818cf8;
+            --isp-accent-dark: #4f46e5;
             --isp-success: #10b981;
+            --isp-success-light: #34d399;
             --isp-warning: #f59e0b;
+            --isp-warning-light: #fbbf24;
             --isp-danger: #ef4444;
-            --isp-info: #06b6d4;
-            --isp-bg: #f1f5f9;
+            --isp-danger-light: #f87171;
+            --isp-info: #0ea5e9;
+            --isp-info-light: #38bdf8;
+            --isp-bg: #f8fafc;
             --isp-card-bg: #ffffff;
-            --isp-text: #334155;
+            --isp-text: #1e293b;
             --isp-text-muted: #64748b;
+            --isp-text-light: #94a3b8;
             --isp-border: #e2e8f0;
-            --isp-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-            --isp-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
-            --isp-radius: 0.75rem;
-            --isp-radius-lg: 1rem;
+            --isp-border-light: #f1f5f9;
+            --isp-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --isp-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --isp-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --isp-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --isp-radius: 0.5rem;
+            --isp-radius-lg: 0.75rem;
+            --isp-radius-xl: 1rem;
         }
         
         body { 
@@ -693,7 +704,7 @@ try {
         .sidebar .nav-link.active { 
             background: linear-gradient(90deg, var(--isp-accent) 0%, var(--isp-accent-light) 100%);
             color: #fff;
-            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
         }
         .sidebar .nav-link i { width: 24px; font-size: 1.1rem; }
         .brand-title { 
@@ -745,10 +756,11 @@ try {
             transform: translateY(-4px); 
             box-shadow: var(--isp-shadow-lg);
         }
-        .stat-card.stat-success::before { background: linear-gradient(90deg, var(--isp-success), #34d399); }
-        .stat-card.stat-warning::before { background: linear-gradient(90deg, var(--isp-warning), #fbbf24); }
-        .stat-card.stat-danger::before { background: linear-gradient(90deg, var(--isp-danger), #f87171); }
-        .stat-card.stat-info::before { background: linear-gradient(90deg, var(--isp-info), #22d3ee); }
+        .stat-card.stat-success::before { background: linear-gradient(90deg, var(--isp-success), var(--isp-success-light)); }
+        .stat-card.stat-warning::before { background: linear-gradient(90deg, var(--isp-warning), var(--isp-warning-light)); }
+        .stat-card.stat-danger::before { background: linear-gradient(90deg, var(--isp-danger), var(--isp-danger-light)); }
+        .stat-card.stat-info::before { background: linear-gradient(90deg, var(--isp-info), var(--isp-info-light)); }
+        .stat-card.stat-accent::before { background: linear-gradient(90deg, var(--isp-accent), var(--isp-accent-light)); }
         
         .stat-icon { 
             width: 56px; 
@@ -813,12 +825,56 @@ try {
         .btn-primary {
             background: linear-gradient(135deg, var(--isp-accent), var(--isp-accent-light));
             border: none;
-            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
         }
         .btn-primary:hover {
-            background: linear-gradient(135deg, var(--isp-accent-light), var(--isp-accent));
+            background: linear-gradient(135deg, var(--isp-accent-dark), var(--isp-accent));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, var(--isp-success), var(--isp-success-light));
+            border: none;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, var(--isp-success));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, var(--isp-warning), var(--isp-warning-light));
+            border: none;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+            color: #fff;
+        }
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #d97706, var(--isp-warning));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+            color: #fff;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--isp-danger), var(--isp-danger-light));
+            border: none;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, var(--isp-danger));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, var(--isp-info), var(--isp-info-light));
+            border: none;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+            color: #fff;
+        }
+        .btn-info:hover {
+            background: linear-gradient(135deg, #0284c7, var(--isp-info));
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+            color: #fff;
         }
         
         .main-content {
