@@ -5048,23 +5048,33 @@ class HuaweiOLT {
             return $this->executeViaService($oltId, $command);
         }
         
-        // SSH connections use direct connection
+        // SSH connections - use OLT Session Service (Node.js has better SSH support)
         if ($olt['connection_type'] === 'ssh') {
-            $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
-            $result = $this->executeSSHCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
+            // Prefer OLT Session Service for SSH (more reliable, maintains sessions)
+            if ($this->isOLTServiceAvailable()) {
+                return $this->executeViaService($oltId, $command);
+            }
             
-            // Log command with response
-            $this->addLog([
-                'olt_id' => $oltId,
-                'action' => 'command',
-                'status' => $result['success'] ? 'success' : 'failed',
-                'message' => $result['message'] ?? '',
-                'command_sent' => $command,
-                'command_response' => substr($result['output'] ?? '', 0, 10000),
-                'user_id' => $_SESSION['user_id'] ?? null
-            ]);
+            // Fallback to direct SSH only if service unavailable and PHP has ssh2
+            if (function_exists('ssh2_connect')) {
+                $password = !empty($olt['password_encrypted']) ? $this->decrypt($olt['password_encrypted']) : '';
+                $result = $this->executeSSHCommand($olt['ip_address'], $olt['port'], $olt['username'], $password, $command);
+                
+                // Log command with response
+                $this->addLog([
+                    'olt_id' => $oltId,
+                    'action' => 'command',
+                    'status' => $result['success'] ? 'success' : 'failed',
+                    'message' => $result['message'] ?? '',
+                    'command_sent' => $command,
+                    'command_response' => substr($result['output'] ?? '', 0, 10000),
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                
+                return $result;
+            }
             
-            return $result;
+            return ['success' => false, 'message' => 'OLT Session Service not available and PHP SSH2 extension not installed'];
         }
         
         return ['success' => false, 'message' => 'Unsupported connection type'];
