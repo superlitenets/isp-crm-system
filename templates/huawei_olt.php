@@ -169,8 +169,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     header('Content-Type: application/json');
     
+    // Debug logging function
+    $debugLog = function($stage, $message, $data = []) {
+        $logFile = '/tmp/auth_debug.log';
+        $entry = date('Y-m-d H:i:s') . " [Stage $stage] $message";
+        if (!empty($data)) {
+            $entry .= " | " . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        }
+        @file_put_contents($logFile, $entry . "\n", FILE_APPEND);
+    };
+    
     $stage = isset($_POST['stage']) ? (int)$_POST['stage'] : 1;
     $response = ['success' => false, 'stage' => $stage, 'next_stage' => null];
+    
+    $debugLog($stage, 'Starting stage', ['POST' => $_POST]);
     
     try {
         switch ($stage) {
@@ -282,10 +294,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                     'skip_service_port' => true // We'll do this in stage 3
                 ]);
                 
+                $debugLog(2, 'Authorization result', [
+                    'success' => $result['success'] ?? false,
+                    'message' => $result['message'] ?? null,
+                    'onu_id' => $result['onu_id'] ?? null
+                ]);
+                
                 if (!$result['success']) {
                     throw new Exception($result['message'] ?? 'Failed to authorize ONU on OLT');
                 }
                 
+                // Verify DB was updated
+                $onuAfter = $huaweiOLT->getONU($onuId);
+                $debugLog(2, 'ONU after authorization', [
+                    'is_authorized' => $onuAfter['is_authorized'] ?? null,
+                    'olt_onu_id' => $onuAfter['onu_id'] ?? null
+                ]);
                 $response['success'] = true;
                 $response['message'] = 'ONU authorized as ID ' . ($result['onu_id'] ?? 'N/A');
                 $response['next_stage'] = 3;
@@ -314,11 +338,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
             case 4: // Configure TR-069
                 $onuId = (int)$_POST['onu_id'];
                 
+                // Get ONU data before calling TR-069 config
+                $onuDataBefore = $huaweiOLT->getONU($onuId);
+                $debugLog(4, 'Before TR-069 config', [
+                    'onu_id' => $onuId,
+                    'is_authorized' => $onuDataBefore['is_authorized'] ?? null,
+                    'olt_onu_id' => $onuDataBefore['onu_id'] ?? null,
+                    'olt_id' => $onuDataBefore['olt_id'] ?? null,
+                    'frame_slot_port' => ($onuDataBefore['frame'] ?? '?') . '/'. ($onuDataBefore['slot'] ?? '?') . '/'. ($onuDataBefore['port'] ?? '?')
+                ]);
+                
                 $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
                     'tr069_vlan' => 69,
                     'tr069_gem_port' => 2
                 ]);
                 
+                $debugLog(4, 'TR-069 result', $tr069Result);
                 $response['success'] = $tr069Result['success'];
                 if ($tr069Result['success']) {
                     $response['message'] = 'TR-069 management configured on VLAN 69';

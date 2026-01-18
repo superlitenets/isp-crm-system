@@ -3831,7 +3831,8 @@ class HuaweiOLT {
                    'vlan_id', 'vlan_priority', 'ip_mode', 'line_profile_id', 'srv_profile_id',
                    'tr069_profile_id', 'zone', 'zone_id', 'area', 'customer_name', 'auth_date',
                    'phone', 'address', 'latitude', 'longitude', 'installation_date',
-                   'pppoe_username', 'pppoe_password', 'onu_type_id', 'tr069_status', 'tr069_ip'];
+                   'pppoe_username', 'pppoe_password', 'onu_type_id', 'tr069_status', 'tr069_ip',
+                   'provisioning_stage'];
         $booleanFields = ['is_authorized'];
         $updates = [];
         $params = [];
