@@ -4945,7 +4945,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 if ($onuData) {
                     // Try GenieACS first
                     try {
-                        $genieAcs = new \App\GenieACS();
+                        $genieAcs = new \App\GenieACS($db);
                         $device = null;
                         $searchFormats = [
                             $onuData['sn'],

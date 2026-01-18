@@ -1044,6 +1044,7 @@ class HuaweiOLT {
         $o = (int)$onuId;
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         
         // First command set: Get ont info (distance, status, IP)
         $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
@@ -1702,6 +1703,7 @@ class HuaweiOLT {
         
         $readResponse = function($sock, $maxWait = 10, $handleMore = true) {
             $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
             $start = time();
             $lastData = time();
             while ((time() - $start) < $maxWait) {
@@ -1992,7 +1994,8 @@ class HuaweiOLT {
         $o = (int)$onuId;
         
         // 1. Enter interface context
-        $interfaceCmd = "interface gpon {$frame}/{$slot}";
+        $interfaceCmd = 'interface gpon ' . $frame . '/' . $slot;
+        $interfaceCmdOld = "interface gpon {$frame}/{$slot}";
         $this->executeViaService($oltId, $interfaceCmd, 30000);
         
         // 2. Get optical info
@@ -5153,6 +5156,7 @@ class HuaweiOLT {
         
         // Read output with timeout
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $startTime = time();
         $lastDataTime = time();
         $maxWait = 30; // 30 seconds max for command output
@@ -5238,6 +5242,7 @@ class HuaweiOLT {
             
             // Read output until prompt
             $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
             $startTime = time();
             while ((time() - $startTime) < 180) { // 3 minutes for large configs
                 $chunk = $ssh->read('/[>#]/', SSH2::READ_REGEX);
@@ -6516,6 +6521,7 @@ class HuaweiOLT {
         $tr069ProfileId = $options['tr069_profile_id'] ?? $this->getTR069ProfileId();
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Helper to check for real errors
@@ -6670,6 +6676,7 @@ class HuaweiOLT {
         } catch (\Exception $e) {}
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Helper to check for real errors (ignoring "already configured" messages)
@@ -6807,6 +6814,7 @@ class HuaweiOLT {
         }
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Helper to check for real errors
@@ -6892,6 +6900,7 @@ class HuaweiOLT {
         $ipIndex = (int)($config['ip_index'] ?? 1);
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Helper to check for real errors
@@ -8336,6 +8345,7 @@ class HuaweiOLT {
         }
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Determine GEM port based on number of attached VLANs
@@ -8427,6 +8437,7 @@ class HuaweiOLT {
         }
         
         $output = '';
+        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // First, find the service-port index for this VLAN
@@ -8829,7 +8840,8 @@ class HuaweiOLT {
             $priority = $config['vlan_priority'] ?? 0;
             
             // Enter interface context, configure, then exit
-            $interfaceCmd = "interface gpon {$frame}/{$slot}";
+            $interfaceCmd = 'interface gpon ' . $frame . '/' . $slot;
+        $interfaceCmdOld = "interface gpon {$frame}/{$slot}";
             $configCmd = "ont ipconfig {$port} {$onuIdNum} {$config['ip_mode']} vlan {$vlan} priority {$priority}";
             $batchedCommand = "{$interfaceCmd}\n{$configCmd}\nquit";
             
@@ -8876,7 +8888,8 @@ class HuaweiOLT {
         
         // Configure bandwidth profile - requires interface context
         if (isset($config['traffic_table_index'])) {
-            $interfaceCmd = "interface gpon {$frame}/{$slot}";
+            $interfaceCmd = 'interface gpon ' . $frame . '/' . $slot;
+        $interfaceCmdOld = "interface gpon {$frame}/{$slot}";
             $trafficCmd = "ont traffic-table-index {$port} {$onuIdNum} {$config['traffic_table_index']}";
             $batchedCommand = "{$interfaceCmd}\n{$trafficCmd}\nquit";
             
