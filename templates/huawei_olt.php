@@ -428,7 +428,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'realtime_onus') {
                        ol.name as olt_name, o.updated_at,
                        c.name as customer_name, z.name as zone_name
                 FROM huawei_onus o
-                LEFT JOIN zones z ON o.zone_id = z.id
+                LEFT JOIN huawei_zones z ON o.zone_id = z.id
                 LEFT JOIN huawei_olts ol ON o.olt_id = ol.id
                 LEFT JOIN customers c ON o.customer_id = c.id
                 $whereClause
