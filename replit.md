@@ -18,7 +18,7 @@ The system features a clean, responsive design, including a mobile PWA for field
 - **SMS & WhatsApp Integration**: Supports custom gateways (any POST/GET API) and Twilio for SMS; full-featured WhatsApp Web integration with real-time chat, automatic customer linking, and a Node.js Puppeteer service.
 - **Template Engine**: A custom `TemplateEngine.php` class for dynamic content replacement.
 - **Biometric Integration**: Abstract `BiometricDevice.php` with concrete implementations for ZKTeco, Hikvision, and BioTime Cloud.
-- **M-Pesa Integration**: Handles STK Push for payments, C2B payments, and real-time callback processing.
+- **M-Pesa Integration**: Handles STK Push for payments, C2B payments, and real-time callback processing. Features robust network error handling with automatic retry logic (up to 3 attempts), detailed error messages for DNS/SSL/timeout issues, and graceful fallback mechanisms.
 - **Order System**: Public order form integration with CRM, lead capture, M-Pesa payments, and conversion to installation tickets.
 - **Inventory Management**: Comprehensive warehouse and stock management with multi-warehouse support, stock intake, disbursement workflow, field usage tracking, returns/RMA, loss reporting, and audit trails.
 - **SLA Management**: Automatic policy application based on ticket priority and business hours.
