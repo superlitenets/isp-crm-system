@@ -963,6 +963,134 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
     exit;
 }
 
+// Summon and Check TR-069 Reachability - Combined API for faster status button
+if ($page === 'api' && $action === 'summon_and_check') {
+    ob_clean();
+    header('Content-Type: application/json');
+    
+    if (!\App\Auth::isLoggedIn()) {
+        echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        exit;
+    }
+    
+    $serialNumber = isset($_GET['serial']) ? trim($_GET['serial']) : '';
+    $onuId = isset($_GET['onu_id']) ? (int)$_GET['onu_id'] : 0;
+    
+    if (empty($serialNumber) && !$onuId) {
+        echo json_encode(['success' => false, 'error' => 'Serial or ONU ID required']);
+        exit;
+    }
+    
+    try {
+        $genieAcs = new \App\GenieACS($db);
+        
+        // Fast lookup: First check database for cached genieacs_id
+        $onu = null;
+        if ($onuId) {
+            $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE id = ?");
+            $stmt->execute([$onuId]);
+            $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($onu) $serialNumber = $onu['sn'];
+        } elseif ($serialNumber) {
+            $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE sn = ? OR sn = ?");
+            $stmt->execute([$serialNumber, strtoupper($serialNumber)]);
+            $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Step 1: Send connection request (summon) - non-blocking
+        $summonResult = ['success' => false, 'queued' => false];
+        if ($serialNumber) {
+            $summonResult = $genieAcs->sendConnectionRequest($serialNumber);
+        }
+        
+        // Step 2: Fast device lookup using cached ID or serial search
+        $device = null;
+        $deviceId = null;
+        
+        // Try cached genieacs_id first (fastest)
+        if ($onu && !empty($onu['genieacs_id'])) {
+            $deviceResult = $genieAcs->getDevice($onu['genieacs_id']);
+            if ($deviceResult) {
+                $device = $deviceResult;
+                $deviceId = $onu['genieacs_id'];
+            }
+        }
+        
+        // Fallback to serial search if cached ID didn't work
+        if (!$device && $serialNumber) {
+            $searchFormats = [$serialNumber, strtoupper($serialNumber)];
+            $upperSerial = strtoupper($serialNumber);
+            if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $upperSerial)) {
+                $searchFormats[] = $genieAcs->convertOltSerialToGenieacs($upperSerial);
+            }
+            $searchFormats[] = preg_replace('/^[A-Z]{4}/', '', $upperSerial);
+            
+            foreach ($searchFormats as $sn) {
+                if (empty($sn)) continue;
+                $result = $genieAcs->getDeviceBySerial($sn);
+                if ($result['success'] && !empty($result['device'])) {
+                    $device = $result['device'];
+                    $deviceId = $device['_id'] ?? null;
+                    // Cache the genieacs_id for faster future lookups
+                    if ($onu && $deviceId) {
+                        $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?")->execute([$deviceId, $onu['id']]);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Determine reachability status
+        $isReachable = false;
+        $lastInformFormatted = 'Never';
+        $tr069Status = 'offline';
+        
+        if ($device) {
+            $lastInformStr = $device['_lastInform'] ?? null;
+            if ($lastInformStr) {
+                $lastInform = strtotime($lastInformStr);
+                $diff = time() - $lastInform;
+                $isReachable = ($diff < 300);
+                $tr069Status = $isReachable ? 'online' : 'offline';
+                
+                if ($diff < 60) {
+                    $lastInformFormatted = $diff . ' seconds ago';
+                } elseif ($diff < 3600) {
+                    $lastInformFormatted = round($diff / 60) . ' minutes ago';
+                } elseif ($diff < 86400) {
+                    $lastInformFormatted = round($diff / 3600) . ' hours ago';
+                } else {
+                    $lastInformFormatted = round($diff / 86400) . ' days ago';
+                }
+            }
+            
+            // Update database with current status
+            if ($onu) {
+                $db->prepare("UPDATE huawei_onus SET tr069_status = ?, genieacs_id = ? WHERE id = ?")
+                   ->execute([$tr069Status, $deviceId, $onu['id']]);
+            }
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'summoned' => $summonResult['success'] ?? false,
+            'queued' => $summonResult['queued'] ?? false,
+            'reachable' => $isReachable,
+            'tr069_status' => $tr069Status,
+            'last_inform' => $lastInformFormatted,
+            'device_id' => $deviceId,
+            'in_genieacs' => ($device !== null),
+            'onu_status' => $onu['status'] ?? 'unknown',
+            'distance' => $onu['distance'] ?? null,
+            'rx_power' => $onu['rx_power'] ?? null,
+            'tx_power' => $onu['tx_power'] ?? null
+        ]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Get WAN Configuration API
 if ($page === 'api' && $action === 'get_wan_config') {
     ob_clean();
