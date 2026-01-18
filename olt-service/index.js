@@ -545,10 +545,45 @@ function sendRadiusPacket(nasIp, nasPort, packet, expectedAck, timeout = 5000) {
     });
 }
 
+// Real-time event system for session updates
+const EventEmitter = require('events');
+const sessionEvents = new EventEmitter();
+const sseClients = new Set();
+
+// SSE endpoint for real-time session updates
+app.get('/radius/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+    
+    sseClients.add(res);
+    console.log(`[SSE] Client connected (${sseClients.size} active)`);
+    
+    // Send heartbeat every 30s to keep connection alive
+    const heartbeat = setInterval(() => {
+        res.write(': heartbeat\n\n');
+    }, 30000);
+    
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        sseClients.delete(res);
+        console.log(`[SSE] Client disconnected (${sseClients.size} active)`);
+    });
+});
+
+function broadcastEvent(type, data) {
+    const event = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+    sseClients.forEach(client => {
+        try { client.write(event); } catch (e) {}
+    });
+}
+
 // RADIUS Disconnect endpoint (via VPN)
 app.post('/radius/disconnect', async (req, res) => {
     try {
-        const { nasIp, nasPort = 3799, secret, username, sessionId } = req.body;
+        const { nasIp, nasPort = 3799, secret, username, sessionId, subscriptionId } = req.body;
         
         if (!nasIp || !secret) {
             return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
@@ -562,6 +597,18 @@ app.post('/radius/disconnect', async (req, res) => {
         const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_DISCONNECT_ACK);
         
         console.log(`[RADIUS] Disconnect ${username || sessionId} @ ${nasIp}: ${result.success ? 'OK' : result.error}`);
+        
+        // Broadcast real-time event
+        broadcastEvent('session_disconnect', {
+            username,
+            sessionId,
+            subscriptionId,
+            nasIp,
+            success: result.success,
+            response: result.response || result.error,
+            timestamp: new Date().toISOString()
+        });
+        
         res.json(result);
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -571,7 +618,7 @@ app.post('/radius/disconnect', async (req, res) => {
 // RADIUS CoA (speed update) endpoint (via VPN)
 app.post('/radius/coa', async (req, res) => {
     try {
-        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit } = req.body;
+        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit, subscriptionId } = req.body;
         
         if (!nasIp || !secret) {
             return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
@@ -585,6 +632,19 @@ app.post('/radius/coa', async (req, res) => {
         const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_COA_ACK);
         
         console.log(`[RADIUS] CoA ${username || sessionId} @ ${nasIp} rate=${rateLimit}: ${result.success ? 'OK' : result.error}`);
+        
+        // Broadcast real-time event
+        broadcastEvent('speed_update', {
+            username,
+            sessionId,
+            subscriptionId,
+            nasIp,
+            rateLimit,
+            success: result.success,
+            response: result.response || result.error,
+            timestamp: new Date().toISOString()
+        });
+        
         res.json({ ...result, rateLimit });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

@@ -1486,6 +1486,7 @@ try {
                     <div class="d-flex gap-3 flex-wrap align-items-center">
                         <span class="badge bg-light text-dark border px-3 py-2"><i class="bi bi-people-fill me-1"></i><?= $totalSubs ?> total</span>
                         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2" id="onlineCountBadge"><i class="bi bi-wifi me-1"></i><span id="onlineCountNum"><?= count($onlineSubscribers) ?></span> online</span>
+                        <span class="badge bg-secondary-subtle text-secondary border px-2 py-2 ms-2" id="realTimeIndicator" title="Connecting to real-time updates..."><i class="bi bi-broadcast me-1"></i>Live</span>
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2"><i class="bi bi-check-circle me-1"></i><?= $activeCount ?> active</span>
                         <?php if ($expiringSoonCount > 0): ?>
                         <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="bi bi-exclamation-triangle me-1"></i><?= $expiringSoonCount ?> expiring soon</span>
@@ -4878,5 +4879,110 @@ try {
             </div>
         </div>
     </div>
+    
+    <script>
+    // Real-time session updates via Server-Sent Events
+    let eventSource = null;
+    let reconnectTimeout = null;
+    
+    function connectSSE() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        
+        eventSource = new EventSource('http://localhost:3002/radius/events');
+        
+        eventSource.onopen = function() {
+            console.log('[SSE] Connected to real-time session updates');
+            const indicator = document.getElementById('realTimeIndicator');
+            if (indicator) {
+                indicator.classList.remove('bg-danger');
+                indicator.classList.add('bg-success');
+                indicator.title = 'Real-time updates active';
+            }
+        };
+        
+        eventSource.onerror = function(e) {
+            console.log('[SSE] Connection error, will retry...');
+            const indicator = document.getElementById('realTimeIndicator');
+            if (indicator) {
+                indicator.classList.remove('bg-success');
+                indicator.classList.add('bg-danger');
+                indicator.title = 'Real-time updates disconnected';
+            }
+            eventSource.close();
+            // Retry connection after 5 seconds
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(connectSSE, 5000);
+        };
+        
+        eventSource.addEventListener('session_disconnect', function(e) {
+            const data = JSON.parse(e.data);
+            console.log('[SSE] Session disconnected:', data);
+            
+            // Show toast notification
+            showToast(`Session disconnected: ${data.username || data.sessionId}`, data.success ? 'success' : 'warning');
+            
+            // Update UI - remove session from table or mark as disconnected
+            const sessionRow = document.querySelector(`tr[data-session-id="${data.sessionId}"]`);
+            if (sessionRow) {
+                sessionRow.classList.add('table-secondary');
+                sessionRow.style.opacity = '0.5';
+                const statusCell = sessionRow.querySelector('.session-status');
+                if (statusCell) statusCell.innerHTML = '<span class="badge bg-secondary">Disconnected</span>';
+            }
+            
+            // Update online count
+            const onlineCount = document.getElementById('onlineCountNum');
+            if (onlineCount) {
+                const current = parseInt(onlineCount.textContent) || 0;
+                if (current > 0) onlineCount.textContent = current - 1;
+            }
+            
+            // Update subscriber row status indicator
+            if (data.subscriptionId) {
+                const subRow = document.querySelector(`.sub-row[data-sub-id="${data.subscriptionId}"]`);
+                if (subRow) {
+                    const statusDiv = subRow.querySelector('.me-2.position-relative');
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="bi bi-wifi-off text-secondary"></i>
+                            </div>
+                        `;
+                    }
+                }
+            }
+        });
+        
+        eventSource.addEventListener('speed_update', function(e) {
+            const data = JSON.parse(e.data);
+            console.log('[SSE] Speed updated:', data);
+            
+            // Show toast notification
+            showToast(`Speed updated for ${data.username}: ${data.rateLimit}`, data.success ? 'success' : 'warning');
+            
+            // Highlight the affected row briefly
+            if (data.subscriptionId) {
+                const subRow = document.querySelector(`.sub-row[data-sub-id="${data.subscriptionId}"]`);
+                if (subRow) {
+                    subRow.classList.add('table-info');
+                    setTimeout(() => subRow.classList.remove('table-info'), 3000);
+                }
+            }
+        });
+    }
+    
+    // Connect on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        connectSSE();
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) eventSource.close();
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    });
+    </script>
 </body>
 </html>
