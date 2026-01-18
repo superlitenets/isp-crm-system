@@ -6403,6 +6403,232 @@ try {
             color: var(--oms-text);
             font-weight: 600;
             margin-bottom: 0.5rem;
+        
+        /* Premium ONU Status Button */
+        .btn-status-refresh {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-dark));
+            color: white;
+            border: none;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.875rem;
+        }
+        
+        .btn-status-refresh:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+            color: white;
+        }
+        
+        .btn-status-refresh:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-status-refresh.spinning i {
+            animation: spin 0.8s linear infinite;
+        }
+        
+        /* ONU Status Card */
+        .onu-status-card {
+            background: var(--oms-card-bg);
+            border-radius: var(--oms-radius-xl);
+            border: 1px solid var(--oms-border);
+            overflow: hidden;
+            box-shadow: var(--oms-shadow-sm);
+        }
+        
+        .onu-status-header {
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .onu-status-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--oms-radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+        }
+        
+        .onu-status-icon.online {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+            color: var(--oms-success);
+        }
+        
+        .onu-status-icon.offline {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.15), rgba(100, 116, 139, 0.05));
+            color: var(--oms-text-muted);
+        }
+        
+        .onu-status-icon.los {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+            color: var(--oms-danger);
+        }
+        
+        .onu-status-info h5 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--oms-text);
+            font-size: 1.125rem;
+        }
+        
+        .onu-status-info .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        
+        .onu-status-info .status-badge.online {
+            background: linear-gradient(135deg, var(--oms-success), var(--oms-success-light));
+            color: white;
+        }
+        
+        .onu-status-info .status-badge.offline {
+            background: linear-gradient(135deg, #64748b, #94a3b8);
+            color: white;
+        }
+        
+        .onu-status-info .status-badge.los {
+            background: linear-gradient(135deg, var(--oms-danger), var(--oms-danger-light));
+            color: white;
+            animation: pulse-danger 2s infinite;
+        }
+        
+        @keyframes pulse-danger {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        }
+        
+        /* Optical Power Display */
+        .optical-power-display {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            background: var(--oms-bg);
+            border-top: 1px solid var(--oms-border);
+        }
+        
+        .optical-power-item {
+            flex: 1;
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--oms-card-bg);
+            border-radius: var(--oms-radius);
+            border: 1px solid var(--oms-border);
+        }
+        
+        .optical-power-item .power-label {
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--oms-text-muted);
+            margin-bottom: 0.25rem;
+        }
+        
+        .optical-power-item .power-value {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--oms-text);
+        }
+        
+        .optical-power-item .power-value.good {
+            color: var(--oms-success);
+        }
+        
+        .optical-power-item .power-value.warning {
+            color: var(--oms-warning);
+        }
+        
+        .optical-power-item .power-value.danger {
+            color: var(--oms-danger);
+        }
+        
+        /* Quick Action Buttons */
+        .onu-quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--oms-border);
+            flex-wrap: wrap;
+        }
+        
+        .btn-quick-action {
+            flex: 1;
+            min-width: 100px;
+            padding: 0.625rem 1rem;
+            border-radius: var(--oms-radius);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-quick-action.btn-check-status {
+            background: linear-gradient(135deg, var(--oms-accent), var(--oms-accent-dark));
+            color: white;
+            border: none;
+        }
+        
+        .btn-quick-action.btn-check-status:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+        }
+        
+        .btn-quick-action.btn-reboot {
+            background: linear-gradient(135deg, var(--oms-warning), #d97706);
+            color: #1e293b;
+            border: none;
+        }
+        
+        .btn-quick-action.btn-reboot:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+        }
+        
+        .btn-quick-action.btn-delete {
+            background: linear-gradient(135deg, var(--oms-danger), #dc2626);
+            color: white;
+            border: none;
+        }
+        
+        .btn-quick-action.btn-delete:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+        }
+        
+        /* Info Label/Value pairs */
+        .info-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--oms-text-muted);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .info-value {
+            font-size: 0.9375rem;
+            color: var(--oms-text);
+            font-weight: 500;
+        }
         }
     </style>
     <!-- Load Bootstrap JS early for mobile offcanvas and all modals -->
@@ -8327,7 +8553,7 @@ try {
                                 <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
                                     <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
                                 </span>
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshLiveStatus()" title="Refresh live status">
+                                <button type="button" class="btn btn-status-refresh ms-2" onclick="refreshLiveStatus()" title="Refresh live status">
                                     <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
                                 </button>
                             </div>
