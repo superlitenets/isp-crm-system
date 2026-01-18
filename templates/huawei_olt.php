@@ -8115,7 +8115,7 @@ try {
                         <div class="text-muted small">TX (dBm)</div>
                     </div>
                     <div class="col-4 col-md-3 text-center">
-                        <div class="h4 fw-bold mb-0"><?= $distanceDisplay ?></div>
+                        <div class="h4 fw-bold mb-0" id="liveDistanceDisplay" data-live-distance><?= $distanceDisplay ?></div>
                         <div class="text-muted small">Distance</div>
                     </div>
                     <div class="col-12 col-md-3 text-center d-none d-md-block">
@@ -8623,6 +8623,13 @@ try {
                         }
                         if (txEl && onu.tx_power !== null) {
                             txEl.textContent = onu.tx_power.toFixed(1);
+                        }
+                        
+                        // Update distance display
+                        const distEl = document.querySelector('[data-live-distance]');
+                        if (distEl && onu.distance !== null) {
+                            const dist = parseInt(onu.distance);
+                            distEl.textContent = dist >= 1000 ? (dist / 1000).toFixed(2) + ' km' : dist + ' m';
                         }
                         
                         if (!silent) {
