@@ -6497,11 +6497,18 @@ class HuaweiOLT {
     public function configureONUStage2TR069(int $onuDbId, array $options = []): array {
         $onu = $this->getONU($onuDbId);
         if (!$onu) {
-            return ['success' => false, 'stage' => 2, 'message' => 'ONU not found'];
+            return ['success' => false, 'stage' => 2, 'message' => 'ONU not found (ID: ' . $onuDbId . ')'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
-            return ['success' => false, 'stage' => 2, 'message' => 'Complete Stage 1 first (ONU must be authorized)'];
+        $isAuthorized = $this->castBoolean($onu['is_authorized'] ?? false);
+        $onuIdAssigned = !empty($onu['onu_id']);
+        
+        if (!$isAuthorized || !$onuIdAssigned) {
+            return [
+                'success' => false, 
+                'stage' => 2, 
+                'message' => 'Complete Stage 1 first. is_authorized=' . var_export($onu['is_authorized'], true) . ', onu_id=' . var_export($onu['onu_id'], true)
+            ];
         }
         
         $oltId = $onu['olt_id'];
