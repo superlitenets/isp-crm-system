@@ -997,22 +997,16 @@ if ($page === 'api' && $action === 'summon_and_check') {
             $onu = $stmt->fetch(PDO::FETCH_ASSOC);
         }
         
-        // Step 1: Send connection request (summon) - non-blocking
-        $summonResult = ['success' => false, 'queued' => false];
-        if ($serialNumber) {
-            $summonResult = $genieAcs->sendConnectionRequest($serialNumber);
-        }
-        
-        // Step 2: Fast device lookup using cached ID or serial search
+        // Step 1: Fast device lookup using cached ID first (before summon)
         $device = null;
         $deviceId = null;
         
-        // Try cached genieacs_id first (fastest)
+        // Try cached genieacs_id first (fastest - no HTTP call if we have it)
         if ($onu && !empty($onu['genieacs_id'])) {
-            $deviceResult = $genieAcs->getDevice($onu['genieacs_id']);
+            $deviceId = $onu['genieacs_id'];
+            $deviceResult = $genieAcs->getDevice($deviceId);
             if ($deviceResult) {
                 $device = $deviceResult;
-                $deviceId = $onu['genieacs_id'];
             }
         }
         
@@ -1038,6 +1032,13 @@ if ($page === 'api' && $action === 'summon_and_check') {
                     break;
                 }
             }
+        }
+        
+        // Step 2: Send instant connection request using device ID (fast, non-blocking)
+        $summonResult = ['success' => false, 'queued' => false];
+        if ($deviceId) {
+            // Fast summon using device ID directly - 2 second timeout
+            $summonResult = $genieAcs->sendFastConnectionRequest($deviceId);
         }
         
         // Determine reachability status

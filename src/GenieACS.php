@@ -274,6 +274,56 @@ class GenieACS {
     }
     
     /**
+     * Send fast connection request using device ID directly (no serial search)
+     * Uses a 2-second timeout for quick response
+     */
+    public function sendFastConnectionRequest(string $deviceId): array {
+        if (empty($deviceId)) {
+            return ['success' => false, 'error' => 'Device ID required'];
+        }
+        
+        $encodedId = urlencode($deviceId);
+        
+        // Just send connection request - no task, just wake up the device
+        // Use very short timeout (2 seconds) to be instant
+        $ch = curl_init();
+        $url = rtrim($this->baseUrl, '/') . "/devices/{$encodedId}/tasks?connection_request&timeout=2000";
+        
+        // Send a simple getParameterNames task to trigger connection
+        $task = [
+            'name' => 'getParameterNames',
+            'parameterPath' => 'InternetGatewayDevice.',
+            'nextLevel' => false
+        ];
+        
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($task),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_TIMEOUT => 3, // 3 second total timeout
+            CURLOPT_CONNECTTIMEOUT => 2
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        // Any response means the request was sent (even timeout is OK - device may be waking up)
+        $success = ($httpCode >= 200 && $httpCode < 500) || !empty($response);
+        $queued = ($httpCode == 202 || $httpCode == 0); // 202 = queued, 0 = timeout (still sent)
+        
+        return [
+            'success' => $success,
+            'queued' => $queued,
+            'http_code' => $httpCode,
+            'error' => $error ?: null
+        ];
+    }
+    
+    /**
      * Get ConnectionRequestURL from device data
      */
     public function getConnectionRequestURL(array $device): ?string {
