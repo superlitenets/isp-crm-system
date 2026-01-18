@@ -84,40 +84,103 @@ class Mpesa {
         return !empty($this->consumerKey) && !empty($this->consumerSecret) && !empty($this->shortcode);
     }
     
+    private ?string $lastError = null;
+    
+    public function getLastError(): ?string {
+        return $this->lastError;
+    }
+    
+    private function makeRequest(string $url, array $options, int $maxRetries = 3): array {
+        $lastError = null;
+        $lastHttpCode = 0;
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $curl = curl_init($url);
+            
+            $defaultOptions = [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_CONNECTTIMEOUT => 30,
+                CURLOPT_DNS_CACHE_TIMEOUT => 120,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 3,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                CURLOPT_ENCODING => '',
+            ];
+            
+            curl_setopt_array($curl, array_replace($defaultOptions, $options));
+            
+            $result = curl_exec($curl);
+            $lastHttpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($curl);
+            $curlErrno = curl_errno($curl);
+            curl_close($curl);
+            
+            if (!$curlError && $result !== false) {
+                return [
+                    'success' => true,
+                    'result' => $result,
+                    'httpCode' => $lastHttpCode
+                ];
+            }
+            
+            $errorMessages = [
+                CURLE_COULDNT_RESOLVE_HOST => 'DNS resolution failed. Check internet connection.',
+                CURLE_COULDNT_CONNECT => 'Could not connect to M-Pesa servers. Check firewall settings.',
+                CURLE_OPERATION_TIMEDOUT => 'Connection timed out. M-Pesa servers may be slow.',
+                CURLE_SSL_CONNECT_ERROR => 'SSL/TLS connection error. Check SSL certificates.',
+                CURLE_GOT_NOTHING => 'Empty response from server. Try again.',
+                CURLE_SEND_ERROR => 'Failed to send data. Network issue.',
+                CURLE_RECV_ERROR => 'Failed to receive data. Network issue.',
+            ];
+            
+            $lastError = $errorMessages[$curlErrno] ?? "Network error: {$curlError} (code: {$curlErrno})";
+            error_log("M-Pesa request attempt {$attempt}/{$maxRetries} failed: {$lastError}");
+            
+            if ($attempt < $maxRetries) {
+                usleep(500000 * $attempt);
+            }
+        }
+        
+        return [
+            'success' => false,
+            'error' => $lastError,
+            'httpCode' => $lastHttpCode
+        ];
+    }
+    
     public function getAccessToken(): ?string {
         if (!$this->isConfigured()) {
+            $this->lastError = 'M-Pesa is not configured. Please set up credentials in Settings.';
             return null;
         }
         
         $url = "{$this->baseUrl}/oauth/v1/generate?grant_type=client_credentials";
         
-        $curl = curl_init($url);
-        curl_setopt_array($curl, [
+        $response = $this->makeRequest($url, [
             CURLOPT_HTTPHEADER => ['Content-Type:application/json; charset=utf8'],
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => false,
             CURLOPT_USERPWD => "{$this->consumerKey}:{$this->consumerSecret}",
-            CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_TIMEOUT => 30
-        ]);
+        ], 3);
         
-        $result = curl_exec($curl);
-        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-        
-        if ($error) {
-            error_log("M-Pesa token error: " . $error);
+        if (!$response['success']) {
+            $this->lastError = $response['error'];
+            error_log("M-Pesa token error: " . $response['error']);
             return null;
         }
         
-        $response = json_decode($result, true);
+        $data = json_decode($response['result'], true);
         
-        if ($httpCode === 200 && isset($response['access_token'])) {
-            return $response['access_token'];
+        if ($response['httpCode'] === 200 && isset($data['access_token'])) {
+            $this->lastError = null;
+            return $data['access_token'];
         }
         
-        error_log("M-Pesa token error: " . json_encode($response));
+        $this->lastError = $data['error_description'] ?? $data['errorMessage'] ?? 'Invalid credentials or server error';
+        error_log("M-Pesa token error: " . json_encode($data));
         return null;
     }
     
@@ -125,12 +188,13 @@ class Mpesa {
         $accessToken = $this->getAccessToken();
         
         if (!$accessToken) {
-            return ['success' => false, 'message' => 'Failed to get access token. Check M-Pesa credentials.'];
+            $errorMsg = $this->lastError ?? 'Failed to get access token. Check M-Pesa credentials.';
+            return ['success' => false, 'message' => $errorMsg];
         }
         
         $phone = $this->formatPhoneNumber($phone);
         if (!$phone) {
-            return ['success' => false, 'message' => 'Invalid phone number format'];
+            return ['success' => false, 'message' => 'Invalid phone number format. Use 254XXXXXXXXX or 07XXXXXXXX'];
         }
         
         $timestamp = date('YmdHis');
@@ -152,29 +216,23 @@ class Mpesa {
         
         $url = "{$this->baseUrl}/mpesa/stkpush/v1/processrequest";
         
-        $curl = curl_init($url);
-        curl_setopt_array($curl, [
+        $apiResponse = $this->makeRequest($url, [
             CURLOPT_HTTPHEADER => [
                 'Content-Type:application/json',
                 'Authorization:Bearer ' . $accessToken
             ],
-            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_TIMEOUT => 60
-        ]);
+        ], 2);
         
-        $result = curl_exec($curl);
-        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-        
-        if ($error) {
-            return ['success' => false, 'message' => 'Connection error: ' . $error];
+        if (!$apiResponse['success']) {
+            $this->lastError = $apiResponse['error'];
+            return ['success' => false, 'message' => $apiResponse['error']];
         }
         
-        $response = json_decode($result, true);
+        $response = json_decode($apiResponse['result'], true);
+        $httpCode = $apiResponse['httpCode'];
         
         if ($httpCode === 200 && isset($response['ResponseCode']) && $response['ResponseCode'] === '0') {
             $this->saveTransaction([
