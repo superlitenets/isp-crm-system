@@ -6578,7 +6578,7 @@ try {
             <script>
             (function() {
                 let realtimeInterval = null;
-                const REFRESH_INTERVAL = 10000; // 10 seconds
+                const REFRESH_INTERVAL = 30000; // 30 seconds (reduced polling to prevent hangs)
                 
                 function updateStats(data) {
                     if (!data.success) return;
@@ -6626,12 +6626,16 @@ try {
                 }
                 
                 async function fetchRealtimeStats() {
+                    if (document.hidden || window._fetchingStats) return;
+                    window._fetchingStats = true;
                     try {
                         const resp = await fetch('?page=huawei-olt&ajax=realtime_stats');
                         const data = await resp.json();
                         updateStats(data);
                     } catch (e) {
                         console.error('Realtime stats error:', e);
+                    } finally {
+                        window._fetchingStats = false;
                     }
                 }
                 
@@ -7295,7 +7299,7 @@ try {
                 const statusParam = '<?= htmlspecialchars($_GET['status'] ?? '') ?>';
                 let isDiscovering = false;
                 let realtimeInterval = null;
-                const REFRESH_INTERVAL = 15000; // 15 seconds for ONU list
+                const REFRESH_INTERVAL = 45000; // 45 seconds for ONU list (reduced to prevent hangs)
                 
                 function showToast(message, type) {
                     const toast = document.createElement('div');
@@ -7314,6 +7318,8 @@ try {
                 
                 // Realtime ONU status updates
                 async function fetchRealtimeONUs() {
+                    if (document.hidden || window._fetchingONUs) return;
+                    window._fetchingONUs = true;
                     try {
                         let url = '?page=huawei-olt&ajax=realtime_onus';
                         if (oltId) url += '&olt_id=' + oltId;
@@ -7330,6 +7336,8 @@ try {
                         }
                     } catch (e) {
                         console.error('Realtime ONU error:', e);
+                    } finally {
+                        window._fetchingONUs = false;
                     }
                 }
                 
@@ -7998,7 +8006,7 @@ try {
                     btn.innerHTML = '<i class="bi bi-broadcast me-1"></i> Live Mode';
                 } else {
                     fetchLiveOnuData();
-                    liveIntervalId = setInterval(fetchLiveOnuData, 10000); // Refresh every 10 seconds
+                    liveIntervalId = setInterval(fetchLiveOnuData, 30000); // Refresh every 10 seconds
                     btn.classList.remove('btn-success');
                     btn.classList.add('btn-danger');
                     btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i> Stop Live';
@@ -18866,7 +18874,7 @@ function saveDeviceStatus() {
             btn.classList.add('btn-outline-danger');
             btn.innerHTML = '<i class="bi bi-record-circle me-1"></i> LIVE!';
         } else {
-            liveInterval = setInterval(fetchLiveOnuData, 5000);
+            liveInterval = setInterval(fetchLiveOnuData, 15000);
             fetchLiveOnuData();
             btn.classList.remove('btn-outline-danger');
             btn.classList.add('btn-danger');
