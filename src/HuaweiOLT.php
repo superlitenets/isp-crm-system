@@ -6362,31 +6362,72 @@ class HuaweiOLT {
             $description = $this->generateNextSNSCode($oltId);
         }
         
-        // ALWAYS query OLT for the next available ONU ID to avoid conflicts
-        $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
+        // ==== CHECK IF ONU IS ALREADY AUTHORIZED ON OLT ====
+        $existingOnuId = null;
+        $alreadyAuthorized = false;
+        $output = '';
         
-        // ==== STAGE 1A: AUTHORIZE ONU ====
-        $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
+        // Query OLT to check if this SN is already authorized
+        $checkCmd = "display ont info by-sn {$onu['sn']}";
+        $checkResult = $this->executeCommand($oltId, $checkCmd);
+        $checkOutput = $checkResult['output'] ?? '';
         
-        $result = $this->executeCommand($oltId, $cliScript);
-        $output = $result['output'] ?? '';
-        
-        // Check for assigned ONU ID in response
-        if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
-            $assignedOnuId = (int)$m[1];
+        // Parse response: look for existing ONU ID on this port
+        // Format: F/S/P: 0/1/0, ONT-ID: 5, Control flag: ...
+        if (preg_match('/F\/S\/P\s*:\s*(\d+)\/(\d+)\/(\d+).*?ONT-ID\s*:\s*(\d+)/is', $checkOutput, $m)) {
+            $existingFrame = (int)$m[1];
+            $existingSlot = (int)$m[2];
+            $existingPort = (int)$m[3];
+            $existingOnuId = (int)$m[4];
+            
+            // Verify it's on the same port
+            if ($existingFrame == $frame && $existingSlot == $slot && $existingPort == $port) {
+                $alreadyAuthorized = true;
+                $assignedOnuId = $existingOnuId;
+                $output = "[ONU Already Authorized] Found existing ONT-ID {$existingOnuId} on {$frame}/{$slot}/{$port}\n";
+            }
         }
         
-        // Check for errors
-        $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output);
-        
-        if (!$result['success'] || $hasError) {
-            $this->addLog([
-                'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
-                'status' => 'failed', 'message' => "Stage 1 failed for {$onu['sn']}",
-                'command_sent' => $cliScript, 'command_response' => $output,
-                'user_id' => $_SESSION['user_id'] ?? null
-            ]);
-            return ['success' => false, 'stage' => 1, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
+        if (!$alreadyAuthorized) {
+            // Query OLT for the next available ONU ID to avoid conflicts
+            $assignedOnuId = $this->findNextAvailableOnuId($oltId, $frame, $slot, $port);
+            
+            // ==== STAGE 1A: AUTHORIZE ONU ====
+            $cliScript = "interface gpon {$frame}/{$slot}\r\nont add {$port} {$assignedOnuId} {$authPart} omci ont-lineprofile-id {$lineProfileId} ont-srvprofile-id {$srvProfileId} desc \"{$description}\"\r\nquit";
+            
+            $result = $this->executeCommand($oltId, $cliScript);
+            $output = $result['output'] ?? '';
+            
+            // Check for assigned ONU ID in response
+            if (preg_match('/(?:ONTID|ONT-ID|Number)\s*[:\=]\s*(\d+)/i', $output, $m)) {
+                $assignedOnuId = (int)$m[1];
+            }
+            
+            // Check for "already exist" - treat as success and extract existing ID
+            if (preg_match('/ONT ID has already exist/i', $output)) {
+                // ONU exists with different ID - query to find it
+                $recheckResult = $this->executeCommand($oltId, "display ont info by-sn {$onu['sn']}");
+                $recheckOutput = $recheckResult['output'] ?? '';
+                if (preg_match('/ONT-ID\s*:\s*(\d+)/i', $recheckOutput, $m2)) {
+                    $assignedOnuId = (int)$m2[1];
+                    $alreadyAuthorized = true;
+                    $output .= "\n[Recovered] Using existing ONT-ID {$assignedOnuId}\n";
+                }
+            }
+            
+            // Check for real errors (not "already exist")
+            $hasError = preg_match('/(?:Failure|Error:|failed|Invalid|Wrong parameter)/i', $output) 
+                        && !preg_match('/already exist/i', $output);
+            
+            if (!$alreadyAuthorized && (!$result['success'] || $hasError)) {
+                $this->addLog([
+                    'olt_id' => $oltId, 'onu_id' => $onuId, 'action' => 'authorize_stage1',
+                    'status' => 'failed', 'message' => "Stage 1 failed for {$onu['sn']}",
+                    'command_sent' => $cliScript, 'command_response' => $output,
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                return ['success' => false, 'stage' => 1, 'message' => 'Authorization failed: ' . substr($output, 0, 200), 'output' => $output];
+            }
         }
         
         // Update ONU record with stage 1 data
