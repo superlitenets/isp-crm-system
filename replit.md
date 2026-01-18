@@ -70,7 +70,7 @@ The system features a clean, responsive design, including a mobile PWA for field
   - **M-Pesa Integration**: Automatic subscription renewal on M-Pesa payment, matching by phone number or username.
   - **Captive Portal Expiry Page**: Public `/expired.php` page for expired subscribers. Detects client IP via X-Forwarded-For/proxy headers, matches to subscription in database, shows account details and renewal amount. Includes M-Pesa STK Push for instant payment. MikroTik redirects expired users to this page via walled garden.
   - **Customer Self-Service Portal**: Full-featured portal at `/portal` with phone number login and automatic IP-based authentication when connected to the ISP network. Features include usage viewing, session history, invoices, M-Pesa payments, and WiFi management. WiFi configuration via TR-069/GenieACS for supported devices, or embedded router web interface (via VPN proxy) for non-TR-069 routers.
-  - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires.
+  - **CoA Support**: Change of Authorization for disconnecting users when package changes or subscription expires. CoA packets are routed through the OLT Session Manager service which has WireGuard VPN access, ensuring connectivity to MikroTik devices on private networks. Features automatic fallback to direct PHP client if the OLT service is unavailable.
   - **MAC Binding**: Bind subscriptions to specific MAC addresses for security.
   - **IP Pool Management**: Create and manage IP address pools for dynamic allocation.
   - **Bulk Import**: CSV import for batch subscription creation with validation.

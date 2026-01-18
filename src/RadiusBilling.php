@@ -1128,18 +1128,60 @@ class RadiusBilling {
         
         // Build CoA with new rate limit
         $rateLimit = $this->buildRateLimit($sub);
+        
+        // Send CoA via OLT service (routes through WireGuard VPN)
+        $oltServiceUrl = 'http://localhost:3002/radius/coa';
+        
+        $payload = [
+            'nasIp' => $nas['ip_address'],
+            'nasPort' => 3799,
+            'secret' => $nas['secret'],
+            'username' => $sub['username'],
+            'rateLimit' => $rateLimit
+        ];
+        
+        try {
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                // Fallback to direct PHP client if OLT service unavailable
+                return $this->sendSpeedUpdateCoADirect($sub, $nas, $rateLimit);
+            }
+            
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address'], 'via' => 'vpn'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
+        } catch (\Exception $e) {
+            return $this->sendSpeedUpdateCoADirect($sub, $nas, $rateLimit);
+        }
+    }
+    
+    private function sendSpeedUpdateCoADirect(array $sub, array $nas, string $rateLimit): array {
         $attrs = [
             'User-Name' => $sub['username'],
             'Mikrotik-Rate-Limit' => $rateLimit
         ];
         
-        // Send CoA directly to NAS IP on port 3799 (routed via VPN tunnel)
         try {
             $client = new RadiusClient($nas['ip_address'], $nas['secret'], 3799, 5);
             $result = $client->coa($attrs);
             
             if ($result['success']) {
-                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address']];
+                return ['success' => true, 'rate_limit' => $rateLimit, 'output' => $result['response'] ?? 'CoA-ACK', 'target_ip' => $nas['ip_address'], 'via' => 'direct'];
             }
             
             $errorResponse = ['success' => false, 'error' => $result['error'] ?? 'CoA failed', 'target_ip' => $nas['ip_address']];
@@ -1590,7 +1632,54 @@ class RadiusBilling {
             return ['success' => false, 'error' => 'Missing session ID and username'];
         }
         
-        // Build attributes for RADIUS Disconnect-Request
+        // Send Disconnect-Request via OLT service (routes through WireGuard VPN)
+        $oltServiceUrl = 'http://localhost:3002/radius/disconnect';
+        
+        $payload = [
+            'nasIp' => $nasIp,
+            'nasPort' => 3799,
+            'secret' => $nasSecret,
+            'username' => $username ?: null,
+            'sessionId' => $sessionId ?: null
+        ];
+        
+        try {
+            $ch = curl_init($oltServiceUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($curlError) {
+                // Fallback to direct PHP client if OLT service unavailable
+                return $this->sendCoADisconnectDirect($session);
+            }
+            
+            $result = json_decode($response, true);
+            if ($result && $result['success']) {
+                return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK', 'target_ip' => $nasIp, 'via' => 'vpn'];
+            }
+            
+            return ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $nasIp];
+        } catch (\Exception $e) {
+            return $this->sendCoADisconnectDirect($session);
+        }
+    }
+    
+    private function sendCoADisconnectDirect(array $session): array {
+        $sessionId = $session['acct_session_id'] ?? '';
+        $username = $session['username'] ?? '';
+        $nasIp = $session['nas_ip'];
+        $nasSecret = $session['nas_secret'];
+        
         $attrs = [];
         if (!empty($sessionId)) {
             $attrs['Acct-Session-Id'] = $sessionId;
@@ -1599,13 +1688,12 @@ class RadiusBilling {
             $attrs['User-Name'] = $username;
         }
         
-        // Send Disconnect-Request directly to NAS IP on port 3799 (routed via VPN tunnel)
         try {
             $client = new RadiusClient($nasIp, $nasSecret, 3799, 5);
             $result = $client->disconnect($attrs);
             
             if ($result['success']) {
-                return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK', 'target_ip' => $nasIp];
+                return ['success' => true, 'output' => $result['response'] ?? 'Disconnect-ACK', 'target_ip' => $nasIp, 'via' => 'direct'];
             }
             
             $errorResponse = ['success' => false, 'error' => $result['error'] ?? 'Disconnect failed', 'target_ip' => $nasIp];

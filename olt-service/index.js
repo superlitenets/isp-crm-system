@@ -404,6 +404,193 @@ app.post('/wireguard/apply', async (req, res) => {
     }
 });
 
+// RADIUS CoA/Disconnect endpoint - sends packets via VPN tunnel
+const dgram = require('dgram');
+const crypto = require('crypto');
+
+// RADIUS codes
+const RADIUS_DISCONNECT_REQUEST = 40;
+const RADIUS_DISCONNECT_ACK = 41;
+const RADIUS_DISCONNECT_NAK = 42;
+const RADIUS_COA_REQUEST = 43;
+const RADIUS_COA_ACK = 44;
+const RADIUS_COA_NAK = 45;
+
+// RADIUS attributes
+const ATTR_USER_NAME = 1;
+const ATTR_ACCT_SESSION_ID = 44;
+const ATTR_VENDOR_SPECIFIC = 26;
+const VENDOR_MIKROTIK = 14988;
+const MIKROTIK_RATE_LIMIT = 8;
+
+function encodeRadiusAttribute(type, value) {
+    const valBuf = Buffer.from(value, 'utf8');
+    const attrBuf = Buffer.alloc(2 + valBuf.length);
+    attrBuf.writeUInt8(type, 0);
+    attrBuf.writeUInt8(2 + valBuf.length, 1);
+    valBuf.copy(attrBuf, 2);
+    return attrBuf;
+}
+
+function encodeMikrotikRateLimit(rateLimit) {
+    const valBuf = Buffer.from(rateLimit, 'utf8');
+    const vendorData = Buffer.alloc(2 + valBuf.length);
+    vendorData.writeUInt8(MIKROTIK_RATE_LIMIT, 0);
+    vendorData.writeUInt8(2 + valBuf.length, 1);
+    valBuf.copy(vendorData, 2);
+    
+    const vsaBuf = Buffer.alloc(6 + vendorData.length);
+    vsaBuf.writeUInt8(ATTR_VENDOR_SPECIFIC, 0);
+    vsaBuf.writeUInt8(6 + vendorData.length, 1);
+    vsaBuf.writeUInt32BE(VENDOR_MIKROTIK, 2);
+    vendorData.copy(vsaBuf, 6);
+    return vsaBuf;
+}
+
+function buildRadiusPacket(code, identifier, attributes, secret) {
+    const attrBuffers = [];
+    
+    if (attributes.username) {
+        attrBuffers.push(encodeRadiusAttribute(ATTR_USER_NAME, attributes.username));
+    }
+    if (attributes.sessionId) {
+        attrBuffers.push(encodeRadiusAttribute(ATTR_ACCT_SESSION_ID, attributes.sessionId));
+    }
+    if (attributes.rateLimit) {
+        attrBuffers.push(encodeMikrotikRateLimit(attributes.rateLimit));
+    }
+    
+    const attrData = Buffer.concat(attrBuffers);
+    const length = 20 + attrData.length;
+    
+    // Build pre-packet with zero authenticator
+    const prePacket = Buffer.alloc(20 + attrData.length);
+    prePacket.writeUInt8(code, 0);
+    prePacket.writeUInt8(identifier, 1);
+    prePacket.writeUInt16BE(length, 2);
+    // bytes 4-19 are zeros (authenticator placeholder)
+    attrData.copy(prePacket, 20);
+    
+    // Calculate authenticator = MD5(Code + ID + Length + 16 zeros + Attributes + Secret)
+    const hash = crypto.createHash('md5');
+    hash.update(prePacket);
+    hash.update(secret);
+    const authenticator = hash.digest();
+    
+    // Build final packet
+    const packet = Buffer.alloc(length);
+    prePacket.copy(packet);
+    authenticator.copy(packet, 4);
+    
+    return packet;
+}
+
+function sendRadiusPacket(nasIp, nasPort, packet, expectedAck, timeout = 5000) {
+    return new Promise((resolve) => {
+        const socket = dgram.createSocket('udp4');
+        let responded = false;
+        
+        const timer = setTimeout(() => {
+            if (!responded) {
+                responded = true;
+                socket.close();
+                resolve({ success: false, error: 'Timeout - no response from NAS' });
+            }
+        }, timeout);
+        
+        socket.on('message', (msg) => {
+            if (responded) return;
+            responded = true;
+            clearTimeout(timer);
+            socket.close();
+            
+            if (msg.length < 4) {
+                resolve({ success: false, error: 'Invalid response' });
+                return;
+            }
+            
+            const code = msg.readUInt8(0);
+            const codeNames = {
+                [RADIUS_DISCONNECT_ACK]: 'Disconnect-ACK',
+                [RADIUS_DISCONNECT_NAK]: 'Disconnect-NAK',
+                [RADIUS_COA_ACK]: 'CoA-ACK',
+                [RADIUS_COA_NAK]: 'CoA-NAK'
+            };
+            const codeName = codeNames[code] || `Unknown-${code}`;
+            
+            if (code === expectedAck) {
+                resolve({ success: true, response: codeName, code });
+            } else {
+                resolve({ success: false, error: `Received ${codeName}`, code });
+            }
+        });
+        
+        socket.on('error', (err) => {
+            if (!responded) {
+                responded = true;
+                clearTimeout(timer);
+                socket.close();
+                resolve({ success: false, error: err.message });
+            }
+        });
+        
+        socket.send(packet, 0, packet.length, nasPort, nasIp, (err) => {
+            if (err && !responded) {
+                responded = true;
+                clearTimeout(timer);
+                socket.close();
+                resolve({ success: false, error: `Send failed: ${err.message}` });
+            }
+        });
+    });
+}
+
+// RADIUS Disconnect endpoint (via VPN)
+app.post('/radius/disconnect', async (req, res) => {
+    try {
+        const { nasIp, nasPort = 3799, secret, username, sessionId } = req.body;
+        
+        if (!nasIp || !secret) {
+            return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
+        }
+        if (!username && !sessionId) {
+            return res.status(400).json({ success: false, error: 'Need username or sessionId' });
+        }
+        
+        const identifier = Math.floor(Math.random() * 256);
+        const packet = buildRadiusPacket(RADIUS_DISCONNECT_REQUEST, identifier, { username, sessionId }, secret);
+        const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_DISCONNECT_ACK);
+        
+        console.log(`[RADIUS] Disconnect ${username || sessionId} @ ${nasIp}: ${result.success ? 'OK' : result.error}`);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// RADIUS CoA (speed update) endpoint (via VPN)
+app.post('/radius/coa', async (req, res) => {
+    try {
+        const { nasIp, nasPort = 3799, secret, username, sessionId, rateLimit } = req.body;
+        
+        if (!nasIp || !secret) {
+            return res.status(400).json({ success: false, error: 'Missing nasIp or secret' });
+        }
+        if (!username && !sessionId) {
+            return res.status(400).json({ success: false, error: 'Need username or sessionId' });
+        }
+        
+        const identifier = Math.floor(Math.random() * 256);
+        const packet = buildRadiusPacket(RADIUS_COA_REQUEST, identifier, { username, sessionId, rateLimit }, secret);
+        const result = await sendRadiusPacket(nasIp, nasPort, packet, RADIUS_COA_ACK);
+        
+        console.log(`[RADIUS] CoA ${username || sessionId} @ ${nasIp} rate=${rateLimit}: ${result.success ? 'OK' : result.error}`);
+        res.json({ ...result, rateLimit });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 const PORT = process.env.OLT_SERVICE_PORT || 3002;
 const DISCOVERY_INTERVAL = process.env.DISCOVERY_INTERVAL || '0 * * * * *'; // CLI autofind every 60s (for new ONUs only)
 const SNMP_INTERVAL = parseInt(process.env.SNMP_POLL_INTERVAL) || 300; // SNMP polling every 5 minutes (reduced to prevent slowdowns)
