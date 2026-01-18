@@ -319,18 +319,17 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                     'tr069_gem_port' => 2
                 ]);
                 
-                $response['success'] = true;
+                $response['success'] = $tr069Result['success'];
                 if ($tr069Result['success']) {
                     $response['message'] = 'TR-069 management configured on VLAN 69';
                 } else {
-                    $response['message'] = 'TR-069 setup pending: ' . ($tr069Result['message'] ?? 'Manual config may be needed');
+                    $response['message'] = 'TR-069 config failed: ' . ($tr069Result['message'] ?? 'Unknown error');
+                    $response['error'] = $tr069Result['message'] ?? 'TR-069 configuration failed';
+                    $response['debug'] = $tr069Result['output'] ?? '';
                 }
                 $response['next_stage'] = null; // Done
                 $response['redirect'] = '?page=huawei-olt&view=onu_detail&onu_id=' . $onuId;
                 break;
-                
-            default:
-                throw new Exception('Invalid stage');
         }
     } catch (Exception $e) {
         $response['success'] = false;
