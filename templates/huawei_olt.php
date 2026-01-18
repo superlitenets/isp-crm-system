@@ -8247,7 +8247,37 @@ try {
             <script>
             const onuSerial = '<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>';
             const onuId = <?= $currentOnu['id'] ?>;
+            const onuOltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
             const hasTR069 = <?= !empty($currentOnu['tr069_ip']) ? 'true' : 'false' ?>;
+            let availableVlans = [];
+            
+            function loadWifiVlans() {
+                if (!onuOltId) return Promise.resolve([]);
+                return fetch('?action=get_olt_vlans&olt_id=' + onuOltId)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.vlans) {
+                            availableVlans = data.vlans;
+                        }
+                        return availableVlans;
+                    })
+                    .catch(() => []);
+            }
+            
+            function buildVlanSelect(wlanIdx, currentVlan) {
+                let html = '<select class="form-select form-select-sm wifi-vlan-select" style="width:120px" data-index="' + wlanIdx + '">';
+                html += '<option value="">-- None --</option>';
+                availableVlans.forEach(v => {
+                    const selected = (v.vlan_id == currentVlan) ? 'selected' : '';
+                    const label = v.description ? v.vlan_id + ' - ' + v.description : 'VLAN ' + v.vlan_id;
+                    html += '<option value="' + v.vlan_id + '" ' + selected + '>' + label + '</option>';
+                });
+                if (currentVlan && !availableVlans.find(v => v.vlan_id == currentVlan)) {
+                    html += '<option value="' + currentVlan + '" selected>VLAN ' + currentVlan + ' (custom)</option>';
+                }
+                html += '</select>';
+                return html;
+            }
             
             function loadWiFiFromTR069() {
                 if (!hasTR069) return;
@@ -8261,10 +8291,12 @@ try {
                 loading.classList.remove('d-none');
                 refreshBtn.disabled = true;
                 
-                fetch('?page=huawei-olt&t=' + Date.now(), {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
+                loadWifiVlans().then(() => {
+                    return fetch('?page=huawei-olt&t=' + Date.now(), {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
+                    });
                 })
                 .then(async r => {
                     const text = await r.text();
@@ -8306,7 +8338,7 @@ try {
                         html += '<td>wifi_0/' + wlanIdx + ' <small class="text-muted">(' + band + ')</small></td>';
                         html += '<td><div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input wifi-enable-toggle" data-index="' + wlanIdx + '" ' + enableChecked + '></div></td>';
                         html += '<td><strong>' + ssid + '</strong></td>';
-                        html += '<td><input type="number" class="form-control form-control-sm wifi-vlan-input" style="width:70px" data-index="' + wlanIdx + '" value="' + vlan + '" placeholder="-"></td>';
+                        html += '<td>' + buildVlanSelect(wlanIdx, vlan) + '</td>';
                         html += '<td><small>' + security + '</small></td>';
                         html += '<td><a href="#" class="text-primary" onclick="openTR069WiFiConfig(\'' + onuSerial + '\', ' + wlanIdx + ')">Configure</a></td>';
                         html += '</tr>';
@@ -8325,9 +8357,9 @@ try {
                         });
                     });
                     
-                    // Add event handlers for VLAN inputs
-                    document.querySelectorAll('.wifi-vlan-input').forEach(input => {
-                        input.addEventListener('change', function() {
+                    // Add event handlers for VLAN selects
+                    document.querySelectorAll('.wifi-vlan-select').forEach(select => {
+                        select.addEventListener('change', function() {
                             const wlanIdx = this.dataset.index;
                             const vlanId = this.value;
                             if (vlanId && vlanId > 0) {
