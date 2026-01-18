@@ -350,7 +350,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 
                 $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
                     'tr069_vlan' => 69,
-                    'tr069_gem_port' => 2
+                    'tr069_gem_port' => 2,
+                    'tr069_profile_id' => 3
                 ]);
                 
                 $debugLog(4, 'TR-069 result', $tr069Result);
@@ -1622,7 +1623,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     try {
                         $tr069Result = $huaweiOLT->configureONUStage2TR069($onuId, [
                             'tr069_vlan' => 69,
-                            'tr069_gem_port' => 2
+                            'tr069_gem_port' => 2,
+                            'tr069_profile_id' => 3
                         ]);
                         
                         if ($tr069Result['success']) {
@@ -1651,7 +1653,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 try {
                     $result = $huaweiOLT->configureONUStage2TR069($onuId, [
                         'tr069_vlan' => !empty($_POST['tr069_vlan']) ? (int)$_POST['tr069_vlan'] : null,
-                        'tr069_gem_port' => !empty($_POST['tr069_gem_port']) ? (int)$_POST['tr069_gem_port'] : 2
+                        'tr069_gem_port' => !empty($_POST['tr069_gem_port']) ? (int)$_POST['tr069_gem_port'] : 2,
+                        'tr069_profile_id' => 3
                     ]);
                     
                     if ($result['success']) {
