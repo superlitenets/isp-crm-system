@@ -19424,32 +19424,44 @@ function saveDeviceStatus() {
         }
     }
     
-    // Open TR-069 WiFi Config Modal (standalone WiFi configuration)
+// Open TR-069 WiFi Config Modal (standalone WiFi configuration)
     function openTR069WiFiConfig(serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        const loadingToast = showToast('Checking device readiness...', 'info', 10000);
+        // Clear any previous toasts first
+        document.querySelectorAll('.toast').forEach(t => t.remove());
         
-        // Check if device is reachable via GenieACS AND in READY/ACTIVE state
-        fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
+        const loadingToast = showToast('Summoning device and checking readiness...', 'info', 15000);
+        
+        // Use combined summon_and_check API for faster response
+        fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
             .then(r => r.json())
             .then(data => {
                 hideToast(loadingToast);
                 
-                // GUARDRAIL: Check if blocked due to provisioning state
-                if (data.blocked) {
+                if (!data.success) {
+                    showToast('Error: ' + (data.error || 'Failed to check device'), 'danger', 5000);
+                    return;
+                }
+                
+                // Show summon feedback
+                if (data.summoned || data.queued) {
+                    showToast('Connection request sent to device', 'info', 2000);
+                }
+                
+                if (!data.in_genieacs) {
                     showToast('<div class="text-start">' +
-                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not Ready for TR-069</strong><br>' +
-                        '<small class="text-warning">' + (data.block_reason || 'ONU not ready') + '</small><br>' +
+                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
+                        '<small class="text-warning">Device not connected to ACS server</small><br>' +
                         '<hr class="my-1">' +
                         '<small><strong>Required steps:</strong><br>' +
                         '1. Complete OLT Authorization first<br>' +
                         '2. Push TR-069 OMCI config<br>' +
                         '3. Wait for device to connect to ACS</small>' +
-                        '</div>', 'warning', 15000);
+                        '</div>', 'warning', 12000);
                     return;
                 }
                 
@@ -19457,21 +19469,19 @@ function saveDeviceStatus() {
                     // Device is online and ready - open WiFi config modal
                     openWifiConfigModal(serialNumber, data.device_id);
                 } else {
-                    // Device is offline or not connected to GenieACS
+                    // Device is in GenieACS but offline
                     showToast('<div class="text-start">' +
                         '<strong>Device Offline</strong><br>' +
                         '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                        '<small>Summoned: ' + (data.summoned ? 'Yes' : 'No') + '</small><br>' +
                         '<hr class="my-1">' +
-                        '<small><strong>Troubleshooting:</strong><br>' +
-                        '1. Verify TR-069 OMCI config is pushed<br>' +
-                        '2. Check TR-069 VLAN connectivity<br>' +
-                        '3. Verify ACS URL is reachable from device</small>' +
-                        '</div>', 'warning', 15000);
+                        '<small>Wait for device to respond or try again in 30 seconds</small>' +
+                        '</div>', 'warning', 10000);
                 }
             })
             .catch(err => {
                 hideToast(loadingToast);
-                showToast('Failed to check device readiness: ' + err.message, 'error');
+                showToast('Connection error: ' + err.message, 'danger', 5000);
             });
     }
     
@@ -19482,31 +19492,44 @@ function saveDeviceStatus() {
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-    // Open TR-069 WAN Config (with reachability check + state guardrail)
+// Open TR-069 WAN Config (with reachability check + state guardrail)
     function openTR069WANConfig(onuId, serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        const loadingToast = showToast('Checking device readiness...', 'info', 10000);
+        // Clear any previous toasts first
+        document.querySelectorAll('.toast').forEach(t => t.remove());
         
-        fetch('?page=api&action=check_tr069_reachability&serial=' + encodeURIComponent(serialNumber))
+        const loadingToast = showToast('Summoning device and checking readiness...', 'info', 15000);
+        
+        // Use combined summon_and_check API for faster response
+        fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber) + '&onu_id=' + onuId)
             .then(r => r.json())
             .then(data => {
                 hideToast(loadingToast);
                 
-                // GUARDRAIL: Check if blocked due to provisioning state
-                if (data.blocked) {
+                if (!data.success) {
+                    showToast('Error: ' + (data.error || 'Failed to check device'), 'danger', 5000);
+                    return;
+                }
+                
+                // Show summon feedback
+                if (data.summoned || data.queued) {
+                    showToast('Connection request sent to device', 'info', 2000);
+                }
+                
+                if (!data.in_genieacs) {
                     showToast('<div class="text-start">' +
-                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not Ready for TR-069</strong><br>' +
-                        '<small class="text-warning">' + (data.block_reason || 'ONU not ready') + '</small><br>' +
+                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
+                        '<small class="text-warning">Device not connected to ACS server</small><br>' +
                         '<hr class="my-1">' +
                         '<small><strong>Required steps:</strong><br>' +
                         '1. Complete OLT Authorization first<br>' +
                         '2. Push TR-069 OMCI config<br>' +
                         '3. Wait for device to connect to ACS</small>' +
-                        '</div>', 'warning', 15000);
+                        '</div>', 'warning', 12000);
                     return;
                 }
                 
@@ -19514,21 +19537,19 @@ function saveDeviceStatus() {
                     // Device is online and ready - open WAN config modal
                     openWANConfig(onuId);
                 } else {
-                    // Device is offline
+                    // Device is in GenieACS but offline
                     showToast('<div class="text-start">' +
                         '<strong>Device Offline</strong><br>' +
                         '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                        '<small>Summoned: ' + (data.summoned ? 'Yes' : 'No') + '</small><br>' +
                         '<hr class="my-1">' +
-                        '<small><strong>Troubleshooting:</strong><br>' +
-                        '1. Verify TR-069 OMCI config is pushed<br>' +
-                        '2. Check TR-069 VLAN connectivity<br>' +
-                        '3. Verify ACS URL is reachable from device</small>' +
-                        '</div>', 'warning', 15000);
+                        '<small>Wait for device to respond or try again in 30 seconds</small>' +
+                        '</div>', 'warning', 10000);
                 }
             })
             .catch(err => {
                 hideToast(loadingToast);
-                showToast('Failed to check device readiness: ' + err.message, 'error');
+                showToast('Connection error: ' + err.message, 'danger', 5000);
             });
     }
     
