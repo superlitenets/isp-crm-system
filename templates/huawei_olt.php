@@ -6404,6 +6404,7 @@ try {
             font-weight: 600;
             margin-bottom: 0.5rem;
         }
+    </style>
     <!-- Load Bootstrap JS early for mobile offcanvas and all modals -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
