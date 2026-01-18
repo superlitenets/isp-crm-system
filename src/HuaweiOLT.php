@@ -6543,7 +6543,7 @@ class HuaweiOLT {
         }
         
         $isAuthorized = $this->castBoolean($onu['is_authorized'] ?? false);
-        $onuIdAssigned = !empty($onu['onu_id']);
+        $onuIdAssigned = isset($onu['onu_id']) && $onu['onu_id'] !== null && $onu['onu_id'] !== '';
         
         if (!$isAuthorized || !$onuIdAssigned) {
             return [
