@@ -9295,7 +9295,8 @@ try {
             }
             
             // Auto-refresh live ONU status on page load
-            setTimeout(() => refreshLiveStatus(true), 300);
+            // Auto-refresh disabled to prevent page lag (users can click refresh button)
+            // setTimeout(() => refreshLiveStatus(true), 300);
             
             // Refresh optical data (RX/TX power, distance)
             async function refreshOpticalData(onuId) {
