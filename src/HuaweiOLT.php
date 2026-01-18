@@ -5903,18 +5903,9 @@ class HuaweiOLT {
     public function findNextAvailableOnuId(int $oltId, int $frame, int $slot, int $port): int {
         $usedIds = [];
         
-        // Try multiple CLI commands to get used IDs
-        // Command 1: display ont info (shows authorized ONTs)
+        // Get used IDs from OLT via CLI - single command to avoid slowdowns
         $result = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay ont info {$port} all\r\nquit");
         $output = $result['output'] ?? '';
-        
-        // Command 2: display current-configuration (shows ont add commands)
-        $configResult = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}\r\ndisplay current-configuration\r\nquit");
-        if (!empty($configResult['output'])) {
-            $output .= "\n" . $configResult['output'];
-        }
-        
-        error_log("[findNextAvailableOnuId] Combined CLI output length: " . strlen($output));
         
         if ($result['success'] && !empty($output)) {
             // Format 1: "0/1/0  1  HWTC..." (F/S/P  ONU_ID  SN) - table format
