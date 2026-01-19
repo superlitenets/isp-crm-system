@@ -3086,6 +3086,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $serial = $_POST['serial'] ?? '';
                 $params = json_decode($_POST['params'] ?? '{}', true);
                 
+                error_log("[save_device_params] Serial received: " . $serial);
+                
                 if (empty($serial)) {
                     echo json_encode(['success' => false, 'error' => 'Serial number required']);
                     exit;
@@ -3100,8 +3102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 // Find device by serial
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
+                error_log("[save_device_params] Device lookup result: " . json_encode($deviceResult));
                 if (!($deviceResult['success'] ?? false) || empty($deviceResult['device'])) {
-                    echo json_encode(['success' => false, 'error' => 'Device not found in TR-069']);
+                    echo json_encode(['success' => false, 'error' => 'Device not found in TR-069', 'serial_searched' => $serial]);
                     exit;
                 }
                 
