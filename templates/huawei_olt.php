@@ -8742,7 +8742,31 @@ try {
             }
             </script>
             
-            <!-- Optical Signal Card (Mobile shows on status bar) -->
+            <!-- Inline TR-069 Status Section (expandable) -->
+            <div id="inlineStatusSection" class="card shadow-sm mb-4" style="display: none;">
+                <div class="card-header bg-info text-white py-2 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-sliders me-2"></i>TR-069 Device Status</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-light" onclick="refreshInlineStatus()" title="Refresh">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success" id="inlineStatusSaveBtn" onclick="saveInlineStatus()" style="display: none;">
+                            <i class="bi bi-check-lg me-1"></i>Save
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleInlineStatus()" title="Collapse">
+                            <i class="bi bi-chevron-up"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="inlineStatusContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-info" role="status"></div>
+                        <div class="mt-2 text-muted">Loading device parameters...</div>
+                    </div>
+                </div>
+            </div>
+            
+                        <!-- Optical Signal Card (Mobile shows on status bar) -->
             <div class="onu-info-card signal-card p-3 mb-3 d-md-block">
                 <div class="section-header mb-3 d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-reception-4 me-2"></i>Optical Signal</span>
