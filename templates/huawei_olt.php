@@ -17159,28 +17159,48 @@ function renderDeviceStatusTabs(categories) {
     tabList.innerHTML = '';
     tabContent.innerHTML = '';
     
-    // Consolidate miscellaneous variants into single category
+    // Consolidate categories: merge auto_ prefixed and miscellaneous variants
     const consolidatedCategories = {};
-    let miscellaneousParams = [];
+    const mergedParams = {};
     
     Object.keys(categories).forEach(key => {
-        if (key.startsWith('miscellaneous')) {
-            if (categories[key].params) {
-                miscellaneousParams = miscellaneousParams.concat(categories[key].params);
-            }
-        } else {
-            consolidatedCategories[key] = categories[key];
+        // Normalize key: remove auto_ prefix and consolidate miscellaneous variants
+        let normalizedKey = key;
+        if (key.startsWith('auto_')) {
+            normalizedKey = key.replace('auto_', '');
+        }
+        if (normalizedKey.startsWith('miscellaneous')) {
+            normalizedKey = 'miscellaneous';
+        }
+        
+        // Initialize merged params array if needed
+        if (!mergedParams[normalizedKey]) {
+            mergedParams[normalizedKey] = {
+                label: categories[key].label || normalizedKey,
+                icon: categories[key].icon || 'bi-gear',
+                editable: categories[key].editable ?? true,
+                params: []
+            };
+        }
+        
+        // Merge params, avoiding duplicates by path
+        if (categories[key].params) {
+            const existingPaths = new Set(mergedParams[normalizedKey].params.map(p => p.path));
+            categories[key].params.forEach(param => {
+                if (!existingPaths.has(param.path)) {
+                    mergedParams[normalizedKey].params.push(param);
+                    existingPaths.add(param.path);
+                }
+            });
         }
     });
     
-    if (miscellaneousParams.length > 0) {
-        consolidatedCategories['miscellaneous'] = {
-            label: 'Miscellaneous',
-            icon: 'bi-three-dots',
-            editable: true,
-            params: miscellaneousParams
-        };
-    }
+    // Copy merged params to consolidated categories
+    Object.keys(mergedParams).forEach(key => {
+        if (mergedParams[key].params.length > 0) {
+            consolidatedCategories[key] = mergedParams[key];
+        }
+    });
     
     // Filter and sort categories - only show allowed tabs
     const sortedKeys = Object.keys(consolidatedCategories).filter(key => {
