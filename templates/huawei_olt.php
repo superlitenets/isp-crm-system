@@ -17300,16 +17300,19 @@ function renderInlineStatus(categories) {
     tabsHtml += '</ul>';
     contentHtml += '</div>';
     
-    // After rendering, scan all inputs to ensure original values are captured
+    // After rendering, attach change listeners to mark modified fields
     setTimeout(() => {
         document.querySelectorAll('#inlineStatusContent input[data-path], #inlineStatusContent select[data-path]').forEach(el => {
-            const path = el.dataset.path;
-            if (path && inlineOriginalParams[path] === undefined) {
-                const val = el.type === 'checkbox' ? el.checked : el.value;
-                inlineOriginalParams[path] = val;
-            }
+            el.addEventListener('input', function() {
+                this.dataset.modified = 'true';
+                document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
+            });
+            el.addEventListener('change', function() {
+                this.dataset.modified = 'true';
+                document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
+            });
         });
-        console.log('[Status] After DOM scan, total params:', Object.keys(inlineOriginalParams).length);
+        console.log('[Status] Change listeners attached to inputs');
     }, 100);
     
     container.innerHTML = tabsHtml + contentHtml;
@@ -17344,26 +17347,14 @@ async function saveInlineStatus() {
     const saveBtn = document.getElementById('inlineStatusSaveBtn');
     const changes = {};
     
-    container.querySelectorAll('input[data-path], select[data-path]').forEach(el => {
+    // Only save fields that user has actually modified (marked with data-modified)
+    container.querySelectorAll('input[data-path][data-modified="true"], select[data-path][data-modified="true"]').forEach(el => {
         const path = el.dataset.path;
         if (!path) return;
-        
-        let value = el.type === 'checkbox' ? el.checked : el.value;
-        const original = inlineOriginalParams[path];
-        
-        // Normalize for comparison - convert everything to string for exact match
-        const normalizeVal = (v) => {
-            if (v === null || v === undefined) return '';
-            return String(v).trim();
-        };
-        
-        // Only track as changed if values actually differ after normalization
-        if (original !== undefined && normalizeVal(original) !== normalizeVal(value)) {
-            changes[path] = value;
-        }
+        changes[path] = el.type === 'checkbox' ? el.checked : el.value;
     });
     
-    console.log('[Save] Total changes:', Object.keys(changes).length);
+    console.log('[Save] User-modified changes:', Object.keys(changes).length, changes);
     if (Object.keys(changes).length === 0) {
         showToast('No changes to save', 'info');
         return;
