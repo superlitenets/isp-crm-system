@@ -17364,10 +17364,13 @@ async function saveInlineStatus() {
     }
     
     try {
-        const response = await fetch('?action=set_device_params', {
+        const formData = new FormData();
+        formData.append('action', 'save_device_params');
+        formData.append('serial', inlineStatusSerial);
+        formData.append('params', JSON.stringify(changes));
+        const response = await fetch(window.location.pathname + '?page=huawei-olt', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ serial: inlineStatusSerial, params: changes })
+            body: formData
         });
         const data = await response.json();
         
