@@ -17110,9 +17110,9 @@ function renderInlineStatus(categories) {
         }
     });
     
-    // Build tabs
-    let tabsHtml = '<ul class="nav nav-tabs nav-fill flex-nowrap overflow-auto" style="flex-wrap: nowrap;">';
-    let contentHtml = '<div class="tab-content pt-3">';
+    // Build tabs with improved styling
+    let tabsHtml = '<ul class="nav nav-pills nav-fill mb-3" style="background: #f8f9fa; border-radius: 8px; padding: 4px;">';
+    let contentHtml = '<div class="tab-content">';
     let first = true;
     
     Object.keys(mergedParams).forEach(key => {
@@ -17123,7 +17123,7 @@ function renderInlineStatus(categories) {
         const activeClass = first ? 'active' : '';
         const showClass = first ? 'show active' : '';
         
-        tabsHtml += `<li class="nav-item flex-shrink-0"><a class="nav-link ${activeClass}" data-bs-toggle="tab" href="#${tabId}">${category.label}</a></li>`;
+        tabsHtml += `<li class="nav-item"><a class="nav-link ${activeClass}" style="font-weight: 500; padding: 8px 16px;" data-bs-toggle="tab" href="#${tabId}">${category.label}</a></li>`;
         
         contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
         
@@ -17166,17 +17166,34 @@ function renderInlineStatus(categories) {
             });
         }
         
-        sortedParams.forEach(param => {
-            if (param.value !== null && param.value !== undefined || param.value === '') {
-                inlineOriginalParams[param.path] = param.value;
-                const inputHtml = renderParamInput(param, category.editable);
-                let displayLabel = param.label;
-                if (displayLabel.toLowerCase().includes('passphrase') || displayLabel.toLowerCase().includes('presharedkey')) {
-                    displayLabel = 'Password';
+        // Use table format for lan_ports and hosts
+        const useTable = key === 'lan_ports' || key === 'hosts' || key === 'lan_counters';
+        
+        if (useTable) {
+            contentHtml += '<div class="table-responsive"><table class="table table-sm table-striped table-hover mb-0"><thead class="table-light"><tr><th style="width: 40%">Parameter</th><th>Value</th></tr></thead><tbody>';
+            sortedParams.forEach(param => {
+                if (param.value !== null && param.value !== undefined || param.value === '') {
+                    inlineOriginalParams[param.path] = param.value;
+                    let displayLabel = param.label;
+                    let displayValue = param.value;
+                    if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
+                    contentHtml += `<tr><td class="text-muted">${displayLabel}</td><td><strong>${displayValue}</strong></td></tr>`;
                 }
-                contentHtml += `<div class="param-item"><label>${displayLabel}</label>${inputHtml}</div>`;
-            }
-        });
+            });
+            contentHtml += '</tbody></table></div>';
+        } else {
+            sortedParams.forEach(param => {
+                if (param.value !== null && param.value !== undefined || param.value === '') {
+                    inlineOriginalParams[param.path] = param.value;
+                    const inputHtml = renderParamInput(param, category.editable);
+                    let displayLabel = param.label;
+                    if (displayLabel.toLowerCase().includes('passphrase') || displayLabel.toLowerCase().includes('presharedkey')) {
+                        displayLabel = 'Password';
+                    }
+                    contentHtml += `<div class="param-item"><label>${displayLabel}</label>${inputHtml}</div>`;
+                }
+            });
+        }
         
         contentHtml += '</div>';
         first = false;
