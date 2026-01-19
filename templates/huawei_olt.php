@@ -15684,7 +15684,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <tr id="wifiVlanRow">
                                 <td class="text-muted">VLAN-ID</td>
                                 <td>
-                                    <input type="number" class="form-control form-control-sm" id="wifiPortVlan" min="1" max="4094" placeholder="Enter VLAN ID">
+                                    <select class="form-select form-select-sm" id="wifiPortVlan">
+                                        <option value="">-- Select VLAN --</option>
+                                    </select>
                                     <div class="form-text small text-muted" id="wifiVlanHelp"></div>
                                 </td>
                             </tr>
@@ -20929,7 +20931,7 @@ function saveDeviceStatus() {
         // Reset form
         document.getElementById('wifiPortEnabled').checked = true;
         document.getElementById('wifiPortMode').value = 'LAN';
-        document.getElementById('wifiPortVlan').value = '';
+        populateWifiVlanDropdown();
         document.getElementById('ssidCustom').checked = true;
         document.getElementById('wifiPortSsid').value = '';
         document.getElementById('wifiPortEncryption').value = 'AES';
@@ -20960,7 +20962,10 @@ function saveDeviceStatus() {
                     document.getElementById('wifiPortDisabled').checked = !iface.enabled;
                     document.getElementById('wifiPortSsid').value = iface.ssid || '';
                     if (iface.vlan_id) {
-                        document.getElementById('wifiPortVlan').value = iface.vlan_id;
+                        // Delay to ensure dropdown is populated first
+                        setTimeout(() => {
+                            document.getElementById('wifiPortVlan').value = iface.vlan_id;
+                        }, 100);
                     }
                 }
             }
@@ -20969,6 +20974,24 @@ function saveDeviceStatus() {
         }
     }
     
+    
+    // Populate WiFi VLAN dropdown with attached VLANs only
+    function populateWifiVlanDropdown() {
+        const select = document.getElementById('wifiPortVlan');
+        if (!select) return;
+        
+        // Use the currentAttachedVlans from the page (same as WAN modal)
+        const vlans = typeof currentAttachedVlans !== 'undefined' ? currentAttachedVlans : [];
+        
+        select.innerHTML = '<option value="">-- Select VLAN --</option>';
+        if (vlans.length === 0) {
+            select.innerHTML = '<option value="">-- No VLANs attached --</option>';
+        } else {
+            vlans.forEach(vlan => {
+                select.innerHTML += `<option value="${vlan}">${vlan}</option>`;
+            });
+        }
+    }
     
     // Toggle WiFi mode options (Access creates bridge + VLAN tag)
     function toggleWifiModeOptions(mode) {
