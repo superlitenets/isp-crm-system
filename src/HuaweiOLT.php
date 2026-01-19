@@ -6698,7 +6698,7 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'message' => 'ONU must be authorized first'];
         }
         
@@ -6852,7 +6852,7 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'message' => 'ONU must be authorized first'];
         }
         
@@ -6943,7 +6943,7 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'ONU not found'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'message' => 'ONU must be authorized first'];
         }
         
@@ -7086,7 +7086,7 @@ class HuaweiOLT {
      */
     public function getONUTR069IP(int $onuDbId): ?string {
         $onu = $this->getONU($onuDbId);
-        if (!$onu || !$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu || !$onu['is_authorized'] || $onu['onu_id'] === null) {
             return null;
         }
         
@@ -8379,7 +8379,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'error' => 'ONU must be authorized first'];
         }
         
@@ -8471,7 +8471,7 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
-        if (!$onu['is_authorized'] || empty($onu['onu_id'])) {
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'error' => 'ONU must be authorized first'];
         }
         
