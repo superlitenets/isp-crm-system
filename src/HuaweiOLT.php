@@ -10164,6 +10164,23 @@ class HuaweiOLT {
                 }
             }
             
+            // Extract WiFi info
+            $data['wifi'] = [];
+            for ($i = 1; $i <= 4; $i++) {
+                $basePath = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.{$i}";
+                $ssid = $this->extractTR069Value($device, "{$basePath}.SSID");
+                if ($ssid !== null) {
+                    $data['wifi'][] = [
+                        'index' => $i,
+                        'ssid' => $ssid,
+                        'enabled' => $this->extractTR069Value($device, "{$basePath}.Enable") === '1' || $this->extractTR069Value($device, "{$basePath}.Enable") === 'true',
+                        'channel' => $this->extractTR069Value($device, "{$basePath}.Channel") ?? 'Auto',
+                        'security' => $this->extractTR069Value($device, "{$basePath}.BeaconType") ?? '-',
+                        'standard' => $this->extractTR069Value($device, "{$basePath}.Standard") ?? '-'
+                    ];
+                }
+            }
+            
             // Extract device details
             $uptime = $this->extractTR069Value($device, 'InternetGatewayDevice.DeviceInfo.UpTime');
             $data['details'] = [

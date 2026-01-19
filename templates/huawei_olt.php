@@ -17984,6 +17984,21 @@ function saveDeviceStatus() {
             }
             html += '</div></div></div>';
             
+            // WiFi Networks
+            html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-purple text-white" style="background-color: #6f42c1 !important;"><i class="bi bi-wifi me-2"></i>WiFi Networks</div><div class="card-body">';
+            if (s.wifi && s.wifi.length > 0) {
+                html += '<table class="table table-sm mb-0"><thead><tr><th>SSID</th><th>Status</th><th>Channel</th></tr></thead><tbody>';
+                s.wifi.forEach(w => {
+                    html += '<tr><td><strong>' + w.ssid + '</strong></td>';
+                    html += '<td><span class="badge bg-' + (w.enabled ? 'success' : 'secondary') + '">' + (w.enabled ? 'On' : 'Off') + '</span></td>';
+                    html += '<td>' + (w.channel || 'Auto') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p class="text-muted mb-0">No WiFi data (device may need Refresh)</p>';
+            }
+            html += '</div></div></div>';
+            
             // History
             html += '<div class="col-md-6 mb-3"><div class="card h-100"><div class="card-header bg-dark text-white"><i class="bi bi-clock-history me-2"></i>History</div><div class="card-body">';
             if (s.history && s.history.length > 0) {
