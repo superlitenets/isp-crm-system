@@ -8743,6 +8743,11 @@ try {
             </script>
             
             <!-- Inline TR-069 Status Section (expandable) -->
+            <style>
+                #inlineStatusContent .tab-pane { transition: none !important; }
+                #inlineStatusContent .tab-pane.fade { opacity: 1; }
+                #inlineStatusContent .nav-link { cursor: pointer; }
+            </style>
             <div id="inlineStatusSection" class="card shadow-sm mb-4" style="display: none;">
                 <div class="card-header bg-info text-white py-2">
                     <div class="d-flex justify-content-between align-items-center">
@@ -17162,7 +17167,7 @@ function renderInlineStatus(categories) {
         
         const tabId = 'inline-tab-' + key.replace(/[^a-z0-9]/gi, '-');
         const activeClass = first ? 'active' : '';
-        const showClass = first ? 'show active' : '';
+        const showClass = first ? 'active' : '';
         const baseKey = key.replace(/_\d+(_\d+)?$/, '');
         const icon = tabIcons[baseKey] || tabIcons[key] || 'bi-gear';
         const color = tabColors[baseKey] || tabColors[key] || '#6c757d';
@@ -17174,7 +17179,7 @@ function renderInlineStatus(categories) {
         
         tabsHtml += `<li class="nav-item" role="presentation"><a class="nav-link" id="${tabId}-tab" data-bs-toggle="pill" href="#${tabId}" role="tab" style="${activeStyle} font-weight: 500; padding: 6px 12px;" data-color="${color}"><i class="${icon} me-1"></i>${cleanLabel}</a></li>`;
         
-        contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
+        contentHtml += `<div class="tab-pane ${showClass}" id="${tabId}">`;
         
         // Sort params for PPP and Wireless
         let sortedParams = [...category.params];
