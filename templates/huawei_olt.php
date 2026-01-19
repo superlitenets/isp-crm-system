@@ -17647,7 +17647,7 @@ async function saveInlineStatus() {
             }
             Object.assign(inlineOriginalParams, changes);
             // Refresh to show actual device values after save
-            setTimeout(() => loadInlineStatus(), 2000);
+            setTimeout(() => loadInlineStatus(inlineStatusSerial, true), 2000);
         } else {
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
