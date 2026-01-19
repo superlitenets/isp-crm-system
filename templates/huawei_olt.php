@@ -9011,7 +9011,7 @@ try {
                 return html;
             }
             
-            function loadWiFiFromTR069() {
+            function loadWiFiFromTR069(silent = false) {
                 const loading = document.getElementById('wifiLoadingIndicator');
                 const refreshBtn = document.getElementById('wifiRefreshBtn');
                 
@@ -9049,12 +9049,12 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
-                        showToast(data.error || 'Failed to load WiFi data', 'warning');
+                        if (!silent) showToast(data.error || 'Failed to load WiFi data', 'warning');
                         return;
                     }
                     
                     if (!data.interfaces || data.interfaces.length === 0) {
-                        showToast('No WiFi interfaces found on this device', 'warning');
+                        if (!silent) showToast('No WiFi interfaces found on this device', 'warning');
                         return;
                     }
                     
@@ -9089,7 +9089,7 @@ try {
                     // Attach click handlers to enable buttons
                     attachWifiToggleHandlers();
                     
-                    showToast('WiFi data refreshed', 'success');
+                    if (!silent) showToast('WiFi data refreshed', 'success');
                 })
                 .catch(err => {
                     loading.classList.add('d-none');
