@@ -17331,15 +17331,27 @@ async function saveInlineStatus() {
     const saveBtn = document.getElementById('inlineStatusSaveBtn');
     const changes = {};
     
-    container.querySelectorAll('[data-path]').forEach(el => {
+    container.querySelectorAll('input[data-path], select[data-path]').forEach(el => {
         const path = el.dataset.path;
+        if (!path) return;
+        
         let value = el.type === 'checkbox' ? el.checked : el.value;
-        if (inlineOriginalParams[path] !== undefined && String(inlineOriginalParams[path]) !== String(value)) {
+        const original = inlineOriginalParams[path];
+        
+        // Normalize for comparison (handle boolean/string mismatches)
+        const normalizeVal = (v) => {
+            if (v === true || v === 'true' || v === '1') return 'true';
+            if (v === false || v === 'false' || v === '0' || v === '') return 'false';
+            return String(v ?? '').trim();
+        };
+        
+        if (original !== undefined && normalizeVal(original) !== normalizeVal(value)) {
             changes[path] = value;
+            console.log('[Change]', path, ':', original, '->', value);
         }
     });
     
-    console.log('[Save] Changes detected:', Object.keys(changes).length, changes);
+    console.log('[Save] Total changes:', Object.keys(changes).length);
     if (Object.keys(changes).length === 0) {
         showToast('No changes to save', 'info');
         return;
