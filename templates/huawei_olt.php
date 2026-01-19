@@ -20299,7 +20299,6 @@ function saveDeviceStatus() {
         
         checkDevice();
     }
-    }
     
 // Open TR-069 WAN Config Modal with status pattern
     function openTR069WANConfig(onuId, serialNumber) {
