@@ -17246,30 +17246,40 @@ function renderInlineStatus(categories) {
                 });
                 contentHtml += '</div>';
             } else if (key === 'hosts') {
-                // Group by host number
+                // Group by host number - table with hosts as rows
                 const hosts = {};
+                const columnSet = new Set();
                 sortedParams.forEach(param => {
                     const match = param.path.match(/Host\.(d+)\./);
                     const hostNum = match ? match[1] : '1';
-                    if (!hosts[hostNum]) hosts[hostNum] = [];
-                    hosts[hostNum].push(param);
+                    if (!hosts[hostNum]) hosts[hostNum] = {};
+                    let fieldName = param.label.replace(/Host \d+ /i, '').replace(/^\d+\s*/, '');
+                    hosts[hostNum][fieldName] = param;
+                    columnSet.add(fieldName);
+                    inlineOriginalParams[param.path] = param.value;
                 });
                 
-                contentHtml += '<div class="row g-2">';
+                // Priority columns for hosts
+                const priorityCols = ['HostName', 'IPAddress', 'MACAddress', 'InterfaceType', 'Active', 'LeaseTimeRemaining'];
+                const columns = priorityCols.filter(c => columnSet.has(c));
+                columnSet.forEach(c => { if (!columns.includes(c)) columns.push(c); });
+                
+                contentHtml += '<div class="table-responsive"><table class="table table-sm table-bordered table-hover mb-0"><thead class="table-dark"><tr><th>#</th>';
+                columns.slice(0, 5).forEach(col => { contentHtml += `<th>${col}</th>`; });
+                contentHtml += '</tr></thead><tbody>';
+                
                 Object.keys(hosts).sort((a,b) => parseInt(a) - parseInt(b)).forEach(hostNum => {
-                    const hostParams = hosts[hostNum];
-                    const hostName = hostParams.find(p => p.label.includes('HostName'))?.value || 'Device ' + hostNum;
-                    contentHtml += `<div class="col-md-6 col-lg-4"><div class="card h-100"><div class="card-header py-2 bg-light"><strong><i class="bi bi-pc-display me-1"></i>${hostName}</strong></div><div class="card-body p-2"><table class="table table-sm mb-0">`;
-                    hostParams.forEach(param => {
-                        inlineOriginalParams[param.path] = param.value;
-                        let displayLabel = param.label;
-                        let displayValue = param.value;
-                        if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
-                        contentHtml += `<tr><td class="text-muted small">${displayLabel}</td><td class="text-break">${displayValue}</td></tr>`;
+                    contentHtml += `<tr><td><strong>${hostNum}</strong></td>`;
+                    columns.slice(0, 5).forEach(col => {
+                        const param = hosts[hostNum][col];
+                        let val = param ? param.value : '-';
+                        if (val === true || val === 'true' || val === '1') val = '<span class="badge bg-success">Yes</span>';
+                        else if (val === false || val === 'false' || val === '0') val = '<span class="badge bg-secondary">No</span>';
+                        contentHtml += `<td class="text-break" style="max-width: 150px;">${val}</td>`;
                     });
-                    contentHtml += '</table></div></div></div>';
+                    contentHtml += '</tr>';
                 });
-                contentHtml += '</div>';
+                contentHtml += '</tbody></table></div>';
             } else {
                 // Regular table for counters
                 contentHtml += '<div class="table-responsive"><table class="table table-sm table-striped table-hover mb-0"><thead class="table-light"><tr><th style="width: 40%">Parameter</th><th>Value</th></tr></thead><tbody>';
