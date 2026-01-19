@@ -8744,18 +8744,23 @@ try {
             
             <!-- Inline TR-069 Status Section (expandable) -->
             <div id="inlineStatusSection" class="card shadow-sm mb-4" style="display: none;">
-                <div class="card-header bg-info text-white py-2 d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-sliders me-2"></i>TR-069 Device Status</span>
-                    <div class="d-flex align-items-center gap-2">
-                        <button type="button" class="btn btn-sm btn-light" onclick="refreshInlineStatus()" title="Refresh">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-success" id="inlineStatusSaveBtn" onclick="saveInlineStatus()" style="display: none;">
-                            <i class="bi bi-check-lg me-1"></i>Save
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleInlineStatus()" title="Collapse">
-                            <i class="bi bi-chevron-up"></i>
-                        </button>
+                <div class="card-header bg-info text-white py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-sliders me-2"></i>TR-069 Device Status</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-light" onclick="refreshInlineStatus()" title="Refresh Data">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                            <button type="button" class="btn btn-sm btn-warning text-dark" id="inlineStatusSaveBtn" onclick="saveInlineStatus()" style="display: none;">
+                                <i class="bi bi-cloud-upload me-1"></i>Save & Apply Changes
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleInlineStatus()" title="Collapse">
+                                <i class="bi bi-chevron-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="inlineStatusSaveNotice" class="mt-2 small" style="display: none;">
+                        <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>You have unsaved changes</span>
                     </div>
                 </div>
                 <div class="card-body" id="inlineStatusContent">
@@ -17208,6 +17213,7 @@ function renderInlineStatus(categories) {
     container.querySelectorAll('input, select').forEach(el => {
         el.addEventListener('change', () => {
             document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
+            document.getElementById('inlineStatusSaveNotice').style.display = 'block';
         });
     });
 }
