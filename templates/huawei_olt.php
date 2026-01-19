@@ -17191,21 +17191,75 @@ function renderInlineStatus(categories) {
             });
         }
         
-        // Use table format for lan_ports and hosts
+        // Use table format for lan_ports and hosts  
         const useTable = key === 'lan_ports' || key === 'hosts' || key === 'lan_counters';
         
         if (useTable) {
-            contentHtml += '<div class="table-responsive"><table class="table table-sm table-striped table-hover mb-0"><thead class="table-light"><tr><th style="width: 40%">Parameter</th><th>Value</th></tr></thead><tbody>';
-            sortedParams.forEach(param => {
-                if (param.value !== null && param.value !== undefined || param.value === '') {
-                    inlineOriginalParams[param.path] = param.value;
-                    let displayLabel = param.label;
-                    let displayValue = param.value;
-                    if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
-                    contentHtml += `<tr><td class="text-muted">${displayLabel}</td><td><strong>${displayValue}</strong></td></tr>`;
-                }
-            });
-            contentHtml += '</tbody></table></div>';
+            // Group by port number for lan_ports
+            if (key === 'lan_ports') {
+                // Extract port data and group by port
+                const ports = {};
+                sortedParams.forEach(param => {
+                    const match = param.path.match(/LANEthernetInterfaceConfig\.(d+)\./);
+                    const portNum = match ? match[1] : '1';
+                    if (!ports[portNum]) ports[portNum] = [];
+                    ports[portNum].push(param);
+                });
+                
+                contentHtml += '<div class="row g-2">';
+                Object.keys(ports).sort((a,b) => parseInt(a) - parseInt(b)).forEach(portNum => {
+                    contentHtml += `<div class="col-md-6 col-lg-3"><div class="card h-100"><div class="card-header py-2 bg-light"><strong><i class="bi bi-ethernet me-1"></i>Port ${portNum}</strong></div><div class="card-body p-2"><table class="table table-sm mb-0">`;
+                    ports[portNum].forEach(param => {
+                        inlineOriginalParams[param.path] = param.value;
+                        let displayLabel = param.label.replace(/Port \d+ /i, '');
+                        let displayValue = param.value;
+                        if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
+                        if (displayValue === true || displayValue === 'true' || displayValue === '1') displayValue = '<span class="badge bg-success">Yes</span>';
+                        else if (displayValue === false || displayValue === 'false' || displayValue === '0') displayValue = '<span class="badge bg-secondary">No</span>';
+                        contentHtml += `<tr><td class="text-muted small">${displayLabel}</td><td>${displayValue}</td></tr>`;
+                    });
+                    contentHtml += '</table></div></div></div>';
+                });
+                contentHtml += '</div>';
+            } else if (key === 'hosts') {
+                // Group by host number
+                const hosts = {};
+                sortedParams.forEach(param => {
+                    const match = param.path.match(/Host\.(d+)\./);
+                    const hostNum = match ? match[1] : '1';
+                    if (!hosts[hostNum]) hosts[hostNum] = [];
+                    hosts[hostNum].push(param);
+                });
+                
+                contentHtml += '<div class="row g-2">';
+                Object.keys(hosts).sort((a,b) => parseInt(a) - parseInt(b)).forEach(hostNum => {
+                    const hostParams = hosts[hostNum];
+                    const hostName = hostParams.find(p => p.label.includes('HostName'))?.value || 'Device ' + hostNum;
+                    contentHtml += `<div class="col-md-6 col-lg-4"><div class="card h-100"><div class="card-header py-2 bg-light"><strong><i class="bi bi-pc-display me-1"></i>${hostName}</strong></div><div class="card-body p-2"><table class="table table-sm mb-0">`;
+                    hostParams.forEach(param => {
+                        inlineOriginalParams[param.path] = param.value;
+                        let displayLabel = param.label;
+                        let displayValue = param.value;
+                        if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
+                        contentHtml += `<tr><td class="text-muted small">${displayLabel}</td><td class="text-break">${displayValue}</td></tr>`;
+                    });
+                    contentHtml += '</table></div></div></div>';
+                });
+                contentHtml += '</div>';
+            } else {
+                // Regular table for counters
+                contentHtml += '<div class="table-responsive"><table class="table table-sm table-striped table-hover mb-0"><thead class="table-light"><tr><th style="width: 40%">Parameter</th><th>Value</th></tr></thead><tbody>';
+                sortedParams.forEach(param => {
+                    if (param.value !== null && param.value !== undefined || param.value === '') {
+                        inlineOriginalParams[param.path] = param.value;
+                        let displayLabel = param.label;
+                        let displayValue = param.value;
+                        if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
+                        contentHtml += `<tr><td class="text-muted">${displayLabel}</td><td><strong>${displayValue}</strong></td></tr>`;
+                    }
+                });
+                contentHtml += '</tbody></table></div>';
+            }
         } else {
             sortedParams.forEach(param => {
                 if (param.value !== null && param.value !== undefined || param.value === '') {
