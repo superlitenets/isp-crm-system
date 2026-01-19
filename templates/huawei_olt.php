@@ -8902,10 +8902,6 @@ try {
             </div>
             
             <script>
-            const onuSerial = '<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>';
-            const onuId = <?= $currentOnu['id'] ?>;
-            const onuOltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
-            const hasTR069 = <?= !empty($currentOnu['tr069_ip']) ? 'true' : 'false' ?>;
             let availableVlans = [];
             
             function loadWifiVlans() {
