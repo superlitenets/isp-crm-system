@@ -17300,19 +17300,30 @@ function renderInlineStatus(categories) {
     tabsHtml += '</ul>';
     contentHtml += '</div>';
     
-    // After rendering, attach change listeners to mark modified fields
+    // After rendering, store original values from DOM and attach change listeners
     setTimeout(() => {
-        document.querySelectorAll('#inlineStatusContent input[data-path], #inlineStatusContent select[data-path]').forEach(el => {
-            el.addEventListener('input', function() {
-                this.dataset.modified = 'true';
+        document.querySelectorAll('#inlineStatusContent .device-param:not([readonly]):not([disabled])').forEach(input => {
+            const path = input.dataset.path;
+            if (path) {
+                // Store the actual DOM value as original
+                if (input.type === 'checkbox') {
+                    inlineOriginalParams[path] = input.checked;
+                } else if (input.type === 'number') {
+                    inlineOriginalParams[path] = input.value === '' ? null : Number(input.value);
+                } else {
+                    inlineOriginalParams[path] = input.value;
+                }
+            }
+            
+            // Attach change listener to show save button
+            input.addEventListener('input', function() {
                 document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
             });
-            el.addEventListener('change', function() {
-                this.dataset.modified = 'true';
+            input.addEventListener('change', function() {
                 document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
             });
         });
-        console.log('[Status] Change listeners attached to inputs');
+        console.log('[Status] Stored', Object.keys(inlineOriginalParams).length, 'original param values from DOM');
     }, 100);
     
     container.innerHTML = tabsHtml + contentHtml;
@@ -17347,14 +17358,28 @@ async function saveInlineStatus() {
     const saveBtn = document.getElementById('inlineStatusSaveBtn');
     const changes = {};
     
-    // Only save fields that user has actually modified (marked with data-modified)
-    container.querySelectorAll('input[data-path][data-modified="true"], select[data-path][data-modified="true"]').forEach(el => {
-        const path = el.dataset.path;
+    // Use same logic as the working modal - compare with original values
+    container.querySelectorAll('.device-param:not([readonly]):not([disabled])').forEach(input => {
+        const path = input.dataset.path;
         if (!path) return;
-        changes[path] = el.type === 'checkbox' ? el.checked : el.value;
+        
+        let value;
+        if (input.type === 'checkbox') {
+            value = input.checked;
+        } else if (input.type === 'number') {
+            value = input.value === '' ? null : Number(input.value);
+        } else {
+            value = input.value;
+        }
+        
+        // Only include if changed - same logic as modal
+        const original = inlineOriginalParams[path];
+        if (value !== original && String(value) !== String(original)) {
+            changes[path] = value;
+        }
     });
     
-    console.log('[Save] User-modified changes:', Object.keys(changes).length, changes);
+    console.log('[Save] Changes detected:', Object.keys(changes).length, changes);
     if (Object.keys(changes).length === 0) {
         showToast('No changes to save', 'info');
         return;
