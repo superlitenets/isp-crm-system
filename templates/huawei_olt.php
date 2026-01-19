@@ -17133,10 +17133,28 @@ function renderInlineStatus(categories) {
         'logs': 'bi-journal-text'
     };
     
-    // Build tabs with proper nav structure
-    let tabsHtml = '<ul class="nav nav-tabs mb-3" role="tablist" style="flex-wrap: wrap;">';
-    let contentHtml = '<div class="tab-content border border-top-0 rounded-bottom p-3" style="background: #fafafa;">';
+    // Build tabs with colored theme
+    let tabsHtml = '<ul class="nav nav-pills mb-3" role="tablist" style="flex-wrap: wrap; gap: 4px;">';
+    let contentHtml = '<div class="tab-content border rounded p-3" style="background: #f8f9fa;">';
     let first = true;
+    
+    // Tab color mapping
+    const tabColors = {
+        'ppp_interface': '#0d6efd',
+        'port_forward': '#6610f2',
+        'ip_interface': '#6f42c1',
+        'lan_dhcp': '#d63384',
+        'lan_ports': '#dc3545',
+        'lan_counters': '#fd7e14',
+        'wireless_lan': '#198754',
+        'hosts': '#20c997',
+        'security': '#0dcaf0',
+        'voice_lines': '#6c757d',
+        'miscellaneous': '#adb5bd',
+        'diagnostics': '#ffc107',
+        'firmware': '#212529',
+        'logs': '#495057'
+    };
     
     Object.keys(mergedParams).forEach(key => {
         const category = mergedParams[key];
@@ -17147,8 +17165,14 @@ function renderInlineStatus(categories) {
         const showClass = first ? 'show active' : '';
         const baseKey = key.replace(/_\d+(_\d+)?$/, '');
         const icon = tabIcons[baseKey] || tabIcons[key] || 'bi-gear';
+        const color = tabColors[baseKey] || tabColors[key] || '#6c757d';
         
-        tabsHtml += `<li class="nav-item" role="presentation"><a class="nav-link ${activeClass}" id="${tabId}-tab" data-bs-toggle="tab" href="#${tabId}" role="tab" aria-controls="${tabId}" aria-selected="${first}"><i class="${icon} me-1"></i>${category.label}</a></li>`;
+        // Remove counts like (123) from label
+        let cleanLabel = category.label.replace(/\s*\(\d+\)\s*$/, '');
+        
+        const activeStyle = first ? `background: ${color}; color: white; border-color: ${color};` : `color: ${color}; border: 1px solid ${color}; background: white;`;
+        
+        tabsHtml += `<li class="nav-item" role="presentation"><a class="nav-link" id="${tabId}-tab" data-bs-toggle="pill" href="#${tabId}" role="tab" style="${activeStyle} font-weight: 500; padding: 6px 12px;" data-color="${color}"><i class="${icon} me-1"></i>${cleanLabel}</a></li>`;
         
         contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
         
@@ -17291,7 +17315,21 @@ function renderInlineStatus(categories) {
         });
     });
     
-    // Tabs are now standard Bootstrap tabs - no custom styling needed
+    // Handle tab color styling on change
+    container.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', (e) => {
+            container.querySelectorAll('[data-bs-toggle="pill"]').forEach(t => {
+                const c = t.dataset.color;
+                t.style.background = 'white';
+                t.style.color = c;
+                t.style.border = '1px solid ' + c;
+            });
+            const activeColor = e.target.dataset.color;
+            e.target.style.background = activeColor;
+            e.target.style.color = 'white';
+            e.target.style.borderColor = activeColor;
+        });
+    });
 }
 
 async function saveInlineStatus() {
