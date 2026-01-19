@@ -8409,9 +8409,9 @@ class HuaweiOLT {
         // Determine GEM port based on number of attached VLANs
         $gemPort = count($attachedVlans) + 1;
         
-        // Create service-port command
+        // Create service-port command (without traffic-table for compatibility)
         // service-port vlan {vlan} gpon {frame}/{slot}/{port} ont {onu_id} gemport {gem} multi-service user-vlan {vlan} tag-transform translate
-        $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate inbound traffic-table index 8 outbound traffic-table index 9";
+        $cmd = "service-port vlan {$vlanId} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$vlanId} tag-transform translate";
         
         $result = $this->executeCommand($oltId, $cmd);
         $output .= "[Service Port Creation]\n" . ($result['output'] ?? '') . "\n";
