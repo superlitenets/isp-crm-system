@@ -20157,18 +20157,77 @@ function saveDeviceStatus() {
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-// Open TR-069 WAN Config - Direct push without summoning device
+// Open TR-069 WAN Config with streaming summon
     function openTR069WANConfig(onuId, serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        // Skip device summoning - open config modal directly
-        // Config will be pushed when user submits the form
-        openWANConfig(onuId, serialNumber);
+        // Clear any previous toasts
+        document.querySelectorAll('.toast').forEach(t => t.remove());
+        
+        let attempt = 0;
+        const maxAttempts = 10;
+        let deviceId = null;
+        
+        const statusToast = showToast('<div id="wanSummonProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
+        
+        function updateProgress(message) {
+            const el = document.getElementById('wanSummonProgress');
+            if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + message;
+        }
+        
+        function checkDevice() {
+            attempt++;
+            updateProgress('Checking device... (attempt ' + attempt + '/' + maxAttempts + ')');
+            
+            fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        hideToast(statusToast);
+                        showToast('Error: ' + (data.error || 'Failed'), 'danger', 5000);
+                        return;
+                    }
+                    
+                    deviceId = data.device_id;
+                    
+                    if (!data.in_genieacs) {
+                        hideToast(statusToast);
+                        showToast('<div class="text-start">' +
+                            '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
+                            '<small class="text-warning">Device not connected to ACS</small><br>' +
+                            '<small>Complete OLT Authorization and push TR-069 config first</small>' +
+                            '</div>', 'warning', 10000);
+                        return;
+                    }
+                    
+                    if (data.reachable && deviceId) {
+                        hideToast(statusToast);
+                        showToast('<i class="bi bi-check-circle me-1"></i>Device ready!', 'success', 2000);
+                        openWANConfig(onuId);
+                    } else if (attempt < maxAttempts) {
+                        updateProgress('Waiting for device response... (' + attempt + '/' + maxAttempts + ')');
+                        setTimeout(checkDevice, 3000);
+                    } else {
+                        hideToast(statusToast);
+                        showToast('<div class="text-start">' +
+                            '<strong>Device Not Responding</strong><br>' +
+                            '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                            '<small>Try again in a few minutes</small>' +
+                            '</div>', 'warning', 8000);
+                    }
+                })
+                .catch(err => {
+                    hideToast(statusToast);
+                    showToast('Connection error: ' + err.message, 'danger', 5000);
+                });
+        }
+        
+        // Start checking
+        checkDevice();
     }
-    
     // Open WAN Config Modal (loads existing config)
     function openWANConfig(onuId) {
         const modal = document.getElementById('wanConfigModal');
