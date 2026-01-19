@@ -16994,6 +16994,212 @@ echo "# ================================================\n";
 // Device Status Modal Functions
 let currentDeviceStatusSerial = '';
 let originalDeviceParams = {};
+let inlineStatusSerial = null;
+let inlineOriginalParams = {};
+
+// Inline Status Section Functions
+async function toggleInlineStatus(serial = null) {
+    const section = document.getElementById('inlineStatusSection');
+    const btn = document.getElementById('inlineStatusBtn');
+    
+    if (section.style.display === 'none' && serial) {
+        // Show section with spinner
+        section.style.display = 'block';
+        inlineStatusSerial = serial;
+        btn.classList.remove('btn-outline-info');
+        btn.classList.add('btn-info');
+        await loadInlineStatus(serial);
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        // Hide
+        section.style.display = 'none';
+        inlineStatusSerial = null;
+        btn.classList.remove('btn-info');
+        btn.classList.add('btn-outline-info');
+    }
+}
+
+async function refreshInlineStatus() {
+    if (inlineStatusSerial) {
+        await loadInlineStatus(inlineStatusSerial, true);
+    }
+}
+
+async function loadInlineStatus(serial, forceRefresh = false) {
+    const container = document.getElementById('inlineStatusContent');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info" role="status"></div><div class="mt-2 text-muted">Loading device parameters...</div></div>';
+    
+    try {
+        const response = await fetch('?action=get_device_status&serial=' + serial + (forceRefresh ? '&refresh=1' : ''));
+        const data = await response.json();
+        
+        if (!data.success) {
+            container.innerHTML = '<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Device not found in GenieACS') + '</div>';
+            return;
+        }
+        
+        inlineOriginalParams = {};
+        renderInlineStatus(data.categories);
+    } catch (error) {
+        container.innerHTML = '<div class="alert alert-danger mb-0"><i class="bi bi-x-circle me-2"></i>Error loading status: ' + error.message + '</div>';
+    }
+}
+
+function renderInlineStatus(categories) {
+    const container = document.getElementById('inlineStatusContent');
+    
+    // Use same consolidation logic
+    const mergedParams = {};
+    const keepSuffixCategories = ['ppp_interface', 'ip_interface', 'voice_line'];
+    
+    Object.keys(categories).forEach(key => {
+        let normalizedKey = key;
+        if (key.startsWith('auto_')) {
+            normalizedKey = key.replace('auto_', '');
+        }
+        
+        const baseKey = normalizedKey.replace(/_\d+(_\d+)?$/, '');
+        const hasSuffix = baseKey !== normalizedKey;
+        
+        if (normalizedKey.startsWith('miscellaneous')) {
+            normalizedKey = 'miscellaneous';
+        }
+        
+        if (!mergedParams[normalizedKey]) {
+            mergedParams[normalizedKey] = {
+                label: categories[key].label || normalizedKey,
+                icon: categories[key].icon || 'bi-gear',
+                editable: categories[key].editable ?? true,
+                params: []
+            };
+        }
+        
+        if (categories[key].params) {
+            mergedParams[normalizedKey].params.push(...categories[key].params);
+        }
+    });
+    
+    // Build tabs
+    let tabsHtml = '<ul class="nav nav-tabs nav-fill flex-nowrap overflow-auto" style="flex-wrap: nowrap;">';
+    let contentHtml = '<div class="tab-content pt-3">';
+    let first = true;
+    
+    Object.keys(mergedParams).forEach(key => {
+        const category = mergedParams[key];
+        if (!category.params || category.params.length === 0) return;
+        
+        const tabId = 'inline-tab-' + key.replace(/[^a-z0-9]/gi, '-');
+        const activeClass = first ? 'active' : '';
+        const showClass = first ? 'show active' : '';
+        
+        tabsHtml += `<li class="nav-item flex-shrink-0"><a class="nav-link ${activeClass}" data-bs-toggle="tab" href="#${tabId}">${category.label}</a></li>`;
+        
+        contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
+        
+        // Sort params for PPP and Wireless
+        let sortedParams = [...category.params];
+        
+        if (key === 'ppp_interface' || key.startsWith('ppp_interface')) {
+            const pppPriority = ['Username', 'Password', 'ConnectionStatus', 'Status', 'Enable', 'ExternalIPAddress', 'DNSServers'];
+            sortedParams.sort((a, b) => {
+                const aName = a.path.split('.').pop();
+                const bName = b.path.split('.').pop();
+                let aPriority = pppPriority.findIndex(p => aName.includes(p) || a.label.includes(p));
+                let bPriority = pppPriority.findIndex(p => bName.includes(p) || b.label.includes(p));
+                if (aPriority === -1) aPriority = 100;
+                if (bPriority === -1) bPriority = 100;
+                return aPriority - bPriority;
+            });
+        }
+        
+        if (key === 'wireless_lan' || key.startsWith('wireless_lan')) {
+            const excludeFields = ['BSSID', 'PeerBSSID', 'Peer BSSID'];
+            const seenLabels = new Set();
+            sortedParams = sortedParams.filter(p => {
+                const paramName = p.path.split('.').pop();
+                const label = p.label;
+                if (excludeFields.some(ex => paramName.includes(ex) || label.includes(ex))) return false;
+                if (seenLabels.has(label)) return false;
+                seenLabels.add(label);
+                return true;
+            });
+            const priorityOrder = ['SSID', 'PreSharedKey', 'KeyPassphrase', 'Password'];
+            sortedParams.sort((a, b) => {
+                const aName = a.path.split('.').pop();
+                const bName = b.path.split('.').pop();
+                let aPriority = priorityOrder.findIndex(p => aName.includes(p));
+                let bPriority = priorityOrder.findIndex(p => bName.includes(p));
+                if (aPriority === -1) aPriority = 100;
+                if (bPriority === -1) bPriority = 100;
+                return aPriority - bPriority;
+            });
+        }
+        
+        sortedParams.forEach(param => {
+            if (param.value !== null && param.value !== undefined || param.value === '') {
+                inlineOriginalParams[param.path] = param.value;
+                const inputHtml = renderParamInput(param, category.editable);
+                let displayLabel = param.label;
+                if (displayLabel.toLowerCase().includes('passphrase') || displayLabel.toLowerCase().includes('presharedkey')) {
+                    displayLabel = 'Password';
+                }
+                contentHtml += `<div class="param-item"><label>${displayLabel}</label>${inputHtml}</div>`;
+            }
+        });
+        
+        contentHtml += '</div>';
+        first = false;
+    });
+    
+    tabsHtml += '</ul>';
+    contentHtml += '</div>';
+    
+    container.innerHTML = tabsHtml + contentHtml;
+    
+    // Add change listener
+    container.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('change', () => {
+            document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
+        });
+    });
+}
+
+async function saveInlineStatus() {
+    const container = document.getElementById('inlineStatusContent');
+    const changes = {};
+    
+    container.querySelectorAll('[data-param-path]').forEach(el => {
+        const path = el.dataset.paramPath;
+        let value = el.type === 'checkbox' ? el.checked : el.value;
+        if (inlineOriginalParams[path] !== undefined && String(inlineOriginalParams[path]) !== String(value)) {
+            changes[path] = value;
+        }
+    });
+    
+    if (Object.keys(changes).length === 0) {
+        showToast('No changes to save', 'info');
+        return;
+    }
+    
+    try {
+        const response = await fetch('?action=set_device_params', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serial: inlineStatusSerial, params: changes })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Changes saved successfully', 'success');
+            document.getElementById('inlineStatusSaveBtn').style.display = 'none';
+            Object.assign(inlineOriginalParams, changes);
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to save'), 'danger');
+        }
+    } catch (error) {
+        showToast('Error saving: ' + error.message, 'danger');
+    }
+}
 
 // Tab definitions - Only show these specific sections
 const tabConfig = {
