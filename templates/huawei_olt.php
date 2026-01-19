@@ -17159,8 +17159,31 @@ function renderDeviceStatusTabs(categories) {
     tabList.innerHTML = '';
     tabContent.innerHTML = '';
     
+    // Consolidate miscellaneous variants into single category
+    const consolidatedCategories = {};
+    let miscellaneousParams = [];
+    
+    Object.keys(categories).forEach(key => {
+        if (key.startsWith('miscellaneous')) {
+            if (categories[key].params) {
+                miscellaneousParams = miscellaneousParams.concat(categories[key].params);
+            }
+        } else {
+            consolidatedCategories[key] = categories[key];
+        }
+    });
+    
+    if (miscellaneousParams.length > 0) {
+        consolidatedCategories['miscellaneous'] = {
+            label: 'Miscellaneous',
+            icon: 'bi-three-dots',
+            editable: true,
+            params: miscellaneousParams
+        };
+    }
+    
     // Filter and sort categories - only show allowed tabs
-    const sortedKeys = Object.keys(categories).filter(key => {
+    const sortedKeys = Object.keys(consolidatedCategories).filter(key => {
         // Check if tab is allowed (directly in tabConfig or matches a pattern)
         const baseKey = key.replace(/_\d+(_\d+)?$/g, ''); // Remove numeric suffixes like _1 or _1_1
         return tabConfig[key] || tabConfig[baseKey] || 
@@ -17184,7 +17207,7 @@ function renderDeviceStatusTabs(categories) {
     
     let isFirst = true;
     sortedKeys.forEach(key => {
-        const category = categories[key];
+        const category = consolidatedCategories[key];
         const config = getTabConfig(key);
         
         // Skip if tab config not found (not an allowed tab)
