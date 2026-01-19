@@ -8456,21 +8456,80 @@ try {
                 </div>
             </div>
             
-            <!-- Info Cards Row -->
-            <div class="row g-3 mb-4">
-                <!-- Customer & Location -->
-                <div class="col-md-4">
-                    <div class="onu-info-card h-100 p-3">
-                        <div class="section-header mb-3"><i class="bi bi-person me-2"></i>Customer & Location</div>
-                        <form method="post" id="onuInfoForm">
+            <!-- Compact ONU Info Bar -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-body py-2 px-3">
+                    <div class="row align-items-center g-2">
+                        <!-- Status & Model -->
+                        <div class="col-auto">
+                            <?php
+                            $onuStatus = strtolower($currentOnu['status'] ?? 'offline');
+                            $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'][$onuStatus] ?? 'secondary';
+                            $statusIcon = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill'][$onuStatus] ?? 'circle';
+                            ?>
+                            <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
+                                <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
+                            </span>
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshLiveStatus()" title="Refresh">
+                                <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
+                            </button>
+                        </div>
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Model</small>
+                            <div class="fw-medium"><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'Unknown') ?></div>
+                        </div>
+                        <!-- Position -->
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Position</small>
+                            <div class="fw-medium"><code><?= $currentOnu['frame'] ?? 0 ?>/<?= $currentOnu['slot'] ?? 0 ?>/<?= $currentOnu['port'] ?? 0 ?></code> ONU <code><?= $currentOnu['onu_id'] ?? '-' ?></code></div>
+                        </div>
+                        <!-- VLANs -->
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">VLANs <button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#attachedVlansModal"><i class="bi bi-pencil-square"></i></button></small>
+                            <div class="fw-medium">
+                                <?php if (!empty($attachedVlans)): foreach ($attachedVlans as $vid): ?><span class="badge bg-info me-1"><?= $vid ?></span><?php endforeach; else: ?><span class="text-muted">None</span><?php endif; ?>
+                            </div>
+                        </div>
+                        <!-- TR-069 -->
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">TR-069</small>
+                            <div>
+                                <?php $tr069Status = $currentOnu['tr069_status'] ?? 'pending'; ?>
+                                <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
+                            </div>
+                        </div>
+                        <!-- Auth Date -->
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Authorized</small>
+                            <div class="fw-medium"><?= $currentOnu['auth_date'] ? date('d-M-Y', strtotime($currentOnu['auth_date'])) : ($currentOnu['created_at'] ? date('d-M-Y', strtotime($currentOnu['created_at'])) : '-') ?></div>
+                        </div>
+                        <?php if (!empty($currentOnu['line_profile_name'])): ?>
+                        <div class="col-auto border-start ps-2">
+                            <small class="text-muted">Line Profile</small>
+                            <div class="fw-medium"><?= htmlspecialchars($currentOnu['line_profile_name']) ?></div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Editable Customer Info (Collapsible) -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#customerInfoCollapse">
+                    <span><i class="bi bi-person me-2"></i>Customer Info</span>
+                    <i class="bi bi-chevron-down"></i>
+                </div>
+                <div class="collapse show" id="customerInfoCollapse">
+                    <div class="card-body py-2">
+                        <form method="post" id="onuInfoForm" class="row g-2 align-items-end">
                             <input type="hidden" name="action" value="update_onu_info">
                             <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
-                            <div class="mb-2">
-                                <div class="info-label">Name</div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-0 small text-muted">Name</label>
                                 <input type="text" name="name" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['name'] ?? '') ?>" placeholder="Customer name">
                             </div>
-                            <div class="mb-2">
-                                <div class="info-label">Zone</div>
+                            <div class="col-md-2">
+                                <label class="form-label mb-0 small text-muted">Zone</label>
                                 <select name="zone_id" class="form-select form-select-sm">
                                     <option value="">None</option>
                                     <?php foreach ($zones as $z): ?>
@@ -8478,13 +8537,13 @@ try {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="mb-2">
-                                <div class="info-label">Description</div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-0 small text-muted">Description</label>
                                 <input type="text" name="description" class="form-control form-control-sm" value="<?= htmlspecialchars($currentOnu['description'] ?? '') ?>" placeholder="Address or comment">
                             </div>
-                            <div class="mb-2">
-                                <div class="info-label">Customer Link</div>
-                                <div class="info-value">
+                            <div class="col-md-2">
+                                <label class="form-label mb-0 small text-muted">Customer</label>
+                                <div class="form-control-plaintext form-control-sm py-1">
                                     <?php if ($currentOnu['customer_id']): ?>
                                     <a href="?page=customers&action=view&id=<?= $currentOnu['customer_id'] ?>"><?= htmlspecialchars($currentOnu['customer_name'] ?? 'View') ?></a>
                                     <?php else: ?>
@@ -8492,98 +8551,14 @@ try {
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-sm w-100 mt-2"><i class="bi bi-check me-1"></i>Save Changes</button>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Save</button>
+                            </div>
                         </form>
                     </div>
                 </div>
-                
-                <!-- Network Configuration -->
-                <div class="col-md-4">
-                    <div class="onu-info-card h-100 p-3">
-                        <div class="section-header mb-3"><i class="bi bi-hdd-network me-2"></i>Network Configuration</div>
-                        <div class="mb-2">
-                            <div class="info-label">OLT Position</div>
-                            <div class="info-value"><code><?= $currentOnu['frame'] ?? 0 ?>/<?= $currentOnu['slot'] ?? 0 ?>/<?= $currentOnu['port'] ?? 0 ?></code> ONU <code><?= $currentOnu['onu_id'] ?? '-' ?></code></div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">Service VLANs <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-bs-toggle="modal" data-bs-target="#attachedVlansModal"><i class="bi bi-pencil-square"></i></button></div>
-                            <div class="info-value">
-                                <?php if (!empty($attachedVlans)): foreach ($attachedVlans as $vid): ?>
-                                <span class="badge bg-primary me-1"><?= $vid ?></span>
-                                <?php endforeach; else: ?>
-                                <span class="text-muted">None</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">WAN Mode</div>
-                            <div class="info-value">
-                                <?php if (!empty($currentOnu['pppoe_username'])): ?>
-                                <span class="badge bg-info">PPPoE</span> <?= htmlspecialchars($currentOnu['pppoe_username']) ?>
-                                <?php elseif (!empty($currentOnu['wan_mode'])): ?>
-                                <span class="badge bg-success"><?= strtoupper($currentOnu['wan_mode']) ?></span>
-                                <?php else: ?>
-                                <span class="badge bg-secondary">Bridge</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">WAN IP <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshOntIP()"><i class="bi bi-arrow-clockwise" id="ontIpRefreshIcon"></i></button></div>
-                            <div class="info-value" id="ontIpDisplay"><?= !empty($currentOnu['ont_ip']) ? htmlspecialchars($currentOnu['ont_ip']) : '<span class="text-muted">-</span>' ?></div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">TR-069 IP <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="refreshTR069IP()"><i class="bi bi-arrow-clockwise" id="tr069RefreshIcon"></i></button></div>
-                            <div class="info-value" id="tr069IpDisplay"><?= !empty($currentOnu['tr069_ip']) ? '<span class="text-success">'.htmlspecialchars($currentOnu['tr069_ip']).'</span>' : '<span class="text-muted">Pending...</span>' ?></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Device Info -->
-                <div class="col-md-4">
-                    <div class="onu-info-card h-100 p-3">
-                        <div class="section-header mb-3"><i class="bi bi-cpu me-2"></i>Device Information</div>
-                        <div class="text-center mb-3 position-relative">
-                            <i class="bi bi-router text-primary" style="font-size: 3rem;"></i>
-                            <?php
-                            $onuStatus = strtolower($currentOnu['status'] ?? 'offline');
-                            $statusClass = ['online' => 'success', 'offline' => 'secondary', 'los' => 'danger'][$onuStatus] ?? 'secondary';
-                            $statusIcon = ['online' => 'check-circle-fill', 'offline' => 'x-circle', 'los' => 'exclamation-triangle-fill'][$onuStatus] ?? 'circle';
-                            ?>
-                            <div class="mt-2">
-                                <span id="onuStatusBadge" class="badge bg-<?= $statusClass ?> fs-6" data-live-status>
-                                    <i class="bi bi-<?= $statusIcon ?> me-1"></i><?= ucfirst($onuStatus) ?>
-                                </span>
-                                <button type="button" class="btn btn-status-refresh ms-2" onclick="refreshLiveStatus()" title="Refresh live status">
-                                    <i class="bi bi-arrow-clockwise" id="liveStatusRefreshIcon"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">Model</div>
-                            <div class="info-value"><?= htmlspecialchars($currentOnu['onu_type_model'] ?? $currentOnu['discovered_eqid'] ?? 'Unknown') ?></div>
-                        </div>
-                        <?php if (!empty($currentOnu['line_profile_name'])): ?>
-                        <div class="mb-2">
-                            <div class="info-label">Line Profile</div>
-                            <div class="info-value"><?= htmlspecialchars($currentOnu['line_profile_name']) ?></div>
-                        </div>
-                        <?php endif; ?>
-                        <div class="mb-2">
-                            <div class="info-label">Authorization Date</div>
-                            <div class="info-value"><?= $currentOnu['auth_date'] ? date('d-M-Y H:i', strtotime($currentOnu['auth_date'])) : ($currentOnu['created_at'] ? date('d-M-Y H:i', strtotime($currentOnu['created_at'])) : '-') ?></div>
-                        </div>
-                        <div class="mb-2">
-                            <div class="info-label">TR-069 Status</div>
-                            <div class="info-value">
-                                <?php $tr069Status = $currentOnu['tr069_status'] ?? 'pending'; ?>
-                                <span id="tr069StatusBadge" class="badge bg-<?= $tr069Status === 'online' ? 'success' : ($tr069Status === 'configured' ? 'info' : ($tr069Status === 'offline' ? 'secondary' : 'warning')) ?>"><?= ucfirst($tr069Status) ?></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
-            
-            <!-- Define JS functions BEFORE buttons use them -->
+                        <!-- Define JS functions BEFORE buttons use them -->
             <script>
             const onuOltId = <?= $currentOnu['olt_id'] ?? 'null' ?>;
             const onuFrame = <?= $currentOnu['frame'] ?? 0 ?>;
