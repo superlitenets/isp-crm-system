@@ -20973,32 +20973,16 @@ function saveDeviceStatus() {
         const params = {};
         const basePath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + portIndex + '.';
         
+        // Core WiFi parameters (universally supported)
         params[basePath + 'Enable'] = enabled;
         if (ssid) params[basePath + 'SSID'] = ssid;
-        if (password && password.length >= 8) params[basePath + 'KeyPassphrase'] = password;
-        
-        // Set encryption type
-        if (encryption === 'AES') {
-            params[basePath + 'WPAEncryptionModes'] = 'AESEncryption';
-        } else if (encryption === 'TKIP') {
-            params[basePath + 'WPAEncryptionModes'] = 'TKIPEncryption';
-        } else {
-            params[basePath + 'WPAEncryptionModes'] = 'TKIPandAESEncryption';
+        if (password && password.length >= 8) {
+            params[basePath + 'PreSharedKey.1.KeyPassphrase'] = password;
         }
         
-        // Configure mode and VLAN
-        if (mode === 'Access' && vlan) {
-            // Access mode: Bridge with VLAN tagging
-            params[basePath + 'X_HW_WlanAccessType'] = 'Bridge';
+        // VLAN configuration (if specified)
+        if (vlan) {
             params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
-            params[basePath + 'X_HW_VlanMappingEnable'] = true;
-        } else if (vlan) {
-            // LAN mode with optional VLAN
-            params[basePath + 'X_HW_WlanAccessType'] = 'Router';
-            params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
-        } else {
-            // LAN mode without VLAN
-            params[basePath + 'X_HW_WlanAccessType'] = 'Router';
         }
         
         const saveBtn = document.querySelector('#wifiPortConfigModal .btn-primary');
