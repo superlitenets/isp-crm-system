@@ -16791,10 +16791,15 @@ echo "# ================================================\n";
     gap: 0.5rem;
 }
 .param-row {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
     padding: 0.875rem;
+}
+.param-row > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 .param-item {
     margin-bottom: 0;
@@ -16826,46 +16831,7 @@ echo "# ================================================\n";
     color: #64748b;
 }
 
-/* Wireless Config Layout */
-.wireless-config {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-.wireless-config .param-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f1f5f9;
-}
-.wireless-config .param-item:last-child {
-    border-bottom: none;
-}
-.wireless-config .param-item label {
-    flex: 0 0 200px;
-    margin-bottom: 0;
-    font-weight: 500;
-}
-.wireless-config .param-item > *:not(label) {
-    flex: 1;
-    max-width: 300px;
-}
-.wifi-prominent-field {
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    padding: 0.75rem 1rem !important;
-    border-radius: 8px;
-    border: 1px solid #bae6fd !important;
-    margin-bottom: 0.5rem;
-}
-.wifi-prominent-field label {
-    color: #0369a1;
-    font-weight: 600 !important;
-}
-.wifi-prominent-field .form-control-lg {
-    font-size: 1rem;
-    font-weight: 500;
-}
+
 .param-item .form-check-input {
     width: 2.25rem;
     height: 1.125rem;
@@ -17358,129 +17324,6 @@ function renderTabContent(key, category) {
         });
         html += '</tbody></table>';
         
-    } else if (key === 'wireless_lan' || key.startsWith('wireless_lan')) {
-        // Wireless LAN - Custom layout with ordered fields
-        const wlanParams = {};
-        category.params.forEach(param => {
-            originalDeviceParams[param.path] = param.value;
-            const paramName = param.path.split('.').pop();
-            wlanParams[paramName] = param;
-        });
-        
-        // Define field order as requested
-        const fieldOrder = [
-            { key: 'SSID', label: 'SSID', type: 'text', prominent: true },
-            { key: 'PreSharedKey', altKeys: ['KeyPassphrase', 'PreSharedKey.1.PreSharedKey', 'PreSharedKey.1.KeyPassphrase'], label: 'Password', type: 'password', prominent: true },
-            { key: 'BeaconType', label: 'Authentication Mode', type: 'select', options: ['None', 'Basic', 'WPA', 'WPA2', '11i', 'WPAand11i'] },
-            { key: 'Status', label: 'Status', type: 'readonly' },
-            { key: 'Enable', label: 'Enable', type: 'boolean' },
-            { key: 'X_HW_WlanRfBand', altKeys: ['OperatingFrequencyBand'], label: 'RF Band', type: 'readonly' },
-            { key: 'Standard', label: 'Standard', type: 'readonly' },
-            { key: 'RadioEnabled', label: 'Radio Enabled', type: 'boolean' },
-            { key: 'TotalAssociations', label: 'Total Associations', type: 'readonly' },
-            { key: 'SSIDAdvertisementEnabled', label: 'SSID Advertisement Enabled', type: 'boolean' },
-            { key: 'WPAEncryptionModes', altKeys: ['IEEE11iEncryptionModes'], label: 'WPA Encryption', type: 'select', options: ['TKIPEncryption', 'AESEncryption', 'TKIPandAESEncryption'] },
-            { key: 'X_HW_ChannelWidth', altKeys: ['OperatingChannelBandwidth'], label: 'Channel Width', type: 'readonly' },
-            { key: 'AutoChannelEnable', label: 'Auto Channel', type: 'boolean' },
-            { key: 'Channel', label: 'Channel', type: 'number' },
-            { key: 'RegulatoryDomain', label: 'Country Regulatory Domain', type: 'readonly' },
-            { key: 'TransmitPower', altKeys: ['X_HW_TxPower', 'TransmitPowerSupported'], label: 'Tx Power', type: 'readonly' }
-        ];
-        
-        html = '<div class="wireless-config">';
-        
-        fieldOrder.forEach(field => {
-            // Find the param by key or alternate keys
-            let param = wlanParams[field.key];
-            if (!param && field.altKeys) {
-                for (const altKey of field.altKeys) {
-                    // Check for nested keys like PreSharedKey.1.PreSharedKey
-                    if (altKey.includes('.')) {
-                        const parts = altKey.split('.');
-                        const lastPart = parts[parts.length - 1];
-                        // Search in all params for this pattern
-                        for (const [k, v] of Object.entries(wlanParams)) {
-                            if (k === lastPart || k.endsWith('.' + lastPart)) {
-                                param = v;
-                                break;
-                            }
-                        }
-                    } else {
-                        param = wlanParams[altKey];
-                    }
-                    if (param) break;
-                }
-            }
-            
-            if (!param) {
-                // Also search in full category params by label similarity
-                category.params.forEach(p => {
-                    if (!param && (p.label.toLowerCase().includes(field.label.toLowerCase()) || 
-                        p.path.toLowerCase().includes(field.key.toLowerCase()))) {
-                        param = p;
-                        wlanParams[field.key] = p;
-                    }
-                });
-            }
-            
-            if (!param) return; // Skip if param not found
-            
-            const isEditable = category.editable && field.type !== 'readonly';
-            let inputHtml = '';
-            
-            if (field.type === 'password') {
-                const val = param.value || '';
-                inputHtml = `<div class="input-group">
-                    <input type="password" class="form-control device-param ${field.prominent ? 'form-control-lg' : ''}" 
-                           data-path="${param.path}" value="${escapeHtml(val)}" ${!isEditable ? 'readonly' : ''}>
-                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                </div>`;
-            } else if (field.type === 'boolean') {
-                const isChecked = param.value === true || param.value === 'true' || param.value === 1 || param.value === '1';
-                inputHtml = `<div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check device-param-bool" name="wlan_${field.key}" id="wlan_${field.key}_yes" 
-                           data-path="${param.path}" data-value="true" ${isChecked ? 'checked' : ''} ${!isEditable ? 'disabled' : ''}>
-                    <label class="btn btn-outline-success" for="wlan_${field.key}_yes">Yes</label>
-                    <input type="radio" class="btn-check device-param-bool" name="wlan_${field.key}" id="wlan_${field.key}_no" 
-                           data-path="${param.path}" data-value="false" ${!isChecked ? 'checked' : ''} ${!isEditable ? 'disabled' : ''}>
-                    <label class="btn btn-outline-danger" for="wlan_${field.key}_no">No</label>
-                </div>`;
-            } else if (field.type === 'select' && field.options) {
-                inputHtml = `<select class="form-select device-param ${field.prominent ? 'form-select-lg' : ''}" 
-                              data-path="${param.path}" ${!isEditable ? 'disabled' : ''}>`;
-                field.options.forEach(opt => {
-                    const selected = param.value === opt ? 'selected' : '';
-                    const displayOpt = opt.replace(/Encryption|Authentication/g, '').replace(/([A-Z])/g, ' $1').trim();
-                    inputHtml += `<option value="${opt}" ${selected}>${displayOpt}</option>`;
-                });
-                inputHtml += '</select>';
-            } else if (field.type === 'number') {
-                inputHtml = `<input type="number" class="form-control device-param" data-path="${param.path}" 
-                              value="${param.value ?? ''}" ${!isEditable ? 'readonly' : ''}>`;
-            } else if (field.type === 'readonly') {
-                let displayVal = param.value ?? '-';
-                if (field.key === 'X_HW_WlanRfBand' || field.key === 'OperatingFrequencyBand') {
-                    displayVal = displayVal === '2.4GHz' || displayVal === '2.4G' || displayVal.includes('2.4') ? '2.4 GHz' : 
-                                 displayVal === '5GHz' || displayVal === '5G' || displayVal.includes('5') ? '5 GHz' : displayVal;
-                }
-                inputHtml = `<span class="form-control-plaintext">${escapeHtml(String(displayVal))}</span>`;
-            } else {
-                // text
-                inputHtml = `<input type="text" class="form-control device-param ${field.prominent ? 'form-control-lg' : ''}" 
-                              data-path="${param.path}" value="${escapeHtml(param.value ?? '')}" ${!isEditable ? 'readonly' : ''}>`;
-            }
-            
-            const rowClass = field.prominent ? 'wifi-prominent-field' : '';
-            html += `<div class="param-item ${rowClass}">
-                <label>${field.label}</label>
-                ${inputHtml}
-            </div>`;
-        });
-        
-        html += '</div>';
-
     } else if (key === 'hosts') {
         // Hosts - Table format
         const hosts = {};
@@ -18487,17 +18330,6 @@ function saveDeviceStatus() {
         return div.innerHTML;
     }
     
-    function togglePasswordVisibility(btn) {
-        const input = btn.parentElement.querySelector('input');
-        const icon = btn.querySelector('i');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.replace('bi-eye', 'bi-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.replace('bi-eye-slash', 'bi-eye');
-        }
-    }
     
     function setCommand(cmd) {
         document.querySelector('input[name="command"]').value = cmd;
