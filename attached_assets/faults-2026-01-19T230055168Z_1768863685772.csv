@@ -1,0 +1,9 @@
+"Device","Channel","Code","Message","Detail","Retries","Timestamp"
+"00259E-HG8546M-48575443F2D53A8B","task_696eb634d2e8e0ce639b23a5","cwmp.9007","Invalid parameter value","faultCode: ""9007""
+faultString: Invalid parameter value
+setParameterValuesFault: null
+",1,"2026-01-19T23:00:31.788Z"
+"00259E-HG8546M-48575443F2D53A8B","task_696eb6f78832606b57289417","cwmp.9007","Invalid parameter value","faultCode: ""9007""
+faultString: Invalid parameter value
+setParameterValuesFault: null
+",0,"2026-01-19T22:57:59.544Z"

@@ -3110,6 +3110,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 $deviceId = $deviceResult['device']['_id'] ?? '';
                 $result = $genieacs->saveDeviceParams($deviceId, $params);
+                
+                // Check if task was queued (202) vs completed (200)
+                if ($result['success'] && isset($result['http_code'])) {
+                    if ($result['http_code'] == 202) {
+                        // Task queued but device didn't respond in time - send explicit connection request
+                        $genieacs->sendConnectionRequest($serial);
+                        $result['warning'] = 'Changes queued. Device may apply them on next connection.';
+                        $result['queued'] = true;
+                    } elseif ($result['http_code'] == 200) {
+                        $result['applied'] = true;
+                    }
+                }
+                
                 echo json_encode($result);
                 exit;
                 
@@ -17598,7 +17611,11 @@ async function saveInlineStatus() {
             saveBtn.style.display = 'none';
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
-            showToast('Changes saved! Refreshing...', 'success');
+            if (data.queued) {
+                showToast('Changes queued - device will apply on next connection', 'warning');
+            } else {
+                showToast('Changes applied successfully!', 'success');
+            }
             Object.assign(inlineOriginalParams, changes);
             // Refresh to show actual device values after save
             setTimeout(() => loadInlineStatus(), 2000);
