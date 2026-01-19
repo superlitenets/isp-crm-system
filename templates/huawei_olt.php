@@ -8260,6 +8260,9 @@ try {
                                     <button type="button" class="btn-close" onclick="this.closest('.modal').remove()"></button>
                                 </div>
                                 <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                     <table class="table table-sm mb-0">
                                         <tr><td><kbd>Ctrl</kbd> + <kbd>A</kbd></td><td>Select all ONUs</td></tr>
                                         <tr><td><kbd>Esc</kbd></td><td>Clear selection</td></tr>
@@ -9628,6 +9631,9 @@ try {
                         </div>
                         <form method="post" id="tr069ConfigForm">
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <input type="hidden" name="action" value="configure_tr069">
                                 <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                 
@@ -9699,6 +9705,9 @@ try {
                         </div>
                         <form id="wanConfigForm" onsubmit="return submitWanConfig(event)">
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <input type="hidden" name="onu_id" value="<?= $currentOnu['id'] ?>">
                                 
                                 <div class="alert alert-info small">
@@ -9811,6 +9820,9 @@ try {
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                             <input type="hidden" id="attachedVlansOnuId" value="<?= $currentOnu['id'] ?>">
                             
                             <div class="alert alert-info small">
@@ -10161,6 +10173,9 @@ try {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <div class="mb-3">
                                     <label class="form-label">Name (Equipment ID)</label>
                                     <input type="text" name="name" id="onuTypeName" class="form-control" required placeholder="e.g. HG8546M">
@@ -11406,6 +11421,9 @@ try {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <div class="mb-3">
                                     <label class="form-label">Server Name</label>
                                     <input type="text" class="form-control" name="name" required placeholder="Main VPN Server">
@@ -11457,6 +11475,9 @@ try {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <?php if (!empty($wgServers)): ?>
                                 <div class="mb-3">
                                     <label class="form-label">Server</label>
@@ -11540,6 +11561,9 @@ try {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <div class="mb-3">
                                     <label class="form-label">Peer Name</label>
                                     <input type="text" class="form-control" name="name" id="editPeerName" required>
@@ -11600,6 +11624,9 @@ try {
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                             <pre id="configContent" class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
                         </div>
                         <div class="modal-footer justify-content-between">
@@ -12149,6 +12176,9 @@ try {
                         </div>
                         <form method="post" action="?page=huawei-olt&view=migrations">
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <input type="hidden" name="csrf_token" value="<?= $csrfToken ?>">
                                 <input type="hidden" name="action" value="move_onu">
                                 <input type="hidden" name="onu_id" id="moveOnuId">
@@ -12844,6 +12874,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <div class="row">
                                     <div class="col-6 mb-3">
                                         <label class="form-label">Name <span class="text-danger">*</span></label>
@@ -13955,6 +13988,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                     </div>
                                                     <form method="post">
                                                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                                             <input type="hidden" name="action" value="update_vlan_features">
                                                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                                                             <input type="hidden" name="vlan_id" value="<?= $vlan['vlan_id'] ?>">
@@ -14223,6 +14259,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
                                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                             <div class="row g-3">
                                                 <div>
                                                     <label class="form-label">Default VLAN for Authorization</label>
@@ -14412,6 +14451,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                                     </div>
                                                     <form method="post">
                                                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                                             <input type="hidden" name="action" value="configure_uplink">
                                                             <input type="hidden" name="olt_id" value="<?= $oltId ?>">
                                                             <input type="hidden" name="port_name" value="<?= htmlspecialchars($uplink['port_name']) ?>">
@@ -14633,6 +14675,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="mb-3">
                             <label class="form-label">Name</label>
                             <input type="text" name="name" id="oltName" class="form-control" required>
@@ -14739,6 +14784,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Profile Name</label>
@@ -14844,6 +14892,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="row">
                             <div class="col-md-8 mb-3">
                                 <label class="form-label">Serial Number</label>
@@ -14919,6 +14970,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle me-2"></i>
                             Provisioning ONU: <strong id="provisionOnuSn"></strong>
@@ -14965,6 +15019,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info mb-3">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-router fs-4 me-3"></i>
@@ -15360,6 +15417,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-2"></i>
                             Configuring device: <strong id="wifiDeviceSn"></strong>
@@ -15568,6 +15628,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     </div>
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div><!-- end wifiConfigContent -->
                         <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> Apply Settings</button>
                     </div>
                 </form>
@@ -15584,6 +15645,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                     <input type="hidden" id="addVlanOnuId">
                     <div class="mb-3">
                         <label class="form-label">Select VLAN</label>
@@ -15795,6 +15859,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-2"></i>
                             Changing password for device: <strong id="adminPassDeviceSn"></strong>
@@ -15869,6 +15936,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <input type="hidden" name="onu_id" id="dbaOnuId">
                     <input type="hidden" name="vlan_id" id="dbaVlanId">
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-1"></i>
                             <strong>Speed Profile (DBA)</strong> controls bandwidth allocation for this ONU.
@@ -15914,6 +15984,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <input type="hidden" name="onu_id" id="ethPortOnuId">
                     <input type="hidden" name="port_num" id="ethPortNum">
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-1"></i>
                             <strong>OMCI Port Configuration</strong> - These settings are pushed directly to the OLT via Telnet/CLI commands.
@@ -16008,6 +16081,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <input type="hidden" name="action" value="configure_pppoe">
                     <input type="hidden" name="serial" id="pppoeSerialInput">
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <p class="text-muted small">ONU: <strong id="pppoeDeviceSn"></strong></p>
                         
                         <div class="mb-3">
@@ -16090,6 +16166,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                     <div id="pppoeWanFormSection">
                         <div class="alert alert-info small">
                             <i class="bi bi-info-circle me-1"></i>
@@ -16317,6 +16396,9 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                     <div class="alert alert-warning small">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         <strong>Important:</strong> Run these commands on your Huawei OLT via Telnet/SSH before authorizing ONUs.
@@ -16512,6 +16594,9 @@ echo "# ================================================\n";
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="mb-3">
                             <label class="form-label">Zone Name <span class="text-danger">*</span></label>
                             <input type="text" name="name" id="zoneName" class="form-control" required>
@@ -16546,6 +16631,9 @@ echo "# ================================================\n";
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="mb-3">
                             <label class="form-label">Zone <span class="text-danger">*</span></label>
                             <select name="zone_id" id="subzoneZoneId" class="form-select" required>
@@ -16589,6 +16677,9 @@ echo "# ================================================\n";
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Zone <span class="text-danger">*</span></label>
@@ -16649,6 +16740,9 @@ echo "# ================================================\n";
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Zone <span class="text-danger">*</span></label>
@@ -18147,6 +18241,9 @@ function saveDeviceStatus() {
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                             <div class="row mb-3">
                                 <div class="col-md-4"><strong>Timestamp:</strong><br>${timestamp}</div>
                                 <div class="col-md-4"><strong>Type:</strong><br><span class="badge bg-info">${log.task_type || '-'}</span></div>
@@ -19937,6 +20034,9 @@ function saveDeviceStatus() {
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                             <div class="text-center mb-4">
                                 <i class="bi bi-wifi-off text-warning" style="font-size: 4rem;"></i>
                             </div>
@@ -20045,6 +20145,9 @@ function saveDeviceStatus() {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                        <div id="wifiConfigLoading" class="text-center py-4" style="display:none;"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>
+                        <div id="wifiConfigError" class="alert alert-warning text-center" style="display:none;"></div>
+                        <div id="wifiConfigContent">
                                 <div class="row g-3">
                                     <div>
                                         <div class="card h-100">
@@ -20118,317 +20221,204 @@ function saveDeviceStatus() {
         }
     }
     
-// Open TR-069 WiFi Config Modal with streaming summon
+// Open TR-069 WiFi Config Modal with status pattern
     function openTR069WiFiConfig(serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        // Clear any previous toasts
-        document.querySelectorAll('.toast').forEach(t => t.remove());
+        // Show modal immediately with loading state
+        const modal = document.getElementById('wifiConfigModal');
+        const loadingEl = document.getElementById('wifiConfigLoading');
+        const contentEl = document.getElementById('wifiConfigContent');
+        const errorEl = document.getElementById('wifiConfigError');
+        
+        if (loadingEl) loadingEl.style.display = 'block';
+        if (contentEl) contentEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'none';
+        
+        document.getElementById('wifiDeviceId').value = serialNumber;
+        document.getElementById('wifiDeviceSn').textContent = serialNumber;
+        new bootstrap.Modal(modal).show();
         
         let attempt = 0;
         const maxAttempts = 10;
-        let deviceId = null;
         
-        const statusToast = showToast('<div id="summonProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
+        function updateLoading(message) {
+            if (loadingEl) loadingEl.innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">' + message + '</p>';
+        }
         
-        function updateProgress(message) {
-            const el = document.getElementById('summonProgress');
-            if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + message;
+        function showError(message, showRefresh = false) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (errorEl) {
+                let html = '<div class="text-center"><p>' + message + '</p>';
+                if (showRefresh) {
+                    html += '<button class="btn btn-primary" onclick="openTR069WiFiConfig(\'' + serialNumber + '\')"><i class="bi bi-arrow-clockwise me-1"></i> Retry</button>';
+                }
+                html += '</div>';
+                errorEl.innerHTML = html;
+                errorEl.style.display = 'block';
+            }
         }
         
         function checkDevice() {
             attempt++;
-            updateProgress('Checking device... (attempt ' + attempt + '/' + maxAttempts + ')');
+            updateLoading('Checking device readiness... (' + attempt + '/' + maxAttempts + ')');
             
             fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) {
-                        hideToast(statusToast);
-                        showToast('Error: ' + (data.error || 'Failed'), 'danger', 5000);
+                        showError(data.error || 'Failed to check device', true);
                         return;
                     }
-                    
-                    deviceId = data.device_id;
                     
                     if (!data.in_genieacs) {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start">' +
-                            '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
-                            '<small class="text-warning">Device not connected to ACS</small><br>' +
-                            '<small>Complete OLT Authorization and push TR-069 config first</small>' +
-                            '</div>', 'warning', 10000);
+                        showError('<strong>Device not in GenieACS</strong><br><small>Complete OLT Authorization and push TR-069 config first</small>', false);
                         return;
                     }
                     
-                    if (data.reachable && deviceId) {
-                        hideToast(statusToast);
-                        showToast('<i class="bi bi-check-circle me-1"></i>Device ready!', 'success', 2000);
-                        openWifiConfigModal(serialNumber, deviceId);
+                    if (data.reachable && data.device_id) {
+                        // Device ready - show config form
+                        if (loadingEl) loadingEl.style.display = 'none';
+                        if (contentEl) contentEl.style.display = 'block';
+                        document.getElementById('wifiDeviceId').value = data.device_id;
+                        loadWifiVlans();
                     } else if (attempt < maxAttempts) {
-                        updateProgress('Waiting for device response... (' + attempt + '/' + maxAttempts + ')');
+                        updateLoading('Waiting for device response... (' + attempt + '/' + maxAttempts + ')');
                         setTimeout(checkDevice, 3000);
                     } else {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start">' +
-                            '<strong>Device Not Responding</strong><br>' +
-                            '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
-                            '<small>Try again in a few minutes</small>' +
-                            '</div>', 'warning', 8000);
+                        showError('<strong>Device Not Responding</strong><br><small>Last seen: ' + (data.last_inform || 'Never') + '</small>', true);
                     }
                 })
                 .catch(err => {
-                    hideToast(statusToast);
-                    showToast('Connection error: ' + err.message, 'danger', 5000);
+                    showError('Connection error: ' + err.message, true);
                 });
         }
         
-        // Start checking
         checkDevice();
     }
-    
-    // Open WiFi Config Modal (after reachability check passed)
-    function openWifiConfigModal(serialNumber, deviceId) {
-        document.getElementById('wifiDeviceId').value = deviceId || serialNumber;
-        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
-        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-// Open TR-069 WAN Config with streaming summon
+// Open TR-069 WAN Config Modal with status pattern
     function openTR069WANConfig(onuId, serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        // Clear any previous toasts
-        document.querySelectorAll('.toast').forEach(t => t.remove());
+        // Show modal immediately with loading state
+        const modal = document.getElementById('wanConfigModal');
+        const body = document.getElementById('wanConfigBody');
+        document.getElementById('wanConfigOnuId').value = onuId;
+        
+        body.innerHTML = '<div id="wanConfigLoading" class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2">Checking device readiness...</p></div>';
+        new bootstrap.Modal(modal).show();
         
         let attempt = 0;
         const maxAttempts = 10;
-        let deviceId = null;
         
-        const statusToast = showToast('<div id="wanSummonProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
+        function updateLoading(message) {
+            const el = document.getElementById('wanConfigLoading');
+            if (el) el.innerHTML = '<div class="spinner-border text-primary"></div><p class="mt-2">' + message + '</p>';
+        }
         
-        function updateProgress(message) {
-            const el = document.getElementById('wanSummonProgress');
-            if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + message;
+        function showError(message, showRetry = false) {
+            let html = '<div class="text-center py-4"><div class="alert alert-warning"><p class="mb-2">' + message + '</p>';
+            if (showRetry) {
+                html += '<button class="btn btn-primary btn-sm" onclick="openTR069WANConfig(' + onuId + ', \'' + serialNumber + '\')"><i class="bi bi-arrow-clockwise me-1"></i> Retry</button>';
+            }
+            html += '</div></div>';
+            body.innerHTML = html;
+        }
+        
+        function loadWanContent() {
+            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2">Loading WAN configuration...</p></div>';
+            
+            fetch('?page=api&action=get_wan_config&onu_id=' + onuId)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        renderWanConfig(data, onuId);
+                    } else {
+                        showError(data.error || 'Failed to load WAN config', true);
+                    }
+                })
+                .catch(err => {
+                    showError('Connection error: ' + err.message, true);
+                });
         }
         
         function checkDevice() {
             attempt++;
-            updateProgress('Checking device... (attempt ' + attempt + '/' + maxAttempts + ')');
+            updateLoading('Checking device readiness... (' + attempt + '/' + maxAttempts + ')');
             
             fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) {
-                        hideToast(statusToast);
-                        showToast('Error: ' + (data.error || 'Failed'), 'danger', 5000);
+                        showError(data.error || 'Failed to check device', true);
                         return;
                     }
-                    
-                    deviceId = data.device_id;
                     
                     if (!data.in_genieacs) {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start">' +
-                            '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
-                            '<small class="text-warning">Device not connected to ACS</small><br>' +
-                            '<small>Complete OLT Authorization and push TR-069 config first</small>' +
-                            '</div>', 'warning', 10000);
+                        showError('<strong>Device not in GenieACS</strong><br><small>Complete OLT Authorization and push TR-069 config first</small>', false);
                         return;
                     }
                     
-                    if (data.reachable && deviceId) {
-                        hideToast(statusToast);
-                        showToast('<i class="bi bi-check-circle me-1"></i>Device ready!', 'success', 2000);
-                        openWANConfig(onuId);
+                    if (data.reachable) {
+                        loadWanContent();
                     } else if (attempt < maxAttempts) {
-                        updateProgress('Waiting for device response... (' + attempt + '/' + maxAttempts + ')');
+                        updateLoading('Waiting for device response... (' + attempt + '/' + maxAttempts + ')');
                         setTimeout(checkDevice, 3000);
                     } else {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start">' +
-                            '<strong>Device Not Responding</strong><br>' +
-                            '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
-                            '<small>Try again in a few minutes</small>' +
-                            '</div>', 'warning', 8000);
+                        showError('<strong>Device Not Responding</strong><br><small>Last seen: ' + (data.last_inform || 'Never') + '</small>', true);
                     }
                 })
                 .catch(err => {
-                    hideToast(statusToast);
-                    showToast('Connection error: ' + err.message, 'danger', 5000);
+                    showError('Connection error: ' + err.message, true);
                 });
         }
         
-        // Start checking
         checkDevice();
     }
-    // Open WAN Config Modal (loads existing config)
-    function openWANConfig(onuId) {
-        const modal = document.getElementById('wanConfigModal');
-        const body = document.getElementById('wanConfigBody');
-        document.getElementById('wanConfigOnuId').value = onuId;
-        
-        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Loading WAN configuration...</p></div>';
-        new bootstrap.Modal(modal).show();
-        
-        fetch('?page=api&action=get_wan_config&onu_id=' + onuId)
-            .then(r => r.json())
-            .then(data => {
-                let html = '';
-                
-                if (data.success) {
-                    const onu = data.onu || {};
-                    const wans = data.wans || [];
-                    
-                    html += '<div class="alert alert-light border mb-3">';
-                    html += '<div class="d-flex align-items-center">';
-                    html += '<i class="bi bi-router fs-4 text-primary me-3"></i>';
-                    html += '<div>';
-                    html += '<strong>' + escapeHtml(onu.serial_number || onu.sn || 'Unknown') + '</strong>';
-                    html += '<div class="small text-muted">' + escapeHtml(onu.description || onu.model || '') + '</div>';
-                    html += '</div>';
-                    html += '</div>';
-                    html += '</div>';
-                    
-                    if (wans.length > 0) {
-                        html += '<h6 class="text-primary mb-3"><i class="bi bi-globe me-2"></i>Configured WAN Interfaces</h6>';
-                        wans.forEach((wan, idx) => {
-                            const typeLabel = wan.type === 'pppoe' ? 'PPPoE' : (wan.type === 'dhcp' ? 'DHCP' : 'Static IP');
-                            const statusClass = wan.connected ? 'success' : 'secondary';
-                            html += '<div class="card mb-2">';
-                            html += '<div class="card-body py-2">';
-                            html += '<div class="d-flex justify-content-between align-items-center">';
-                            html += '<div>';
-                            html += '<span class="badge bg-' + statusClass + ' me-2">' + (wan.connected ? 'Connected' : 'Disconnected') + '</span>';
-                            html += '<strong>' + escapeHtml(wan.name || 'WAN ' + (idx + 1)) + '</strong>';
-                            html += '<span class="text-muted ms-2">(' + typeLabel + ')</span>';
-                            html += '</div>';
-                            html += '<div>';
-                            if (wan.ip) html += '<code class="small">' + escapeHtml(wan.ip) + '</code>';
-                            html += '</div>';
-                            html += '</div>';
-                            if (wan.vlan) html += '<div class="small text-muted mt-1">VLAN: ' + wan.vlan + '</div>';
-                            html += '</div>';
-                            html += '</div>';
-                        });
-                    } else {
-                        html += '<div class="alert alert-warning">';
-                        html += '<i class="bi bi-exclamation-triangle me-2"></i>';
-                        html += 'No WAN interfaces configured. Use the form below to add one.';
-                        html += '</div>';
-                    }
-                    
-                    html += '<hr class="my-3">';
-                    html += '<h6 class="text-primary mb-3"><i class="bi bi-plus-circle me-2"></i>Add/Update Internet WAN</h6>';
-                    
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">Connection Type</label>';
-                    html += '<select name="wan_mode" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
-                    html += '<option value="pppoe">PPPoE</option>';
-                    html += '<option value="dhcp">DHCP (IPoE)</option>';
-                    html += '<option value="static">Static IP</option>';
-                    html += '</select>';
-                    html += '</div>';
-                    
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">Internet VLAN</label>';
-                    html += '<input type="number" name="service_vlan" class="form-control" value="' + ((onu.vlan_id && onu.vlan_id > 1) ? onu.vlan_id : 902) + '" min="1" max="4094">';
-                    html += '<div class="form-text">Service VLAN for internet traffic</div>';
-                    html += '</div>';
-                    
-                    html += '<div id="pppoeFields">';
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">PPPoE Username <span class="text-danger">*</span></label>';
-                    html += '<input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com">';
-                    html += '</div>';
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">PPPoE Password <span class="text-danger">*</span></label>';
-                    html += '<div class="input-group">';
-                    html += '<input type="password" name="pppoe_password" id="wanPppoePass" class="form-control" placeholder="password">';
-                    html += '<button type="button" class="btn btn-outline-secondary" onclick="togglePassword(\'wanPppoePass\')"><i class="bi bi-eye"></i></button>';
-                    html += '</div>';
-                    html += '</div>';
-                    html += '</div>';
-                    
-                    html += '<div id="staticFields" class="d-none">';
-                    html += '<div class="row">';
-                    html += '<div class="col-md-6 mb-3">';
-                    html += '<label class="form-label">IP Address</label>';
-                    html += '<input type="text" name="static_ip" class="form-control" placeholder="192.168.1.100">';
-                    html += '</div>';
-                    html += '<div class="col-md-6 mb-3">';
-                    html += '<label class="form-label">Subnet Mask</label>';
-                    html += '<input type="text" name="static_mask" class="form-control" value="255.255.255.0">';
-                    html += '</div>';
-                    html += '</div>';
-                    html += '<div class="row">';
-                    html += '<div class="col-md-6 mb-3">';
-                    html += '<label class="form-label">Gateway</label>';
-                    html += '<input type="text" name="static_gateway" class="form-control" placeholder="192.168.1.1">';
-                    html += '</div>';
-                    html += '<div class="col-md-6 mb-3">';
-                    html += '<label class="form-label">DNS Server</label>';
-                    html += '<input type="text" name="static_dns" class="form-control" value="8.8.8.8">';
-                    html += '</div>';
-                    html += '</div>';
-                    html += '</div>';
-                    
-                    html += '<div class="form-check mb-3">';
-                    html += '<input type="checkbox" name="nat_enabled" class="form-check-input" id="wanNatEnabled" checked>';
-                    html += '<label class="form-check-label" for="wanNatEnabled">Enable NAT</label>';
-                    html += '</div>';
-                    
-                } else {
-                    html += '<div class="alert alert-danger">';
-                    html += '<i class="bi bi-exclamation-triangle me-2"></i>';
-                    html += (data.error || 'Failed to load WAN configuration');
-                    html += '</div>';
-                    html += '<p class="text-muted">You can still configure WAN manually:</p>';
-                    
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">Connection Type</label>';
-                    html += '<select name="wan_mode" id="wanConnectionType" class="form-select" onchange="toggleWanFields()">';
-                    html += '<option value="pppoe">PPPoE</option>';
-                    html += '<option value="dhcp">DHCP (IPoE)</option>';
-                    html += '<option value="static">Static IP</option>';
-                    html += '</select>';
-                    html += '</div>';
-                    
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">Internet VLAN</label>';
-                    html += '<input type="number" name="service_vlan" class="form-control" value="902" min="1" max="4094">';
-                    html += '</div>';
-                    
-                    html += '<div id="pppoeFields">';
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">PPPoE Username</label>';
-                    html += '<input type="text" name="pppoe_username" class="form-control" placeholder="user@isp.com">';
-                    html += '</div>';
-                    html += '<div class="mb-3">';
-                    html += '<label class="form-label">PPPoE Password</label>';
-                    html += '<input type="password" name="pppoe_password" class="form-control">';
-                    html += '</div>';
-                    html += '</div>';
-                    
-                    html += '<div id="staticFields" class="d-none">';
-                    html += '<div class="mb-3"><label class="form-label">IP Address</label><input type="text" name="static_ip" class="form-control"></div>';
-                    html += '<div class="mb-3"><label class="form-label">Gateway</label><input type="text" name="static_gateway" class="form-control"></div>';
-                    html += '</div>';
-                }
-                
-                body.innerHTML = html;
-            })
-            .catch(err => {
-                body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error: ' + err.message + '</div>';
-            });
-    }
     
+    function renderWanConfig(data, onuId) {
+        const body = document.getElementById('wanConfigBody');
+        let html = '';
+        const onu = data.onu || {};
+        const wans = data.wans || [];
+        
+        html += '<div class="alert alert-light border mb-3">';
+        html += '<div class="d-flex align-items-center">';
+        html += '<i class="bi bi-router fs-4 text-primary me-3"></i>';
+        html += '<div>';
+        html += '<strong>' + escapeHtml(onu.serial_number || onu.sn || 'Unknown') + '</strong>';
+        html += '<div class="small text-muted">' + escapeHtml(onu.description || onu.model || '') + '</div>';
+        html += '</div></div></div>';
+        
+        if (wans.length > 0) {
+            html += '<h6 class="text-primary mb-3"><i class="bi bi-globe me-2"></i>Configured WAN Interfaces</h6>';
+            wans.forEach((wan, idx) => {
+                const typeLabel = wan.type === 'pppoe' ? 'PPPoE' : (wan.type === 'dhcp' ? 'DHCP' : 'Static IP');
+                const statusClass = wan.connected ? 'success' : 'secondary';
+                html += '<div class="card mb-2"><div class="card-body py-2">';
+                html += '<div class="d-flex justify-content-between align-items-center">';
+                html += '<div><span class="badge bg-' + statusClass + ' me-2">' + (wan.connected ? 'Connected' : 'Disconnected') + '</span>';
+                html += '<strong>' + escapeHtml(wan.name || 'WAN ' + (idx + 1)) + '</strong>';
+                html += '<span class="text-muted ms-2">(' + typeLabel + ')</span></div>';
+                html += '<div>' + (wan.ip ? '<code class="small">' + escapeHtml(wan.ip) + '</code>' : '') + '</div>';
+                html += '</div>';
+                if (wan.vlan) html += '<div class="small text-muted mt-1">VLAN: ' + wan.vlan + '</div>';
+                html += '</div></div>';
+            });
+        } else {
+            html += '<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>No WAN interfaces configured</div>';
+        }
+        
+        body.innerHTML = html;
+    }
     function toggleWanFields() {
         const type = document.getElementById('wanConnectionType').value;
         const pppoeFields = document.getElementById('pppoeFields');
