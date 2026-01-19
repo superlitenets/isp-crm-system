@@ -17418,8 +17418,13 @@ function renderTabContent(key, category) {
             if (param.value !== null && param.value !== undefined || param.value === '') {
                 originalDeviceParams[param.path] = param.value;
                 const inputHtml = renderParamInput(param, category.editable);
+                // Rename certain labels for clarity
+                let displayLabel = param.label;
+                if (displayLabel.toLowerCase().includes('passphrase') || displayLabel.toLowerCase().includes('presharedkey')) {
+                    displayLabel = 'Password';
+                }
                 html += `<div class="param-item">
-                    <label>${param.label}</label>
+                    <label>${displayLabel}</label>
                     ${inputHtml}
                 </div>`;
             }
