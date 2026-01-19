@@ -17380,8 +17380,24 @@ function renderTabContent(key, category) {
         // Default - Vertical layout with priority sorting for wireless
         html = '<div class="param-row"><div>';
         
-        // Sort params - for wireless_lan, put SSID and Password at top, filter unwanted fields
+        // Sort params - prioritize important fields at the top
         let sortedParams = [...category.params];
+        
+        // PPP Interface sorting - put Username, Password, Status at top
+        if (key === 'ppp_interface' || key.startsWith('ppp_interface')) {
+            const pppPriority = ['Username', 'Password', 'ConnectionStatus', 'Status', 'Enable', 'ExternalIPAddress', 'DNSServers', 'VLAN', 'X_HW_VLAN', 'ConnectionType', 'Name'];
+            sortedParams.sort((a, b) => {
+                const aName = a.path.split('.').pop();
+                const bName = b.path.split('.').pop();
+                let aPriority = pppPriority.findIndex(p => aName.includes(p) || a.label.includes(p));
+                let bPriority = pppPriority.findIndex(p => bName.includes(p) || b.label.includes(p));
+                if (aPriority === -1) aPriority = 100;
+                if (bPriority === -1) bPriority = 100;
+                return aPriority - bPriority;
+            });
+        }
+        
+        // Wireless LAN sorting and filtering
         if (key === 'wireless_lan' || key.startsWith('wireless_lan')) {
             // Filter out unwanted fields
             const excludeFields = ['BSSID', 'PeerBSSID', 'Peer BSSID'];
