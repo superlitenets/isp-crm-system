@@ -8865,7 +8865,7 @@ try {
                 <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
                     <strong>WiFi</strong>
                     <div>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="summonOnuWithProgress()" id="wifiRefreshBtn">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadWiFiFromTR069()" id="wifiRefreshBtn">
                             <i class="bi bi-arrow-clockwise me-1"></i> Refresh from TR-069
                         </button>
                     </div>
