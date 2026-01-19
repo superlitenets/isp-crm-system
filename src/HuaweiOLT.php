@@ -10049,6 +10049,7 @@ class HuaweiOLT {
         if ($genieData['success']) {
             $status['wan'] = $genieData['wan'] ?? null;
             $status['lan'] = $genieData['lan'] ?? null;
+            $status['wifi'] = $genieData['wifi'] ?? null;
             $status['details'] = $genieData['details'] ?? null;
             $status['source'] = 'tr069';
             
