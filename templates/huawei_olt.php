@@ -17328,6 +17328,7 @@ function renderInlineStatus(categories) {
 
 async function saveInlineStatus() {
     const container = document.getElementById('inlineStatusContent');
+    const saveBtn = document.getElementById('inlineStatusSaveBtn');
     const changes = {};
     
     container.querySelectorAll('[data-path]').forEach(el => {
@@ -17343,6 +17344,10 @@ async function saveInlineStatus() {
         return;
     }
     
+    const originalBtnHtml = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving ' + Object.keys(changes).length + ' changes...';
+    
     try {
         const formData = new FormData();
         formData.append('action', 'save_device_params');
@@ -17355,13 +17360,26 @@ async function saveInlineStatus() {
         const data = await response.json();
         
         if (data.success) {
+            saveBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
+            saveBtn.classList.remove('btn-warning');
+            saveBtn.classList.add('btn-success');
             showToast('Changes saved successfully', 'success');
-            document.getElementById('inlineStatusSaveBtn').style.display = 'none';
+            setTimeout(() => {
+                saveBtn.style.display = 'none';
+                saveBtn.classList.remove('btn-success');
+                saveBtn.classList.add('btn-warning');
+                saveBtn.innerHTML = originalBtnHtml;
+                saveBtn.disabled = false;
+            }, 2000);
             Object.assign(inlineOriginalParams, changes);
         } else {
+            saveBtn.innerHTML = originalBtnHtml;
+            saveBtn.disabled = false;
             showToast('Error: ' + (data.error || 'Failed to save'), 'danger');
         }
     } catch (error) {
+        saveBtn.innerHTML = originalBtnHtml;
+        saveBtn.disabled = false;
         showToast('Error saving: ' + error.message, 'danger');
     }
 }
