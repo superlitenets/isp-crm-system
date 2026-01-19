@@ -8869,13 +8869,27 @@ try {
                 </div>
             </div>
             
-            <!-- WiFi Section - Dynamically loads from TR-069 -->
+            <!-- WiFi Section - Always shows based on ONU type -->
+            <?php
+            // Determine WiFi interface count based on ONU type
+            $wifiCount = 0;
+            if (!empty($currentOnu['onu_type_id'])) {
+                $typeStmt = $db->prepare("SELECT wifi_capable, wifi_dual_band FROM huawei_onu_types WHERE id = ?");
+                $typeStmt->execute([$currentOnu['onu_type_id']]);
+                $onuType = $typeStmt->fetch(PDO::FETCH_ASSOC);
+                if ($onuType && $onuType['wifi_capable']) {
+                    $wifiCount = $onuType['wifi_dual_band'] ? 4 : 4; // 4 SSIDs for all WiFi ONUs
+                }
+            }
+            ?>
+            <?php if ($wifiCount > 0): ?>
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
-                    <strong>WiFi</strong>
+                    <strong><i class="bi bi-wifi me-2"></i>WiFi</strong>
                     <div>
+                        <span class="badge bg-info me-2">TR-069</span>
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadWiFiFromTR069()" id="wifiRefreshBtn">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh from TR-069
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                         </button>
                     </div>
                 </div>
@@ -8884,31 +8898,38 @@ try {
                         <div class="spinner-border spinner-border-sm text-primary me-2"></div>
                         <span class="text-muted">Loading WiFi data from TR-069...</span>
                     </div>
-                    <div id="wifiNotConnected" class="text-center py-3 <?= empty($currentOnu['tr069_ip']) ? '' : 'd-none' ?>">
-                        <i class="bi bi-wifi-off text-muted fs-4 d-block mb-2"></i>
-                        <span class="text-muted">Device not connected to TR-069. WiFi data will be available when the device connects to the ACS.</span>
-                    </div>
-                    <table class="table table-sm table-hover mb-0 <?= empty($currentOnu['tr069_ip']) ? 'd-none' : '' ?>" id="wifiTable">
-                        <thead>
+                    <table class="table table-sm table-hover mb-0" id="wifiTable">
+                        <thead class="table-dark">
                             <tr>
                                 <th>Port</th>
-                                <th>Enable</th>
+                                <th>Admin State</th>
+                                <th>Mode</th>
                                 <th>SSID</th>
-                                <th>VLAN</th>
-                                <th>Security</th>
+                                <th>DHCP</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="wifiPortsTable">
-                            <tr>
-                                <td colspan="6" class="text-muted text-center">
-                                    <span class="spinner-border spinner-border-sm me-1"></span> Loading...
-                                </td>
+                            <?php for ($i = 1; $i <= $wifiCount; $i++): ?>
+                            <tr class="wifi-row" data-index="<?= $i ?>">
+                                <td><strong>wifi_0/<?= $i ?></strong></td>
+                                <td><button class="btn btn-sm btn-secondary wifi-enable-toggle" data-index="<?= $i ?>" data-enabled="false" disabled>Disabled</button></td>
+                                <td><span class="badge bg-info">LAN</span></td>
+                                <td class="wifi-ssid"><span class="text-muted fst-italic">Loading...</span></td>
+                                <td><span class="text-muted">No control</span></td>
+                                <td><button class="btn btn-sm btn-outline-primary" onclick="openTR069WiFiConfig('<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>', <?= $i ?>)"><i class="bi bi-gear me-1"></i>Configure</button></td>
                             </tr>
+                            <?php endfor; ?>
                         </tbody>
                     </table>
+                    <?php if (empty($currentOnu['tr069_ip'])): ?>
+                    <div class="alert alert-warning m-2 mb-0 py-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Device not connected to TR-069. Click Configure to set up WiFi once device connects.
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
             
             <script>
             const onuSerial = '<?= htmlspecialchars($currentOnu['tr069_serial'] ?? $currentOnu['sn'] ?? '') ?>';
@@ -8946,23 +8967,25 @@ try {
             }
             
             function loadWiFiFromTR069() {
-                if (!hasTR069) return;
-                
-                const tbody = document.getElementById('wifiPortsTable');
                 const loading = document.getElementById('wifiLoadingIndicator');
-                const table = document.getElementById('wifiTable');
-                const notConnected = document.getElementById('wifiNotConnected');
                 const refreshBtn = document.getElementById('wifiRefreshBtn');
+                
+                if (!loading || !refreshBtn) return;
                 
                 loading.classList.remove('d-none');
                 refreshBtn.disabled = true;
                 
-                loadWifiVlans().then(() => {
-                    return fetch('?page=huawei-olt&t=' + Date.now(), {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                        body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
-                    });
+                if (!hasTR069) {
+                    loading.classList.add('d-none');
+                    refreshBtn.disabled = false;
+                    showToast('Device not connected to TR-069', 'warning');
+                    return;
+                }
+                
+                fetch('?page=huawei-olt&t=' + Date.now(), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(onuSerial)
                 })
                 .then(async r => {
                     const text = await r.text();
@@ -8981,66 +9004,100 @@ try {
                     refreshBtn.disabled = false;
                     
                     if (!data.success) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-warning text-center">' + (data.error || 'Failed to load WiFi data') + '</td></tr>';
+                        showToast(data.error || 'Failed to load WiFi data', 'warning');
                         return;
                     }
                     
                     if (!data.interfaces || data.interfaces.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No WiFi interfaces found on this device</td></tr>';
+                        showToast('No WiFi interfaces found on this device', 'warning');
                         return;
                     }
                     
-                    let html = '';
+                    // Update pre-rendered rows with actual data
                     data.interfaces.forEach((iface, idx) => {
                         const wlanIdx = iface.index || (idx + 1);
-                        const band = iface.band || (idx === 0 ? '2.4GHz' : '5GHz');
-                        const ssid = iface.ssid || '<span class="text-muted">Not configured</span>';
-                        const vlan = iface.vlan_id || '';
-                        const security = iface.security || '-';
-                        const enableChecked = iface.enabled ? 'checked' : '';
-                        const rowClass = iface.enabled ? '' : 'table-secondary';
+                        const row = document.querySelector('.wifi-row[data-index="' + wlanIdx + '"]');
+                        if (!row) return;
                         
-                        html += '<tr class="' + rowClass + '">';
-                        html += '<td>wifi_0/' + wlanIdx + ' <small class="text-muted">(' + band + ')</small></td>';
-                        html += '<td><div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input wifi-enable-toggle" data-index="' + wlanIdx + '" ' + enableChecked + '></div></td>';
-                        html += '<td><strong>' + ssid + '</strong></td>';
-                        html += '<td>' + buildVlanSelect(wlanIdx, vlan) + '</td>';
-                        html += '<td><small>' + security + '</small></td>';
-                        html += '<td><a href="#" class="text-primary" onclick="openTR069WiFiConfig(\'' + onuSerial + '\', ' + wlanIdx + ')">Configure</a></td>';
-                        html += '</tr>';
+                        const isEnabled = iface.enabled;
+                        const ssid = iface.ssid || '';
+                        
+                        // Update enable button
+                        const btn = row.querySelector('.wifi-enable-toggle');
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.dataset.enabled = String(isEnabled);
+                            btn.className = isEnabled ? 'btn btn-sm btn-success wifi-enable-toggle' : 'btn btn-sm btn-secondary wifi-enable-toggle';
+                            btn.innerHTML = isEnabled ? 'Enabled' : 'Disabled';
+                        }
+                        
+                        // Update SSID
+                        const ssidCell = row.querySelector('.wifi-ssid');
+                        if (ssidCell) {
+                            ssidCell.innerHTML = ssid || '<span class="text-muted fst-italic">Not set</span>';
+                        }
+                        
+                        // Update row style
+                        row.className = isEnabled ? 'wifi-row' : 'wifi-row table-secondary';
                     });
                     
-                    tbody.innerHTML = html;
-                    table.classList.remove('d-none');
-                    notConnected.classList.add('d-none');
+                    // Attach click handlers to enable buttons
+                    attachWifiToggleHandlers();
                     
-                    // Add event handlers for enable toggles
-                    document.querySelectorAll('.wifi-enable-toggle').forEach(toggle => {
-                        toggle.addEventListener('change', function() {
-                            const wlanIdx = this.dataset.index;
-                            const enabled = this.checked;
-                            saveWiFiSetting(wlanIdx, 'Enable', enabled);
-                        });
-                    });
-                    
-                    // Add event handlers for VLAN selects
-                    document.querySelectorAll('.wifi-vlan-select').forEach(select => {
-                        select.addEventListener('change', function() {
-                            const wlanIdx = this.dataset.index;
-                            const vlanId = this.value;
-                            if (vlanId && vlanId > 0) {
-                                saveWiFiSetting(wlanIdx, 'X_HW_VLANID', parseInt(vlanId));
-                            }
-                        });
-                    });
+                    showToast('WiFi data refreshed', 'success');
                 })
-        .catch(err => {
+                .catch(err => {
                     loading.classList.add('d-none');
                     refreshBtn.disabled = false;
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center">Error: ' + err.message + '</td></tr>';
+                    showToast('Error: ' + err.message, 'danger');
                 });
             }
             
+            function attachWifiToggleHandlers() {
+                document.querySelectorAll('.wifi-enable-toggle').forEach(btn => {
+                    btn.onclick = async function() {
+                        if (this.disabled) return;
+                        
+                        const wlanIdx = this.dataset.index;
+                        const currentEnabled = this.dataset.enabled === 'true';
+                        const newEnabled = !currentEnabled;
+                        
+                        this.disabled = true;
+                        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                        
+                        try {
+                            await saveWiFiSettingAsync(wlanIdx, 'Enable', newEnabled);
+                            this.dataset.enabled = String(newEnabled);
+                            this.className = newEnabled ? 'btn btn-sm btn-success wifi-enable-toggle' : 'btn btn-sm btn-secondary wifi-enable-toggle';
+                            this.innerHTML = newEnabled ? 'Enabled' : 'Disabled';
+                            this.closest('tr').className = newEnabled ? 'wifi-row' : 'wifi-row table-secondary';
+                            showToast('WiFi ' + (newEnabled ? 'enabled' : 'disabled'), 'success');
+                        } catch (err) {
+                            showToast('Error: ' + err.message, 'danger');
+                            this.innerHTML = currentEnabled ? 'Enabled' : 'Disabled';
+                        }
+                        this.disabled = false;
+                    };
+                });
+            }
+            
+            
+            // Async version of saveWiFiSetting for await usage
+            async function saveWiFiSettingAsync(wlanIndex, param, value) {
+                const path = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + wlanIndex + '.' + param;
+                
+                const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=save_device_params&serial=' + encodeURIComponent(onuSerial) + '&params=' + encodeURIComponent(JSON.stringify({[path]: value}))
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to save');
+                }
+                return data;
+            }
+
             // Save individual WiFi setting via TR-069
             function saveWiFiSetting(wlanIndex, param, value) {
                 const path = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + wlanIndex + '.' + param;
@@ -9093,7 +9150,7 @@ try {
             if (onuSerial) {
                 summonOnu();
             }
-            if (hasTR069) {
+            if (hasTR069 && document.getElementById('wifiTable')) {
                 loadWiFiFromTR069();
             }
             </script>
