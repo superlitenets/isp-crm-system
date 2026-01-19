@@ -17786,8 +17786,9 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 alert('Failed to update description: ' + (data.error || 'Unknown error'));
             }
         })
@@ -17890,8 +17891,9 @@ function saveDeviceStatus() {
         })
         .then(data => {
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 return;
             }
             
@@ -18039,8 +18041,9 @@ function saveDeviceStatus() {
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                     container.innerHTML = '<div class="alert alert-warning m-2">' + (data.error || 'Failed to load logs') + '</div>';
                     return;
                 }
@@ -18169,8 +18172,9 @@ function saveDeviceStatus() {
         })
         .then(data => {
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 body.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to fetch config') + '</div>';
                 return;
             }
@@ -18263,75 +18267,16 @@ function saveDeviceStatus() {
         document.querySelector('input[name="command"]').value = cmd;
     }
     
+    // Open WiFi Config - Direct push without summoning device
     async function openWifiConfig(deviceId, serialNumber) {
         if (!serialNumber) {
             showToast('Serial number required', 'danger');
             return;
         }
         
-        // First check if ONU is reachable via GenieACS
-        const loadingToast = showToast('Checking ONU reachability...', 'info', 10000);
-        
-        try {
-            // Check GenieACS for this device using serial number
-            const genieResp = await fetch('?page=huawei-olt&action=get_tr069_device_by_serial&serial=' + encodeURIComponent(serialNumber));
-            const genieData = await genieResp.json();
-            
-            hideToast(loadingToast);
-            
-            if (!genieData.success || !genieData.device) {
-                showTR069NotReachableModal(null, serialNumber, 'not_found', 
-                    'ONU not registered in GenieACS. The device may not have TR-069 configured or hasn\'t contacted the ACS yet.');
-                return;
-            }
-            
-            // Check last inform time
-            const device = genieData.device;
-            const genieacsDeviceId = device._id || deviceId;  // Extract GenieACS device ID from lookup
-            const lastInform = device._lastInform ? new Date(device._lastInform) : null;
-            const now = new Date();
-            const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-            
-            if (!lastInform || lastInform < fiveMinutesAgo) {
-                // Device hasn't informed recently - try connection request
-                showToast('Sending connection request to ONU...', 'info', 5000);
-                
-                const connResp = await fetch('?page=huawei-olt&action=tr069_connection_request_by_serial&serial=' + encodeURIComponent(serialNumber), {
-                    method: 'POST'
-                });
-                
-                // Wait for device to respond
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-                // Re-check device status
-                const recheckResp = await fetch('?page=huawei-olt&action=get_tr069_device_by_serial&serial=' + encodeURIComponent(serialNumber));
-                const recheckData = await recheckResp.json();
-                
-                if (recheckData.success && recheckData.device) {
-                    const newLastInform = recheckData.device._lastInform ? new Date(recheckData.device._lastInform) : null;
-                    if (newLastInform && newLastInform >= fiveMinutesAgo) {
-                        // Device is now reachable - use GenieACS device ID from lookup
-                        showToast('ONU is reachable', 'success');
-                        openWifiConfigDirect(recheckData.device._id || genieacsDeviceId, serialNumber);
-                        return;
-                    }
-                }
-                
-                // Still not reachable
-                const lastSeenStr = lastInform ? formatTimeAgo(lastInform) : 'Never';
-                showTR069NotReachableModal(null, serialNumber, 'stale', 
-                    'ONU last contacted ACS: ' + lastSeenStr + '. The device may be offline or have network issues.');
-                return;
-            }
-            
-            // Device is reachable - open config modal using GenieACS device ID
-            showToast('ONU is reachable via ACS', 'success');
-            openWifiConfigDirect(genieacsDeviceId, serialNumber);
-            
-        } catch (err) {
-            hideToast(loadingToast);
-            showToast('Error checking GenieACS: ' + err.message, 'danger');
-        }
+        // Skip device summoning - open config modal directly
+        // Use serial number as device ID if not provided
+        openWifiConfigDirect(deviceId || serialNumber, serialNumber);
     }
     
     function openWifiConfigDirect(deviceId, serialNumber) {
@@ -18364,8 +18309,9 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 container.innerHTML = '<div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-2"></i>' + (data.error || 'Failed to load WiFi settings') + (data.model ? ' (Model: ' + data.model + ')' : '') + '</div>';
                 return;
             }
@@ -18417,6 +18363,62 @@ function saveDeviceStatus() {
         });
     }
     
+    // Show WiFi config form even when device is offline (for direct push)
+    function showWifiConfigFormFallback(container, serialNumber, data) {
+        let html = '<div class="alert alert-warning small mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Device offline or unreachable. You can still push config - it will be applied when device connects.</div>';
+        html += '<div class="card mb-3">';
+        html += '<div class="card-header bg-primary text-white py-2"><i class="bi bi-wifi me-2"></i>2.4 GHz WiFi</div>';
+        html += '<div class="card-body">';
+        html += '<div class="mb-2"><label class="form-label small">SSID</label><input type="text" id="wifi24Ssid" class="form-control form-control-sm" placeholder="Network Name"></div>';
+        html += '<div class="mb-2"><label class="form-label small">Password</label><input type="text" id="wifi24Pass" class="form-control form-control-sm" placeholder="WiFi Password (min 8 chars)"></div>';
+        html += '</div></div>';
+        html += '<div class="card mb-3">';
+        html += '<div class="card-header bg-info text-white py-2"><i class="bi bi-broadcast me-2"></i>5 GHz WiFi (Optional)</div>';
+        html += '<div class="card-body">';
+        html += '<div class="mb-2"><label class="form-label small">SSID</label><input type="text" id="wifi5Ssid" class="form-control form-control-sm" placeholder="Leave empty to use same as 2.4GHz"></div>';
+        html += '<div class="mb-2"><label class="form-label small">Password</label><input type="text" id="wifi5Pass" class="form-control form-control-sm" placeholder="Leave empty to use same as 2.4GHz"></div>';
+        html += '</div></div>';
+        html += '<button type="button" class="btn btn-success w-100" onclick="pushWifiConfigDirect(\'' + serialNumber + '\')">';
+        html += '<i class="bi bi-cloud-upload me-2"></i>Push WiFi Config</button>';
+        container.innerHTML = html;
+    }
+
+    // Push WiFi config directly without requiring device to be online first
+    async function pushWifiConfigDirect(serialNumber) {
+        const ssid24 = document.getElementById('wifi24Ssid')?.value?.trim();
+        const pass24 = document.getElementById('wifi24Pass')?.value?.trim();
+        const ssid5 = document.getElementById('wifi5Ssid')?.value?.trim() || ssid24;
+        const pass5 = document.getElementById('wifi5Pass')?.value?.trim() || pass24;
+        
+        if (!ssid24) { showToast('2.4GHz SSID is required', 'danger'); return; }
+        if (!pass24 || pass24.length < 8) { showToast('Password must be at least 8 characters', 'danger'); return; }
+        
+        showToast('Pushing WiFi config...', 'info', 10000);
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'set_tr069_wifi');
+            formData.append('serial', serialNumber);
+            formData.append('ssid_24', ssid24);
+            formData.append('password_24', pass24);
+            formData.append('ssid_5', ssid5);
+            formData.append('password_5', pass5);
+            formData.append('sync_both', ssid5 === ssid24 ? '1' : '0');
+            
+            const resp = await fetch('?page=huawei-olt&t=' + Date.now(), { method: 'POST', body: formData });
+            const data = await resp.json();
+            
+            if (data.success) {
+                showToast('WiFi config pushed successfully!', 'success', 5000);
+                bootstrap.Modal.getInstance(document.getElementById('wifiConfigModal'))?.hide();
+            } else {
+                showToast('Failed: ' + (data.error || 'Unknown error'), 'danger', 8000);
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+        }
+    }
+
     function openPPPoEConfig(serialNumber) {
         // Close the full status modal first
         const statusModal = bootstrap.Modal.getInstance(document.getElementById('onuFullStatusModal'));
@@ -18446,8 +18448,9 @@ function saveDeviceStatus() {
         .then(r => r.json())
         .then(data => {
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No SW info available') + '</div>';
                 return;
             }
@@ -18712,8 +18715,9 @@ function saveDeviceStatus() {
         .then(data => {
             tr069CurrentData = data;
             if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                 body.innerHTML = '<div class="alert alert-warning">' + (data.error || 'No data available') + '</div>';
                 return;
             }
@@ -18997,8 +19001,9 @@ function saveDeviceStatus() {
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
-                modal.hide();
-                alert('Device Offline: ' + (data.error || 'Unable to reach device'));
+                // modal.hide(); -- Keep modal open
+                // Removed alert - show form instead
+                showWifiConfigFormFallback(container, serialNumber, data);
                     container.innerHTML = '<div class="alert alert-warning m-2 small">' + (data.error || 'Failed') + '</div>';
                     return;
                 }
@@ -19935,7 +19940,7 @@ function saveDeviceStatus() {
     // Retry TR-069 connection
     function retryTR069Connection(onuId) {
         const modal = bootstrap.Modal.getInstance(document.getElementById('tr069NotReachableModal'));
-        if (modal) modal.hide();
+        if (modal) // modal.hide(); -- Keep modal open
         setTimeout(() => openTR069Config(onuId), 500);
     }
     
@@ -20142,65 +20147,16 @@ function saveDeviceStatus() {
         new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
     
-// Open TR-069 WAN Config (with reachability check + state guardrail)
+// Open TR-069 WAN Config - Direct push without summoning device
     function openTR069WANConfig(onuId, serialNumber) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        // Clear any previous toasts first
-        document.querySelectorAll('.toast').forEach(t => t.remove());
-        
-        const loadingToast = showToast('Summoning device and checking readiness...', 'info', 15000);
-        
-        // Use combined summon_and_check API for faster response
-        fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber) + '&onu_id=' + onuId)
-            .then(r => r.json())
-            .then(data => {
-                hideToast(loadingToast);
-                
-                if (!data.success) {
-                    showToast('Error: ' + (data.error || 'Failed to check device'), 'danger', 5000);
-                    return;
-                }
-                
-                // Show summon feedback
-                if (data.summoned || data.queued) {
-                    showToast('Connection request sent to device', 'info', 2000);
-                }
-                
-                if (!data.in_genieacs) {
-                    showToast('<div class="text-start">' +
-                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
-                        '<small class="text-warning">Device not connected to ACS server</small><br>' +
-                        '<hr class="my-1">' +
-                        '<small><strong>Required steps:</strong><br>' +
-                        '1. Complete OLT Authorization first<br>' +
-                        '2. Push TR-069 OMCI config<br>' +
-                        '3. Wait for device to connect to ACS</small>' +
-                        '</div>', 'warning', 12000);
-                    return;
-                }
-                
-                if (data.reachable) {
-                    // Device is online and ready - open WAN config modal
-                    openWANConfig(onuId);
-                } else {
-                    // Device is in GenieACS but offline
-                    showToast('<div class="text-start">' +
-                        '<strong>Device Offline</strong><br>' +
-                        '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
-                        '<small>Summoned: ' + (data.summoned ? 'Yes' : 'No') + '</small><br>' +
-                        '<hr class="my-1">' +
-                        '<small>Wait for device to respond or try again in 30 seconds</small>' +
-                        '</div>', 'warning', 10000);
-                }
-            })
-            .catch(err => {
-                hideToast(loadingToast);
-                showToast('Connection error: ' + err.message, 'danger', 5000);
-            });
+        // Skip device summoning - open config modal directly
+        // Config will be pushed when user submits the form
+        openWANConfig(onuId, serialNumber);
     }
     
     // Open WAN Config Modal (loads existing config)
