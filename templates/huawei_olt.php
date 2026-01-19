@@ -17346,8 +17346,8 @@ async function saveInlineStatus() {
     const container = document.getElementById('inlineStatusContent');
     const changes = {};
     
-    container.querySelectorAll('[data-param-path]').forEach(el => {
-        const path = el.dataset.paramPath;
+    container.querySelectorAll('[data-path]').forEach(el => {
+        const path = el.dataset.path;
         let value = el.type === 'checkbox' ? el.checked : el.value;
         if (inlineOriginalParams[path] !== undefined && String(inlineOriginalParams[path]) !== String(value)) {
             changes[path] = value;
