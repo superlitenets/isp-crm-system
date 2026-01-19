@@ -17360,17 +17360,10 @@ async function saveInlineStatus() {
         const data = await response.json();
         
         if (data.success) {
-            saveBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Saved!';
-            saveBtn.classList.remove('btn-warning');
-            saveBtn.classList.add('btn-success');
-            showToast('Changes saved successfully', 'success');
-            setTimeout(() => {
-                saveBtn.style.display = 'none';
-                saveBtn.classList.remove('btn-success');
-                saveBtn.classList.add('btn-warning');
-                saveBtn.innerHTML = originalBtnHtml;
-                saveBtn.disabled = false;
-            }, 2000);
+            saveBtn.style.display = 'none';
+            saveBtn.innerHTML = originalBtnHtml;
+            saveBtn.disabled = false;
+            showToast('Changes saved & applied', 'success');
             Object.assign(inlineOriginalParams, changes);
         } else {
             saveBtn.innerHTML = originalBtnHtml;
