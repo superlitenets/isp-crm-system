@@ -17056,6 +17056,7 @@ async function loadInlineStatus(serial, forceRefresh = false) {
         
         inlineOriginalParams = {};
         renderInlineStatus(data.categories);
+        console.log('[Status] Original params stored:', Object.keys(inlineOriginalParams).length);
     } catch (error) {
         container.innerHTML = '<div class="alert alert-danger mb-0"><i class="bi bi-x-circle me-2"></i>Error loading status: ' + error.message + '</div>';
     }
@@ -17298,6 +17299,18 @@ function renderInlineStatus(categories) {
     
     tabsHtml += '</ul>';
     contentHtml += '</div>';
+    
+    // After rendering, scan all inputs to ensure original values are captured
+    setTimeout(() => {
+        document.querySelectorAll('#inlineStatusContent input[data-path], #inlineStatusContent select[data-path]').forEach(el => {
+            const path = el.dataset.path;
+            if (path && inlineOriginalParams[path] === undefined) {
+                const val = el.type === 'checkbox' ? el.checked : el.value;
+                inlineOriginalParams[path] = val;
+            }
+        });
+        console.log('[Status] After DOM scan, total params:', Object.keys(inlineOriginalParams).length);
+    }, 100);
     
     container.innerHTML = tabsHtml + contentHtml;
     
