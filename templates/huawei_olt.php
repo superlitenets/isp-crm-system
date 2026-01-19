@@ -15629,15 +15629,18 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <tr>
                                 <td class="text-muted">Mode</td>
                                 <td>
-                                    <select class="form-select form-select-sm" id="wifiPortMode">
-                                        <option value="LAN" selected>LAN Access</option>
+                                    <select class="form-select form-select-sm" id="wifiPortMode" onchange="toggleWifiModeOptions(this.value)">
+                                        <option value="LAN">LAN</option>
+                                        <option value="Access">Access (Bridge + VLAN Tag)</option>
                                     </select>
+                                    <div class="form-text small text-muted" id="wifiModeHelp">Standard LAN mode - traffic routed through ONU</div>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr id="wifiVlanRow">
                                 <td class="text-muted">VLAN-ID</td>
                                 <td>
                                     <input type="number" class="form-control form-control-sm" id="wifiPortVlan" min="1" max="4094" placeholder="Enter VLAN ID">
+                                    <div class="form-text small text-muted" id="wifiVlanHelp"></div>
                                 </td>
                             </tr>
                             <tr>
@@ -20917,6 +20920,24 @@ function saveDeviceStatus() {
         }
     }
     
+    
+    // Toggle WiFi mode options (Access creates bridge + VLAN tag)
+    function toggleWifiModeOptions(mode) {
+        const helpText = document.getElementById('wifiModeHelp');
+        const vlanHelp = document.getElementById('wifiVlanHelp');
+        const vlanInput = document.getElementById('wifiPortVlan');
+        
+        if (mode === 'Access') {
+            helpText.textContent = 'Bridge mode - VLAN tagged traffic passed directly to wireless';
+            vlanHelp.textContent = 'Required: VLAN ID to tag on this wireless interface';
+            vlanInput.required = true;
+        } else {
+            helpText.textContent = 'Standard LAN mode - traffic routed through ONU';
+            vlanHelp.textContent = '';
+            vlanInput.required = false;
+        }
+    }
+
     // Save WiFi port configuration via TR-069
     async function saveWifiPortConfig() {
         const serial = document.getElementById('wifiPortSerial').value;
@@ -20927,13 +20948,14 @@ function saveDeviceStatus() {
         const vlan = document.getElementById('wifiPortVlan').value;
         const encryption = document.getElementById('wifiPortEncryption').value;
         
+        const mode = document.getElementById('wifiPortMode').value;
+        
         const params = {};
         const basePath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + portIndex + '.';
         
         params[basePath + 'Enable'] = enabled;
         if (ssid) params[basePath + 'SSID'] = ssid;
         if (password && password.length >= 8) params[basePath + 'KeyPassphrase'] = password;
-        if (vlan) params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
         
         // Set encryption type
         if (encryption === 'AES') {
@@ -20942,6 +20964,21 @@ function saveDeviceStatus() {
             params[basePath + 'WPAEncryptionModes'] = 'TKIPEncryption';
         } else {
             params[basePath + 'WPAEncryptionModes'] = 'TKIPandAESEncryption';
+        }
+        
+        // Configure mode and VLAN
+        if (mode === 'Access' && vlan) {
+            // Access mode: Bridge with VLAN tagging
+            params[basePath + 'X_HW_WlanAccessType'] = 'Bridge';
+            params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
+            params[basePath + 'X_HW_VlanMappingEnable'] = true;
+        } else if (vlan) {
+            // LAN mode with optional VLAN
+            params[basePath + 'X_HW_WlanAccessType'] = 'Router';
+            params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
+        } else {
+            // LAN mode without VLAN
+            params[basePath + 'X_HW_WlanAccessType'] = 'Router';
         }
         
         const saveBtn = document.querySelector('#wifiPortConfigModal .btn-primary');
