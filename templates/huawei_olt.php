@@ -17338,16 +17338,15 @@ async function saveInlineStatus() {
         let value = el.type === 'checkbox' ? el.checked : el.value;
         const original = inlineOriginalParams[path];
         
-        // Normalize for comparison (handle boolean/string mismatches)
+        // Normalize for comparison - convert everything to string for exact match
         const normalizeVal = (v) => {
-            if (v === true || v === 'true' || v === '1') return 'true';
-            if (v === false || v === 'false' || v === '0' || v === '') return 'false';
-            return String(v ?? '').trim();
+            if (v === null || v === undefined) return '';
+            return String(v).trim();
         };
         
+        // Only track as changed if values actually differ after normalization
         if (original !== undefined && normalizeVal(original) !== normalizeVal(value)) {
             changes[path] = value;
-            console.log('[Change]', path, ':', original, '->', value);
         }
     });
     
