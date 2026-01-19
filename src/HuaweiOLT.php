@@ -7789,29 +7789,25 @@ class HuaweiOLT {
             return ['success' => false, 'error' => 'ONU not found'];
         }
         
-        $genieacsId = $onu['genieacs_id'] ?? null;
-        $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
+        $serial = $onu['sn'] ?? '';
         
-        // Always verify genieacs_id is a proper device ID (should contain hyphens like HWTC-Model-Serial)
-        // If it's just the serial number, look up the proper ID
+        // Always do a fresh lookup to get the correct GenieACS device ID
         require_once __DIR__ . '/GenieACS.php';
         $genieacs = new \App\GenieACS($this->db);
         
-        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
-            // Look up proper GenieACS device ID by serial
-            if (!empty($serial)) {
-                $deviceResult = $genieacs->getDeviceBySerial($serial);
-                if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
-                    $genieacsId = $deviceResult['device']['_id'];
-                    // Update the ONU record with the correct ID
-                    $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
-                    $stmt->execute([$genieacsId, $onuDbId]);
-                }
+        $genieacsId = null;
+        if (!empty($serial)) {
+            $deviceResult = $genieacs->getDeviceBySerial($serial);
+            if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
+                $genieacsId = $deviceResult['device']['_id'];
+                // Update the ONU record with the correct ID
+                $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
+                $stmt->execute([$genieacsId, $onuDbId]);
             }
         }
         
-        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
-            return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
+        if (empty($genieacsId)) {
+            return ['success' => false, 'error' => "Device not found in GenieACS (Serial: {$serial}). Push TR-069 OMCI config and wait for device to connect."];
         }
         $wlanIndex = (int)($config['wlan_index'] ?? 1);
         $enabled = $config['enabled'] ?? true;
@@ -7954,10 +7950,12 @@ class HuaweiOLT {
             ];
         }
         
+        $errDetail = $httpCode == 404 ? "Device not found in GenieACS (ID: {$genieacsId})" : ($curlError ?: $response);
         return [
             'success' => false,
-            'error' => "Failed to send WiFi config (HTTP {$httpCode}): " . ($curlError ?: $response),
-            'http_code' => $httpCode
+            'error' => "HTTP {$httpCode}: {$errDetail}",
+            'http_code' => $httpCode,
+            'device_id' => $genieacsId
         ];
     }
     
