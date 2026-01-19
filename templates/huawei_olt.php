@@ -8865,7 +8865,7 @@ try {
                 <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
                     <strong>WiFi</strong>
                     <div>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="loadWiFiFromTR069()" id="wifiRefreshBtn">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="summonOnuWithProgress()" id="wifiRefreshBtn">
                             <i class="bi bi-arrow-clockwise me-1"></i> Refresh from TR-069
                         </button>
                     </div>
@@ -9059,25 +9059,65 @@ try {
             }
             
             // Auto-summon ONU in GenieACS when page opens (triggers connection request)
-            function summonOnu() {
-                if (!onuSerial) return;
-                fetch('?page=huawei-olt&t=' + Date.now(), {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'action=summon_onu&serial=' + encodeURIComponent(onuSerial)
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('ONU summoned successfully');
-                        // Refresh WiFi data after a short delay to allow device to respond
-                        setTimeout(loadWiFiFromTR069, 2000);
-                    } else {
-                        console.log('Summon queued or device offline:', data.error || 'unknown');
+            function summonOnu(showProgress = false) {
+                if (!onuSerial) return Promise.resolve(false);
+                
+                let attempt = 0;
+                const maxAttempts = 10;
+                let statusToast = null;
+                
+                if (showProgress) {
+                    statusToast = showToast('<div id="summonOnuProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
+                }
+                
+                function updateProgress(message) {
+                    const el = document.getElementById('summonOnuProgress');
+                    if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + message;
+                }
+                
+                return new Promise((resolve) => {
+                    function checkDevice() {
+                        attempt++;
+                        if (showProgress) updateProgress('Checking device... (' + attempt + '/' + maxAttempts + ')');
+                        
+                        fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(onuSerial))
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.reachable) {
+                                    if (statusToast) hideToast(statusToast);
+                                    if (showProgress) showToast('<i class="bi bi-check-circle me-1"></i>Device online!', 'success', 2000);
+                                    // Refresh WiFi data
+                                    setTimeout(loadWiFiFromTR069, 500);
+                                    resolve(true);
+                                } else if (attempt < maxAttempts) {
+                                    if (showProgress) updateProgress('Waiting for response... (' + attempt + '/' + maxAttempts + ')');
+                                    setTimeout(checkDevice, 3000);
+                                } else {
+                                    if (statusToast) hideToast(statusToast);
+                                    if (showProgress) {
+                                        showToast('<div class="text-start"><strong>Device Not Responding</strong><br><small>Last seen: ' + (data.last_inform || 'Never') + '</small></div>', 'warning', 5000);
+                                    }
+                                    // Still try to load WiFi data anyway
+                                    setTimeout(loadWiFiFromTR069, 500);
+                                    resolve(false);
+                                }
+                            })
+                            .catch(err => {
+                                if (statusToast) hideToast(statusToast);
+                                console.error('Summon error:', err.message);
+                                resolve(false);
+                            });
                     }
-                })
-                .catch(err => console.log('Summon error:', err.message));
+                    checkDevice();
+                });
             }
+            
+            // Button handler for manual summon with progress
+            function summonOnuWithProgress() {
+                summonOnu(true);
+            }
+            
+            // Auto-summon silently when page opens
             
             // Auto-summon and load WiFi when page opens
             if (onuSerial) {
