@@ -15601,6 +15601,98 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
             </div>
         </div>
     </div>
+    <!-- Per-Port WiFi Configuration Modal -->
+    <div class="modal fade" id="wifiPortConfigModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title"><i class="bi bi-wifi me-2"></i>Configure WiFi port <span id="wifiPortName">wifi_0/1</span></h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="wifiPortSerial">
+                    <input type="hidden" id="wifiPortIndex">
+                    
+                    <table class="table table-sm table-borderless mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width:40%">Status</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <input type="radio" class="btn-check" name="wifiPortStatus" id="wifiPortEnabled" value="true" checked>
+                                        <label class="btn btn-outline-success" for="wifiPortEnabled">Enabled</label>
+                                        <input type="radio" class="btn-check" name="wifiPortStatus" id="wifiPortDisabled" value="false">
+                                        <label class="btn btn-outline-secondary" for="wifiPortDisabled">Port shutdown</label>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Mode</td>
+                                <td>
+                                    <select class="form-select form-select-sm" id="wifiPortMode">
+                                        <option value="LAN" selected>LAN Access</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">VLAN-ID</td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm" id="wifiPortVlan" min="1" max="4094" placeholder="Enter VLAN ID">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">SSID</td>
+                                <td>
+                                    <div class="mb-2">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="wifiSsidType" id="ssidDefault" value="default">
+                                            <label class="form-check-label small" for="ssidDefault">Default - factory SSID</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="wifiSsidType" id="ssidCustom" value="custom" checked>
+                                            <label class="form-check-label small" for="ssidCustom">User defined</label>
+                                        </div>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm" id="wifiPortSsid" placeholder="Enter SSID">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Encryption</td>
+                                <td>
+                                    <select class="form-select form-select-sm" id="wifiPortEncryption">
+                                        <option value="AES" selected>AES</option>
+                                        <option value="TKIP">TKIP</option>
+                                        <option value="TKIP+AES">TKIP+AES</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Change password</td>
+                                <td>
+                                    <div class="input-group input-group-sm">
+                                        <input type="password" class="form-control" id="wifiPortPassword" placeholder="Min 8 characters" minlength="8">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('wifiPortPassword', this)">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">DHCP</td>
+                                <td><span class="text-muted fst-italic">No control</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveWifiPortConfig()">
+                        <i class="bi bi-check-lg me-1"></i>Save Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Add VLAN to ONU Modal -->
     <div class="modal fade" id="addVlanModal" tabindex="-1">
@@ -20770,17 +20862,129 @@ function saveDeviceStatus() {
         }
     }
     
-// Open TR-069 WiFi Config Modal (standalone WiFi configuration)
-    function openTR069WiFiConfig(serialNumber) {
+// Open TR-069 WiFi Config Modal (per-port configuration)
+    function openTR069WiFiConfig(serialNumber, portIndex = 1) {
         if (!serialNumber) {
             showToast('No serial number available', 'error');
             return;
         }
         
-        // Open modal directly without summoning
-        document.getElementById('wifiDeviceId').value = serialNumber;
-        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
-        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
+        // Set port info
+        document.getElementById('wifiPortSerial').value = serialNumber;
+        document.getElementById('wifiPortIndex').value = portIndex;
+        document.getElementById('wifiPortName').textContent = 'wifi_0/' + portIndex;
+        
+        // Reset form
+        document.getElementById('wifiPortEnabled').checked = true;
+        document.getElementById('wifiPortMode').value = 'LAN';
+        document.getElementById('wifiPortVlan').value = '';
+        document.getElementById('ssidCustom').checked = true;
+        document.getElementById('wifiPortSsid').value = '';
+        document.getElementById('wifiPortEncryption').value = 'AES';
+        document.getElementById('wifiPortPassword').value = '';
+        
+        // Load current values from TR-069 if connected
+        if (typeof hasTR069 !== 'undefined' && hasTR069) {
+            loadWifiPortConfig(serialNumber, portIndex);
+        }
+        
+        new bootstrap.Modal(document.getElementById('wifiPortConfigModal')).show();
+    }
+    
+    // Load current WiFi port configuration from TR-069
+    async function loadWifiPortConfig(serial, portIndex) {
+        try {
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=get_tr069_wifi&serial=' + encodeURIComponent(serial)
+            });
+            const data = await response.json();
+            
+            if (data.success && data.interfaces) {
+                const iface = data.interfaces.find(i => i.index == portIndex);
+                if (iface) {
+                    document.getElementById('wifiPortEnabled').checked = iface.enabled;
+                    document.getElementById('wifiPortDisabled').checked = !iface.enabled;
+                    document.getElementById('wifiPortSsid').value = iface.ssid || '';
+                    if (iface.vlan_id) {
+                        document.getElementById('wifiPortVlan').value = iface.vlan_id;
+                    }
+                }
+            }
+        } catch (err) {
+            console.log('Could not load WiFi config:', err);
+        }
+    }
+    
+    // Save WiFi port configuration via TR-069
+    async function saveWifiPortConfig() {
+        const serial = document.getElementById('wifiPortSerial').value;
+        const portIndex = document.getElementById('wifiPortIndex').value;
+        const enabled = document.querySelector('input[name="wifiPortStatus"]:checked').value === 'true';
+        const ssid = document.getElementById('wifiPortSsid').value;
+        const password = document.getElementById('wifiPortPassword').value;
+        const vlan = document.getElementById('wifiPortVlan').value;
+        const encryption = document.getElementById('wifiPortEncryption').value;
+        
+        const params = {};
+        const basePath = 'InternetGatewayDevice.LANDevice.1.WLANConfiguration.' + portIndex + '.';
+        
+        params[basePath + 'Enable'] = enabled;
+        if (ssid) params[basePath + 'SSID'] = ssid;
+        if (password && password.length >= 8) params[basePath + 'KeyPassphrase'] = password;
+        if (vlan) params[basePath + 'X_HW_VLANID'] = parseInt(vlan);
+        
+        // Set encryption type
+        if (encryption === 'AES') {
+            params[basePath + 'WPAEncryptionModes'] = 'AESEncryption';
+        } else if (encryption === 'TKIP') {
+            params[basePath + 'WPAEncryptionModes'] = 'TKIPEncryption';
+        } else {
+            params[basePath + 'WPAEncryptionModes'] = 'TKIPandAESEncryption';
+        }
+        
+        const saveBtn = document.querySelector('#wifiPortConfigModal .btn-primary');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+        
+        try {
+            const response = await fetch('?page=huawei-olt&t=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=save_device_params&serial=' + encodeURIComponent(serial) + '&params=' + encodeURIComponent(JSON.stringify(params))
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                showToast('WiFi configuration saved', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('wifiPortConfigModal')).hide();
+                
+                // Refresh the WiFi table
+                if (typeof loadWiFiFromTR069 === 'function') {
+                    loadWiFiFromTR069();
+                }
+            } else {
+                showToast('Error: ' + (data.error || 'Failed to save'), 'danger');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'danger');
+        }
+        
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Configuration';
+    }
+    
+    // Toggle password visibility helper
+    function togglePasswordVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            input.type = 'password';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
     }
     function openWifiConfigModal(serialNumber, deviceId) {
         document.getElementById('wifiDeviceId').value = deviceId || serialNumber;
