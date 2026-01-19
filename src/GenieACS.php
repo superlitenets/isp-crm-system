@@ -190,7 +190,15 @@ class GenieACS {
     }
     
     public function getDeviceBySerial(string $serial): array {
-        // Try exact match first
+        // Try exact _id match first (full GenieACS device ID format like "00259E-HG8546M-48575443F2D53A8B")
+        $query = json_encode(['_id' => $serial]);
+        $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
+        
+        if ($result['success'] && !empty($result['data'])) {
+            return ['success' => true, 'device' => $result['data'][0]];
+        }
+        
+        // Try exact serial number match
         $query = json_encode(['_deviceId._SerialNumber' => $serial]);
         $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
         
@@ -198,8 +206,16 @@ class GenieACS {
             return ['success' => true, 'device' => $result['data'][0]];
         }
         
+        // Try _id containing serial (regex match for partial serial in device ID)
+        $query = json_encode(['_id' => ['$regex' => $serial, '$options' => 'i']]);
+        $result = $this->request('GET', '/devices', null, ['query' => $query, 'limit' => 1]);
+        
+        if ($result['success'] && !empty($result['data'])) {
+            return ['success' => true, 'device' => $result['data'][0]];
+        }
+        
         // If not found and serial looks like OLT format (4 letter prefix + hex), convert to GenieACS format
-        if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $serial)) {
+        if (preg_match('/^[A-Z]{4}[0-9A-F]{8,16}$/i', $serial)) {
             $genieSerial = $this->convertOltSerialToGenieacs($serial);
             if ($genieSerial !== $serial) {
                 $query = json_encode(['_deviceId._SerialNumber' => $genieSerial]);
