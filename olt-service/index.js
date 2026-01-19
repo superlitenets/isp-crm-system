@@ -54,12 +54,15 @@ app.post('/disconnect', async (req, res) => {
 app.post('/execute', async (req, res) => {
     try {
         const { oltId, command, timeout, expectPrompt } = req.body;
+        console.log(`[Execute] OLT ${oltId}: ${command.substring(0, 100)}${command.length > 100 ? '...' : ''}`);
         if (!oltId || !command) {
             return res.status(400).json({ success: false, error: 'Missing oltId or command' });
         }
         const result = await sessionManager.execute(oltId, command, { timeout, expectPrompt });
+        console.log(`[Execute] OLT ${oltId} result (${(result || '').length} chars): ${(result || '').substring(0, 200)}`);
         res.json({ success: true, output: result });
     } catch (error) {
+        console.log(`[Execute] OLT ${oltId} error: ${error.message}`);
         res.status(500).json({ success: false, error: error.message });
     }
 });
