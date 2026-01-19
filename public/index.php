@@ -13,7 +13,10 @@ function applyTimezoneFromSettings(): void {
         $tz = $stmt->fetchColumn();
         if ($tz && in_array($tz, timezone_identifiers_list())) {
             date_default_timezone_set($tz);
+        }
     } catch (\Exception $e) {
+    }
+}
 
 $isReplit = !empty(getenv('REPLIT_DEV_DOMAIN'));
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
@@ -55,6 +58,8 @@ if (session_status() === PHP_SESSION_NONE) {
         $cookieName = session_name();
         $expires = gmdate('D, d M Y H:i:s T', time() + 86400);
         header("Set-Cookie: {$cookieName}={$sessionId}; Path=/; Expires={$expires}; Secure; HttpOnly; SameSite=None; Partitioned", false);
+    }
+}
 
 ob_start();
 
@@ -242,6 +247,7 @@ if ($page === 'api' && $action === 'test_biometric_device') {
         if (!function_exists('socket_create')) {
             echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled. Please enable php-sockets in php.ini or rebuild Docker with sockets extension.']);
             exit;
+        }
         
         $biometricService = new \App\BiometricSyncService($db);
         $result = $biometricService->testDevice($deviceId);
@@ -278,6 +284,7 @@ if ($page === 'api' && $action === 'sync_biometric_device') {
         if (!function_exists('socket_create')) {
             echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled']);
             exit;
+        }
         
         $biometricService = new \App\BiometricSyncService($db);
         $result = $biometricService->syncDevice($deviceId, null, $debug);
@@ -314,6 +321,7 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
         if (!function_exists('socket_create')) {
             echo json_encode(['success' => false, 'message' => 'PHP sockets extension not enabled']);
             exit;
+        }
         
         $biometricService = new \App\BiometricSyncService($db);
         
@@ -328,6 +336,7 @@ if ($page === 'api' && $action === 'fetch_biometric_users') {
         } else {
             $users = $biometricService->getDeviceUsers($deviceId);
             echo json_encode(['success' => true, 'users' => $users, 'count' => count($users)]);
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
@@ -357,6 +366,7 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
         if (!$ticketData) {
             echo json_encode(['success' => false, 'error' => 'Ticket not found']);
             exit;
+        }
         
         $settings = new \App\Settings();
         $whatsapp = new \App\WhatsApp($db);
@@ -371,10 +381,12 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
             $statusLink = $statusLinkService->generateStatusUpdateUrl($ticketId, $ticketData['assigned_to'] ?? null);
         } catch (Throwable $e) {
             error_log("Failed to generate status link for repost: " . $e->getMessage());
+        }
         
         if (!empty($ticketData['assigned_to'])) {
             $assignedUser = $ticketModel->getUser($ticketData['assigned_to']);
             $ticketData['assigned_to_name'] = $assignedUser['name'] ?? 'Unknown';
+        }
         
         $serviceFee = new \App\ServiceFee($db);
         $ticketData['service_fees'] = $serviceFee->getTicketFees($ticketId);
@@ -393,9 +405,9 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
                     $groupsSent++;
                 } else {
                     $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
-                    $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
                 }
             }
+        }
         
         $operationsGroupId = $settings->get('whatsapp_operations_group_id');
         if (!empty($operationsGroupId)) {
@@ -405,6 +417,7 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
             } else {
                 $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
             }
+        }
         
         echo json_encode([
             'success' => count($errors) === 0,
@@ -459,6 +472,7 @@ if ($page === 'api' && $action === 'smartolt_stats') {
         
         if ($forceRefresh) {
             \App\SmartOLT::clearCache();
+        }
         
         $stats = $smartolt->getDashboardStats();
         echo json_encode(['success' => true, 'stats' => $stats]);
@@ -510,11 +524,13 @@ if ($page === 'api' && $action === 'smartolt_onu_action') {
             default:
                 echo json_encode(['success' => false, 'error' => 'Invalid action']);
                 exit;
+        }
         
         if ($result['status'] ?? false) {
             echo json_encode(['success' => true, 'message' => ucfirst($onuAction) . ' command sent successfully']);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Action failed']);
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
     }
@@ -586,6 +602,7 @@ if ($page === 'api' && $action === 'smartolt_authorize_onu') {
             echo json_encode(['success' => true, 'message' => 'ONU provisioned successfully', 'data' => $result['response'] ?? null]);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to provision ONU']);
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => 'Error: ' . $e->getMessage()]);
     }
@@ -670,6 +687,7 @@ if ($page === 'api' && $action === 'send_whatsapp') {
         } else {
             $whatsapp->logMessage($ticketId, $orderId, $complaintId, $phone, 'customer', $message, 'failed', $messageType, $result['error'] ?? 'Unknown error');
             echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Failed to send']);
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -727,6 +745,7 @@ if ($page === 'api' && $action === 'whatsapp_session') {
                 break;
             default:
                 $result = ['success' => false, 'error' => 'Unknown operation'];
+        }
         echo json_encode($result);
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -820,6 +839,7 @@ if ($page === 'api' && $action === 'get_onu_details') {
             echo json_encode(['success' => true, 'onu' => $onu]);
         } else {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -859,6 +879,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
         $upperSerial = strtoupper($serialNumber);
         if (preg_match('/^[A-Z]{4}[0-9A-F]{8}$/i', $upperSerial)) {
             $searchFormats[] = $genieAcs->convertOltSerialToGenieacs($upperSerial);
+        }
         // Also try stripping 4-letter prefix as fallback
         $searchFormats[] = preg_replace('/^[A-Z]{4}/', '', $upperSerial);
         
@@ -868,6 +889,8 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             if ($result['success'] && !empty($result['device'])) {
                 $device = $result['device'];
                 break;
+            }
+        }
         
         // Get ONU from database for reference (use minimal columns for compatibility)
         $stmt = $db->prepare("SELECT id, sn, tr069_status, status FROM huawei_onus WHERE sn = ? OR sn = ?");
@@ -895,6 +918,7 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
                 ]);
             }
             exit;
+        }
         
         // Device found in GenieACS - check if online
         $lastInformStr = $device['_lastInform'] ?? null;
@@ -917,10 +941,12 @@ if ($page === 'api' && $action === 'check_tr069_reachability') {
             } else {
                 $lastInformFormatted = round($diff / 86400) . ' days ago';
             }
+        }
         // Auto-update database if device is in GenieACS (sync status)
         if ($onu && $isReachable) {
             $stmt = $db->prepare("UPDATE huawei_onus SET tr069_status = 'online' WHERE id = ?");
             $stmt->execute([$onu['id']]);
+        }
         
         echo json_encode([
             'reachable' => $isReachable,
@@ -966,6 +992,7 @@ if ($page === 'api' && $action === 'summon_and_check') {
             $stmt = $db->prepare("SELECT * FROM huawei_onus WHERE sn = ? OR sn = ?");
             $stmt->execute([$serialNumber, strtoupper($serialNumber)]);
             $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
         
         // Step 1: Fast device lookup using cached ID first (before summon)
         $device = null;
@@ -977,6 +1004,8 @@ if ($page === 'api' && $action === 'summon_and_check') {
             $deviceResult = $genieAcs->getDevice($deviceId);
             if ($deviceResult) {
                 $device = $deviceResult;
+            }
+        }
         
         // Fallback to serial search if cached ID didn't work
         if (!$device && $serialNumber) {
@@ -998,12 +1027,16 @@ if ($page === 'api' && $action === 'summon_and_check') {
                         $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?")->execute([$deviceId, $onu['id']]);
                     }
                     break;
+                }
+            }
+        }
         
         // Step 2: Send instant connection request using device ID (fast, non-blocking)
         $summonResult = ['success' => false, 'queued' => false];
         if ($deviceId) {
             // Fast summon using device ID directly - 2 second timeout
             $summonResult = $genieAcs->sendFastConnectionRequest($deviceId);
+        }
         
         // Determine reachability status
         $isReachable = false;
@@ -1026,11 +1059,15 @@ if ($page === 'api' && $action === 'summon_and_check') {
                     $lastInformFormatted = round($diff / 3600) . ' hours ago';
                 } else {
                     $lastInformFormatted = round($diff / 86400) . ' days ago';
+                }
+            }
             
             // Update database with current status
             if ($onu) {
                 $db->prepare("UPDATE huawei_onus SET tr069_status = ?, genieacs_id = ? WHERE id = ?")
                    ->execute([$tr069Status, $deviceId, $onu['id']]);
+            }
+        }
         
         echo json_encode([
             'success' => true,
@@ -1077,6 +1114,7 @@ if ($page === 'api' && $action === 'get_wan_config') {
         if (!$onu) {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);
             exit;
+        }
         
         // Skip live GenieACS fetch - use database values only for faster response
         // Live WAN status can be refreshed via status button
@@ -1118,6 +1156,7 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
         if (!$onu) {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);
             exit;
+        }
         
         require_once __DIR__ . '/../src/GenieACS.php';
         $genieacs = new \App\GenieACS($db);
@@ -1128,6 +1167,7 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
         if (empty($deviceId)) {
             $deviceId = !empty($onu['tr069_device_id']) ? $onu['tr069_device_id'] : '';
             $lookupMethod = 'tr069_device_id';
+        }
         
         // If still empty, look up by serial
         if (empty($deviceId)) {
@@ -1142,11 +1182,15 @@ if ($page === 'api' && $action === 'tr069_reboot_onu') {
                     // Save for future lookups
                     $updateStmt = $db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
                     $updateStmt->execute([$deviceId, $onuId]);
+                }
+            }
+        }
         
         if (empty($deviceId)) {
             error_log("[TR069 Reboot] No device ID found for ONU {$onuId}, fields: " . json_encode($onu));
             echo json_encode(['success' => false, 'error' => 'Device not connected to TR-069/GenieACS', 'debug' => $onu]);
             exit;
+        }
         
         error_log("[TR069 Reboot] Using deviceId={$deviceId} (via {$lookupMethod})");
         $result = $genieacs->rebootDevice($deviceId);
@@ -1186,6 +1230,7 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
         if (!$onu) {
             echo json_encode(['success' => false, 'error' => 'ONU not found']);
             exit;
+        }
         
         $huaweiOLT = new \App\HuaweiOLT($db);
         
@@ -1209,6 +1254,7 @@ if ($page === 'api' && $action === 'configure_wan_tr069') {
             echo json_encode(['success' => false, 'error' => 'JSON encode error: ' . json_last_error_msg()]);
         } else {
             echo $json;
+        }
     } catch (Throwable $e) {
         error_log("[configure_wan_tr069] Exception: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -1297,6 +1343,8 @@ if ($page === 'api' && $action === 'update_onu_mode') {
                 echo json_encode(['success' => true, 'message' => "Router mode with " . strtoupper($wanMode) . " configured via TR-069"]);
             } else {
                 echo json_encode(['success' => true, 'message' => "Mode set to Router. WAN config: " . ($result['error'] ?? 'pending TR-069 connection')]);
+            }
+        }
     } catch (Throwable $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -1329,6 +1377,7 @@ if ($page === 'api' && $action === 'manage_onu_vlan') {
             $result = $huaweiOLT->attachVlanToONU($onuId, $vlanId);
         } else {
             $result = $huaweiOLT->detachVlanFromONU($onuId, $vlanId);
+        }
         
         echo json_encode($result);
     } catch (Throwable $e) {
@@ -1347,6 +1396,7 @@ if ($page === 'api' && $action === 'clock_in') {
         if (!\App\Auth::isLoggedIn()) {
             echo json_encode(['success' => false, 'error' => 'Not logged in']);
             exit;
+        }
         
         $userId = \App\Auth::user()['id'];
         $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
@@ -1356,6 +1406,7 @@ if ($page === 'api' && $action === 'clock_in') {
         if (!$employee) {
             echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
             exit;
+        }
         
         $today = date('Y-m-d');
         $now = date('H:i:s');
@@ -1368,6 +1419,7 @@ if ($page === 'api' && $action === 'clock_in') {
         if ($attendance && $attendance['clock_in']) {
             echo json_encode(['success' => false, 'error' => 'Already clocked in today at ' . $attendance['clock_in']]);
             exit;
+        }
         
         // Calculate late minutes
         $lateCalculator = new \App\LateDeductionCalculator($db);
@@ -1376,6 +1428,7 @@ if ($page === 'api' && $action === 'clock_in') {
         $rule = $lateCalculator->getRuleForEmployee($employee['id']);
         if ($rule && $lateMinutes > 0) {
             $lateDeduction = $lateCalculator->calculateDeduction($lateMinutes, $rule);
+        }
         
         if ($attendance) {
             $stmt = $db->prepare("UPDATE attendance SET clock_in = ?, late_minutes = ?, status = 'present', source = 'web' WHERE id = ?");
@@ -1383,6 +1436,7 @@ if ($page === 'api' && $action === 'clock_in') {
         } else {
             $stmt = $db->prepare("INSERT INTO attendance (employee_id, date, clock_in, late_minutes, status, source) VALUES (?, ?, ?, ?, 'present', 'web')");
             $stmt->execute([$employee['id'], $today, $now, $lateMinutes]);
+        }
         
         $response = [
             'success' => true,
@@ -1409,6 +1463,7 @@ if ($page === 'api' && $action === 'clock_out') {
         if (!\App\Auth::isLoggedIn()) {
             echo json_encode(['success' => false, 'error' => 'Not logged in']);
             exit;
+        }
         
         $userId = \App\Auth::user()['id'];
         $stmt = $db->prepare("SELECT id FROM employees WHERE user_id = ?");
@@ -1418,6 +1473,7 @@ if ($page === 'api' && $action === 'clock_out') {
         if (!$employee) {
             echo json_encode(['success' => false, 'error' => 'No employee profile linked to your account']);
             exit;
+        }
         
         $today = date('Y-m-d');
         $now = date('H:i:s');
@@ -1429,10 +1485,12 @@ if ($page === 'api' && $action === 'clock_out') {
         if (!$attendance || !$attendance['clock_in']) {
             echo json_encode(['success' => false, 'error' => 'You must clock in first']);
             exit;
+        }
         
         if ($attendance['clock_out']) {
             echo json_encode(['success' => false, 'error' => 'Already clocked out at ' . $attendance['clock_out']]);
             exit;
+        }
         
         // Check minimum clock out time (configurable, default 5:00 PM)
         $settingsObj = new \App\Settings();
@@ -1442,6 +1500,7 @@ if ($page === 'api' && $action === 'clock_out') {
             $minTimeFormatted = date('g:i A', strtotime("$minClockOutHour:00"));
             echo json_encode(['success' => false, 'error' => "Clock out is only allowed after $minTimeFormatted"]);
             exit;
+        }
         
         // Calculate hours worked
         $clockIn = strtotime($attendance['clock_in']);
@@ -1542,6 +1601,7 @@ if ($page === 'api' && $action === 'get_vpn_peer') {
             echo json_encode(['success' => true, 'peer' => $peer]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Peer not found']);
+        }
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -1634,6 +1694,7 @@ if ($page === 'api' && $action === 'vpn_peer_status') {
                 'rx_formatted' => $wgService->formatBytes($peer['rx_bytes']),
                 'tx_formatted' => $wgService->formatBytes($peer['tx_bytes'])
             ];
+        }
         
         echo json_encode(['success' => true, 'peers' => $peerStatus]);
     } catch (Exception $e) {
@@ -1667,10 +1728,12 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
         $ticketData = $ticket->find($ticketId);
         if (!$ticketData) {
             throw new Exception('Ticket not found');
+        }
         
         $whatsapp = new \App\WhatsApp();
         if (!$whatsapp->isEnabled() || $whatsapp->getProvider() !== 'session') {
             throw new Exception('WhatsApp session provider is required for group messaging');
+        }
         
         $customer = new \App\Customer($db);
         $customerData = $customer->find($ticketData['customer_id']);
@@ -1695,6 +1758,7 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
         $repostMessage .= "Customer: " . ($customerData['name'] ?? 'Unknown') . "\n";
         if (!empty($customerData['phone'])) {
             $repostMessage .= "Phone: {$customerData['phone']}\n";
+        }
         $repostMessage .= "Assigned: {$assignedName}\n";
         $repostMessage .= "Age: {$age} days\n";
         
@@ -1705,6 +1769,7 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
                 $repostMessage .= "• {$fee['fee_name']}: " . number_format($fee['amount'], 2) . " {$fee['currency']} {$paidStatus}\n";
             }
             $repostMessage .= "Total: " . number_format($feesTotal['total'], 2) . " (Paid: " . number_format($feesTotal['paid'], 2) . ")\n";
+        }
         
         $repostMessage .= "\n_Reposted at " . date('h:i A, M j') . "_";
         
@@ -1724,6 +1789,7 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
                     $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
                 }
             }
+        }
         
         $settings = new \App\Settings($db);
         $operationsGroupId = $settings->get('whatsapp_operations_group_id', '');
@@ -1735,9 +1801,11 @@ if ($page === 'api' && $action === 'repost_single_ticket') {
             } else {
                 $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
             }
+        }
         
         if (empty($results)) {
             throw new Exception('No WhatsApp groups configured for this ticket');
+        }
         
         echo json_encode([
             'success' => count($errors) === 0,
@@ -1779,10 +1847,12 @@ if ($page === 'submit_complaint' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($existingCustomer) {
             $customerId = $existingCustomer['id'];
+        }
         
         $fullDescription = $description;
         if ($location) {
             $fullDescription .= "\n\nLocation: " . $location;
+        }
         $fullDescription .= "\n\nSubmitted via: Public Complaint Form";
         
         $complaintModel = new \App\Complaint();
@@ -1860,6 +1930,7 @@ if ($page === 'mpesa_callback') {
                 
             default:
                 echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Unknown callback type']);
+        }
     } catch (Exception $e) {
         error_log("M-Pesa callback error: " . $e->getMessage());
         echo json_encode(['ResultCode' => 1, 'ResultDesc' => 'Error processing callback']);
@@ -1923,13 +1994,19 @@ if ($page === 'order') {
                                 $paymentInitiated = true;
                                 if (!empty($result['transaction_id'])) {
                                     $orderModel->updatePaymentStatus($orderId, 'pending', $result['transaction_id']);
+                                }
+                            }
                         }
                     } catch (\Exception $mpesaError) {
                         error_log("M-Pesa STK push error: " . $mpesaError->getMessage());
                         // Order still successful, just payment initiation failed
+                    }
+                }
             } catch (\Exception $e) {
                 $error = 'An error occurred. Please try again.';
                 error_log("Order creation error: " . $e->getMessage());
+            }
+        }
     }
     
     include __DIR__ . '/../templates/order_form.php';
@@ -1954,6 +2031,8 @@ if ($page === 'login') {
                 exit;
             } else {
                 $loginError = 'Invalid email or password';
+            }
+        }
         $csrfToken = \App\Auth::generateToken();
     }
     include __DIR__ . '/../templates/login.php';
@@ -2001,6 +2080,7 @@ if ($page === 'isp') {
         if (!$nas) {
             echo json_encode(['success' => false, 'error' => 'NAS not found']);
             exit;
+        }
         
         $ip = $nas['ip_address'];
         $apiPort = $nas['api_port'] ?? 8728;
@@ -2027,6 +2107,8 @@ if ($page === 'isp') {
                 $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
                 $result['reachable_port'] = $port;
                 break;
+            }
+        }
         
         $startTime = microtime(true);
         $socket = @fsockopen($ip, $apiPort, $errno, $errstr, 2);
@@ -2040,6 +2122,8 @@ if ($page === 'isp') {
                 $result['online'] = true;
                 $result['latency_ms'] = $result['api_latency_ms'];
                 $result['reachable_port'] = $apiPort;
+            }
+        }
         
         echo json_encode($result);
         exit;
@@ -2054,6 +2138,7 @@ if ($page === 'isp') {
         if (!$sub) {
             echo json_encode(['success' => false, 'error' => 'Subscriber not found']);
             exit;
+        }
         
         $ipAddress = $sub['static_ip'] ?? null;
         if (!$ipAddress) {
@@ -2064,10 +2149,12 @@ if ($page === 'isp') {
             ");
             $stmt->execute([$subId]);
             $ipAddress = $stmt->fetchColumn();
+        }
         
         if (!$ipAddress) {
             echo json_encode(['success' => false, 'error' => 'No IP address found. Subscriber may be offline.']);
             exit;
+        }
         
         $result = ['success' => true, 'online' => false, 'ip_address' => $ipAddress, 'latency_ms' => null];
         
@@ -2086,6 +2173,8 @@ if ($page === 'isp') {
                 fclose($socket);
                 $result['online'] = true;
                 $result['latency_ms'] = round(($endTime - $startTime) * 1000, 2);
+            }
+        }
         
         echo json_encode($result);
         exit;
@@ -2154,6 +2243,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating customer: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'update_customer':
@@ -2179,6 +2270,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating customer: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'delete_customer':
@@ -2196,6 +2289,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting customer: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'create_ticket':
@@ -2247,6 +2342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $message = 'Error creating new customer: ' . $e->getMessage();
                         $messageType = 'danger';
                         break;
+                    }
+                }
                 
                 if ($customerType === 'billing') {
                     $billingData = $_POST['billing_customer'] ?? '';
@@ -2302,6 +2399,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $message = 'Error importing billing customer: ' . $e->getMessage();
                             $messageType = 'danger';
                             break;
+                        }
+                    }
                     $_POST['customer_id'] = $customerId;
                 }
                 
@@ -2335,6 +2434,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         'currency' => $feeType['currency'] ?? 'KES',
                                         'created_by' => $currentUser['id'] ?? null
                                     ]);
+                                }
+                            }
                         }
                         
                         $customerCreatedMsg = ($customerType === 'new') ? ' New customer created.' : (($customerType === 'billing') ? ' Customer imported from billing.' : '');
@@ -2344,6 +2445,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating ticket: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'update_ticket':
@@ -2375,6 +2478,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'fee_type_id' => (int)$feeTypeId,
                                     'amount' => isset($feeAmounts[$feeTypeId]) ? (float)$feeAmounts[$feeTypeId] : 0
                                 ];
+                            }
+                        }
                         $serviceFeeModel->syncTicketFees($ticketId, $feeData, $currentUser['id'] ?? null);
                         
                         $message = 'Ticket updated successfully! SMS notification sent to customer.';
@@ -2383,6 +2488,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating ticket: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
             
             case 'delete_ticket':
@@ -2407,6 +2514,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting ticket: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'add_comment':
@@ -2428,6 +2537,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error adding comment: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
             
             case 'repost_to_whatsapp':
@@ -2501,8 +2612,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $results['branch'] = $result;
                             if (!$result['success']) {
                                 $errors[] = "Branch group: " . ($result['error'] ?? 'Unknown error');
-                }
-            }
+                            }
+                        }
                     }
                     
                     $settings = new \App\Settings($db);
@@ -2512,7 +2623,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $results['operations'] = $result;
                         if (!$result['success']) {
                             $errors[] = "Operations group: " . ($result['error'] ?? 'Unknown error');
-            }
+                        }
+                    }
                     
                     if (empty($results)) {
                         throw new Exception('No WhatsApp groups configured for this ticket.');
@@ -2632,6 +2744,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $targetPath = $uploadDir . $filename;
                             if (move_uploaded_file($_FILES['passport_photo']['tmp_name'], $targetPath)) {
                                 $data['passport_photo'] = '/uploads/employees/' . $filename;
+                            }
+                        }
                         $employee->create($data);
                         $message = 'Employee added successfully!';
                         $messageType = 'success';
@@ -2639,6 +2753,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error adding employee: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'update_employee':
@@ -2662,6 +2778,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $targetPath = $uploadDir . $filename;
                             if (move_uploaded_file($_FILES['passport_photo']['tmp_name'], $targetPath)) {
                                 $data['passport_photo'] = '/uploads/employees/' . $filename;
+                            }
+                        }
                         $employee->update((int)$_POST['id'], $data);
                         $message = 'Employee updated successfully!';
                         $messageType = 'success';
@@ -2669,6 +2787,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating employee: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'delete_employee':
@@ -2684,6 +2804,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting employee: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'upload_kyc_document':
@@ -2721,6 +2843,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error uploading document: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'delete_kyc_document':
@@ -2734,6 +2858,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting document: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'verify_kyc_document':
@@ -2747,6 +2873,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error verifying document: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'create_department':
@@ -2763,6 +2891,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating department: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'update_department':
@@ -2779,6 +2909,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating department: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
                 
             case 'delete_department':
@@ -2794,6 +2926,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting department: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'record_attendance':
@@ -2833,6 +2967,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting attendance: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
             
             case 'toggle_late_penalties':
@@ -2921,7 +3057,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         'payroll_id' => $payrollId,
                                         'recorded_by' => $currentUser['id']
                                     ]);
+                                }
+                            }
                             $additions[] = 'advance deductions';
+                        }
+                    }
                     
                     if (!empty($additions)) {
                         $message = 'Payroll record created with ' . implode(', ', $additions) . ' applied!';
@@ -2961,6 +3101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting payroll: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'bulk_generate_payroll':
@@ -3002,6 +3144,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             'payroll_id' => $payrollId,
                                             'recorded_by' => $currentUser['id']
                                         ]);
+                                    }
+                                }
+                            }
+                        }
                         
                         if (!empty($_POST['include_late_deductions'])) $additionsApplied[] = 'late deductions';
                         if (!empty($_POST['include_ticket_commissions'])) $additionsApplied[] = 'ticket commissions';
@@ -3019,6 +3165,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error generating bulk payroll: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'create_performance':
@@ -3058,6 +3206,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting performance review: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'create_advance':
@@ -3473,6 +3623,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'line_total' => ($qty * $price) + $taxAmount,
                                 'sort_order' => $idx
                             ]);
+                        }
+                    }
                     
                     $accounting->recalculateInvoice($invoiceId);
                     
@@ -3639,6 +3791,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($item['description'])) {
                                 $item['sort_order'] = $idx;
                                 $accounting->addQuoteItem($quoteId, $item);
+                            }
+                        }
                         $accounting->recalculateQuote($quoteId);
                         $message = 'Quote created successfully!';
                     } else {
@@ -3660,6 +3814,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($item['description'])) {
                                 $item['sort_order'] = $idx;
                                 $accounting->addQuoteItem($quoteId, $item);
+                            }
+                        }
                         $accounting->recalculateQuote($quoteId);
                         $message = 'Quote updated successfully!';
                     }
@@ -3788,6 +3944,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $result = $mpesa->stkPush($phone, $amount, $reference);
                         if ($result['success'] && $customerId) {
                             // Link transaction to customer
+                        }
+                    }
                     
                     if ($result['success']) {
                         $message = 'M-Pesa payment request sent! The customer will receive a prompt on their phone.';
@@ -3843,6 +4001,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!empty($item['description'])) {
                                 $item['sort_order'] = $idx;
                                 $accounting->addBillItem($billId, $item);
+                            }
+                        }
                         $accounting->recalculateBill($billId);
                         $message = 'Bill created successfully!';
                     } else {
@@ -3902,6 +4062,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     foreach ($templateKeys as $key) {
                         if (isset($_POST[$key])) {
                             $settings->set($key, $_POST[$key]);
+                        }
+                    }
                     \App\Settings::clearCache();
                     $message = 'SMS templates saved successfully!';
                     $messageType = 'success';
@@ -3961,6 +4123,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     foreach ($templateKeys as $key) {
                         if (isset($_POST[$key])) {
                             $settings->set($key, $_POST[$key]);
+                        }
+                    }
                     \App\Settings::clearCache();
                     $message = 'WhatsApp templates saved successfully!';
                     $messageType = 'success';
@@ -4130,6 +4294,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating package: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_package':
@@ -4154,6 +4320,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating package: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'delete_package':
@@ -4172,6 +4340,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting package: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'save_landing_settings':
@@ -4446,6 +4616,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         exec($command, $output, $returnVar);
                         if ($returnVar === 0 && file_exists($filepath) && filesize($filepath) > 100) {
                             $backupSuccess = true;
+                        }
+                    }
                     
                     // Method 2: Try docker exec (for Docker deployments)
                     if (!$backupSuccess) {
@@ -4460,6 +4632,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         exec($command, $output, $returnVar);
                         if ($returnVar === 0 && file_exists($filepath) && filesize($filepath) > 100) {
                             $backupSuccess = true;
+                        }
+                    }
                     
                     // Method 3: PHP-based backup using PDO (fallback)
                     if (!$backupSuccess) {
@@ -4486,10 +4660,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     return $db->quote($v);
                                 }, array_values($row));
                                 $backupContent .= "INSERT INTO \"$table\" (\"" . implode('", "', $columns) . "\") VALUES (" . implode(', ', $values) . ");\n";
+                            }
+                        }
                         
                         file_put_contents($filepath, $backupContent);
                         if (file_exists($filepath) && filesize($filepath) > 100) {
                             $backupSuccess = true;
+                        }
+                    }
                     
                     if (!$backupSuccess) {
                         if (file_exists($filepath)) {
@@ -4840,6 +5018,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error saving SmartOLT settings: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'test_smartolt_connection':
@@ -4861,6 +5041,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error testing connection: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'register_c2b':
@@ -4898,6 +5080,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating template: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_template':
@@ -4915,6 +5099,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating template: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'delete_template':
@@ -4930,6 +5116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting template: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'add_biometric_device':
@@ -4959,6 +5147,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error adding device: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_biometric_device':
@@ -4990,6 +5180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating device: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'save_user_mapping':
@@ -5011,6 +5203,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error saving mapping: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'add_late_rule':
@@ -5029,6 +5223,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         'max_minutes' => (int)$_POST['tier_max'][$i],
                                         'amount' => (float)$_POST['tier_amount'][$i]
                                     ];
+                                }
+                            }
                         }
                         $ruleData = [
                             'name' => $_POST['name'],
@@ -5047,6 +5243,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error adding rule: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_late_rule':
@@ -5065,6 +5263,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         'max_minutes' => (int)$_POST['tier_max'][$i],
                                         'amount' => (float)$_POST['tier_amount'][$i]
                                     ];
+                                }
+                            }
                         }
                         $ruleData = [
                             'name' => $_POST['name'],
@@ -5083,6 +5283,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating rule: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'save_salesperson':
@@ -5105,6 +5307,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $message = 'Invalid employee selected.';
                             $messageType = 'danger';
                             break;
+                        }
+                    }
                     
                     if (empty($message)) {
                         try {
@@ -5127,6 +5331,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         } catch (Exception $e) {
                             $message = 'Error adding salesperson: ' . $e->getMessage();
                             $messageType = 'danger';
+                        }
+                    }
                 }
                 break;
 
@@ -5151,6 +5357,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $message = 'Invalid employee selected.';
                             $messageType = 'danger';
                             break;
+                        }
+                    }
                     
                     if (empty($message)) {
                         try {
@@ -5173,6 +5381,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         } catch (Exception $e) {
                             $message = 'Error updating salesperson: ' . $e->getMessage();
                             $messageType = 'danger';
+                        }
+                    }
                 }
                 break;
 
@@ -5193,6 +5403,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting salesperson: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'pay_commission':
@@ -5470,6 +5682,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating role: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_role':
@@ -5488,6 +5702,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating role: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'delete_role':
@@ -5511,6 +5727,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting role: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'create_user':
@@ -5530,6 +5748,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error creating user: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'update_user':
@@ -5550,6 +5770,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error updating user: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'delete_user':
@@ -5570,6 +5792,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         $message = 'Error deleting user: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
 
             case 'add_device':
@@ -5597,8 +5821,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $message = 'Error adding device: ' . $e->getMessage();
                         $messageType = 'danger';
+                    }
+                }
                 break;
-
+        }
 }
 
 if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -5726,6 +5952,8 @@ if ($page === 'devices' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'data' => $history]);
             exit;
+    }
+}
 
 if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::validateToken($_POST['csrf_token'] ?? '')) {
     $action = $_POST['action'] ?? '';
@@ -5745,6 +5973,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 } catch (Exception $e) {
                     $message = 'Error creating team: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+            }
             break;
 
         case 'update_team':
@@ -5767,6 +5997,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 } catch (Exception $e) {
                     $message = 'Error updating team: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+            }
             break;
 
         case 'delete_team':
@@ -5784,6 +6016,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 } catch (Exception $e) {
                     $message = 'Error deleting team: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+            }
             break;
 
         case 'change_employee_password':
@@ -5810,6 +6044,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                     } else {
                         $message = $result['error'];
                         $messageType = 'danger';
+                    }
+                }
             }
             break;
 
@@ -5829,6 +6065,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 } catch (Exception $e) {
                     $message = 'Error adding team member: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+            }
             break;
 
         case 'remove_team_member':
@@ -5847,6 +6085,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 } catch (Exception $e) {
                     $message = 'Error removing team member: ' . $e->getMessage();
                     $messageType = 'danger';
+                }
+            }
             break;
 
         case 'remove_late_penalty':
@@ -5886,6 +6126,8 @@ if ($page === 'hr' && $_SERVER['REQUEST_METHOD'] === 'POST' && \App\Auth::valida
                 $messageType = 'danger';
             }
             break;
+    }
+}
 
 if ($page === 'settings' && $action === 'delete_device' && isset($_GET['id'])) {
     if (!\App\Auth::isAdmin()) {
@@ -5900,6 +6142,8 @@ if ($page === 'settings' && $action === 'delete_device' && isset($_GET['id'])) {
         } catch (Exception $e) {
             $message = 'Error deleting device: ' . $e->getMessage();
             $messageType = 'danger';
+        }
+    }
 }
 
 if ($page === 'settings' && $action === 'delete_mapping' && isset($_GET['device_id']) && isset($_GET['device_user_id'])) {
@@ -5915,6 +6159,8 @@ if ($page === 'settings' && $action === 'delete_mapping' && isset($_GET['device_
         } catch (Exception $e) {
             $message = 'Error deleting mapping: ' . $e->getMessage();
             $messageType = 'danger';
+        }
+    }
 }
 
 if ($page === 'settings' && $action === 'delete_rule' && isset($_GET['id'])) {
@@ -5930,6 +6176,8 @@ if ($page === 'settings' && $action === 'delete_rule' && isset($_GET['id'])) {
         } catch (Exception $e) {
             $message = 'Error deleting rule: ' . $e->getMessage();
             $messageType = 'danger';
+        }
+    }
 }
 
 if ($page === 'hr' && $action === 'sync_biometric') {
@@ -5955,6 +6203,8 @@ if ($page === 'hr' && $action === 'sync_biometric') {
         } catch (Exception $e) {
             $message = 'Error syncing devices: ' . $e->getMessage();
             $messageType = 'danger';
+        }
+    }
 }
 
 if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -6010,6 +6260,8 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $inventory->addEquipment($itemData);
                                 }
                                 $_SESSION['success_message'] = "{$quantity} equipment items added successfully!";
+                            }
+                        }
                         \App\Auth::regenerateToken();
                         header('Location: ?page=inventory&tab=equipment');
                         exit;
@@ -6265,6 +6517,8 @@ if ($page === 'inventory' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
 }
 
 // Handle inventory GET actions (template download and export)
@@ -6292,6 +6546,8 @@ if ($page === 'inventory' && isset($_GET['action'])) {
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
         $writer->save('php://output');
         exit;
+    }
+}
 
 // Redirect old payments page to accounting payments
 if ($page === 'payments') {
@@ -6325,6 +6581,8 @@ if ($page === 'payments_legacy' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['success_message'] = $result['message'];
                     } else {
                         $_SESSION['error_message'] = $result['message'];
+                    }
+                }
                 \App\Auth::regenerateToken();
             } elseif ($tab === 'c2b' && $paymentAction === 'register_urls') {
                 $result = $mpesa->registerC2BUrls();
@@ -6337,6 +6595,8 @@ if ($page === 'payments_legacy' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
     header('Location: ?page=payments&tab=' . $tab);
     exit;
 }
@@ -6355,6 +6615,7 @@ if ($page === 'payments_legacy' && isset($_GET['action'])) {
             $_SESSION['error_message'] = 'Transaction status: ' . ($result['ResultDesc'] ?? 'Unknown');
         } else {
             $_SESSION['error_message'] = 'Could not query transaction status.';
+        }
         header('Location: ?page=payments&tab=' . $tab);
         exit;
     } elseif ($paymentAction === 'export') {
@@ -6371,6 +6632,7 @@ if ($page === 'payments_legacy' && isset($_GET['action'])) {
         $headers = ['Date', 'Phone', 'Amount', 'Receipt', 'Account Ref', 'Customer', 'Status', 'Description'];
         foreach ($headers as $col => $header) {
             $sheet->setCellValue([$col + 1, 1], $header);
+        }
         $sheet->getStyle('A1:H1')->getFont()->setBold(true);
         
         $row = 2;
@@ -6384,9 +6646,11 @@ if ($page === 'payments_legacy' && isset($_GET['action'])) {
             $sheet->setCellValue([7, $row], $tx['status'] ?? '');
             $sheet->setCellValue([8, $row], $tx['result_desc'] ?? '');
             $row++;
+        }
         
         foreach (range('A', 'H') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
         
         $filename = 'mpesa_transactions_' . date('Y-m-d_His') . '.xlsx';
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -6395,6 +6659,8 @@ if ($page === 'payments_legacy' && isset($_GET['action'])) {
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
         $writer->save('php://output');
         exit;
+    }
+}
 
 if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $complaintAction = $_GET['action'] ?? '';
@@ -6453,6 +6719,8 @@ if ($page === 'complaints' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             \App\Auth::regenerateToken();
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
     header('Location: ?page=complaints');
     exit;
 }
@@ -6501,6 +6769,8 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         exit;
                     } else {
                         $_SESSION['error_message'] = 'Failed to create order.';
+                    }
+                }
             } elseif ($orderId) {
                 switch ($orderAction) {
                     case 'confirm':
@@ -6523,9 +6793,13 @@ if ($page === 'orders' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         $orderModel->updateStatus($orderId, 'cancelled');
                         $_SESSION['success_message'] = 'Order cancelled.';
                         break;
+                }
+            }
             \App\Auth::regenerateToken();
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Error: ' . $e->getMessage();
+        }
+    }
     header('Location: ?page=orders');
     exit;
 }
@@ -7050,6 +7324,8 @@ $csrfToken = \App\Auth::generateToken();
                 $attStmt = $db->prepare("SELECT * FROM attendance WHERE employee_id = ? AND date = ?");
                 $attStmt->execute([$empProfile['id'], date('Y-m-d')]);
                 $userAttendance = $attStmt->fetch(PDO::FETCH_ASSOC);
+            }
+        }
         ?>
         
         <?php if ($hasEmployeeProfile): ?>
@@ -7338,9 +7614,11 @@ $csrfToken = \App\Auth::generateToken();
                 break;
             default:
                 include __DIR__ . '/../templates/dashboard.php';
+        }
         
         if ($accessDenied) {
             echo '<div class="alert alert-danger m-4"><i class="bi bi-shield-exclamation me-2"></i><strong>Access Denied.</strong> You do not have permission to view this page. Please contact your administrator if you need access.</div>';
+        }
         ?>
     </main>
 
@@ -7360,6 +7638,8 @@ $csrfToken = \App\Auth::generateToken();
             if (clockEl) {
                 const now = new Date();
                 clockEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+        }
         setInterval(updateClockDisplay, 1000);
         
         // Web Clock In
@@ -7397,6 +7677,8 @@ $csrfToken = \App\Auth::generateToken();
             } catch (error) {
                 alert('Network error. Please try again.');
                 if (btn) btn.disabled = false;
+            }
+        }
         
         // Web Clock Out
         async function webClockOut() {
@@ -7426,6 +7708,8 @@ $csrfToken = \App\Auth::generateToken();
             } catch (error) {
                 alert('Network error. Please try again.');
                 if (btn) btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
