@@ -17364,9 +17364,22 @@ function renderTabContent(key, category) {
         // Default - Vertical layout with priority sorting for wireless
         html = '<div class="param-row"><div>';
         
-        // Sort params - for wireless_lan, put SSID and Password at top
+        // Sort params - for wireless_lan, put SSID and Password at top, filter unwanted fields
         let sortedParams = [...category.params];
         if (key === 'wireless_lan' || key.startsWith('wireless_lan')) {
+            // Filter out unwanted fields
+            const excludeFields = ['BSSID', 'PeerBSSID', 'Peer BSSID'];
+            const seenLabels = new Set();
+            sortedParams = sortedParams.filter(p => {
+                const paramName = p.path.split('.').pop();
+                const label = p.label;
+                // Exclude BSSID fields
+                if (excludeFields.some(ex => paramName.includes(ex) || label.includes(ex))) return false;
+                // Exclude duplicate labels (like multiple KeyPassphrase)
+                if (seenLabels.has(label)) return false;
+                seenLabels.add(label);
+                return true;
+            });
             const priorityOrder = ['SSID', 'PreSharedKey', 'KeyPassphrase', 'Password', 'BeaconType', 'Status', 'Enable'];
             sortedParams.sort((a, b) => {
                 const aName = a.path.split('.').pop();
