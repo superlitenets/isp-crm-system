@@ -17361,24 +17361,41 @@ function renderTabContent(key, category) {
         }
         
     } else {
-        // Default - Two column grid
-        html = '<div class="param-row">';
-        let col1 = '', col2 = '';
-        let idx = 0;
-        category.params.forEach(param => {
+        // Default - Vertical layout with priority sorting for wireless
+        html = '<div class="param-row"><div>';
+        
+        // Sort params - for wireless_lan, put SSID and Password at top
+        let sortedParams = [...category.params];
+        if (key === 'wireless_lan' || key.startsWith('wireless_lan')) {
+            const priorityOrder = ['SSID', 'PreSharedKey', 'KeyPassphrase', 'Password', 'BeaconType', 'Status', 'Enable'];
+            sortedParams.sort((a, b) => {
+                const aName = a.path.split('.').pop();
+                const bName = b.path.split('.').pop();
+                const aLabel = a.label.toLowerCase();
+                const bLabel = b.label.toLowerCase();
+                
+                // Check priority
+                let aPriority = priorityOrder.findIndex(p => aName.includes(p) || aLabel.includes(p.toLowerCase()));
+                let bPriority = priorityOrder.findIndex(p => bName.includes(p) || bLabel.includes(p.toLowerCase()));
+                
+                if (aPriority === -1) aPriority = 100;
+                if (bPriority === -1) bPriority = 100;
+                
+                return aPriority - bPriority;
+            });
+        }
+        
+        sortedParams.forEach(param => {
             if (param.value !== null && param.value !== undefined || param.value === '') {
                 originalDeviceParams[param.path] = param.value;
                 const inputHtml = renderParamInput(param, category.editable);
-                const field = `<div class="param-item">
+                html += `<div class="param-item">
                     <label>${param.label}</label>
                     ${inputHtml}
                 </div>`;
-                if (idx % 2 === 0) col1 += field;
-                else col2 += field;
-                idx++;
             }
         });
-        html += `<div>${col1}</div><div>${col2}</div></div>`;
+        html += '</div></div>';
     }
     
     return html;
