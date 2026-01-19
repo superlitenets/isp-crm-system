@@ -17339,8 +17339,16 @@ async function saveInlineStatus() {
         }
     });
     
+    console.log('[Save] Changes detected:', Object.keys(changes).length, changes);
     if (Object.keys(changes).length === 0) {
         showToast('No changes to save', 'info');
+        return;
+    }
+    
+    // Limit to max 20 parameters per save to avoid overload
+    const changeKeys = Object.keys(changes);
+    if (changeKeys.length > 20) {
+        showToast('Too many changes (' + changeKeys.length + '). Please save smaller batches.', 'warning');
         return;
     }
     
@@ -17363,8 +17371,10 @@ async function saveInlineStatus() {
             saveBtn.style.display = 'none';
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
-            showToast('Changes saved & applied', 'success');
+            showToast('Changes saved! Refreshing...', 'success');
             Object.assign(inlineOriginalParams, changes);
+            // Refresh to show actual device values after save
+            setTimeout(() => loadInlineStatus(), 2000);
         } else {
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
