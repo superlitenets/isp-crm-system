@@ -17202,30 +17202,45 @@ function renderInlineStatus(categories) {
         if (useTable) {
             // Group by port number for lan_ports
             if (key === 'lan_ports') {
-                // Extract port data and group by port
+                // Group by port number - table with ports as rows
                 const ports = {};
                 sortedParams.forEach(param => {
                     const match = param.path.match(/LANEthernetInterfaceConfig\.(\d+)\./);
                     const portNum = match ? match[1] : '1';
-                    if (!ports[portNum]) ports[portNum] = [];
-                    ports[portNum].push(param);
+                    if (!ports[portNum]) ports[portNum] = {};
+                    const pathParts = param.path.split('.');
+                    const fieldName = pathParts[pathParts.length - 1];
+                    ports[portNum][fieldName] = param;
+                    inlineOriginalParams[param.path] = param.value;
                 });
                 
-                contentHtml += '<div class="row g-2">';
+                // Define column display order and labels
+                const portColDefs = [
+                    { key: 'Enable', label: 'Enable' },
+                    { key: 'Status', label: 'Status' },
+                    { key: 'MaxBitRate', label: 'Speed' },
+                    { key: 'DuplexMode', label: 'Duplex' },
+                    { key: 'X_HW_L3Enable', label: 'L3 Enable' }
+                ];
+                
+                contentHtml += '<div class="table-responsive"><table class="table table-sm table-bordered table-hover mb-0"><thead class="table-dark"><tr><th>Port</th>';
+                portColDefs.forEach(col => { contentHtml += `<th>${col.label}</th>`; });
+                contentHtml += '</tr></thead><tbody>';
+                
                 Object.keys(ports).sort((a,b) => parseInt(a) - parseInt(b)).forEach(portNum => {
-                    contentHtml += `<div class="col-md-6 col-lg-3"><div class="card h-100"><div class="card-header py-2 bg-light"><strong><i class="bi bi-ethernet me-1"></i>Port ${portNum}</strong></div><div class="card-body p-2"><table class="table table-sm mb-0">`;
-                    ports[portNum].forEach(param => {
-                        inlineOriginalParams[param.path] = param.value;
-                        let displayLabel = param.label.replace(/Port \d+ /i, '');
-                        let displayValue = param.value;
-                        if (typeof displayValue === 'boolean') displayValue = displayValue ? 'Yes' : 'No';
-                        if (displayValue === true || displayValue === 'true' || displayValue === '1') displayValue = '<span class="badge bg-success">Yes</span>';
-                        else if (displayValue === false || displayValue === 'false' || displayValue === '0') displayValue = '<span class="badge bg-secondary">No</span>';
-                        contentHtml += `<tr><td class="text-muted small">${displayLabel}</td><td>${displayValue}</td></tr>`;
+                    contentHtml += `<tr><td><strong><i class="bi bi-ethernet me-1"></i>${portNum}</strong></td>`;
+                    portColDefs.forEach(col => {
+                        const param = ports[portNum][col.key];
+                        let val = param ? param.value : '-';
+                        if (val === true || val === 'true' || val === '1') val = '<span class="badge bg-success">Yes</span>';
+                        else if (val === false || val === 'false' || val === '0') val = '<span class="badge bg-secondary">No</span>';
+                        else if (val === 'Up') val = '<span class="badge bg-success">Up</span>';
+                        else if (val === 'Down' || val === 'Disabled') val = '<span class="badge bg-secondary">' + val + '</span>';
+                        contentHtml += `<td>${val}</td>`;
                     });
-                    contentHtml += '</table></div></div></div>';
+                    contentHtml += '</tr>';
                 });
-                contentHtml += '</div>';
+                contentHtml += '</tbody></table></div>';
             } else if (key === 'hosts') {
                 // Group by host number - table with hosts as rows
                 const hosts = {};
