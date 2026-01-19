@@ -17232,11 +17232,28 @@ function renderInlineStatus(categories) {
                     portColDefs.forEach(col => {
                         const param = ports[portNum][col.key];
                         let val = param ? param.value : '-';
-                        if (val === true || val === 'true' || val === '1') val = '<span class="badge bg-success">Yes</span>';
-                        else if (val === false || val === 'false' || val === '0') val = '<span class="badge bg-secondary">No</span>';
-                        else if (val === 'Up') val = '<span class="badge bg-success">Up</span>';
-                        else if (val === 'Down' || val === 'Disabled') val = '<span class="badge bg-secondary">' + val + '</span>';
-                        contentHtml += `<td>${val}</td>`;
+                        
+                        // For Enable and L3 Enable - make them toggle buttons
+                        if ((col.key === 'Enable' || col.key === 'X_HW_L3Enable') && param) {
+                            const isEnabled = val === true || val === 'true' || val === '1';
+                            const btnClass = isEnabled ? 'btn-success' : 'btn-secondary';
+                            const btnText = isEnabled ? 'Enabled' : 'Disabled';
+                            const newVal = isEnabled ? 'false' : 'true';
+                            contentHtml += `<td><button type="button" class="btn btn-sm ${btnClass} device-param-toggle" 
+                                data-path="${param.path}" data-current="${isEnabled}" 
+                                onclick="toggleLanPortParam(this, '${param.path}', ${!isEnabled})">
+                                ${btnText}</button></td>`;
+                        } else if (val === true || val === 'true' || val === '1') {
+                            contentHtml += '<td><span class="badge bg-success">Yes</span></td>';
+                        } else if (val === false || val === 'false' || val === '0') {
+                            contentHtml += '<td><span class="badge bg-secondary">No</span></td>';
+                        } else if (val === 'Up') {
+                            contentHtml += '<td><span class="badge bg-success">Up</span></td>';
+                        } else if (val === 'Down' || val === 'Disabled') {
+                            contentHtml += `<td><span class="badge bg-secondary">${val}</span></td>`;
+                        } else {
+                            contentHtml += `<td>${val}</td>`;
+                        }
                     });
                     contentHtml += '</tr>';
                 });
@@ -17440,6 +17457,42 @@ async function saveInlineStatus() {
         saveBtn.disabled = false;
         showToast('Error saving: ' + error.message, 'danger');
     }
+}
+
+
+// Toggle LAN port parameter (Enable/L3Enable)
+async function toggleLanPortParam(btn, path, newValue) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'save_device_params');
+        formData.append('serial', inlineStatusSerial);
+        formData.append('params', JSON.stringify({ [path]: newValue }));
+        
+        const response = await fetch(window.location.pathname + '?page=huawei-olt', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update button state
+            btn.className = newValue ? 'btn btn-sm btn-success device-param-toggle' : 'btn btn-sm btn-secondary device-param-toggle';
+            btn.innerHTML = newValue ? 'Enabled' : 'Disabled';
+            btn.dataset.current = newValue;
+            btn.onclick = () => toggleLanPortParam(btn, path, !newValue);
+            showToast('Setting updated', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed'), 'danger');
+            btn.innerHTML = btn.dataset.current === 'true' ? 'Enabled' : 'Disabled';
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'danger');
+        btn.innerHTML = btn.dataset.current === 'true' ? 'Enabled' : 'Disabled';
+    }
+    btn.disabled = false;
 }
 
 // Tab definitions - Only show these specific sections
