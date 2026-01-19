@@ -7227,7 +7227,7 @@ class HuaweiOLT {
         $genieacsId = $onu['genieacs_id'] ?? null;
         
         // If genieacs_id not set, try to look up by serial
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             require_once __DIR__ . '/GenieACS.php';
             $genieacs = new \App\GenieACS($this->db);
             
@@ -7244,7 +7244,7 @@ class HuaweiOLT {
             }
         }
         
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             return ['success' => false, 'error' => 'Provision blocked: ONU not registered in GenieACS'];
         }
         
@@ -7790,28 +7790,29 @@ class HuaweiOLT {
         }
         
         $genieacsId = $onu['genieacs_id'] ?? null;
+        $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
         
-        // If genieacs_id not set, try to look up by serial
-        if (empty($genieacsId)) {
-            require_once __DIR__ . '/GenieACS.php';
-            $genieacs = new \App\GenieACS($this->db);
-            
-            $serial = $onu['tr069_serial'] ?? $onu['tr069_device_id'] ?? $onu['sn'] ?? '';
+        // Always verify genieacs_id is a proper device ID (should contain hyphens like HWTC-Model-Serial)
+        // If it's just the serial number, look up the proper ID
+        require_once __DIR__ . '/GenieACS.php';
+        $genieacs = new \App\GenieACS($this->db);
+        
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
+            // Look up proper GenieACS device ID by serial
             if (!empty($serial)) {
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
                 if ($deviceResult['success'] && !empty($deviceResult['device']['_id'])) {
                     $genieacsId = $deviceResult['device']['_id'];
-                    // Update the ONU record with the found ID
+                    // Update the ONU record with the correct ID
                     $stmt = $this->db->prepare("UPDATE huawei_onus SET genieacs_id = ? WHERE id = ?");
                     $stmt->execute([$genieacsId, $onuDbId]);
                 }
             }
         }
         
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             return ['success' => false, 'error' => 'ONU not registered in GenieACS. Configure TR-069 first.'];
         }
-        
         $wlanIndex = (int)($config['wlan_index'] ?? 1);
         $enabled = $config['enabled'] ?? true;
         $ssid = $config['ssid'] ?? '';
@@ -8007,7 +8008,7 @@ class HuaweiOLT {
         if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
         
         $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
         }
         
@@ -8091,7 +8092,7 @@ class HuaweiOLT {
         if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
         
         $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
         }
         
@@ -8301,7 +8302,7 @@ class HuaweiOLT {
     private function resolveGenieACSId(int $onuDbId, array $onu): ?string {
         $genieacsId = $onu['genieacs_id'] ?? null;
         
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             require_once __DIR__ . '/GenieACS.php';
             $genieacs = new \App\GenieACS($this->db);
             
@@ -8327,7 +8328,7 @@ class HuaweiOLT {
         if (!$onu) return ['success' => false, 'error' => 'ONU not found'];
         
         $genieacsId = $this->resolveGenieACSId($onuDbId, $onu);
-        if (empty($genieacsId)) {
+        if (empty($genieacsId) || !str_contains($genieacsId, '-')) {
             return ['success' => false, 'error' => 'ONU not registered in GenieACS'];
         }
         
