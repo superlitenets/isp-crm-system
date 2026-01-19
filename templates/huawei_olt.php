@@ -20081,58 +20081,11 @@ function saveDeviceStatus() {
             return;
         }
         
-        document.querySelectorAll('.toast').forEach(t => t.remove());
-        
-        let attempt = 0;
-        const maxAttempts = 10;
-        const statusToast = showToast('<div id="wifiSummonProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
-        
-        function updateProgress(msg) {
-            const el = document.getElementById('wifiSummonProgress');
-            if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + msg;
-        }
-        
-        function checkDevice() {
-            attempt++;
-            updateProgress('Checking device... (' + attempt + '/' + maxAttempts + ')');
-            
-            fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) {
-                        hideToast(statusToast);
-                        showToast('Error: ' + (data.error || 'Failed'), 'danger', 5000);
-                        return;
-                    }
-                    
-                    if (!data.in_genieacs) {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start"><strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br><small>Complete OLT Authorization and push TR-069 config first</small></div>', 'warning', 10000);
-                        return;
-                    }
-                    
-                    if (data.reachable && data.device_id) {
-                        hideToast(statusToast);
-                        showToast('<i class="bi bi-check-circle me-1"></i>Device ready!', 'success', 2000);
-                        openWifiConfigModal(serialNumber, data.device_id);
-                    } else if (attempt < maxAttempts) {
-                        updateProgress('Waiting for device... (' + attempt + '/' + maxAttempts + ')');
-                        setTimeout(checkDevice, 3000);
-                    } else {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start"><strong>Device Not Responding</strong><br><small>Last seen: ' + (data.last_inform || 'Never') + '</small><br><small>Click WiFi button again to retry</small></div>', 'warning', 8000);
-                    }
-                })
-                .catch(err => {
-                    hideToast(statusToast);
-                    showToast('Connection error: ' + err.message, 'danger', 5000);
-                });
-        }
-        
-        checkDevice();
+        // Open modal directly without summoning
+        document.getElementById('wifiDeviceId').value = serialNumber;
+        document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
+        new bootstrap.Modal(document.getElementById('wifiConfigModal')).show();
     }
-    
-    // Open WiFi Config Modal (after reachability check passed)
     function openWifiConfigModal(serialNumber, deviceId) {
         document.getElementById('wifiDeviceId').value = deviceId || serialNumber;
         document.getElementById('wifiDeviceSn').textContent = serialNumber || 'Unknown';
@@ -20146,58 +20099,9 @@ function saveDeviceStatus() {
             return;
         }
         
-        document.querySelectorAll('.toast').forEach(t => t.remove());
-        
-        let attempt = 0;
-        const maxAttempts = 10;
-        const statusToast = showToast('<div id="wanSummonProgress"><i class="bi bi-arrow-repeat spin me-2"></i>Summoning device...</div>', 'info', 60000);
-        
-        function updateProgress(msg) {
-            const el = document.getElementById('wanSummonProgress');
-            if (el) el.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>' + msg;
-        }
-        
-        function checkDevice() {
-            attempt++;
-            updateProgress('Checking device... (' + attempt + '/' + maxAttempts + ')');
-            
-            fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber) + '&onu_id=' + onuId)
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) {
-                        hideToast(statusToast);
-                        showToast('Error: ' + (data.error || 'Failed'), 'danger', 5000);
-                        return;
-                    }
-                    
-                    if (!data.in_genieacs) {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start"><strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br><small>Complete OLT Authorization and push TR-069 config first</small></div>', 'warning', 10000);
-                        return;
-                    }
-                    
-                    if (data.reachable) {
-                        hideToast(statusToast);
-                        showToast('<i class="bi bi-check-circle me-1"></i>Device ready!', 'success', 2000);
-                        openWANConfig(onuId);
-                    } else if (attempt < maxAttempts) {
-                        updateProgress('Waiting for device... (' + attempt + '/' + maxAttempts + ')');
-                        setTimeout(checkDevice, 3000);
-                    } else {
-                        hideToast(statusToast);
-                        showToast('<div class="text-start"><strong>Device Not Responding</strong><br><small>Last seen: ' + (data.last_inform || 'Never') + '</small><br><small>Click WAN button again to retry</small></div>', 'warning', 8000);
-                    }
-                })
-                .catch(err => {
-                    hideToast(statusToast);
-                    showToast('Connection error: ' + err.message, 'danger', 5000);
-                });
-        }
-        
-        checkDevice();
+        // Open modal directly without summoning
+        openWANConfig(onuId);
     }
-    
-    // Open WAN Config Modal (loads existing config)
     function openWANConfig(onuId) {
         const modal = document.getElementById('wanConfigModal');
         const body = document.getElementById('wanConfigBody');
