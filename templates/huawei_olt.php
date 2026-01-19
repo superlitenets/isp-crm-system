@@ -17133,9 +17133,9 @@ function renderInlineStatus(categories) {
         'logs': 'bi-journal-text'
     };
     
-    // Build tabs with icons
-    let tabsHtml = '<div class="d-flex flex-wrap gap-1 mb-3">';
-    let contentHtml = '<div class="tab-content border rounded p-3" style="background: #fafafa;">';
+    // Build tabs with proper nav structure
+    let tabsHtml = '<ul class="nav nav-tabs mb-3" role="tablist" style="flex-wrap: wrap;">';
+    let contentHtml = '<div class="tab-content border border-top-0 rounded-bottom p-3" style="background: #fafafa;">';
     let first = true;
     
     Object.keys(mergedParams).forEach(key => {
@@ -17148,7 +17148,7 @@ function renderInlineStatus(categories) {
         const baseKey = key.replace(/_\d+(_\d+)?$/, '');
         const icon = tabIcons[baseKey] || tabIcons[key] || 'bi-gear';
         
-        tabsHtml += `<button class="btn btn-sm ${first ? 'btn-info' : 'btn-outline-secondary'}" data-bs-toggle="tab" data-bs-target="#${tabId}" title="${category.label}" style="white-space: nowrap;"><i class="${icon} me-1"></i>${category.label}</button>`;
+        tabsHtml += `<li class="nav-item" role="presentation"><a class="nav-link ${activeClass}" id="${tabId}-tab" data-bs-toggle="tab" href="#${tabId}" role="tab" aria-controls="${tabId}" aria-selected="${first}"><i class="${icon} me-1"></i>${category.label}</a></li>`;
         
         contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
         
@@ -17278,7 +17278,7 @@ function renderInlineStatus(categories) {
         first = false;
     });
     
-    tabsHtml += '</div>';
+    tabsHtml += '</ul>';
     contentHtml += '</div>';
     
     container.innerHTML = tabsHtml + contentHtml;
@@ -17291,17 +17291,7 @@ function renderInlineStatus(categories) {
         });
     });
     
-    // Tab button toggle styling
-    container.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
-        btn.addEventListener('shown.bs.tab', () => {
-            container.querySelectorAll('[data-bs-toggle="tab"]').forEach(b => {
-                b.classList.remove('btn-info');
-                b.classList.add('btn-outline-secondary');
-            });
-            btn.classList.remove('btn-outline-secondary');
-            btn.classList.add('btn-info');
-        });
-    });
+    // Tabs are now standard Bootstrap tabs - no custom styling needed
 }
 
 async function saveInlineStatus() {
