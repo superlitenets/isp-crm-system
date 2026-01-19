@@ -3100,6 +3100,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 
                 $genieacs = new \App\GenieACS($db);
                 
+                // Normalize parameter paths - fix common issues
+                $normalizedParams = [];
+                foreach ($params as $path => $value) {
+                    // Fix KeyPassphrase path for Huawei devices
+                    if (strpos($path, '.KeyPassphrase') !== false && strpos($path, 'PreSharedKey') === false) {
+                        // Convert WLANConfiguration.X.KeyPassphrase to WLANConfiguration.X.PreSharedKey.1.KeyPassphrase
+                        $path = preg_replace('/\.KeyPassphrase$/', '.PreSharedKey.1.KeyPassphrase', $path);
+                    }
+                    
+                    // Skip problematic parameters that cause cwmp.9007 errors
+                    $skipParams = ['WPAEncryptionModes', 'X_HW_WlanAccessType', 'X_HW_VlanMappingEnable', 'BeaconType', 'WEPEncryptionLevel'];
+                    $skip = false;
+                    foreach ($skipParams as $skipParam) {
+                        if (strpos($path, $skipParam) !== false) {
+                            $skip = true;
+                            break;
+                        }
+                    }
+                    if (!$skip) {
+                        $normalizedParams[$path] = $value;
+                    }
+                }
+                $params = $normalizedParams;
+                
+                if (empty($params)) {
+                    echo json_encode(['success' => true, 'message' => 'No valid parameters to save (some may have been filtered)']);
+                    exit;
+                }
+                
                 // Find device by serial
                 $deviceResult = $genieacs->getDeviceBySerial($serial);
                 error_log("[save_device_params] Device lookup result: " . json_encode($deviceResult));
