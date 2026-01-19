@@ -17567,7 +17567,42 @@ function renderInlineStatus(categories) {
         });
     });
     
-    // Handle tab color styling on change
+    // Manually initialize tabs since Bootstrap Tab doesn't auto-bind to dynamic elements
+    container.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Hide all panes
+            container.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Deactivate all tabs
+            container.querySelectorAll('[data-bs-toggle="pill"]').forEach(t => {
+                const c = t.dataset.color;
+                t.classList.remove('active');
+                t.style.background = 'white';
+                t.style.color = c;
+                t.style.border = '1px solid ' + c;
+            });
+            
+            // Show target pane
+            const targetId = this.getAttribute('href');
+            const targetPane = container.querySelector(targetId);
+            if (targetPane) {
+                targetPane.classList.add('show', 'active');
+            }
+            
+            // Activate this tab
+            this.classList.add('active');
+            const activeColor = this.dataset.color;
+            this.style.background = activeColor;
+            this.style.color = 'white';
+            this.style.borderColor = activeColor;
+        });
+    });
+    
+    // Handle tab color styling on change (legacy - for Bootstrap events if they fire)
     container.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {
         tab.addEventListener('shown.bs.tab', (e) => {
             container.querySelectorAll('[data-bs-toggle="pill"]').forEach(t => {
