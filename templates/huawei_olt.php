@@ -20082,9 +20082,58 @@ function saveDeviceStatus() {
             return;
         }
         
-        // Skip device readiness check - open config modal directly
-        // Config will be pushed when user submits the form
-        openWifiConfigModal(serialNumber, serialNumber);
+        // Clear any previous toasts first
+        document.querySelectorAll('.toast').forEach(t => t.remove());
+        
+        const loadingToast = showToast('Checking device readiness...', 'info', 15000);
+        
+        // Use combined summon_and_check API for faster response
+        fetch('?page=api&action=summon_and_check&serial=' + encodeURIComponent(serialNumber))
+            .then(r => r.json())
+            .then(data => {
+                hideToast(loadingToast);
+                
+                if (!data.success) {
+                    showToast('Error: ' + (data.error || 'Failed to check device'), 'danger', 5000);
+                    return;
+                }
+                
+                // Show summon feedback
+                if (data.summoned || data.queued) {
+                    showToast('Connection request sent to device', 'info', 2000);
+                }
+                
+                if (!data.in_genieacs) {
+                    showToast('<div class="text-start">' +
+                        '<strong><i class="bi bi-shield-exclamation me-1"></i>Not in GenieACS</strong><br>' +
+                        '<small class="text-warning">Device not connected to ACS server</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small><strong>Required steps:</strong><br>' +
+                        '1. Complete OLT Authorization first<br>' +
+                        '2. Push TR-069 OMCI config<br>' +
+                        '3. Wait for device to connect to ACS</small>' +
+                        '</div>', 'warning', 12000);
+                    return;
+                }
+                
+                if (data.reachable) {
+                    // Device is online and ready - open WiFi config modal with correct device_id
+                    openWifiConfigModal(serialNumber, data.device_id);
+                } else {
+                    // Device is in GenieACS but offline
+                    showToast('<div class="text-start">' +
+                        '<strong>Device Offline</strong><br>' +
+                        '<small>Last seen: ' + (data.last_inform || 'Never') + '</small><br>' +
+                        '<small>Summoned: ' + (data.summoned ? 'Yes' : 'No') + '</small><br>' +
+                        '<hr class="my-1">' +
+                        '<small>Wait for device to respond or try again in 30 seconds</small>' +
+                        '</div>', 'warning', 10000);
+                }
+            })
+            .catch(err => {
+                hideToast(loadingToast);
+                showToast('Connection error: ' + err.message, 'danger', 5000);
+            });
     }
     
     // Open WiFi Config Modal (after reachability check passed)
