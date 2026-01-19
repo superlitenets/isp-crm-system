@@ -17054,7 +17054,14 @@ async function loadInlineStatus(serial, forceRefresh = false) {
     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info" role="status"></div><div class="mt-2 text-muted">Loading device parameters...</div></div>';
     
     try {
-        const response = await fetch('?action=get_device_status&serial=' + serial + (forceRefresh ? '&refresh=1' : ''));
+        const formData = new FormData();
+        formData.append('action', 'get_device_status');
+        formData.append('serial', serial);
+        if (forceRefresh) formData.append('refresh', '1');
+        const response = await fetch(window.location.pathname + '?page=huawei-olt', {
+            method: 'POST',
+            body: formData
+        });
         const data = await response.json();
         
         if (!data.success) {
