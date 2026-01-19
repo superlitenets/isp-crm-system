@@ -17170,14 +17170,30 @@ function renderDeviceStatusTabs(categories) {
     const consolidatedCategories = {};
     const mergedParams = {};
     
+    // Categories that should keep their numeric suffixes (represent different instances)
+    const keepSuffixCategories = ['ppp_interface', 'ip_interface', 'voice_line'];
+    
     Object.keys(categories).forEach(key => {
         // Normalize key: remove auto_ prefix and consolidate miscellaneous variants
         let normalizedKey = key;
         if (key.startsWith('auto_')) {
             normalizedKey = key.replace('auto_', '');
         }
+        
+        // For categories that should keep suffixes, check if this is a numbered instance
+        // and keep it separate (e.g., ppp_interface_1_1 stays as ppp_interface_1_1)
+        const baseKey = normalizedKey.replace(/_\d+(_\d+)?$/, '');
+        const hasSuffix = baseKey !== normalizedKey;
+        
+        // Only merge if it's miscellaneous or if it's an auto_ without suffix
         if (normalizedKey.startsWith('miscellaneous')) {
             normalizedKey = 'miscellaneous';
+        } else if (hasSuffix && keepSuffixCategories.includes(baseKey)) {
+            // Keep the suffix for numbered instances
+            // normalizedKey stays as is (e.g., ppp_interface_1_1)
+        } else if (!hasSuffix && key.startsWith('auto_')) {
+            // For auto_ categories without suffix, merge with base
+            // e.g., auto_wireless_lan -> wireless_lan (merges with existing wireless_lan)
         }
         
         // Initialize merged params array if needed
