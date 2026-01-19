@@ -17985,6 +17985,24 @@ function renderDeviceStatusTabs(categories) {
         
         isFirst = false;
     });
+    
+    // Initialize Bootstrap tabs manually for dynamically created tabs
+    document.querySelectorAll('#deviceStatusTabs .nav-link').forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Remove active from all tabs and panes
+            document.querySelectorAll('#deviceStatusTabs .nav-link').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#deviceStatusTabContent .tab-pane').forEach(p => {
+                p.classList.remove('show', 'active');
+            });
+            // Activate clicked tab and its pane
+            this.classList.add('active');
+            const target = document.querySelector(this.getAttribute('data-bs-target'));
+            if (target) {
+                target.classList.add('show', 'active');
+            }
+        });
+    });
 }
 
 function renderTabContent(key, category) {
