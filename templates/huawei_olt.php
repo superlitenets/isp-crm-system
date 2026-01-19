@@ -17115,9 +17115,27 @@ function renderInlineStatus(categories) {
         }
     });
     
-    // Build tabs with improved styling
-    let tabsHtml = '<ul class="nav nav-pills nav-fill mb-3" style="background: #f8f9fa; border-radius: 8px; padding: 4px;">';
-    let contentHtml = '<div class="tab-content">';
+    // Tab icon mapping
+    const tabIcons = {
+        'ppp_interface': 'bi-globe',
+        'port_forward': 'bi-arrow-left-right',
+        'ip_interface': 'bi-diagram-3',
+        'lan_dhcp': 'bi-hdd-network',
+        'lan_ports': 'bi-ethernet',
+        'lan_counters': 'bi-speedometer2',
+        'wireless_lan': 'bi-wifi',
+        'hosts': 'bi-pc-display',
+        'security': 'bi-shield-lock',
+        'voice_lines': 'bi-telephone',
+        'miscellaneous': 'bi-gear',
+        'diagnostics': 'bi-tools',
+        'firmware': 'bi-cpu',
+        'logs': 'bi-journal-text'
+    };
+    
+    // Build tabs with icons
+    let tabsHtml = '<div class="d-flex flex-wrap gap-1 mb-3">';
+    let contentHtml = '<div class="tab-content border rounded p-3" style="background: #fafafa;">';
     let first = true;
     
     Object.keys(mergedParams).forEach(key => {
@@ -17127,8 +17145,10 @@ function renderInlineStatus(categories) {
         const tabId = 'inline-tab-' + key.replace(/[^a-z0-9]/gi, '-');
         const activeClass = first ? 'active' : '';
         const showClass = first ? 'show active' : '';
+        const baseKey = key.replace(/_\d+(_\d+)?$/, '');
+        const icon = tabIcons[baseKey] || tabIcons[key] || 'bi-gear';
         
-        tabsHtml += `<li class="nav-item"><a class="nav-link ${activeClass}" style="font-weight: 500; padding: 8px 16px;" data-bs-toggle="tab" href="#${tabId}">${category.label}</a></li>`;
+        tabsHtml += `<button class="btn btn-sm ${first ? 'btn-info' : 'btn-outline-secondary'}" data-bs-toggle="tab" data-bs-target="#${tabId}" title="${category.label}" style="white-space: nowrap;"><i class="${icon} me-1"></i>${category.label}</button>`;
         
         contentHtml += `<div class="tab-pane fade ${showClass}" id="${tabId}">`;
         
@@ -17204,7 +17224,7 @@ function renderInlineStatus(categories) {
         first = false;
     });
     
-    tabsHtml += '</ul>';
+    tabsHtml += '</div>';
     contentHtml += '</div>';
     
     container.innerHTML = tabsHtml + contentHtml;
@@ -17214,6 +17234,18 @@ function renderInlineStatus(categories) {
         el.addEventListener('change', () => {
             document.getElementById('inlineStatusSaveBtn').style.display = 'inline-block';
             document.getElementById('inlineStatusSaveNotice').style.display = 'block';
+        });
+    });
+    
+    // Tab button toggle styling
+    container.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', () => {
+            container.querySelectorAll('[data-bs-toggle="tab"]').forEach(b => {
+                b.classList.remove('btn-info');
+                b.classList.add('btn-outline-secondary');
+            });
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-info');
         });
     });
 }
