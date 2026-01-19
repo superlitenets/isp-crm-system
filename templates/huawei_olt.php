@@ -17002,7 +17002,8 @@ const tabConfig = {
     'voice_lines': { label: 'Voice Lines', icon: 'bi-telephone', order: 10, editable: true },
     'miscellaneous': { label: 'Miscellaneous', icon: 'bi-three-dots', order: 11, editable: true },
     'troubleshooting': { label: 'Troubleshooting', icon: 'bi-tools', order: 12, editable: true },
-    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 13, editable: false }
+    'device_logs': { label: 'Device Logs', icon: 'bi-journal-text', order: 13, editable: false },
+    'file_firmware': { label: 'File & Firmware', icon: 'bi-hdd', order: 14, editable: true }
 };
 
 
@@ -17058,6 +17059,10 @@ function getTabConfig(key) {
     // Check for troubleshooting
     if (key.startsWith('troubleshooting')) {
         return { label: 'Troubleshooting', icon: 'bi-tools', order: 12, editable: true };
+    }
+    // Check for file & firmware management
+    if (key.startsWith('file_firmware') || key.startsWith('miscellaneous_fw')) {
+        return { label: 'File & Firmware', icon: 'bi-hdd', order: 14, editable: true };
     }
     // Check for device logs
     if (key.startsWith('device_log')) {
@@ -17169,7 +17174,8 @@ function renderDeviceStatusTabs(categories) {
                key.startsWith('security') ||
                key.startsWith('miscellaneous') ||
                key.startsWith('troubleshooting') ||
-               key.startsWith('device_log');
+               key.startsWith('device_log') ||
+               key.startsWith('file_firmware');
     }).sort((a, b) => {
         const orderA = tabConfig[a]?.order || getTabConfig(a)?.order || 50;
         const orderB = tabConfig[b]?.order || getTabConfig(b)?.order || 50;
