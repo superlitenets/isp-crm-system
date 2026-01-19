@@ -17205,7 +17205,7 @@ function renderInlineStatus(categories) {
                 // Extract port data and group by port
                 const ports = {};
                 sortedParams.forEach(param => {
-                    const match = param.path.match(/LANEthernetInterfaceConfig\.(d+)\./);
+                    const match = param.path.match(/LANEthernetInterfaceConfig\.(\d+)\./);
                     const portNum = match ? match[1] : '1';
                     if (!ports[portNum]) ports[portNum] = [];
                     ports[portNum].push(param);
