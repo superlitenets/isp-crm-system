@@ -17675,6 +17675,7 @@ async function saveInlineStatus() {
         
         if (data.success) {
             saveBtn.style.display = 'none';
+            document.getElementById('inlineStatusSaveNotice').style.display = 'none';
             saveBtn.innerHTML = originalBtnHtml;
             saveBtn.disabled = false;
             if (data.queued) {
