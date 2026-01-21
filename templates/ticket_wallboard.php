@@ -68,34 +68,25 @@ $topSolvers = $db->query("
     LIMIT 5
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Today's Attendance
+// Today's Attendance - only show employees who checked in
 $todayAttendance = $db->query("
     SELECT 
         e.id, e.name, e.position,
-        a.clock_in, a.clock_out,
+        TO_CHAR(a.clock_in, 'HH24:MI') as clock_in,
+        TO_CHAR(a.clock_out, 'HH24:MI') as clock_out,
         CASE 
-            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NULL THEN 'present'
-            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL THEN 'left'
-            ELSE 'absent'
+            WHEN a.clock_out IS NOT NULL THEN 'left'
+            ELSE 'present'
         END as attendance_status
     FROM employees e
-    LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
-    WHERE e.employment_status = 'active'
+    INNER JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
+    WHERE e.employment_status = 'active' AND a.clock_in IS NOT NULL
     ORDER BY 
-        CASE 
-            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NULL THEN 1
-            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL THEN 2
-            ELSE 3
-        END,
-        e.name
+        CASE WHEN a.clock_out IS NULL THEN 1 ELSE 2 END,
+        a.clock_in DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-$presentCount = 0;
-foreach ($todayAttendance as $att) {
-    if ($att['attendance_status'] === 'present' || $att['attendance_status'] === 'left') {
-        $presentCount++;
-    }
-}
+$presentCount = count($todayAttendance);
 
 function timeAgo($datetime) {
     $now = new DateTime();
@@ -393,6 +384,18 @@ function timeAgo($datetime) {
             color: #7d8590;
         }
         
+        .att-time {
+            font-size: 0.65rem;
+            color: #7d8590;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .att-time i {
+            font-size: 0.7rem;
+        }
+        
         .solver-row {
             display: flex;
             align-items: center;
@@ -566,7 +569,12 @@ function timeAgo($datetime) {
                             <?= strtoupper(substr($att['name'], 0, 2)) ?>
                         </div>
                         <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
-                        <div class="att-role"><?= htmlspecialchars($att['position'] ?? '') ?></div>
+                        <div class="att-time">
+                            <i class="bi bi-box-arrow-in-right"></i> <?= $att['clock_in'] ?>
+                            <?php if ($att['clock_out']): ?>
+                                <i class="bi bi-box-arrow-right"></i> <?= $att['clock_out'] ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
