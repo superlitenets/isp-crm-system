@@ -165,6 +165,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get_customers_for_auth') {
     exit;
 }
 
+// AJAX endpoint to search billing customers
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'search_billing_customer') {
+    header('Content-Type: application/json');
+    $query = trim($_GET['q'] ?? '');
+    if (empty($query)) {
+        echo json_encode(['success' => false, 'error' => 'Search query required']);
+        exit;
+    }
+    try {
+        // Search in customers table
+        $stmt = $db->prepare("
+            SELECT id, name, phone, email, account_number 
+            FROM customers 
+            WHERE name ILIKE ? OR phone ILIKE ? OR account_number ILIKE ?
+            ORDER BY name 
+            LIMIT 20
+        ");
+        $search = '%' . $query . '%';
+        $stmt->execute([$search, $search, $search]);
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'customers' => $customers]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // AJAX endpoint for staged authorization (with progress)
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
     header('Content-Type: application/json');
@@ -15088,11 +15115,59 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label"><i class="bi bi-person-check text-success me-1"></i>Link to Customer</label>
-                            <select name="customer_id" id="authCustomerId" class="form-select">
-                                <option value="">-- No Customer Link --</option>
-                            </select>
-                            <small class="text-muted">Search by name, phone, or account number</small>
+                            <label class="form-label"><i class="bi bi-person-check text-success me-1"></i>Customer</label>
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="customer_mode" id="customerModeExisting" value="existing" checked onchange="toggleCustomerMode()">
+                                <label class="btn btn-outline-primary" for="customerModeExisting">
+                                    <i class="bi bi-search me-1"></i>Select Existing
+                                </label>
+                                <input type="radio" class="btn-check" name="customer_mode" id="customerModeNew" value="new" onchange="toggleCustomerMode()">
+                                <label class="btn btn-outline-success" for="customerModeNew">
+                                    <i class="bi bi-person-plus me-1"></i>Create New
+                                </label>
+                                <input type="radio" class="btn-check" name="customer_mode" id="customerModeBilling" value="billing" onchange="toggleCustomerMode()">
+                                <label class="btn btn-outline-info" for="customerModeBilling">
+                                    <i class="bi bi-receipt me-1"></i>From Billing
+                                </label>
+                            </div>
+                            
+                            <!-- Existing Customer Select -->
+                            <div id="existingCustomerDiv">
+                                <select name="customer_id" id="authCustomerId" class="form-select">
+                                    <option value="">-- No Customer Link --</option>
+                                </select>
+                                <small class="text-muted">Search by name, phone, or account number</small>
+                            </div>
+                            
+                            <!-- New Customer Form -->
+                            <div id="newCustomerDiv" class="d-none">
+                                <input type="hidden" name="create_customer" id="createCustomerFlag" value="0">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <input type="text" name="new_customer_name" id="newCustomerName" class="form-control" placeholder="Customer Name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="text" name="new_customer_phone" id="newCustomerPhone" class="form-control" placeholder="Phone (e.g., 0712345678)">
+                                    </div>
+                                    <div class="col-12">
+                                        <input type="email" name="new_customer_email" id="newCustomerEmail" class="form-control" placeholder="Email (optional)">
+                                    </div>
+                                </div>
+                                <small class="text-success">A new customer will be created and linked to this ONU</small>
+                            </div>
+                            
+                            <!-- Billing Lookup -->
+                            <div id="billingCustomerDiv" class="d-none">
+                                <div class="input-group">
+                                    <input type="text" id="billingSearchInput" class="form-control" placeholder="Search by account number or phone...">
+                                    <button type="button" class="btn btn-info" onclick="searchBillingCustomer()">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </div>
+                                <div id="billingSearchResults" class="mt-2"></div>
+                                <input type="hidden" name="billing_customer_id" id="billingCustomerId">
+                                <small class="text-muted">Import customer from billing system</small>
+                            </div>
                         </div>
                         
                         <div class="row">
@@ -15171,32 +15246,7 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                             <small class="text-muted">Bridge mode configures all LAN ports as bridged. Can be changed later under Ethernet Ports.</small>
                         </div>
                         
-                        <hr>
-                        <h6 class="text-primary mb-3"><i class="bi bi-wifi me-2"></i>PPPoE Internet Configuration (Optional)</h6>
-                        <div class="row">
-                            <div>
-                                <div class="mb-3">
-                                    <label class="form-label">PPPoE Username</label>
-                                    <input type="text" name="pppoe_username" id="authPppoeUser" class="form-control" placeholder="e.g., user@isp.com">
-                                </div>
-                            </div>
-                            <div>
-                                <div class="mb-3">
-                                    <label class="form-label">PPPoE Password</label>
-                                    <div class="input-group">
-                                        <input type="password" name="pppoe_password" id="authPppoePass" class="form-control" placeholder="Password">
-                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePppoePassword()">
-                                            <i class="bi bi-eye" id="pppoeEyeIcon"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <small class="text-muted d-block mb-3">
-                            <i class="bi bi-info-circle me-1"></i>PPPoE will be configured via TR-069 after all TR-069 prerequisites are met (NTP sync, ACS registration). WiFi can be configured separately via the TR-069 modal.
-                        </small>
-                        
+
                         <div class="alert alert-secondary small mb-0">
                             <i class="bi bi-gear me-2"></i>
                             <strong>Auto-configuration:</strong> TR-069 management WAN will be automatically configured. Installation date will be set to today.
@@ -15232,16 +15282,54 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
         }
     }
     
-    function togglePppoePassword() {
-        const input = document.getElementById('authPppoePass');
-        const icon = document.getElementById('pppoeEyeIcon');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.className = 'bi bi-eye-slash';
-        } else {
-            input.type = 'password';
-            icon.className = 'bi bi-eye';
+    function toggleCustomerMode() {
+        const mode = document.querySelector('input[name="customer_mode"]:checked').value;
+        document.getElementById('existingCustomerDiv').classList.toggle('d-none', mode !== 'existing');
+        document.getElementById('newCustomerDiv').classList.toggle('d-none', mode !== 'new');
+        document.getElementById('billingCustomerDiv').classList.toggle('d-none', mode !== 'billing');
+        document.getElementById('createCustomerFlag').value = mode === 'new' ? '1' : '0';
+        
+        // Sync name/phone fields
+        if (mode === 'new') {
+            document.getElementById('newCustomerName').value = document.getElementById('authName').value;
+            document.getElementById('newCustomerPhone').value = document.getElementById('authPhone').value;
         }
+    }
+    
+    function searchBillingCustomer() {
+        const query = document.getElementById('billingSearchInput').value.trim();
+        if (!query) return;
+        
+        const resultsDiv = document.getElementById('billingSearchResults');
+        resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Searching...';
+        
+        fetch(`?page=huawei-olt&ajax=search_billing_customer&q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.customers && data.customers.length > 0) {
+                    let html = '<div class="list-group">';
+                    data.customers.forEach(c => {
+                        html += `<a href="#" class="list-group-item list-group-item-action" onclick="selectBillingCustomer('${c.id}', '${c.name}', '${c.phone || ''}', '${c.email || ''}'); return false;">
+                            <strong>${c.name}</strong><br>
+                            <small class="text-muted">${c.account_number || ''} | ${c.phone || ''}</small>
+                        </a>`;
+                    });
+                    html += '</div>';
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="text-muted">No customers found</div>';
+                }
+            })
+            .catch(err => {
+                resultsDiv.innerHTML = '<div class="text-danger">Search failed: ' + err.message + '</div>';
+            });
+    }
+    
+    function selectBillingCustomer(id, name, phone, email) {
+        document.getElementById('billingCustomerId').value = id;
+        document.getElementById('authName').value = name;
+        document.getElementById('authPhone').value = phone;
+        document.getElementById('billingSearchResults').innerHTML = `<div class="alert alert-success py-1 mb-0"><i class="bi bi-check-circle me-1"></i>Selected: ${name}</div>`;
     }
     
     
