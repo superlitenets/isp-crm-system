@@ -1520,6 +1520,10 @@ function confirmDeleteTicket(ticketId, ticketNumber) {
 $dashboardStats = $ticket->getDashboardStats();
 $overdueTickets = $ticket->getOverdueTickets();
 $escalatedFilter = $_GET['escalated'] ?? '';
+$statusFilter = $_GET['status'] ?? '';
+$priorityFilter = $_GET['priority'] ?? '';
+$slaFilter = $_GET['sla'] ?? '';
+$search = $_GET['search'] ?? '';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-ticket"></i> Tickets</h2>
@@ -1655,7 +1659,8 @@ $escalatedFilter = $_GET['escalated'] ?? '';
                     if ($priorityFilter) $filters['priority'] = $priorityFilter;
                     if ($search) $filters['search'] = $search;
                     if ($escalatedFilter !== '') $filters['escalated'] = $escalatedFilter;
-                    if (!empty($_GET['sla_breached'])) $filters['sla_breached'] = true;
+                    if (!empty($_GET['sla_breached']) || $slaFilter === 'breached') $filters['sla_breached'] = true;
+                    if ($slaFilter === 'at_risk') $filters['sla_at_risk'] = true;
                     if (!\App\Auth::can('tickets.view_all') && !\App\Auth::isAdmin()) {
                         $filters['user_id'] = $_SESSION['user_id'];
                     }
