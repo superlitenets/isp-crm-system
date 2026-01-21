@@ -323,12 +323,12 @@ try {
         $ticketStats = $ticketStmt->fetch(PDO::FETCH_ASSOC) ?: $ticketStats;
     }
     
-    // Get attendance this month
+    // Get attendance this month (only count records with clock_in)
     $attendanceStmt = $statsDb->prepare("
         SELECT 
-            COUNT(*) as days_present,
+            COUNT(*) FILTER (WHERE clock_in IS NOT NULL) as days_present,
             COALESCE(SUM(hours_worked), 0) as total_hours,
-            SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_days
+            COUNT(*) FILTER (WHERE status = 'late' OR is_late = true) as late_days
         FROM attendance 
         WHERE employee_id = ? 
         AND date >= DATE_TRUNC('month', CURRENT_DATE)

@@ -9734,8 +9734,8 @@ try {
                                 
                                 <div class="mb-3">
                                     <label class="form-label">ACS Server URL</label>
-                                    <input type="url" name="acs_url" class="form-control" value="<?= htmlspecialchars($tr069AcsUrl) ?>" placeholder="http://10.200.0.1:7547" required>
-                                    <div class="form-text">The TR-069 ACS server URL (e.g., GenieACS)</div>
+                                    <input type="url" name="acs_url" class="form-control" value="" placeholder="Leave empty for VLAN binding only">
+                                    <div class="form-text">Optional - leave empty to only bind ONU to VLAN without pushing ACS URL</div>
                                 </div>
                                 
                                 <div class="mb-3">
