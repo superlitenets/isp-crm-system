@@ -6931,6 +6931,90 @@ class HuaweiOLT {
             'output' => $output
         ];
     }
+
+    /**
+     * Configure ONU in bridge mode - bridges all LAN ports with native VLAN via OMCI
+     * @param int $onuDbId ONU database ID
+     * @param int $vlanId VLAN to use for bridging (native VLAN on all ports)
+     * @return array Result with success/message
+     */
+    public function configureBridgeMode(int $onuDbId, int $vlanId = 902): array {
+        $onu = $this->getONU($onuDbId);
+        if (!$onu) {
+            return ['success' => false, 'message' => 'ONU not found'];
+        }
+        
+        if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
+            return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        $oltId = $onu['olt_id'];
+        $frame = $onu['frame'] ?? 0;
+        $slot = $onu['slot'];
+        $port = $onu['port'];
+        $onuId = $onu['onu_id'];
+        
+        $output = '';
+        $errors = [];
+        
+        // Helper to check for real errors
+        $hasRealError = function($cmdOutput) {
+            if (empty($cmdOutput)) return false;
+            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $cmdOutput)) {
+                return false;
+            }
+            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $cmdOutput);
+        };
+        
+        // Step 1: Enter interface mode
+        $output .= "[Step 1: Enter GPON interface]\n";
+        $result1 = $this->executeCommand($oltId, "interface gpon {$frame}/{$slot}");
+        $output .= ($result1['output'] ?? '') . "\n";
+        usleep(300000);
+        
+        // Step 2: Configure bridge mode on LAN ports 1-4
+        // Set native VLAN on each port - this bridges traffic transparently
+        // Syntax: ont port native-vlan {port} {onu_id} eth {eth_port} vlan {vlan_id} priority 0
+        for ($ethPort = 1; $ethPort <= 4; $ethPort++) {
+            $output .= "[Step 2.{$ethPort}: Native VLAN on ETH{$ethPort}]\n";
+            $cmd = "ont port native-vlan {$port} {$onuId} eth {$ethPort} vlan {$vlanId} priority 0";
+            $result = $this->executeCommand($oltId, $cmd);
+            $cmdOutput = $result['output'] ?? '';
+            $output .= $cmdOutput . "\n";
+            
+            if ($hasRealError($cmdOutput)) {
+                $errors[] = "Failed to set native VLAN on ETH{$ethPort}";
+            }
+            usleep(200000);
+        }
+        
+        // Step 3: Exit interface mode
+        $output .= "[Step 3: Exit interface]\n";
+        $result3 = $this->executeCommand($oltId, "quit");
+        $output .= ($result3['output'] ?? '') . "\n";
+        
+        // Log the operation
+        $this->addLog([
+            'olt_id' => $oltId,
+            'onu_id' => $onuDbId,
+            'action' => 'configure_bridge',
+            'status' => empty($errors) ? 'success' : 'error',
+            'message' => empty($errors) 
+                ? "Bridge mode configured (VLAN {$vlanId} on all ports)"
+                : "Bridge mode errors: " . implode('; ', $errors),
+            'command_response' => $output,
+            'user_id' => $_SESSION['user_id'] ?? null
+        ]);
+        
+        return [
+            'success' => empty($errors),
+            'message' => empty($errors) 
+                ? "Bridge mode configured successfully"
+                : implode('; ', $errors),
+            'errors' => $errors,
+            'output' => $output
+        ];
+    }
     
     /**
      * Configure DHCP/IPoE WAN via OMCI commands on the OLT

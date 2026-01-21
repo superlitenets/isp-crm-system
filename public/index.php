@@ -7423,6 +7423,13 @@ $csrfToken = \App\Auth::generateToken();
                     include __DIR__ . '/../templates/customers.php';
                 }
                 break;
+            case 'ticket-wallboard':
+                if (!\App\Auth::can('tickets.view')) {
+                    $accessDenied = true;
+                } else {
+                    include __DIR__ . '/../templates/ticket_wallboard.php';
+                }
+                break;
             case 'tickets':
                 if (!\App\Auth::can('tickets.view')) {
                     $accessDenied = true;

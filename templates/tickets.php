@@ -1523,9 +1523,14 @@ $escalatedFilter = $_GET['escalated'] ?? '';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-ticket"></i> Tickets</h2>
-    <a href="?page=tickets&action=create" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Create Ticket
-    </a>
+    <div class="d-flex gap-2">
+        <a href="?page=ticket-wallboard" class="btn btn-outline-info" title="Wallboard View">
+            <i class="bi bi-grid-3x3-gap"></i> Wallboard
+        </a>
+        <a href="?page=tickets&action=create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Create Ticket
+        </a>
+    </div>
 </div>
 
 <div class="row g-3 mb-4">

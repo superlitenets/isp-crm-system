@@ -201,6 +201,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'authorize_staged') {
                 $onuTypeId = !empty($_POST['onu_type_id']) ? (int)$_POST['onu_type_id'] : null;
                 $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
                 $pppoePassword = trim($_POST['pppoe_password'] ?? '');
+                $onuMode = $_POST['onu_mode'] ?? 'router'; // 'router' or 'bridge'
                 $oltIdInput = !empty($_POST['olt_id']) ? (int)$_POST['olt_id'] : null;
                 $frameSlotPort = trim($_POST['frame_slot_port'] ?? '');
                 
@@ -1520,6 +1521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
                 $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
                 $pppoePassword = trim($_POST['pppoe_password'] ?? '');
+                $onuMode = $_POST['onu_mode'] ?? 'router'; // 'router' or 'bridge'
                 
                 // Ensure ONU exists in database
                 $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
@@ -1918,6 +1920,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                     }
                 }
                 
+                // Configure bridge mode if selected
+                if ($messageType === 'success' && isset($onuMode) && $onuMode === 'bridge') {
+                    try {
+                        // Store bridge mode in database
+                        $db->prepare("UPDATE huawei_onus SET onu_mode = ? WHERE id = ?")->execute(['bridge', $onuId]);
+                        
+                        // Configure all LAN ports as bridged via OMCI (native VLAN on all ports)
+                        $bridgeVlan = $vlanId ?: $serviceVlan ?: 902;
+                        $bridgeResult = $huaweiOLT->configureBridgeMode($onuId, $bridgeVlan);
+                        if ($bridgeResult['success']) {
+                            $message .= ' Bridge mode configured.';
+                        } else {
+                            $message .= ' Bridge mode partial: ' . ($bridgeResult['message'] ?? 'check manually');
+                        }
+                    } catch (Exception $e) {
+                        error_log("Bridge mode config failed: " . $e->getMessage());
+                    }
+                } else if ($messageType === 'success') {
+                    // Default router mode
+                    $db->prepare("UPDATE huawei_onus SET onu_mode = ? WHERE id = ?")->execute(['router', $onuId]);
+                }
+
                 // Queue TR-069 configuration if PPPoE settings provided and auth succeeded
                 $tr069Queued = false;
                 if ($messageType === 'success' && !empty($_POST['pppoe_username'])) {
@@ -15136,6 +15160,15 @@ service-port vlan {tr069_vlan} gpon 0/X/{port} ont {onu_id} gemport 2</pre>
                                 <?php endwhile; ?>
                             </select>
                             <small class="text-muted">Leave empty to use auto-detected type</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-diagram-3 text-warning me-1"></i>ONU Mode</label>
+                            <select name="onu_mode" id="authOnuMode" class="form-select">
+                                <option value="router" selected>Router (Default)</option>
+                                <option value="bridge">Bridge (All ports bridged via OMCI)</option>
+                            </select>
+                            <small class="text-muted">Bridge mode configures all LAN ports as bridged. Can be changed later under Ethernet Ports.</small>
                         </div>
                         
                         <hr>
