@@ -1546,9 +1546,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 $customerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : null;
                 $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
                 $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
-                $pppoeUsername = trim($_POST['pppoe_username'] ?? '');
-                $pppoePassword = trim($_POST['pppoe_password'] ?? '');
                 $onuMode = $_POST['onu_mode'] ?? 'router'; // 'router' or 'bridge'
+                
+                // Handle customer creation/selection modes
+                $customerMode = $_POST['customer_mode'] ?? 'existing';
+                $createCustomer = ($_POST['create_customer'] ?? '0') === '1';
+                $billingCustomerId = !empty($_POST['billing_customer_id']) ? (int)$_POST['billing_customer_id'] : null;
+                
+                // Create new customer if requested
+                if ($createCustomer && !$customerId) {
+                    $newCustomerName = trim($_POST['new_customer_name'] ?? '') ?: $name;
+                    $newCustomerPhone = trim($_POST['new_customer_phone'] ?? '') ?: $phone;
+                    $newCustomerEmail = trim($_POST['new_customer_email'] ?? '');
+                    
+                    if (!empty($newCustomerName)) {
+                        try {
+                            $insertCust = $db->prepare("
+                                INSERT INTO customers (name, phone, email, created_at)
+                                VALUES (?, ?, ?, NOW())
+                                RETURNING id
+                            ");
+                            $insertCust->execute([$newCustomerName, $newCustomerPhone, $newCustomerEmail ?: null]);
+                            $customerId = (int)$insertCust->fetchColumn();
+                            $name = $newCustomerName;
+                            $phone = $newCustomerPhone;
+                        } catch (Exception $e) {
+                            // Log but don't fail - customer creation is optional
+                            error_log("Failed to create customer: " . $e->getMessage());
+                        }
+                    }
+                } elseif ($billingCustomerId && !$customerId) {
+                    $customerId = $billingCustomerId;
+                }
                 
                 // Ensure ONU exists in database
                 $onu = $onuId ? $huaweiOLT->getONU($onuId) : null;
