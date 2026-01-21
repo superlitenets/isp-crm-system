@@ -323,8 +323,9 @@ class DiscoveryWorker {
         const lines = output.split('\n');
         let currentOnu = null;
 
-        // Debug: log raw output length
+        // Debug: log raw output length and first 500 chars
         console.log(`[Discovery] Parsing autofind output (${output.length} chars)`);
+        console.log(`[Discovery] Raw output preview: ${output.substring(0, 500).replace(/\n/g, '\\n')}`);
 
         for (const line of lines) {
             // Huawei format: "Number : 1" starts a new ONU record
