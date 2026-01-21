@@ -1304,10 +1304,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                 }
                 
                 try {
-                    $result = $huaweiOLT->configureTR069Manual($onuId, $tr069Vlan, $acsUrl, $gemPort);
+                    $result = $huaweiOLT->configureTR069Manual($onuId);
                     
                     if ($result['success']) {
-                        $message = "TR-069 configured successfully! VLAN: {$result['tr069_vlan']}, ACS: {$result['acs_url']}";
+                        $message = $result['message'];
                         $messageType = 'success';
                         
                         // Update ONU TR-069 status
