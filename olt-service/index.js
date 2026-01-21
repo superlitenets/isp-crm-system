@@ -14,6 +14,20 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', sessions: sessionManager.getSessionCount() });
 });
 
+app.get('/ping/:ip', async (req, res) => {
+    const { ip } = req.params;
+    const { exec } = require('child_process');
+    exec(`ping -c 3 -W 2 ${ip}`, (error, stdout, stderr) => {
+        const reachable = !error;
+        res.json({ 
+            ip, 
+            reachable, 
+            output: stdout || stderr,
+            error: error ? error.message : null
+        });
+    });
+});
+
 app.get('/sessions', (req, res) => {
     res.json(sessionManager.getAllSessionStatus());
 });
