@@ -1,11 +1,10 @@
 <?php
-// Ticket Wallboard - Premium visual display of all tickets, LOS alerts, and new ONU discoveries
+// Operations Wallboard - Statistics display optimized for TV screens
 // Opens in fullscreen mode without header/sidebar
 
 require_once __DIR__ . '/../config/database.php';
 session_start();
 
-// Check authentication
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login.php');
     exit;
@@ -13,99 +12,102 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = Database::getConnection();
 
-// Get all tickets with related data
-$ticketsQuery = $db->query("
-    SELECT t.*, 
-           c.name as customer_name, c.phone as customer_phone, c.account_number,
-           u.name as assigned_name,
-           cr.name as creator_name,
-           (SELECT COUNT(*) FROM ticket_comments tc WHERE tc.ticket_id = t.id) as comment_count,
-           b.name as branch_name
-    FROM tickets t
-    LEFT JOIN customers c ON t.customer_id = c.id
-    LEFT JOIN users u ON t.assigned_to = u.id
-    LEFT JOIN users cr ON t.created_by = cr.id
-    LEFT JOIN branches b ON t.branch_id = b.id
-    WHERE t.status NOT IN ('closed')
+// Ticket Statistics
+$ticketStats = $db->query("
+    SELECT 
+        COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+        COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
+        COUNT(*) FILTER (WHERE status = 'closed' AND updated_at > NOW() - INTERVAL '24 hours') as closed_today,
+        COUNT(*) FILTER (WHERE priority = 'critical' AND status NOT IN ('closed', 'resolved')) as critical,
+        COUNT(*) FILTER (WHERE priority = 'high' AND status NOT IN ('closed', 'resolved')) as high_priority
+    FROM tickets
+")->fetch(PDO::FETCH_ASSOC);
+
+// ONU Statistics
+$onuStats = $db->query("
+    SELECT 
+        COUNT(*) as total_onus,
+        COUNT(*) FILTER (WHERE status = 'online') as online,
+        COUNT(*) FILTER (WHERE status = 'offline') as offline,
+        COUNT(*) FILTER (WHERE status = 'los') as los
+    FROM huawei_onus
+    WHERE is_authorized = true
+")->fetch(PDO::FETCH_ASSOC);
+
+// New ONU discoveries (last 24h)
+$newOnuCount = $db->query("
+    SELECT COUNT(*) as cnt FROM onu_discovery_log 
+    WHERE last_seen_at > NOW() - INTERVAL '24 hours'
+")->fetch(PDO::FETCH_ASSOC)['cnt'] ?? 0;
+
+// Customer Statistics
+$customerStats = $db->query("
+    SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status = 'suspended') as suspended
+    FROM customers
+")->fetch(PDO::FETCH_ASSOC);
+
+// Today's Attendance
+$todayAttendance = $db->query("
+    SELECT 
+        u.id, u.name, u.role,
+        a.check_in, a.check_out, a.status,
+        CASE 
+            WHEN a.check_in IS NOT NULL AND a.check_out IS NULL THEN 'present'
+            WHEN a.check_in IS NOT NULL AND a.check_out IS NOT NULL THEN 'left'
+            ELSE 'absent'
+        END as attendance_status
+    FROM users u
+    LEFT JOIN attendance a ON u.id = a.user_id AND DATE(a.check_in) = CURRENT_DATE
+    WHERE u.is_active = true AND u.role != 'customer'
     ORDER BY 
-        CASE t.priority 
-            WHEN 'critical' THEN 1 
-            WHEN 'high' THEN 2 
-            WHEN 'medium' THEN 3 
-            WHEN 'low' THEN 4 
-            ELSE 5 
+        CASE 
+            WHEN a.check_in IS NOT NULL AND a.check_out IS NULL THEN 1
+            WHEN a.check_in IS NOT NULL AND a.check_out IS NOT NULL THEN 2
+            ELSE 3
         END,
-        t.created_at DESC
-");
-$allTickets = $ticketsQuery->fetchAll(PDO::FETCH_ASSOC);
+        u.name
+")->fetchAll(PDO::FETCH_ASSOC);
 
-// Group by status
-$ticketsByStatus = [
-    'open' => [],
-    'in_progress' => [],
-    'pending' => [],
-    'resolved' => []
-];
-
-foreach ($allTickets as $t) {
-    $status = $t['status'] ?? 'open';
-    if (isset($ticketsByStatus[$status])) {
-        $ticketsByStatus[$status][] = $t;
+$presentCount = 0;
+$absentCount = 0;
+foreach ($todayAttendance as $att) {
+    if ($att['attendance_status'] === 'present' || $att['attendance_status'] === 'left') {
+        $presentCount++;
     } else {
-        $ticketsByStatus['open'][] = $t;
+        $absentCount++;
     }
 }
 
-// Get LOS ONUs (Loss of Signal)
-$losQuery = $db->query("
-    SELECT o.*, olt.name as olt_name, c.name as customer_name, c.phone as customer_phone
+// Recent Critical/High Tickets
+$urgentTickets = $db->query("
+    SELECT t.id, t.subject, t.priority, t.status, t.created_at,
+           c.name as customer_name, u.name as assigned_name
+    FROM tickets t
+    LEFT JOIN customers c ON t.customer_id = c.id
+    LEFT JOIN users u ON t.assigned_to = u.id
+    WHERE t.priority IN ('critical', 'high') 
+    AND t.status NOT IN ('closed', 'resolved')
+    ORDER BY 
+        CASE t.priority WHEN 'critical' THEN 1 ELSE 2 END,
+        t.created_at DESC
+    LIMIT 8
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// LOS ONUs
+$losOnus = $db->query("
+    SELECT o.name, o.sn, olt.name as olt_name, c.name as customer_name
     FROM huawei_onus o
     LEFT JOIN huawei_olts olt ON o.olt_id = olt.id
     LEFT JOIN customers c ON o.customer_id = c.id
     WHERE o.status = 'los'
     ORDER BY o.updated_at DESC
-    LIMIT 50
-");
-$losOnus = $losQuery->fetchAll(PDO::FETCH_ASSOC);
-
-// Get newly discovered ONUs (last 24 hours, not authorized)
-$newOnuQuery = $db->query("
-    SELECT dl.*, olt.name as olt_name
-    FROM onu_discovery_log dl
-    LEFT JOIN huawei_olts olt ON dl.olt_id = olt.id
-    WHERE dl.last_seen_at > NOW() - INTERVAL '24 hours'
-    ORDER BY dl.last_seen_at DESC
-    LIMIT 30
-");
-$newOnus = $newOnuQuery->fetchAll(PDO::FETCH_ASSOC);
-
-// Stats
-$totalTickets = count($allTickets);
-$openCount = count($ticketsByStatus['open']);
-$inProgressCount = count($ticketsByStatus['in_progress']);
-$pendingCount = count($ticketsByStatus['pending']);
-$resolvedCount = count($ticketsByStatus['resolved']);
-$losCount = count($losOnus);
-$newOnuCount = count($newOnus);
-
-$statusLabels = [
-    'open' => 'Open',
-    'in_progress' => 'In Progress',
-    'pending' => 'Pending',
-    'resolved' => 'Resolved'
-];
-
-function wallboardTimeAgo($datetime) {
-    if (empty($datetime)) return '';
-    $now = new DateTime();
-    $then = new DateTime($datetime);
-    $diff = $now->diff($then);
-    
-    if ($diff->days > 0) return $diff->days . 'd';
-    if ($diff->h > 0) return $diff->h . 'h';
-    if ($diff->i > 0) return $diff->i . 'm';
-    return 'now';
-}
+    LIMIT 10
+")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -113,473 +115,404 @@ function wallboardTimeAgo($datetime) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operations Wallboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root {
-            --wb-dark: #0d1117;
-            --wb-darker: #010409;
-            --wb-card: #161b22;
-            --wb-border: #30363d;
-            --wb-text: #c9d1d9;
-            --wb-muted: #8b949e;
-            --wb-danger: #f85149;
-            --wb-warning: #d29922;
-            --wb-success: #3fb950;
-            --wb-info: #58a6ff;
-            --wb-primary: #1f6feb;
-        }
-        
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
         html, body {
-            margin: 0;
-            padding: 0;
             height: 100vh;
             overflow: hidden;
-            background: var(--wb-darker);
-            color: var(--wb-text);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d1b2a 100%);
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
         }
         
-        .wallboard-container {
-            display: flex;
-            flex-direction: column;
+        .wallboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-rows: auto 1fr 1fr;
+            gap: 15px;
             height: 100vh;
-            padding: 10px;
-            gap: 10px;
+            padding: 15px;
         }
         
-        .wb-header {
+        .header {
+            grid-column: 1 / -1;
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 10px 20px;
-            background: var(--wb-card);
+            background: rgba(255,255,255,0.05);
             border-radius: 12px;
-            border: 1px solid var(--wb-border);
         }
         
-        .wb-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .wb-stats {
-            display: flex;
-            gap: 20px;
-        }
-        
-        .wb-stat {
-            text-align: center;
-            padding: 5px 15px;
-            border-radius: 8px;
-            background: var(--wb-dark);
-        }
-        
-        .wb-stat-value {
+        .header h1 {
             font-size: 1.8rem;
-            font-weight: 700;
-            line-height: 1;
-        }
-        
-        .wb-stat-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: var(--wb-muted);
-            margin-top: 2px;
-        }
-        
-        .wb-main {
-            flex: 1;
-            display: flex;
-            gap: 10px;
-            overflow: hidden;
-        }
-        
-        .wb-alerts-panel {
-            width: 300px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .wb-alert-section {
-            flex: 1;
-            background: var(--wb-card);
-            border-radius: 12px;
-            border: 1px solid var(--wb-border);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        
-        .wb-alert-header {
-            padding: 12px 15px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--wb-border);
-        }
-        
-        .wb-alert-header.los { background: rgba(248, 81, 73, 0.15); color: var(--wb-danger); }
-        .wb-alert-header.new-onu { background: rgba(88, 166, 255, 0.15); color: var(--wb-info); }
-        
-        .wb-alert-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px;
-        }
-        
-        .wb-alert-item {
-            padding: 10px 12px;
-            margin-bottom: 6px;
-            background: var(--wb-dark);
-            border-radius: 8px;
-            border-left: 3px solid;
-            font-size: 0.85rem;
-        }
-        
-        .wb-alert-item.los { border-color: var(--wb-danger); }
-        .wb-alert-item.new-onu { border-color: var(--wb-info); }
-        
-        .wb-alert-title {
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
-        
-        .wb-alert-meta {
-            color: var(--wb-muted);
-            font-size: 0.75rem;
-        }
-        
-        .wb-tickets-panel {
-            flex: 1;
-            display: flex;
-            gap: 10px;
-            overflow: hidden;
-        }
-        
-        .wb-column {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: var(--wb-card);
-            border-radius: 12px;
-            border: 1px solid var(--wb-border);
-            overflow: hidden;
-            min-width: 0;
-        }
-        
-        .wb-column-header {
-            padding: 12px 15px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--wb-border);
-        }
-        
-        .wb-column-header.open { background: rgba(31, 111, 235, 0.15); color: var(--wb-info); }
-        .wb-column-header.in_progress { background: rgba(88, 166, 255, 0.15); color: var(--wb-info); }
-        .wb-column-header.pending { background: rgba(210, 153, 34, 0.15); color: var(--wb-warning); }
-        .wb-column-header.resolved { background: rgba(63, 185, 80, 0.15); color: var(--wb-success); }
-        
-        .wb-column-count {
-            background: var(--wb-dark);
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-        }
-        
-        .wb-column-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px;
-        }
-        
-        .wb-ticket {
-            padding: 12px;
-            margin-bottom: 8px;
-            background: var(--wb-dark);
-            border-radius: 8px;
-            border-left: 4px solid;
-            transition: transform 0.15s, box-shadow 0.15s;
-        }
-        
-        .wb-ticket:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        
-        .wb-ticket.critical { border-color: var(--wb-danger); }
-        .wb-ticket.high { border-color: var(--wb-warning); }
-        .wb-ticket.medium { border-color: var(--wb-info); }
-        .wb-ticket.low { border-color: var(--wb-muted); }
-        
-        .wb-ticket-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 6px;
-        }
-        
-        .wb-ticket-id {
-            font-size: 0.7rem;
-            color: var(--wb-muted);
-        }
-        
-        .wb-ticket-priority {
-            font-size: 0.65rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
             font-weight: 600;
         }
         
-        .wb-ticket-priority.critical { background: var(--wb-danger); color: white; }
-        .wb-ticket-priority.high { background: var(--wb-warning); color: #000; }
-        .wb-ticket-priority.medium { background: var(--wb-info); color: white; }
-        .wb-ticket-priority.low { background: var(--wb-muted); color: white; }
+        .header h1 i { color: #00d4ff; }
         
-        .wb-ticket-subject {
-            font-weight: 600;
-            font-size: 0.85rem;
-            margin-bottom: 6px;
-            line-height: 1.3;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        
-        .wb-ticket-customer {
-            font-size: 0.8rem;
-            color: var(--wb-text);
-            margin-bottom: 4px;
-        }
-        
-        .wb-ticket-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--wb-muted);
-            margin-top: 6px;
-        }
-        
-        .wb-ticket-assignee {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .wb-ticket-age {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        
-        .wb-refresh-timer {
+        .live-badge {
             display: flex;
             align-items: center;
             gap: 8px;
-            color: var(--wb-muted);
-            font-size: 0.8rem;
+            font-size: 0.9rem;
+            color: #8b949e;
         }
         
-        .wb-countdown {
-            font-weight: 600;
-            color: var(--wb-text);
-        }
-        
-        .pulse-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--wb-success);
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #3fb950;
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
         
-        .wb-empty {
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            flex: 1;
+        }
+        
+        .stat-item {
             text-align: center;
-            padding: 30px;
-            color: var(--wb-muted);
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
         }
         
-        .wb-empty i {
-            font-size: 2rem;
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #8b949e;
+            margin-top: 5px;
+            text-transform: uppercase;
+        }
+        
+        .color-danger { color: #f85149; }
+        .color-warning { color: #d29922; }
+        .color-success { color: #3fb950; }
+        .color-info { color: #58a6ff; }
+        .color-muted { color: #8b949e; }
+        
+        .list-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+        
+        .list-card h3 {
+            font-size: 0.85rem;
+            color: #8b949e;
+            text-transform: uppercase;
             margin-bottom: 10px;
-            opacity: 0.5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--wb-darker); }
-        ::-webkit-scrollbar-thumb { background: var(--wb-border); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--wb-muted); }
+        .list-card h3 .count {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+        
+        .list-scroll {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .list-item {
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            border-left: 3px solid;
+            font-size: 0.85rem;
+        }
+        
+        .list-item.critical { border-color: #f85149; }
+        .list-item.high { border-color: #d29922; }
+        .list-item.los { border-color: #f85149; }
+        .list-item.present { border-color: #3fb950; }
+        .list-item.left { border-color: #58a6ff; }
+        .list-item.absent { border-color: #8b949e; }
+        
+        .list-item-title {
+            font-weight: 600;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .list-item-meta {
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+        
+        .attendance-panel {
+            grid-column: span 2;
+        }
+        
+        .attendance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .att-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+        
+        .att-item.present { border-color: #3fb950; }
+        .att-item.left { border-color: #58a6ff; }
+        .att-item.absent { border-color: #6e7681; opacity: 0.7; }
+        
+        .att-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .att-avatar.present { background: rgba(63, 185, 80, 0.3); color: #3fb950; }
+        .att-avatar.left { background: rgba(88, 166, 255, 0.3); color: #58a6ff; }
+        .att-avatar.absent { background: rgba(110, 118, 129, 0.3); color: #6e7681; }
+        
+        .att-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .att-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .att-time {
+            font-size: 0.7rem;
+            color: #8b949e;
+        }
+        
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
     </style>
 </head>
 <body>
-    <div class="wallboard-container">
-        <div class="wb-header">
-            <div class="wb-title">
-                <i class="bi bi-grid-3x3-gap-fill"></i>
-                Operations Wallboard
-            </div>
-            
-            <div class="wb-stats">
-                <div class="wb-stat">
-                    <div class="wb-stat-value" style="color: var(--wb-danger)"><?= $losCount ?></div>
-                    <div class="wb-stat-label">LOS Alerts</div>
-                </div>
-                <div class="wb-stat">
-                    <div class="wb-stat-value" style="color: var(--wb-info)"><?= $newOnuCount ?></div>
-                    <div class="wb-stat-label">New ONUs</div>
-                </div>
-                <div class="wb-stat">
-                    <div class="wb-stat-value" style="color: var(--wb-primary)"><?= $openCount ?></div>
-                    <div class="wb-stat-label">Open</div>
-                </div>
-                <div class="wb-stat">
-                    <div class="wb-stat-value" style="color: var(--wb-warning)"><?= $pendingCount ?></div>
-                    <div class="wb-stat-label">Pending</div>
-                </div>
-                <div class="wb-stat">
-                    <div class="wb-stat-value" style="color: var(--wb-success)"><?= $resolvedCount ?></div>
-                    <div class="wb-stat-label">Resolved</div>
-                </div>
-            </div>
-            
-            <div class="wb-refresh-timer">
-                <div class="pulse-dot"></div>
-                <span>Refresh in <span class="wb-countdown" id="countdown">30</span>s</span>
+    <div class="wallboard">
+        <div class="header">
+            <h1><i class="bi bi-grid-3x3-gap-fill"></i> Operations Wallboard</h1>
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                <span>Live</span>
             </div>
         </div>
         
-        <div class="wb-main">
-            <div class="wb-alerts-panel">
-                <div class="wb-alert-section">
-                    <div class="wb-alert-header los">
-                        <span><i class="bi bi-exclamation-triangle-fill me-2"></i>LOS Alerts</span>
-                        <span class="wb-column-count"><?= $losCount ?></span>
-                    </div>
-                    <div class="wb-alert-list">
-                        <?php if (empty($losOnus)): ?>
-                        <div class="wb-empty">
-                            <i class="bi bi-check-circle"></i>
-                            <div>No LOS alerts</div>
-                        </div>
-                        <?php else: ?>
-                        <?php foreach ($losOnus as $onu): ?>
-                        <div class="wb-alert-item los">
-                            <div class="wb-alert-title">
-                                <?= htmlspecialchars($onu['name'] ?: $onu['sn']) ?>
-                            </div>
-                            <div class="wb-alert-meta">
-                                <?= htmlspecialchars($onu['olt_name'] ?? 'Unknown OLT') ?>
-                                <br>
-                                <?php if (!empty($onu['customer_name'])): ?>
-                                <i class="bi bi-person"></i> <?= htmlspecialchars($onu['customer_name']) ?>
-                                <?php else: ?>
-                                Port <?= $onu['slot'] ?>/<?= $onu['port'] ?>
-                                <?php endif; ?>
-                                <br>
-                                <i class="bi bi-clock"></i> <?= wallboardTimeAgo($onu['updated_at']) ?> ago
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
+        <div class="stat-card">
+            <h3><i class="bi bi-ticket"></i> Tickets</h3>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-value color-info"><?= $ticketStats['open_tickets'] ?? 0 ?></div>
+                    <div class="stat-label">Open</div>
                 </div>
-                
-                <div class="wb-alert-section">
-                    <div class="wb-alert-header new-onu">
-                        <span><i class="bi bi-broadcast-pin me-2"></i>New ONUs</span>
-                        <span class="wb-column-count"><?= $newOnuCount ?></span>
-                    </div>
-                    <div class="wb-alert-list">
-                        <?php if (empty($newOnus)): ?>
-                        <div class="wb-empty">
-                            <i class="bi bi-router"></i>
-                            <div>No new discoveries</div>
-                        </div>
-                        <?php else: ?>
-                        <?php foreach ($newOnus as $onu): ?>
-                        <div class="wb-alert-item new-onu">
-                            <div class="wb-alert-title">
-                                <?= htmlspecialchars($onu['serial_number']) ?>
-                            </div>
-                            <div class="wb-alert-meta">
-                                <?= htmlspecialchars($onu['olt_name'] ?? 'Unknown OLT') ?>
-                                <br>
-                                Port <?= $onu['frame'] ?? 0 ?>/<?= $onu['slot'] ?>/<?= $onu['port'] ?>
-                                <br>
-                                <i class="bi bi-clock"></i> <?= wallboardTimeAgo($onu['last_seen_at']) ?> ago
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
+                <div class="stat-item">
+                    <div class="stat-value color-warning"><?= $ticketStats['in_progress'] ?? 0 ?></div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-danger"><?= $ticketStats['critical'] ?? 0 ?></div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-success"><?= $ticketStats['closed_today'] ?? 0 ?></div>
+                    <div class="stat-label">Closed Today</div>
                 </div>
             </div>
-            
-            <div class="wb-tickets-panel">
-                <?php foreach ($ticketsByStatus as $status => $tickets): ?>
-                <div class="wb-column">
-                    <div class="wb-column-header <?= $status ?>">
-                        <span><?= $statusLabels[$status] ?? ucfirst($status) ?></span>
-                        <span class="wb-column-count"><?= count($tickets) ?></span>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="bi bi-router"></i> Network</h3>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-value color-success"><?= $onuStats['online'] ?? 0 ?></div>
+                    <div class="stat-label">Online</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-danger"><?= $onuStats['los'] ?? 0 ?></div>
+                    <div class="stat-label">LOS</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-muted"><?= $onuStats['offline'] ?? 0 ?></div>
+                    <div class="stat-label">Offline</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-info"><?= $newOnuCount ?></div>
+                    <div class="stat-label">New (24h)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="bi bi-people"></i> Customers</h3>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-value color-info"><?= $customerStats['total'] ?? 0 ?></div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-success"><?= $customerStats['active'] ?? 0 ?></div>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-item" style="grid-column: span 2;">
+                    <div class="stat-value color-warning"><?= $customerStats['suspended'] ?? 0 ?></div>
+                    <div class="stat-label">Suspended</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="bi bi-person-check"></i> Attendance</h3>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-value color-success"><?= $presentCount ?></div>
+                    <div class="stat-label">Present</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value color-muted"><?= $absentCount ?></div>
+                    <div class="stat-label">Absent</div>
+                </div>
+                <div class="stat-item" style="grid-column: span 2;">
+                    <div class="stat-value color-info"><?= count($todayAttendance) ?></div>
+                    <div class="stat-label">Total Staff</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="list-card">
+            <h3>
+                <span><i class="bi bi-exclamation-triangle"></i> Urgent Tickets</span>
+                <span class="count"><?= count($urgentTickets) ?></span>
+            </h3>
+            <div class="list-scroll">
+                <?php if (empty($urgentTickets)): ?>
+                <div style="text-align: center; padding: 30px; color: #8b949e;">
+                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                    <div>No urgent tickets</div>
+                </div>
+                <?php else: ?>
+                <?php foreach ($urgentTickets as $t): ?>
+                <div class="list-item <?= $t['priority'] ?>">
+                    <div class="list-item-title">#<?= $t['id'] ?> <?= htmlspecialchars($t['subject']) ?></div>
+                    <div class="list-item-meta">
+                        <?= htmlspecialchars($t['customer_name'] ?? 'No customer') ?>
+                        <?php if ($t['assigned_name']): ?> - <?= htmlspecialchars($t['assigned_name']) ?><?php endif; ?>
                     </div>
-                    <div class="wb-column-body">
-                        <?php if (empty($tickets)): ?>
-                        <div class="wb-empty">
-                            <i class="bi bi-inbox"></i>
-                            <div>No tickets</div>
-                        </div>
-                        <?php else: ?>
-                        <?php foreach ($tickets as $ticket): ?>
-                        <div class="wb-ticket <?= $ticket['priority'] ?? 'medium' ?>">
-                            <div class="wb-ticket-header">
-                                <span class="wb-ticket-id">#<?= $ticket['id'] ?></span>
-                                <span class="wb-ticket-priority <?= $ticket['priority'] ?? 'medium' ?>">
-                                    <?= $ticket['priority'] ?? 'medium' ?>
-                                </span>
-                            </div>
-                            <div class="wb-ticket-subject"><?= htmlspecialchars($ticket['subject']) ?></div>
-                            <?php if (!empty($ticket['customer_name'])): ?>
-                            <div class="wb-ticket-customer">
-                                <i class="bi bi-person"></i> <?= htmlspecialchars($ticket['customer_name']) ?>
-                            </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="list-card">
+            <h3>
+                <span><i class="bi bi-exclamation-octagon"></i> LOS Alerts</span>
+                <span class="count"><?= count($losOnus) ?></span>
+            </h3>
+            <div class="list-scroll">
+                <?php if (empty($losOnus)): ?>
+                <div style="text-align: center; padding: 30px; color: #8b949e;">
+                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                    <div>No LOS alerts</div>
+                </div>
+                <?php else: ?>
+                <?php foreach ($losOnus as $o): ?>
+                <div class="list-item los">
+                    <div class="list-item-title"><?= htmlspecialchars($o['name'] ?: $o['sn']) ?></div>
+                    <div class="list-item-meta">
+                        <?= htmlspecialchars($o['olt_name'] ?? '') ?>
+                        <?php if ($o['customer_name']): ?> - <?= htmlspecialchars($o['customer_name']) ?><?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="list-card attendance-panel">
+            <h3>
+                <span><i class="bi bi-calendar-check"></i> Today's Attendance</span>
+                <span class="count"><?= $presentCount ?>/<?= count($todayAttendance) ?></span>
+            </h3>
+            <div class="attendance-grid">
+                <?php foreach ($todayAttendance as $att): ?>
+                <div class="att-item <?= $att['attendance_status'] ?>">
+                    <div class="att-avatar <?= $att['attendance_status'] ?>">
+                        <?= strtoupper(substr($att['name'], 0, 2)) ?>
+                    </div>
+                    <div class="att-info">
+                        <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
+                        <div class="att-time">
+                            <?php if ($att['attendance_status'] === 'present'): ?>
+                                In: <?= date('H:i', strtotime($att['check_in'])) ?>
+                            <?php elseif ($att['attendance_status'] === 'left'): ?>
+                                <?= date('H:i', strtotime($att['check_in'])) ?> - <?= date('H:i', strtotime($att['check_out'])) ?>
+                            <?php else: ?>
+                                Not checked in
                             <?php endif; ?>
-                            <div class="wb-ticket-footer">
-                                <div class="wb-ticket-assignee">
-                                    <?php if (!empty($ticket['assigned_name'])): ?>
-                                    <i class="bi bi-person-check"></i>
-                                    <?= htmlspecialchars($ticket['assigned_name']) ?>
-                                    <?php else: ?>
-                                    <i class="bi bi-person-dash"></i>
-                                    Unassigned
-                                    <?php endif; ?>
-                                </div>
-                                <div class="wb-ticket-age">
-                                    <i class="bi bi-clock"></i>
-                                    <?= wallboardTimeAgo($ticket['created_at']) ?>
-                                </div>
-                            </div>
                         </div>
-                        <?php endforeach; ?>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -588,16 +521,7 @@ function wallboardTimeAgo($datetime) {
     </div>
     
     <script>
-        let countdown = 30;
-        const countdownEl = document.getElementById('countdown');
-        
-        setInterval(() => {
-            countdown--;
-            countdownEl.textContent = countdown;
-            if (countdown <= 0) {
-                location.reload();
-            }
-        }, 1000);
+        setInterval(() => location.reload(), 30000);
     </script>
 </body>
 </html>
