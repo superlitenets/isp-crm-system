@@ -208,6 +208,9 @@ class DiscoveryWorker {
         for (const onu of unconfiguredOnus) {
             await this.recordDiscovery(olt, onu);
         }
+        
+        // Also update ONU statuses via CLI since SNMP may not work on some OLTs
+        await this.updateOnuStatusesViaCLI(olt);
     }
 
     async discoverUnconfiguredViaCLI(olt) {
@@ -242,9 +245,137 @@ class DiscoveryWorker {
                     await this.recordDiscovery(olt, onu);
                 }
             }
+            
+            // Also update ONU statuses via CLI since SNMP may not work on some OLTs
+            await this.updateOnuStatusesViaCLI(olt);
         } catch (error) {
             console.log(`[Discovery] Autofind error on ${olt.name}: ${error.message}`);
         }
+    }
+
+    async updateOnuStatusesViaCLI(olt) {
+        try {
+            // Get all configured ONUs for this OLT
+            const onusResult = await this.pool.query(`
+                SELECT id, sn, slot, port, onu_id FROM huawei_onus 
+                WHERE olt_id = $1 AND slot IS NOT NULL AND port IS NOT NULL
+            `, [olt.id]);
+            
+            if (onusResult.rows.length === 0) {
+                return;
+            }
+            
+            // Use a single command to get all ONU info at once
+            try {
+                const command = 'display ont info 0 all';
+                const output = await this.sessionManager.execute(olt.id.toString(), command, { timeout: 30000 });
+                
+                // Parse the status output
+                const statusMap = this.parseOntInfoOutput(output);
+                
+                let updatedCount = 0;
+                
+                // Update each ONU's status
+                for (const onu of onusResult.rows) {
+                    // Build the full index: frame/slot/port/onuId
+                    const fullKey = `0/${onu.slot}/${onu.port}/${onu.onu_id}`;
+                    const statusInfo = statusMap[fullKey] || statusMap[onu.onu_id];
+                    if (statusInfo) {
+                        const newStatus = statusInfo.status?.toLowerCase() || 'offline';
+                        const result = await this.pool.query(`
+                            UPDATE huawei_onus 
+                            SET status = $1, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = $2 AND (status IS NULL OR status != $1)
+                            RETURNING id
+                        `, [newStatus, onu.id]);
+                        if (result.rowCount > 0) updatedCount++;
+                    }
+                }
+                
+                if (updatedCount > 0) {
+                    console.log(`[Discovery] CLI updated ${updatedCount} ONU statuses on ${olt.name}`);
+                }
+            } catch (cmdError) {
+                console.log(`[Discovery] CLI ont info error on ${olt.name}: ${cmdError.message}`);
+            }
+        } catch (error) {
+            console.log(`[Discovery] CLI status check error on ${olt.name}: ${error.message}`);
+        }
+    }
+
+    parseOntInfoOutput(output) {
+        const statusMap = {};
+        const lines = output.split('\n');
+        
+        // Debug: log sample lines containing actual data (not headers/separators)
+        const dataLines = lines.filter(l => l.match(/\d+\/\d+\/\d+/) && !l.includes('F/S/P'));
+        if (dataLines.length > 0) {
+            console.log(`[Discovery] Sample data lines from ONT info: "${dataLines.slice(0, 3).join(' | ')}"`);
+        } else {
+            console.log(`[Discovery] ONT info has ${lines.length} lines but no data rows found. First 500 chars: ${output.substring(0, 500).replace(/\n/g, '\\n')}`);
+        }
+        
+        // Huawei OLT output formats vary. Common patterns:
+        // Format 1: 0/2/0  1      HWTC12345678  active      online   normal   match    no
+        // Format 2: 0/ 2/ 0  1    HWTC12345678  active      online   ...
+        // Format 3: Columns may be fixed-width with spaces
+        
+        for (const line of lines) {
+            // Skip header and separator lines
+            if (line.includes('---') || line.includes('F/S/P') || line.trim().length === 0) {
+                continue;
+            }
+            
+            // Try multiple regex patterns for different OLT output formats
+            
+            // Pattern 1: Standard format - F/S/P ONT SN Control RunState ...
+            let match = line.match(/^\s*(\d+\s*\/\s*\d+\s*\/\s*\d+)\s+(\d+)\s+(\S+)\s+\S+\s+(online|offline|los|dying)/i);
+            if (!match) {
+                // Pattern 2: Any position with F/S/P followed eventually by online/offline
+                match = line.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s+(\d+)\s+\S+.*?(online|offline|los|dying)/i);
+                if (match) {
+                    const fsp = `${match[1]}/${match[2]}/${match[3]}`;
+                    const onuId = parseInt(match[4]);
+                    const status = match[5].toLowerCase();
+                    const key = `${fsp}/${onuId}`;
+                    statusMap[key] = { status };
+                    statusMap[onuId] = { status };
+                    continue;
+                }
+            } else {
+                const fsp = match[1].replace(/\s/g, '');
+                const onuId = parseInt(match[2]);
+                const status = match[4].toLowerCase();
+                const key = `${fsp}/${onuId}`;
+                statusMap[key] = { status };
+                statusMap[onuId] = { status };
+                continue;
+            }
+            
+            // Pattern 3: Very flexible - just look for the status keywords in any line with numbers
+            if (line.match(/\d+/) && line.match(/online|offline|los|dying/i)) {
+                const statusMatch = line.match(/(online|offline|los|dying)/i);
+                const numMatches = line.match(/(\d+)/g);
+                if (statusMatch && numMatches && numMatches.length >= 4) {
+                    // Assume format: frame slot port onuId ... status
+                    const fsp = `${numMatches[0]}/${numMatches[1]}/${numMatches[2]}`;
+                    const onuId = parseInt(numMatches[3]);
+                    const status = statusMatch[1].toLowerCase();
+                    const key = `${fsp}/${onuId}`;
+                    statusMap[key] = { status };
+                    statusMap[onuId] = { status };
+                }
+            }
+        }
+        
+        console.log(`[Discovery] Parsed ${Object.keys(statusMap).length} status entries from ONT info`);
+        
+        // Warn if no entries parsed from large output
+        if (Object.keys(statusMap).length === 0 && output.length > 1000) {
+            console.log(`[Discovery] WARNING: No status entries parsed from ${output.length} bytes of output`);
+        }
+        
+        return statusMap;
     }
 
     async cleanupAuthorizedOnus(olt, currentAutofindOnus) {

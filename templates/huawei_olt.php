@@ -8085,6 +8085,9 @@ try {
                                             <button class="btn btn-outline-primary" onclick="rebootOnu(<?= $onu['id'] ?>)" title="Reboot ONU">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
+                                            <button class="btn btn-outline-danger" onclick="deleteOnu(<?= $onu['id'] ?>, '<?= htmlspecialchars($onu['sn'] ?? '') ?>')" title="Delete ONU">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
