@@ -46,31 +46,31 @@ $newOnuCount = $db->query("
 $customerStats = $db->query("
     SELECT 
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'active') as active,
-        COUNT(*) FILTER (WHERE status = 'suspended') as suspended
+        COUNT(*) FILTER (WHERE connection_status = 'active') as active,
+        COUNT(*) FILTER (WHERE connection_status = 'suspended') as suspended
     FROM customers
 ")->fetch(PDO::FETCH_ASSOC);
 
 // Today's Attendance
 $todayAttendance = $db->query("
     SELECT 
-        u.id, u.name, u.role,
-        a.check_in, a.check_out, a.status,
+        e.id, e.name, e.department,
+        a.clock_in, a.clock_out, a.status,
         CASE 
-            WHEN a.check_in IS NOT NULL AND a.check_out IS NULL THEN 'present'
-            WHEN a.check_in IS NOT NULL AND a.check_out IS NOT NULL THEN 'left'
+            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NULL THEN 'present'
+            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL THEN 'left'
             ELSE 'absent'
         END as attendance_status
-    FROM users u
-    LEFT JOIN attendance a ON u.id = a.user_id AND DATE(a.check_in) = CURRENT_DATE
-    WHERE u.is_active = true AND u.role != 'customer'
+    FROM employees e
+    LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = CURRENT_DATE
+    WHERE e.employment_status = 'active'
     ORDER BY 
         CASE 
-            WHEN a.check_in IS NOT NULL AND a.check_out IS NULL THEN 1
-            WHEN a.check_in IS NOT NULL AND a.check_out IS NOT NULL THEN 2
+            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NULL THEN 1
+            WHEN a.clock_in IS NOT NULL AND a.clock_out IS NOT NULL THEN 2
             ELSE 3
         END,
-        u.name
+        e.name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $presentCount = 0;
@@ -506,9 +506,9 @@ $losOnus = $db->query("
                         <div class="att-name"><?= htmlspecialchars($att['name']) ?></div>
                         <div class="att-time">
                             <?php if ($att['attendance_status'] === 'present'): ?>
-                                In: <?= date('H:i', strtotime($att['check_in'])) ?>
+                                In: <?= date('H:i', strtotime($att['clock_in'])) ?>
                             <?php elseif ($att['attendance_status'] === 'left'): ?>
-                                <?= date('H:i', strtotime($att['check_in'])) ?> - <?= date('H:i', strtotime($att['check_out'])) ?>
+                                <?= date('H:i', strtotime($att['clock_in'])) ?> - <?= date('H:i', strtotime($att['clock_out'])) ?>
                             <?php else: ?>
                                 Not checked in
                             <?php endif; ?>

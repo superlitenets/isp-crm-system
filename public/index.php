@@ -7065,12 +7065,12 @@ $csrfToken = \App\Auth::generateToken();
             <ul class="nav flex-column">
                 <li class="nav-item">
                     <a class="nav-link <?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="?page=ticket-wallboard" target="_blank">
                         <i class="bi bi-tv"></i> Wallboard
-                    </a>
-                        <i class="bi bi-speedometer2"></i> Dashboard
                     </a>
                 </li>
                 <?php if (\App\Auth::can('customers.view')): ?>
@@ -7204,12 +7204,12 @@ $csrfToken = \App\Auth::generateToken();
         <ul class="nav flex-column">
             <li class="nav-item">
                 <a class="nav-link <?= $page === 'dashboard' ? 'active' : '' ?>" href="?page=dashboard">
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="?page=ticket-wallboard" target="_blank">
-                        <i class="bi bi-tv"></i> Wallboard
-                    </a>
                     <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="?page=ticket-wallboard" target="_blank">
+                    <i class="bi bi-tv"></i> Wallboard
                 </a>
             </li>
             <?php if (\App\Auth::can('customers.view')): ?>
