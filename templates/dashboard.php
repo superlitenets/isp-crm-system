@@ -222,57 +222,78 @@ $atRiskTickets = $sla->getAtRiskTickets($userFilterId);
             </div>
         </div>
     </div>
-    <?php if ($canViewAllTickets): ?>
     <div class="col-md-4">
         <div class="card">
             <div class="card-header bg-white">
-                <h5 class="mb-0">Team</h5>
+                <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Quick Access</h5>
             </div>
-            <div class="card-body">
-                <?php foreach ($users as $u): ?>
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                        <i class="bi bi-person text-primary"></i>
-                    </div>
-                    <div>
-                        <strong><?= htmlspecialchars($u['name']) ?></strong>
-                        <br><small class="text-muted"><?= ucfirst($u['role']) ?></small>
-                    </div>
+            <div class="card-body p-2">
+                <div class="list-group list-group-flush">
+                    <a href="?page=tickets&priority=critical" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-danger bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-exclamation-octagon text-danger"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>Critical Tickets</strong>
+                            <span class="badge bg-danger float-end"><?= $dashboardStats['critical'] ?? 0 ?></span>
+                        </div>
+                    </a>
+                    <a href="?page=tickets&priority=high" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-warning bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>High Priority</strong>
+                            <span class="badge bg-warning float-end"><?= $dashboardStats['high'] ?? 0 ?></span>
+                        </div>
+                    </a>
+                    <a href="?page=tickets&status=open" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-primary bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-folder2-open text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>Open Tickets</strong>
+                            <span class="badge bg-primary float-end"><?= $dashboardStats['open'] ?? 0 ?></span>
+                        </div>
+                    </a>
+                    <a href="?page=tickets&sla=breached" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-danger bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-clock-history text-danger"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>SLA Breached</strong>
+                            <span class="badge bg-danger float-end"><?= count($breachedTickets) ?></span>
+                        </div>
+                    </a>
+                    <a href="?page=customers" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-info bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-people text-info"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>Customers</strong>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
+                    <a href="?page=orders" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-success bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-cart3 text-success"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>Orders</strong>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
+                    <a href="?page=reports" class="list-group-item list-group-item-action d-flex align-items-center py-2">
+                        <div class="bg-secondary bg-opacity-10 rounded p-2 me-3">
+                            <i class="bi bi-graph-up text-secondary"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <strong>Reports</strong>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
                 </div>
-                <?php endforeach; ?>
             </div>
         </div>
     </div>
-    <?php else: ?>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">My Summary</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Assigned to me:</span>
-                    <strong><?= $dashboardStats['total'] ?? 0 ?></strong>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Open:</span>
-                    <span class="badge bg-warning"><?= $dashboardStats['open'] ?? 0 ?></span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>In Progress:</span>
-                    <span class="badge bg-info"><?= $dashboardStats['in_progress'] ?? 0 ?></span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Resolved:</span>
-                    <span class="badge bg-success"><?= $dashboardStats['resolved'] ?? 0 ?></span>
-                </div>
-                <hr>
-                <div class="d-flex justify-content-between">
-                    <span>SLA Breached:</span>
-                    <span class="badge bg-danger"><?= count($breachedTickets) ?></span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
 </div>
