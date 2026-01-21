@@ -8045,6 +8045,14 @@ try {
                                             'dyinggasp' => ['class' => 'warning', 'icon' => 'lightning-fill', 'label' => 'Dying Gasp'],
                                         ];
                                         $status = strtolower($onu['status'] ?? 'offline');
+                                        // Apply same status override logic as config page
+                                        if ($status !== 'online') {
+                                            $isOnline = false;
+                                            if (!empty($onu['snmp_status']) && $onu['snmp_status'] === 'online') $isOnline = true;
+                                            elseif (!empty($onu['rx_power']) && $onu['rx_power'] > -40) $isOnline = true;
+                                            elseif (!empty($onu['tr069_last_inform']) && strtotime($onu['tr069_last_inform']) >= time() - 300) $isOnline = true;
+                                            if ($isOnline) $status = 'online';
+                                        }
                                         $cfg = $statusConfig[$status] ?? ['class' => 'secondary', 'icon' => 'question-circle', 'label' => ucfirst($status)];
                                         ?>
                                         <span class="badge bg-<?= $cfg['class'] ?>">

@@ -277,9 +277,14 @@ class DiscoveryWorker {
                 
                 // Update each ONU's status
                 for (const onu of onusResult.rows) {
-                    // Build the full index: frame/slot/port/onuId
-                    const fullKey = `0/${onu.slot}/${onu.port}/${onu.onu_id}`;
-                    const statusInfo = statusMap[fullKey] || statusMap[onu.onu_id];
+                    // Try multiple key formats to find a match
+                    // OLT output F/S/P could be frame/slot/port or just slot/port depending on OLT
+                    const keys = [
+                        `0/${onu.slot}/${onu.port}/${onu.onu_id}`,  // frame/slot/port/onuId
+                        `${onu.slot}/${onu.port}/${onu.onu_id}`,    // slot/port/onuId (if F/S/P omits frame)
+                        onu.onu_id                                   // just onuId as fallback
+                    ];
+                    const statusInfo = keys.reduce((found, k) => found || statusMap[k], null);
                     if (statusInfo) {
                         const newStatus = statusInfo.status?.toLowerCase() || 'offline';
                         const result = await this.pool.query(`
@@ -329,25 +334,31 @@ class DiscoveryWorker {
             // Try multiple regex patterns for different OLT output formats
             
             // Pattern 1: Standard format - F/S/P ONT SN Control RunState ...
-            let match = line.match(/^\s*(\d+\s*\/\s*\d+\s*\/\s*\d+)\s+(\d+)\s+(\S+)\s+\S+\s+(online|offline|los|dying)/i);
-            if (!match) {
-                // Pattern 2: Any position with F/S/P followed eventually by online/offline
-                match = line.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s+(\d+)\s+\S+.*?(online|offline|los|dying)/i);
-                if (match) {
-                    const fsp = `${match[1]}/${match[2]}/${match[3]}`;
-                    const onuId = parseInt(match[4]);
-                    const status = match[5].toLowerCase();
-                    const key = `${fsp}/${onuId}`;
-                    statusMap[key] = { status };
-                    statusMap[onuId] = { status };
-                    continue;
-                }
-            } else {
-                const fsp = match[1].replace(/\s/g, '');
-                const onuId = parseInt(match[2]);
-                const status = match[4].toLowerCase();
-                const key = `${fsp}/${onuId}`;
-                statusMap[key] = { status };
+            // F/S/P is frame/slot/port e.g. "0/2/4" or "0/ 2/ 4"
+            let match = line.match(/^\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s+(\d+)\s+(\S+)\s+\S+\s+(online|offline|los|dying)/i);
+            if (match) {
+                const frame = match[1];
+                const slot = match[2];
+                const port = match[3];
+                const onuId = parseInt(match[4]);
+                const status = match[6].toLowerCase();
+                // Store multiple key formats for flexible matching
+                statusMap[`${frame}/${slot}/${port}/${onuId}`] = { status };
+                statusMap[`${slot}/${port}/${onuId}`] = { status };
+                statusMap[onuId] = { status };
+                continue;
+            }
+            
+            // Pattern 2: Fallback - any line with F/S/P followed eventually by online/offline
+            match = line.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s+(\d+)\s+\S+.*?(online|offline|los|dying)/i);
+            if (match) {
+                const frame = match[1];
+                const slot = match[2];
+                const port = match[3];
+                const onuId = parseInt(match[4]);
+                const status = match[5].toLowerCase();
+                statusMap[`${frame}/${slot}/${port}/${onuId}`] = { status };
+                statusMap[`${slot}/${port}/${onuId}`] = { status };
                 statusMap[onuId] = { status };
                 continue;
             }
@@ -358,11 +369,13 @@ class DiscoveryWorker {
                 const numMatches = line.match(/(\d+)/g);
                 if (statusMatch && numMatches && numMatches.length >= 4) {
                     // Assume format: frame slot port onuId ... status
-                    const fsp = `${numMatches[0]}/${numMatches[1]}/${numMatches[2]}`;
+                    const frame = numMatches[0];
+                    const slot = numMatches[1];
+                    const port = numMatches[2];
                     const onuId = parseInt(numMatches[3]);
                     const status = statusMatch[1].toLowerCase();
-                    const key = `${fsp}/${onuId}`;
-                    statusMap[key] = { status };
+                    statusMap[`${frame}/${slot}/${port}/${onuId}`] = { status };
+                    statusMap[`${slot}/${port}/${onuId}`] = { status };
                     statusMap[onuId] = { status };
                 }
             }
