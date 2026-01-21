@@ -24,7 +24,16 @@ $invoices = [];
 $usageHistory = [];
 $customerOnu = null;
 $tr069DeviceId = null;
-$wifiSettings = null;
+$wifiSettings = [];
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
+
+function verifyCsrf($token) {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
 
 function getClientIp() {
     $headers = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'];
@@ -137,9 +146,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 break;
                 
+            case 'reboot_device':
+                if (!isset($_SESSION['portal_subscription_id'])) {
+                    $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
+                    $message = 'Invalid request. Please try again.';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $subscription = $radiusBilling->getSubscription($_SESSION['portal_subscription_id']);
+                if (!$subscription) {
+                    $message = 'Subscription not found';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                $stmt = $db->prepare("SELECT o.*, o.tr069_device_id FROM huawei_onus o WHERE o.customer_id = ? AND o.tr069_device_id IS NOT NULL LIMIT 1");
+                $stmt->execute([$subscription['customer_id']]);
+                $onu = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$onu || empty($onu['tr069_device_id'])) {
+                    $message = 'No device found for your account.';
+                    $messageType = 'warning';
+                    break;
+                }
+                
+                try {
+                    $result = $genieACS->rebootDevice($onu['tr069_device_id']);
+                    if ($result['success']) {
+                        $message = 'Device reboot initiated. Your internet will reconnect in about 2 minutes.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Failed to reboot device: ' . ($result['error'] ?? 'Unknown error');
+                        $messageType = 'danger';
+                    }
+                } catch (Exception $e) {
+                    $message = 'Error rebooting device: ' . $e->getMessage();
+                    $messageType = 'danger';
+                }
+                break;
+                
             case 'update_wifi':
                 if (!isset($_SESSION['portal_subscription_id'])) {
                     $message = 'Please login first';
+                    $messageType = 'danger';
+                    break;
+                }
+                
+                if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
+                    $message = 'Invalid request. Please try again.';
                     $messageType = 'danger';
                     break;
                 }
@@ -336,6 +396,27 @@ if (isset($_SESSION['portal_subscription_id'])) {
         
         if ($customerOnu && !empty($customerOnu['tr069_device_id'])) {
             $tr069DeviceId = $customerOnu['tr069_device_id'];
+            
+            try {
+                $wifiResult = $genieACS->getWiFiSettings($tr069DeviceId);
+                if ($wifiResult['success'] && !empty($wifiResult['data'])) {
+                    $wifiSettings = [];
+                    foreach ($wifiResult['data'] as $item) {
+                        if (count($item) >= 2) {
+                            $path = $item[0];
+                            $value = $item[1];
+                            if (preg_match('/WLANConfiguration\.(\d+)\.(\w+)/', $path, $m)) {
+                                $idx = $m[1];
+                                $key = $m[2];
+                                if (!isset($wifiSettings[$idx])) $wifiSettings[$idx] = [];
+                                $wifiSettings[$idx][$key] = $value;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                $wifiSettings = null;
+            }
         }
         
         $routerIp = null;
@@ -531,6 +612,7 @@ if (isset($_SESSION['portal_subscription_id'])) {
         
         <ul class="nav nav-pills mb-4 flex-wrap">
             <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#overview">Overview</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#usage"><i class="bi bi-graph-up me-1"></i>Usage</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#sessions">Sessions</a></li>
             <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#invoices">Invoices</a></li>
             <li class="nav-item">
@@ -577,6 +659,66 @@ if (isset($_SESSION['portal_subscription_id'])) {
                                 <tr><td class="text-muted">Data Quota</td><td><?= $package['data_quota_mb'] ? number_format($package['data_quota_mb'] / 1024) . ' GB' : 'Unlimited' ?></td></tr>
                                 <tr><td class="text-muted">Validity</td><td><?= $package['validity_days'] ?? 30 ?> days</td></tr>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="usage">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-graph-up me-2"></i>Daily Data Usage (Last 30 Days)</h6>
+                            <canvas id="usageChart" height="250"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="portal-card p-4 mb-4">
+                            <h6 class="mb-3"><i class="bi bi-pie-chart me-2"></i>Usage Summary</h6>
+                            <?php
+                            $totalDownload = 0;
+                            $totalUpload = 0;
+                            $totalSessions = 0;
+                            foreach ($usageHistory as $u) {
+                                $totalDownload += (float)($u['download_mb'] ?? 0);
+                                $totalUpload += (float)($u['upload_mb'] ?? 0);
+                                $totalSessions += (int)($u['session_count'] ?? 0);
+                            }
+                            ?>
+                            <div class="mb-3">
+                                <small class="text-muted">Total Download</small>
+                                <div class="fs-4 fw-bold text-primary"><?= number_format($totalDownload / 1024, 2) ?> GB</div>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">Total Upload</small>
+                                <div class="fs-4 fw-bold text-success"><?= number_format($totalUpload / 1024, 2) ?> GB</div>
+                            </div>
+                            <div>
+                                <small class="text-muted">Total Sessions</small>
+                                <div class="fs-4 fw-bold"><?= number_format($totalSessions) ?></div>
+                            </div>
+                        </div>
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-list me-2"></i>Daily Breakdown</h6>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm mb-0">
+                                    <thead class="sticky-top bg-white">
+                                        <tr><th>Date</th><th>Down</th><th>Up</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach (array_slice($usageHistory, 0, 14) as $u): ?>
+                                        <tr>
+                                            <td><?= date('M j', strtotime($u['log_date'])) ?></td>
+                                            <td><?= number_format(($u['download_mb'] ?? 0) / 1024, 2) ?> GB</td>
+                                            <td><?= number_format(($u['upload_mb'] ?? 0) / 1024, 2) ?> GB</td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (empty($usageHistory)): ?>
+                                        <tr><td colspan="3" class="text-center text-muted">No usage data yet</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -885,70 +1027,117 @@ if (isset($_SESSION['portal_subscription_id'])) {
             <?php if ($tr069DeviceId): ?>
             <div class="tab-pane fade" id="wifi">
                 <div class="row g-4">
-                    <div class="col-md-6">
-                        <div class="portal-card p-4">
-                            <div class="text-center mb-4">
-                                <i class="bi bi-wifi" style="font-size: 48px; color: #667eea;"></i>
-                                <h5 class="mt-3">WiFi Settings</h5>
-                                <p class="text-muted">Change your WiFi name and password</p>
-                            </div>
-                            <form method="post">
-                                <input type="hidden" name="action" value="update_wifi">
-                                <div class="mb-3">
-                                    <label class="form-label">WiFi Band</label>
-                                    <select name="wifi_band" class="form-select">
-                                        <option value="2.4">2.4 GHz</option>
-                                        <option value="5">5 GHz</option>
-                                    </select>
-                                    <small class="text-muted">Select which WiFi band to configure</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">New WiFi Name (SSID)</label>
-                                    <input type="text" name="wifi_ssid" class="form-control" 
-                                           placeholder="Enter new WiFi name" maxlength="32">
-                                    <small class="text-muted">Leave empty to keep current name</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">New WiFi Password</label>
-                                    <div class="input-group">
-                                        <input type="password" name="wifi_password" id="wifi_password" 
-                                               class="form-control" placeholder="Enter new password" 
-                                               minlength="8" maxlength="63">
-                                        <button type="button" class="btn btn-outline-secondary" 
-                                                onclick="toggleWifiPassword()">
-                                            <i class="bi bi-eye" id="wifi_eye_icon"></i>
-                                        </button>
-                                    </div>
-                                    <small class="text-muted">Minimum 8 characters. Leave empty to keep current password.</small>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">
-                                    <i class="bi bi-check-circle me-2"></i>Update WiFi Settings
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="portal-card p-4">
-                            <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>Your Device Info</h6>
-                            <table class="table table-sm">
-                                <tr><td class="text-muted">Device</td><td><?= htmlspecialchars($customerOnu['name'] ?? 'ONU') ?></td></tr>
-                                <tr><td class="text-muted">Serial Number</td><td><code><?= htmlspecialchars($customerOnu['sn'] ?? 'N/A') ?></code></td></tr>
+                    <div class="col-lg-4">
+                        <div class="portal-card p-4 mb-4">
+                            <h6 class="mb-3"><i class="bi bi-router me-2"></i>Device Info</h6>
+                            <table class="table table-sm mb-0">
+                                <tr><td class="text-muted" width="40%">Device</td><td><?= htmlspecialchars($customerOnu['name'] ?? 'ONU') ?></td></tr>
                                 <tr><td class="text-muted">Model</td><td><?= htmlspecialchars($customerOnu['onu_type'] ?? 'N/A') ?></td></tr>
                                 <tr><td class="text-muted">Status</td><td>
                                     <span class="badge bg-<?= ($customerOnu['status'] ?? '') === 'online' ? 'success' : 'secondary' ?>">
                                         <?= ucfirst($customerOnu['status'] ?? 'Unknown') ?>
                                     </span>
                                 </td></tr>
+                                <?php if (!empty($customerOnu['rx_power'])): ?>
+                                <tr><td class="text-muted">Signal</td><td>
+                                    <?php 
+                                    $rxPower = (float)$customerOnu['rx_power'];
+                                    $signalClass = $rxPower > -25 ? 'success' : ($rxPower > -28 ? 'warning' : 'danger');
+                                    ?>
+                                    <span class="badge bg-<?= $signalClass ?>"><?= $rxPower ?> dBm</span>
+                                </td></tr>
+                                <?php endif; ?>
                             </table>
+                            <hr>
+                            <form method="post" onsubmit="return confirm('This will restart your router. Your internet will be offline for about 2 minutes. Continue?')">
+                                <input type="hidden" name="action" value="reboot_device">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                <button type="submit" class="btn btn-outline-warning w-100">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>Restart Device
+                                </button>
+                            </form>
+                            <small class="text-muted d-block mt-2 text-center">Use if experiencing slow speeds or connectivity issues</small>
+                        </div>
+                        
+                        <?php if (!empty($wifiSettings)): ?>
+                        <div class="portal-card p-4">
+                            <h6 class="mb-3"><i class="bi bi-wifi me-2"></i>Current WiFi Networks</h6>
+                            <?php 
+                            $bands = ['2.4 GHz' => [1, 2], '5 GHz' => [5, 6]];
+                            foreach ($bands as $bandName => $indices):
+                                foreach ($indices as $idx):
+                                    if (!isset($wifiSettings[$idx]) || empty($wifiSettings[$idx]['SSID'])) continue;
+                                    $wifi = $wifiSettings[$idx];
+                                    $enabled = ($wifi['Enable'] ?? '') === '1' || ($wifi['Enable'] ?? '') === true;
+                            ?>
+                            <div class="card bg-light mb-2">
+                                <div class="card-body py-2 px-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-wifi text-primary me-2"></i>
+                                            <strong><?= htmlspecialchars($wifi['SSID']) ?></strong>
+                                        </div>
+                                        <span class="badge bg-<?= $enabled ? 'success' : 'secondary' ?>"><?= $bandName ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="col-lg-8">
+                        <div class="portal-card p-4">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-wifi" style="font-size: 48px; color: #667eea;"></i>
+                                <h5 class="mt-3">Change WiFi Settings</h5>
+                                <p class="text-muted">Update your WiFi name or password</p>
+                            </div>
+                            <form method="post">
+                                <input type="hidden" name="action" value="update_wifi">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">WiFi Band</label>
+                                        <select name="wifi_band" class="form-select" id="wifiBandSelect">
+                                            <option value="2.4">2.4 GHz (Better range)</option>
+                                            <option value="5">5 GHz (Faster speed)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">New WiFi Name (SSID)</label>
+                                        <input type="text" name="wifi_ssid" class="form-control" 
+                                               placeholder="<?= htmlspecialchars(!empty($wifiSettings[1]['SSID']) ? $wifiSettings[1]['SSID'] : 'Enter new name') ?>" maxlength="32">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">New WiFi Password</label>
+                                    <div class="input-group">
+                                        <input type="password" name="wifi_password" id="wifi_password" 
+                                               class="form-control" placeholder="Enter new password (min 8 characters)" 
+                                               minlength="8" maxlength="63">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="toggleWifiPassword()">
+                                            <i class="bi bi-eye" id="wifi_eye_icon"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" onclick="generatePassword()">
+                                            <i class="bi bi-shuffle"></i> Generate
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Leave empty to keep current password</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100 btn-lg">
+                                    <i class="bi bi-check-circle me-2"></i>Update WiFi Settings
+                                </button>
+                            </form>
                             
-                            <div class="alert alert-info mt-4">
+                            <div class="alert alert-info mt-4 mb-0">
                                 <i class="bi bi-lightbulb me-2"></i>
                                 <strong>Tips:</strong>
                                 <ul class="mb-0 mt-2 ps-3">
                                     <li>Changes take 1-2 minutes to apply</li>
-                                    <li>Use a strong password with letters, numbers &amp; symbols</li>
-                                    <li>Reconnect your devices after changing WiFi settings</li>
-                                    <li>5 GHz is faster but has shorter range</li>
+                                    <li>You'll need to reconnect all your devices with the new password</li>
+                                    <li>Use 5 GHz for streaming and gaming (shorter range but faster)</li>
+                                    <li>Use 2.4 GHz for devices far from the router</li>
                                 </ul>
                             </div>
                         </div>
@@ -1007,6 +1196,18 @@ if (isset($_SESSION['portal_subscription_id'])) {
         }
     }
     
+    function generatePassword() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+        let password = '';
+        for (let i = 0; i < 12; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const input = document.getElementById('wifi_password');
+        input.value = password;
+        input.type = 'text';
+        document.getElementById('wifi_eye_icon').classList.replace('bi-eye', 'bi-eye-slash');
+    }
+    
     const routerIp = '<?= htmlspecialchars($routerIp ?? '') ?>';
     let routerFrameLoaded = false;
     
@@ -1063,6 +1264,54 @@ if (isset($_SESSION['portal_subscription_id'])) {
             routerTab.addEventListener('shown.bs.tab', function() {
                 if (!routerFrameLoaded) {
                     loadRouterFrame();
+                }
+            });
+        }
+        
+        // Initialize usage chart
+        const usageChartEl = document.getElementById('usageChart');
+        if (usageChartEl) {
+            const usageData = <?= json_encode(array_reverse($usageHistory)) ?>;
+            const labels = usageData.map(u => {
+                const d = new Date(u.log_date);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const downloadData = usageData.map(u => (parseFloat(u.download_mb || 0) / 1024).toFixed(2));
+            const uploadData = usageData.map(u => (parseFloat(u.upload_mb || 0) / 1024).toFixed(2));
+            
+            new Chart(usageChartEl, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Download (GB)',
+                            data: downloadData,
+                            backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Upload (GB)',
+                            data: uploadData,
+                            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Data (GB)' }
+                        }
+                    }
                 }
             });
         }
