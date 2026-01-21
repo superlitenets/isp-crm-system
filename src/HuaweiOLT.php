@@ -6708,41 +6708,29 @@ class HuaweiOLT {
         $port = $onu['port'];
         $onuId = $onu['onu_id'];
         
-        // Auto-detect TR-069 VLAN if not provided
-        if (!$tr069Vlan) {
-            $tr069Vlan = $this->getTR069VlanForOlt($oltId);
-        }
-        if (!$tr069Vlan) {
-            return ['success' => false, 'message' => 'No TR-069 VLAN found. Mark a VLAN as TR-069 in OLT VLANs or specify manually.'];
-        }
-        
         $output = '';
         $errors = [];
         
-        // Helper to check for real errors (ignoring "already configured" messages)
-        $hasRealError = function($output) {
-            if (empty($output)) return false;
-            // Ignore "Make configuration repeatedly" - means already configured (OK)
-            // Ignore "already exists" - means already configured (OK)
-            if (preg_match('/Make configuration repeatedly|already exists|The data already exist/i', $output)) {
-                return false;
-            }
-            // Check for actual failures
-            return preg_match('/(?:Failure|Error:|failed|Invalid parameter|Unknown command)/i', $output);
-        };
-        
-        // Step 1: Create WAN with DHCP on TR-069 VLAN
-        // Syntax matches working ONU: ont ipconfig <port> <onuId> dhcp vlan <vlan> priority <priority>
-        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
-        $cmd1 .= "ont ipconfig {$port} {$onuId} dhcp vlan {$tr069Vlan} priority 2\r\n";
-        $cmd1 .= "quit";
-        $result1 = $this->executeCommand($oltId, $cmd1);
-        $output .= "[Step 1: WAN DHCP Config]\n" . ($result1['output'] ?? '') . "\n";
-        if (!$result1['success'] || $hasRealError($result1['output'] ?? '')) {
-            $errors[] = "WAN DHCP config failed";
+        // Get TR-069 profile ID from settings
+        $tr069ProfileId = $this->getTR069ProfileId();
+        if (!$tr069ProfileId) {
+            return ['success' => false, 'message' => 'No TR-069 profile ID configured in settings'];
         }
         
-        // Step 2: Restart ONU to apply VLAN binding
+        // Step 1: Bind ONU to TR-069 profile
+        $cmd1 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd1 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
+        $cmd1 .= "quit";
+        $result1 = $this->executeCommand($oltId, $cmd1);
+        $output .= "[Step 1: TR-069 Profile Binding]\n" . ($result1['output'] ?? '') . "\n";
+        
+        // Check for errors (ignore "already configured" messages)
+        $out1 = $result1['output'] ?? '';
+        if (!$result1['success'] || (preg_match('/Failure|Error:|failed|Invalid/i', $out1) && !preg_match('/already|repeatedly/i', $out1))) {
+            $errors[] = "TR-069 profile binding failed";
+        }
+        
+        // Step 2: Restart ONU to apply config
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
         $cmd2 .= "ont reset {$port} {$onuId}\r\n";
         $cmd2 .= "quit";
@@ -6751,7 +6739,7 @@ class HuaweiOLT {
         
         $success = empty($errors);
         $message = $success 
-            ? "TR-069 VLAN binding configured (VLAN: {$tr069Vlan}) and ONU restarted"
+            ? "TR-069 profile {$tr069ProfileId} bound and ONU restarted"
             : "TR-069 configuration failed: " . implode(', ', $errors);
         
         $this->addLog([
@@ -6767,7 +6755,7 @@ class HuaweiOLT {
         return [
             'success' => $success,
             'message' => $message,
-            'tr069_vlan' => $tr069Vlan,
+            'profile_id' => $tr069ProfileId,
             'errors' => $errors,
             'output' => $output
         ];
