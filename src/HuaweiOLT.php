@@ -6603,22 +6603,20 @@ class HuaweiOLT {
             $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Configure TR-069 server (profile or URL)
+        // Step 2: Configure TR-069 server (profile ID only - VLAN already configured)
         $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
         if ($tr069ProfileId) {
             $cmd2 .= "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}\r\n";
-        } elseif ($acsUrl) {
-            $cmd2 .= "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}\r\n";
-            $cmd2 .= "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval 300\r\n";
         }
-        // Clear ConnectionRequest credentials so GenieACS can summon without 401 errors
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} connection-request-username \"\"\r\n";
-        $cmd2 .= "ont tr069-server-config {$port} {$onuId} connection-request-password \"\"\r\n";
         $cmd2 .= "quit";
         $result2 = $this->executeCommand($oltId, $cmd2);
-        $output .= "[TR-069 Server Config]\n" . ($result2['output'] ?? '') . "\n";
-        if (!$result2['success'] || $hasRealError($result2['output'] ?? '')) {
-            $errors[] = "TR-069 server config failed";
+        $output .= "[TR-069 Profile Binding]\n" . ($result2['output'] ?? '') . "\n";
+        // Only check for real errors, ignore "already configured" type messages
+        $out2 = $result2['output'] ?? '';
+        if (!$result2['success'] || (preg_match('/Failure|failed|Invalid/i', $out2) && !preg_match('/already|repeatedly|success/i', $out2))) {
+            if ($tr069ProfileId) {
+                $errors[] = "TR-069 profile binding failed";
+            }
         }
         
         // Step 3: Create service-port for TR-069 VLAN
