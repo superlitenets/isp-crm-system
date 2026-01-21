@@ -7424,11 +7424,8 @@ $csrfToken = \App\Auth::generateToken();
                 }
                 break;
             case 'ticket-wallboard':
-                if (!\App\Auth::can('tickets.view')) {
-                    $accessDenied = true;
-                } else {
-                    include __DIR__ . '/../templates/ticket_wallboard.php';
-                }
+                include __DIR__ . '/../templates/ticket_wallboard.php';
+                exit; // Render standalone without layout
                 break;
             case 'tickets':
                 if (!\App\Auth::can('tickets.view')) {
