@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../src/RadiusBilling.php';
 require_once __DIR__ . '/../../src/Mpesa.php';
 require_once __DIR__ . '/../../src/GenieACS.php';
+require_once __DIR__ . '/../../src/Settings.php';
+require_once __DIR__ . '/../../src/SMSGateway.php';
 
 try {
     $db = Database::getConnection();
@@ -82,8 +84,6 @@ if (!isset($_SESSION['portal_subscription_id'])) {
         $_SESSION['portal_client_ip'] = $clientIp;
     }
 }
-
-require_once __DIR__ . '/../../src/SMSGateway.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
