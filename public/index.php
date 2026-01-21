@@ -6901,6 +6901,12 @@ $csrfToken = \App\Auth::generateToken();
         .stat-card:hover {
             transform: translateY(-5px);
         }
+        .stat-card-clickable {
+            cursor: pointer;
+        }
+        .stat-card-clickable:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
         .stat-card .stat-icon {
             width: 60px;
             height: 60px;

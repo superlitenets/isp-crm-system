@@ -17,75 +17,87 @@ $dashboardStats = $ticket->getStats($userFilterId);
 
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-ticket"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $dashboardStats['total'] ?? 0 ?></h3>
-                    <small class="text-muted">Total Tickets</small>
+        <a href="?page=tickets" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
+                        <i class="bi bi-ticket"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $dashboardStats['total'] ?? 0 ?></h3>
+                        <small class="text-muted">Total Tickets</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
-                    <i class="bi bi-exclamation-circle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $dashboardStats['open'] ?? 0 ?></h3>
-                    <small class="text-muted">Open Tickets</small>
+        <a href="?page=tickets&status=open" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $dashboardStats['open'] ?? 0 ?></h3>
+                        <small class="text-muted">Open Tickets</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-info bg-opacity-10 text-info me-3">
-                    <i class="bi bi-arrow-repeat"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $dashboardStats['in_progress'] ?? 0 ?></h3>
-                    <small class="text-muted">In Progress</small>
+        <a href="?page=tickets&status=in_progress" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-info bg-opacity-10 text-info me-3">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $dashboardStats['in_progress'] ?? 0 ?></h3>
+                        <small class="text-muted">In Progress</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $dashboardStats['resolved'] ?? 0 ?></h3>
-                    <small class="text-muted">Resolved</small>
+        <a href="?page=tickets&status=resolved" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $dashboardStats['resolved'] ?? 0 ?></h3>
+                        <small class="text-muted">Resolved</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="card stat-card border-danger">
-            <div class="card-body text-center">
-                <h4 class="text-danger mb-0"><?= $dashboardStats['critical'] ?? 0 ?></h4>
-                <small class="text-muted">Critical Priority</small>
+        <a href="?page=tickets&priority=critical" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable border-danger">
+                <div class="card-body text-center">
+                    <h4 class="text-danger mb-0"><?= $dashboardStats['critical'] ?? 0 ?></h4>
+                    <small class="text-muted">Critical Priority</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card border-warning">
-            <div class="card-body text-center">
-                <h4 class="text-warning mb-0"><?= $dashboardStats['high'] ?? 0 ?></h4>
-                <small class="text-muted">High Priority</small>
+        <a href="?page=tickets&priority=high" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable border-warning">
+                <div class="card-body text-center">
+                    <h4 class="text-warning mb-0"><?= $dashboardStats['high'] ?? 0 ?></h4>
+                    <small class="text-muted">High Priority</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-6">
         <div class="card stat-card">
@@ -113,56 +125,64 @@ $atRiskTickets = $sla->getAtRiskTickets($userFilterId);
 ?>
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
-                    <i class="bi bi-speedometer2"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $slaStats['response_compliance'] ?>%</h3>
-                    <small class="text-muted">Response SLA</small>
+        <a href="?page=reports&view=sla" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
+                        <i class="bi bi-speedometer2"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $slaStats['response_compliance'] ?>%</h3>
+                        <small class="text-muted">Response SLA</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= $slaStats['resolution_compliance'] ?>%</h3>
-                    <small class="text-muted">Resolution SLA</small>
+        <a href="?page=reports&view=sla" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= $slaStats['resolution_compliance'] ?>%</h3>
+                        <small class="text-muted">Resolution SLA</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card border-danger">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-danger bg-opacity-10 text-danger me-3">
-                    <i class="bi bi-x-circle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= count($breachedTickets) ?></h3>
-                    <small class="text-muted">SLA Breached</small>
+        <a href="?page=tickets&sla=breached" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable border-danger">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-danger bg-opacity-10 text-danger me-3">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= count($breachedTickets) ?></h3>
+                        <small class="text-muted">SLA Breached</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card border-warning">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
-                    <i class="bi bi-exclamation-triangle"></i>
-                </div>
-                <div>
-                    <h3 class="mb-0"><?= count($atRiskTickets) ?></h3>
-                    <small class="text-muted">At Risk</small>
+        <a href="?page=tickets&sla=at_risk" class="text-decoration-none">
+            <div class="card stat-card stat-card-clickable border-warning">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0 text-dark"><?= count($atRiskTickets) ?></h3>
+                        <small class="text-muted">At Risk</small>
+                    </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
