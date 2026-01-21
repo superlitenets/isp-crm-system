@@ -6716,27 +6716,7 @@ class HuaweiOLT {
             return ['success' => false, 'message' => 'No TR-069 VLAN found. Mark a VLAN as TR-069 in OLT VLANs or specify manually.'];
         }
         
-        // ACS URL is optional - if not provided, we only configure VLAN binding
-        $pushAcsUrl = false;
-        if (!$acsUrl) {
-            $acsUrl = $this->getTR069AcsUrl();
-        }
-        if ($acsUrl) {
-            $pushAcsUrl = true;
-        }
-        
-        // Get periodic interval from settings
-        $periodicInterval = 300;
-        try {
-            $stmt = $this->db->query("SELECT setting_value FROM settings WHERE setting_key = 'tr069_periodic_interval'");
-            $interval = $stmt->fetchColumn();
-            if ($interval) {
-                $periodicInterval = (int)$interval;
-            }
-        } catch (\Exception $e) {}
-        
         $output = '';
-        $interfaceCmd = "interface gpon {$frame}/{$slot}";
         $errors = [];
         
         // Helper to check for real errors (ignoring "already configured" messages)
@@ -6762,75 +6742,17 @@ class HuaweiOLT {
             $errors[] = "WAN DHCP config failed";
         }
         
-        // Step 2: Push TR-069 server config
-        // Priority: Profile ID > ACS URL > Skip
-        $configFailed = false;
-        $tr069ProfileId = $this->getTR069ProfileId();
-        
-        if ($tr069ProfileId) {
-            // Use profile-id (preferred method - profile is pre-configured on OLT)
-            // This binds the ONU to the TR-069 profile without sending ACS URL via OMCI
-            $cmd2a = "interface gpon {$frame}/{$slot}";
-            $result2a = $this->executeCommand($oltId, $cmd2a);
-            $output .= "[Step 2a: Enter GPON Interface]\n" . ($result2a['output'] ?? '') . "\n";
-            
-            $cmd2b = "ont tr069-server-config {$port} {$onuId} profile-id {$tr069ProfileId}";
-            $result2b = $this->executeCommand($oltId, $cmd2b);
-            $output .= "[Step 2b: TR-069 Profile ID {$tr069ProfileId}]\n" . ($result2b['output'] ?? '') . "\n";
-            $configFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
-            
-            $cmd2d = "quit";
-            $this->executeCommand($oltId, $cmd2d);
-            
-            if ($configFailed) {
-                $errors[] = "TR-069 profile config failed";
-            }
-        } elseif ($pushAcsUrl) {
-            // Fallback: ACS URL command directly (only if no profile ID configured)
-            $cmd2a = "interface gpon {$frame}/{$slot}";
-            $result2a = $this->executeCommand($oltId, $cmd2a);
-            $output .= "[Step 2a: Enter GPON Interface]\n" . ($result2a['output'] ?? '') . "\n";
-            
-            $cmd2b = "ont tr069-server-config {$port} {$onuId} acs-url {$acsUrl}";
-            $result2b = $this->executeCommand($oltId, $cmd2b);
-            $output .= "[Step 2b: ACS URL Config]\n" . ($result2b['output'] ?? '') . "\n";
-            $configFailed = !$result2b['success'] || $hasRealError($result2b['output'] ?? '');
-            
-            // Periodic inform command (only needed when using acs-url, profile has this built-in)
-            $cmd2c = "ont tr069-server-config {$port} {$onuId} periodic-inform enable interval {$periodicInterval}";
-            $result2c = $this->executeCommand($oltId, $cmd2c);
-            $output .= "[Step 2c: Periodic Inform Config]\n" . ($result2c['output'] ?? '') . "\n";
-            if ($hasRealError($result2c['output'] ?? '')) {
-                $configFailed = true;
-            }
-            
-            $cmd2d = "quit";
-            $this->executeCommand($oltId, $cmd2d);
-            
-            if ($configFailed) {
-                $errors[] = "ACS URL config failed";
-            }
-        } else {
-            $output .= "[Step 2: Skipped - VLAN binding only, no profile/ACS configured]\n";
-        }
-        
-        // Step 3: Create service-port for TR-069 (use tagged VLAN to match ONU's TR-069 traffic)
-        // TR-069 uses traffic-table index 7 (management traffic)
-        // Service port already exists from authorization - skip this step (it's not an error)
-        $cmd3 = "service-port vlan {$tr069Vlan} gpon {$frame}/{$slot}/{$port} ont {$onuId} gemport {$gemPort} multi-service user-vlan {$tr069Vlan} tag-transform translate inbound traffic-table index 7 outbound traffic-table index 7";
-        $result3 = $this->executeCommand($oltId, $cmd3);
-        $output .= "[Step 3: Service Port]\n" . ($result3['output'] ?? '') . "\n";
-        // Ignore "already exist" - means service port is already configured from authorization
-        if (!$result3['success'] || $hasRealError($result3['output'] ?? '')) {
-            if (!preg_match('/already exist|Conflicted service/i', $result3['output'] ?? '')) {
-                $errors[] = "Service port creation failed";
-            }
-        }
+        // Step 2: Restart ONU to apply VLAN binding
+        $cmd2 = "interface gpon {$frame}/{$slot}\r\n";
+        $cmd2 .= "ont reset {$port} {$onuId}\r\n";
+        $cmd2 .= "quit";
+        $result2 = $this->executeCommand($oltId, $cmd2);
+        $output .= "[Step 2: ONU Restart]\n" . ($result2['output'] ?? '') . "\n";
         
         $success = empty($errors);
         $message = $success 
-            ? "TR-069 configured successfully (VLAN: {$tr069Vlan}, ACS: {$acsUrl})"
-            : "TR-069 configuration partially failed: " . implode(', ', $errors);
+            ? "TR-069 VLAN binding configured (VLAN: {$tr069Vlan}) and ONU restarted"
+            : "TR-069 configuration failed: " . implode(', ', $errors);
         
         $this->addLog([
             'olt_id' => $oltId,
@@ -6846,7 +6768,6 @@ class HuaweiOLT {
             'success' => $success,
             'message' => $message,
             'tr069_vlan' => $tr069Vlan,
-            'acs_url' => $acsUrl,
             'errors' => $errors,
             'output' => $output
         ];
