@@ -6202,13 +6202,7 @@ class HuaweiOLT {
             
             if ($tr069ProfileId) {
                 $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} profile-id {$tr069ProfileId}\r\n";
-            } elseif ($acsUrl) {
-                $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} acs-url {$acsUrl}\r\n";
-                $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} periodic-inform enable interval 300\r\n";
             }
-            // Clear ConnectionRequest credentials so GenieACS can summon without 401 errors
-            $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} connection-request-username \"\"\r\n";
-            $batchScript .= "ont tr069-server-config {$port} {$assignedOnuId} connection-request-password \"\"\r\n";
             $batchScript .= "quit\r\n";
             
             // Service-port for TR-069 VLAN
