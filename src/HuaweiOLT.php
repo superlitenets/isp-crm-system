@@ -6938,7 +6938,7 @@ class HuaweiOLT {
      * @param int $vlanId VLAN to use for bridging (native VLAN on all ports)
      * @return array Result with success/message
      */
-    public function configureBridgeMode(int $onuDbId, int $vlanId = 902): array {
+    public function configureBridgeMode(int $onuDbId, ?int $vlanId = null): array {
         $onu = $this->getONU($onuDbId);
         if (!$onu) {
             return ['success' => false, 'message' => 'ONU not found'];
@@ -6946,6 +6946,15 @@ class HuaweiOLT {
         
         if (!$onu['is_authorized'] || $onu['onu_id'] === null) {
             return ['success' => false, 'message' => 'ONU must be authorized first'];
+        }
+        
+        // Use provided VLAN, or get from ONU's attached service port VLAN
+        if ($vlanId === null || $vlanId === 0) {
+            $vlanId = !empty($onu['vlan_id']) ? (int)$onu['vlan_id'] : null;
+        }
+        
+        if (!$vlanId) {
+            return ['success' => false, 'message' => 'No service VLAN found. Attach a VLAN first before configuring bridge mode.'];
         }
         
         $oltId = $onu['olt_id'];

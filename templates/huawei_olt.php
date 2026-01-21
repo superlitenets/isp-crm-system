@@ -1927,7 +1927,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
                         $db->prepare("UPDATE huawei_onus SET onu_mode = ? WHERE id = ?")->execute(['bridge', $onuId]);
                         
                         // Configure all LAN ports as bridged via OMCI (native VLAN on all ports)
-                        $bridgeVlan = $vlanId ?: $serviceVlan ?: 902;
+                        $bridgeVlan = null; // Will use attached service VLAN from ONU record
                         $bridgeResult = $huaweiOLT->configureBridgeMode($onuId, $bridgeVlan);
                         if ($bridgeResult['success']) {
                             $message .= ' Bridge mode configured.';
