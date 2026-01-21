@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../src/Mpesa.php';
 require_once __DIR__ . '/../../src/GenieACS.php';
 require_once __DIR__ . '/../../src/Settings.php';
 require_once __DIR__ . '/../../src/SMSGateway.php';
+require_once __DIR__ . '/../../src/WhatsApp.php';
 
 try {
     $db = Database::getConnection();
@@ -155,26 +156,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
                     $expiresAt = date('Y-m-d H:i:s', strtotime('+5 minutes'));
+                    $otpMessage = "Your ISP Portal verification code is: $otp\n\nValid for 5 minutes. Do not share this code.";
+                    $smsPhone = $sub['customer_phone'];
+                    $sentVia = [];
+                    
+                    try {
+                        $whatsapp = new \App\WhatsApp();
+                        if ($whatsapp->isEnabled() && $whatsapp->isApiConfigured()) {
+                            $waResult = $whatsapp->sendMessage($smsPhone, $otpMessage);
+                            if (isset($waResult['success']) && $waResult['success'] === true) {
+                                $sentVia[] = 'WhatsApp';
+                            }
+                        } elseif ($whatsapp->isEnabled() && $whatsapp->getProvider() === 'web') {
+                            $waResult = $whatsapp->sendMessage($smsPhone, $otpMessage);
+                            if (isset($waResult['success']) && $waResult['success'] === true) {
+                                $sentVia[] = 'WhatsApp';
+                            }
+                        }
+                    } catch (Exception $e) {
+                        error_log("Portal OTP WhatsApp error: " . $e->getMessage());
+                    }
                     
                     try {
                         $sms = new \App\SMSGateway();
                         if ($sms->isEnabled()) {
-                            $smsPhone = $sub['customer_phone'];
-                            $sms->send($smsPhone, "Your ISP Portal verification code is: $otp. Valid for 5 minutes.");
-                            
-                            $stmt = $db->prepare("INSERT INTO portal_otp (phone, code, expires_at) VALUES (?, ?, ?)");
-                            $stmt->execute([$normalizedPhone, $otp, $expiresAt]);
-                            
-                            $_SESSION['pending_otp_phone'] = $normalizedPhone;
-                            $_SESSION['pending_otp_subscription'] = $sub['id'];
-                            $message = 'Verification code sent to your phone. Enter it below.';
-                            $messageType = 'success';
-                        } else {
-                            $message = 'SMS service not configured. Please contact support or use password login.';
-                            $messageType = 'danger';
+                            $result = $sms->send($smsPhone, $otpMessage);
+                            if ($result !== false) {
+                                $sentVia[] = 'SMS';
+                            }
                         }
                     } catch (Exception $e) {
-                        $message = 'Failed to send SMS: ' . $e->getMessage();
+                        error_log("Portal OTP SMS error: " . $e->getMessage());
+                    }
+                    
+                    if (!empty($sentVia)) {
+                        $stmt = $db->prepare("INSERT INTO portal_otp (phone, code, expires_at) VALUES (?, ?, ?)");
+                        $stmt->execute([$normalizedPhone, $otp, $expiresAt]);
+                        
+                        $_SESSION['pending_otp_phone'] = $normalizedPhone;
+                        $_SESSION['pending_otp_subscription'] = $sub['id'];
+                        $message = 'Verification code sent via ' . implode(' and ', $sentVia) . '. Enter it below.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Could not send verification code. Please contact support or use password login.';
                         $messageType = 'danger';
                     }
                 } else {
