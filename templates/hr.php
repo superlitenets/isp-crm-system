@@ -328,7 +328,7 @@ try {
         SELECT 
             COUNT(*) FILTER (WHERE clock_in IS NOT NULL) as days_present,
             COALESCE(SUM(hours_worked), 0) as total_hours,
-            COUNT(*) FILTER (WHERE status = 'late' OR is_late = true) as late_days
+            COUNT(*) FILTER (WHERE status = 'late' OR late_minutes > 0) as late_days
         FROM attendance 
         WHERE employee_id = ? 
         AND date >= DATE_TRUNC('month', CURRENT_DATE)
@@ -338,11 +338,11 @@ try {
     
     // Get salary advances this month
     $advanceStmt = $statsDb->prepare("
-        SELECT COALESCE(SUM(amount), 0) as total_advances, COUNT(*) as advance_count
+        SELECT COALESCE(SUM(approved_amount), 0) as total_advances, COUNT(*) as advance_count
         FROM salary_advances 
         WHERE employee_id = ? 
         AND status = 'approved'
-        AND request_date >= DATE_TRUNC('month', CURRENT_DATE)
+        AND requested_at >= DATE_TRUNC('month', CURRENT_DATE)
     ");
     $advanceStmt->execute([$employeeData['id']]);
     $advanceStats = $advanceStmt->fetch(PDO::FETCH_ASSOC) ?: ['total_advances' => 0, 'advance_count' => 0];
